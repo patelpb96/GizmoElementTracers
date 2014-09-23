@@ -14,11 +14,6 @@ import yt.analysis_modules.halo_finding.api as halo_io    #@UnresolvedImport
 #import yt.analysis_modules.halo_merger_tree.api as tree_io    #@UnresolvedImport
 from utilities import utility as ut
 
-AGORA_DIRECTORY = '/Users/awetzel/work/research/simulation/AGORA/18hMpc_level-10/'
-SNAPSHOT_FINAL_DIRECTORY = AGORA_DIRECTORY + 'DD0320/'
-SNAPSHOT_INITIAL_DIRECTORY = AGORA_DIRECTORY + 'DD0000/'
-
-
 # relatively isolated halos with M_vir ~ 2e11 M_sun
 # AGORA uses 473
 halo_ids = np.array([414, 415, 417, 438, 439, 457, 466, 468, 473, 497, 499, 503])
@@ -30,10 +25,15 @@ halo_ids = np.array([414, 415, 417, 438, 439, 457, 466, 468, 473, 497, 499, 503]
 class InitialConditionClass(ut.io.SayClass):
     '''
     '''
-    def __init__(self):
+    def __init__(self, agora_dir='/Users/awetzel/work/research/simulation/AGORA/18hMpc_level-10/',
+                 snapshot_final_dir='DD0320/', snapshot_initial_dir='DD0000/'):
+
+        self.agora_directory = agora_dir
+        self.snapshot_final_directory = self.agora_directory + snapshot_final_dir
+        self.snapshot_initial_directory = self.agora_directory + snapshot_initial_dir
         self.snapshot = []
-        self.snapshot.append(yt.mods.load(SNAPSHOT_FINAL_DIRECTORY + 'data0320'))
-        self.snapshot.append(yt.mods.load(SNAPSHOT_INITIAL_DIRECTORY + 'data0000'))
+        self.snapshot.append(yt.mods.load(self.snapshot_final_directory + 'data0320'))
+        self.snapshot.append(yt.mods.load(self.snapshot_initial_directory + 'data0000'))
 
         self.cube = []
         self.cube.append(self.snapshot[0].h.all_data())
@@ -49,7 +49,8 @@ class InitialConditionClass(ut.io.SayClass):
         '''
         .
         '''
-        self.halo = halo_io.LoadHaloes(self.snapshot[-1], SNAPSHOT_FINAL_DIRECTORY + 'MergerHalos')
+        self.halo = halo_io.LoadHaloes(self.snapshot[-1],
+                                       self.snapshot_final_directory + 'MergerHalos')
 
         self.hal = ut.array.DictClass()
         self.hal.snap = {}
@@ -141,8 +142,8 @@ class InitialConditionTestClass(ut.io.SayClass):
     '''
     def __init__(self):
         self.snapshot = []
-        self.snapshot.append(yt.mods.load(SNAPSHOT_FINAL_DIRECTORY + 'data0320'))
-        self.snapshot.append(yt.mods.load(SNAPSHOT_INITIAL_DIRECTORY + 'data0000'))
+        self.snapshot.append(yt.mods.load(self.snapshot_final_directory + 'data0320'))
+        self.snapshot.append(yt.mods.load(self.snapshot_initial_directory + 'data0000'))
 
         self.cube = []
         self.cube.append(self.snapshot[0].h.all_data())
@@ -158,7 +159,8 @@ class InitialConditionTestClass(ut.io.SayClass):
         '''
         .
         '''
-        self.halo = halo_io.LoadHaloes(self.snapshot[-1], SNAPSHOT_FINAL_DIRECTORY + 'MergerHalos')
+        self.halo = halo_io.LoadHaloes(self.snapshot[-1],
+                                       self.snapshot_final_directory + 'MergerHalos')
 
         self.hal = ut.array.DictClass()
         self.hal.snap = {}
