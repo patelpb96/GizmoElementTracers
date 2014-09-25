@@ -39,7 +39,7 @@ class GizmoClass(ut.io.SayClass):
             1 = dark matter at highest resolution,
             4 = stars
             5 = black hole for runs with
-            5 = DM at lower resolution for non-black hole runs
+            5 = DM at lower resolutions for non-black hole runs (all lower resolution levels)
             2 & 3 = DM at lower resolutions for cosmological
             2 = bulge & 3 = disk stars for non-cosmological
         snapshot file name base: string
@@ -213,7 +213,7 @@ class GizmoClass(ut.io.SayClass):
                     star_form_aexps[particle_index_lo:particle_index_hi] = \
                         input_struct[particle_type_name + 'StellarFormationTime']
                 if particle_type == 5:
-                    # black hole
+                    # black holes
                     bh_masses[particle_index_lo:particle_index_hi] = \
                         input_struct[particle_type_name + 'BH_Mass']
                     bh_dmdt[particle_index_lo:particle_index_hi] = \
@@ -230,7 +230,7 @@ class GizmoClass(ut.io.SayClass):
         masses *= 1e10 / header['hubble']    # {M_sun}
         if np.min(masses) < 1 or np.max(masses) > 1e10:
             self.say('unsure about particle mass units: read min, max = %.3f, %.3f' %
-                     np.min(masses), np.max(masses))
+                     (np.min(masses), np.max(masses)))
         vels *= np.sqrt(header['scale.factor'])    # from gadget's weird units to {km / s physical}
         if particle_type == 0:
             # gas
@@ -276,7 +276,7 @@ class GizmoClass(ut.io.SayClass):
                 'metal': metals
             }
         elif particle_type == 4:
-            # star
+            # stars
             part = {
                 'id': ids,    # star particles retain id of their origin gas particle
                 'position': poss,
@@ -289,15 +289,17 @@ class GizmoClass(ut.io.SayClass):
                 'form.time': star_form_aexps
             }
         elif particle_type == 5:
+            # black holes
             part = {
                 'id': ids,
                 'position': poss,
                 'velocity': vels,
                 'mass': masses,
                 'bh.mass': bh_masses,
-                'dmdt': bh_dmdt
+                'dm/dt': bh_dmdt
             }
         else:
+            # dark matter
             part = {
                 'id': ids,
                 'position': poss,
