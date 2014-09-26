@@ -257,8 +257,8 @@ class TestClass(ut.io.SayClass):
         pis_contam = pis_all[part['mass'] != masses_unique.min()]
 
         if cen_position is None:
-            cen_position = np.zeros(part.shape[1])
-            for dimen_i in xrange(part.shape[1]):
+            cen_position = np.zeros(part['position'].shape[1])
+            for dimen_i in xrange(part['position'].shape[1]):
                 cen_position[dimen_i] = np.median(part['position'][pis_hires, dimen_i])
 
         print('center position = %s' % cen_position)
