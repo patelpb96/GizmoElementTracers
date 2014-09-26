@@ -111,18 +111,31 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
         if np.isscalar(zis):
             zis = [zis]
 
-        self.part = [{'id': [], 'id-to-index': [], 'mass': [], 'position': []} for _ in zis]
+        self.part = ut.array.ListClass()
+        for _ in zis:
+            part_z = ut.array.DictClass()
+            part_z['id'] = []
+            part_z['id-to-index'] = []
+            part_z['mass'] = []
+            part_z['position'] = []
+            part_z.info = {}
+            part_z.info['box.length'] = self['box.length']
+            self.part.append(part_z)
+        self.part.info = {}
+        self.part.info['box.length'] = self['box.length']
 
         for zi in zis:
             # in yt, particle_index = id
             self.part[zi]['id'] = np.array(self.data[zi]['particle_index'], dtype=int32)
             if np.unique(self.part[zi]['id']).size != self.part[zi]['id'].size:
-                raise ValueError('partice ids not unique')
+                raise ValueError('partice ids are not unique')
+            del(self.data[zi]['particle_index'])
 
             ut.catalog.assign_id_to_index(self.part[zi], 'id', 0)
 
             self.part[zi]['mass'] = np.array(self.data[zi]['particle_mass'].in_units('Msun'),
                                              dtype=float32)    # {M_sun}
+            del(self.data[zi]['particle_mass'])
 
             self.part[zi]['position'] = np.zeros(
                 (self.part[zi]['id'].size, len(dimen_names)), dtype=np.float32)
@@ -130,6 +143,7 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
                 # {kpc comoving}
                 self.part[zi]['position'][:, dimen_i] = \
                     self.data[zi]['particle_position_' + dimen_name] * self.hal.info['box.length']
+                del(self.data[zi]['particle_position_' + dimen_name])
 
     def get_particles_around_halo(self, halo_index, distance_max, scale_vir=True):
         '''
@@ -220,7 +234,7 @@ class TestClass(ut.io.SayClass):
         pass
 
     def print_particle_contamination(self, part, cen_position=None, distance_lim=None,
-                                     distance_bin_num=20, scaling='lin', geometry='sphere'):
+                                     distance_bin_num=20, scaling='lin', geometry='cube'):
         '''
         Test lower resolution particle contamination around center.
 
@@ -234,14 +248,20 @@ class TestClass(ut.io.SayClass):
         '''
         if distance_lim is None:
             distance_lim = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
-        if cen_position is None:
-            cen_position = np.r_[[0.5 * part.info['box.length']] * 3]
 
         DistBin = ut.bin.DistanceBinClass(scaling, distance_lim, distance_bin_num)
 
         masses_unique = np.unique(part['mass'])
         pis_all = ut.array.arange_length(part['mass'])
+        pis_hires = pis_all[part['mass'] == masses_unique.min()]
         pis_contam = pis_all[part['mass'] != masses_unique.min()]
+
+        if cen_position is None:
+            cen_position = np.zeros(part.shape[1])
+            for dimen_i in xrange(part.shape[1]):
+                cen_position[dimen_i] = np.median(part['position'][pis_hires, dimen_i])
+
+        print('center position = %s' % cen_position)
 
         if geometry == 'sphere':
             distances, neig_pis = ut.neighbor.Neighbor.get_neighbors(
@@ -269,6 +289,6 @@ class TestClass(ut.io.SayClass):
             self.say('distance = [%.3f, %.3f], fraction = %.5f' %
                      (dist_bin_lim[0], dist_bin_lim[1], frac))
             if frac >= 1.0:
-                continue
+                break
 
 Test = TestClass()
