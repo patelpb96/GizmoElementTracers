@@ -72,7 +72,7 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
         '''
         self.halo = halo_io.LoadHaloes(self.snapshot[0],
                                        self.snapshot_final_directory + 'MergerHalos')
-        #self.halo = halo_analysis.HaloCatalog(self.snapshot[0],
+        #self.halo = halo_analysis.HaloCatalog(data_ds=self.snapshot[0],
         #                                      self.snapshot_final_directory + 'MergerHalos')
 
         self.hal = ut.array.DictClass()
@@ -114,6 +114,7 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
         self.part = [{'id': [], 'id-to-index': [], 'mass': [], 'position': []} for _ in zis]
 
         for zi in zis:
+            # in yt, particle_index = id
             self.part[zi]['id'] = np.array(self.data[zi]['particle_index'], dtype=int32)
             if np.unique(self.part[zi]['id']).size != self.part[zi]['id'].size:
                 raise ValueError('partice ids not unique')
@@ -130,17 +131,9 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
                 self.part[zi]['position'][:, dimen_i] = \
                     self.data[zi]['particle_position_' + dimen_name] * self.hal.info['box.length']
 
-    def get_particle_ids(self, zi=0):
+    def get_particles_around_halo(self, halo_index, distance_max, scale_vir=True):
         '''
-        Get ids of particles.
-
-        Note: in yt, index means id.
-        '''
-        return np.array(self.data[zi]['particle_index'], dtype=int32)
-
-    def get_particles_around_halo(self, halo_index, distance_max, scale_vir=False):
-        '''
-        Get indices of particles that are within distance_max of center of given halo.
+        Get ids of particles that are within distance_max of center of given halo.
 
         Parameters
         ----------
@@ -148,11 +141,10 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
         maximum distance {kpc comoving or in units of virial radius}: float
         whether to scale distance_max by virial radius
         '''
-        # convert distance_max to simulation units [0, 1)
         if scale_vir:
-            distance_max *= self.halo[halo_index].maximum_radius()
-        else:
-            distance_max /= self['box.length.comov']
+            distance_max *= self.hal['radius'][halo_index]
+        # convert distance_max to simulation units [0, 1)
+        distance_max /= self['box.length']
         sp = self.snapshot[0].h.sphere(self.halo[halo_index].center_of_mass(), distance_max)
 
         return np.array(sp['particle_index'], dtype=int32)
@@ -178,6 +170,47 @@ class AgoraClass(ut.array.DictClass, ut.io.SayClass):
         neig_distances /= self.hal['radius'][halo_index]
 
         return neig_distances, neig_indices
+
+    def print_ic_zoom_region_for_halo(
+        self, halo_index, refinement_num=1, distance_max=None, geometry='cube'):
+        '''
+        Print extent of lagrangian region at z_initial around given halo at z = 0.
+        Use rules of thumb from Onorbe et al.
+
+        Parameters
+        ----------
+        halo index: int
+        number of refinement levels beyond current level for zoom-in region: int
+        maximum distance want to be uncontaminated {kpc comoving}: float
+            if None, use R_vir
+        geometry of zoom-in lagrangian regon in initial conditions: string
+            options: cube, ellipsoid
+        '''
+        if not distance_max:
+            distance_max = self.hal['radius'][halo_index] * 1.2
+
+        if geometry == 'cube':
+            distance_max = (1.5 * refinement_num + 1) * distance_max
+        elif geometry == 'ellipsoid':
+            distance_max = (1.5 * refinement_num + 7) * distance_max
+
+        pids = self.get_particles_around_halo(halo_index, distance_max, scale_vir=False)
+        pis = self.part[1]['id-to-index'][pids]
+        poss = self.part[1]['position'][pis]
+        lims = np.zeros((poss.shape[1], 2))
+        wids = np.zeros(poss.shape[1])
+        for dimen_i in xrange(poss.shape[1]):
+            lims[dimen_i] = np.array(ut.array.get_limits(poss[:, dimen_i]))
+            wids[dimen_i] = lims[[dimen_i]].max() - lims[[dimen_i]].min()
+            self.say('dimension-%d: %s (%.3f) kpc, %s (%.8f) box length' %
+                     (dimen_i, ut.array.get_limits(lims[[dimen_i]], digit_num=3), wids[dimen_i],
+                      ut.array.get_limits(lims[[dimen_i]] / self['box.length'], digit_num=8),
+                      wids[dimen_i] / self['box.length']))
+        lims /= self['box.length']
+        wids /= self['box.length']
+        self.say('for MUSIC config file:')
+        self.say('  ref_offset = %.8f, %.8f, %.8f' % (lims[0, 0], lims[1, 0], lims[2, 0]))
+        self.say('  ref_extent = %.8f, %.8f, %.8f' % (wids[0], wids[1], wids[2]))
 
 
 class TestClass(ut.io.SayClass):
