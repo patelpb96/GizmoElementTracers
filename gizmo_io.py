@@ -36,7 +36,7 @@ class GizmoClass(ut.io.SayClass):
         particle kind: string or int
             options:
             0 = gas
-            1 = dark matter at highest resolution,
+            1 = dark matter hat highest resolution,
             4 = stars
             5 = black hole for runs with
             5 = DM at lower resolutions for non-black hole runs (all lower resolution levels)

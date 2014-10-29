@@ -5,11 +5,10 @@
 # system ----
 from __future__ import absolute_import, division, print_function
 import numpy as np
-from scipy import interpolate
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
+#from matplotlib.font_manager import FontProperties
 # local ----
-from utilities import utility as ut
+#from utilities import utility as ut
 
 
 def get_center_position_zoom(part, cen_pos=[0, 0, 0], radius_max=1e10):
