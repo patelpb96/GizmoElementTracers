@@ -1,5 +1,5 @@
 '''
-Read gadget/gizmo snapshots.
+Read gizmo/gadget snapshots.
 
 Masses in {M_sun}, positions in {kpc comoving}, distances & radii in {kpc physical}.
 
@@ -18,63 +18,92 @@ from utilities import cosmology
 
 class GizmoClass(ut.io.SayClass):
     '''
-    .
+    Read in gizmo/gadget snapshots.
     '''
-    def __init__(self):
-        self.dimension_num = 3
+    def __init__(self, int_dtype=np.int64, float_dtype=np.float64):
+        '''
+        Parameters
+        ----------
+        data type for particle int properties: dtype
+        data type for particle float properties: dtype
+        '''
+        self.int_dtype = int_dtype
+        self.float_dtype = float_dtype
+        self.dimension_num = 3    # number of spatial dimensions
 
     def read_snapshot(
-        self, directory, snapshot_index, particle_type, file_name_base='snapshot',
-        is_cosmological=True, use_four_character_number=False, get_header_only=False):
+        self, species_types, snapshot_index=441, directory='.', file_name_base='snapshot',
+        is_cosmological=True, use_four_character_index=False, get_header_only=False):
         '''
         Read simulation snapshot, return as dictionary.
 
         Parameters
         ----------
-        directory: string
-        snapshot index: int
-        particle kind: string or int
+        type[s] of particle species: string or int, or list thereof
             options:
             0 = gas
-            1 = dark matter hat highest resolution,
+            1 = dark matter at highest resolution
+            2 & 3 = dark matter at lower resolutions for cosmological
             4 = stars
-            5 = black hole for runs with
-            5 = DM at lower resolutions for non-black hole runs (all lower resolution levels)
-            2 & 3 = DM at lower resolutions for cosmological
+            5 = dark matter at lower res for non-black hole runs (all lower resolution levels)
+            5 = black holes, if runs contain thems
             2 = bulge & 3 = disk stars for non-cosmological
+        snapshot index: int
+        directory: string
         snapshot file name base: string
-        snapshot file extension: string
+        whether simulation is cosmological: boolean
+        whether to use four characters for snapshot index: boolean
+        whether to read only header: boolean
         '''
         part = {}    # null dictionary if nothing real to return
 
         file_extension = '.hdf5'
 
-        particle_type_dict = {
+        species_dict = {
             'gas': 0,
             'dark': 1,
-            'dark.1': 1,
             'dark.2': 2,
             'dark.3': 3,
-            'bulge': 2,
-            'disk': 3,
+            #'bulge': 2,
+            #'disk': 3,
             'star': 4,
-            'black.hole': 5
+            #'black.hole': 5
+            'dark.4': 5
         }
 
-        if isinstance(particle_type, str):
-            particle_type = particle_type_dict[particle_type]
+        # ensure is list even if just one species
+        if species_types == 'all' or species_types == ['all']:
+            species_types = species_dict.keys()
+        if np.isscalar(species_types):
+            species_types = [species_types]
 
-        if particle_type < 0 or particle_type > 5:
-            print('not recognize particle type = %d' % particle_type)
+        species_ids = []
+        for spec_type in species_types:
+            if isinstance(spec_type, str):
+                species_ids.append(species_dict[spec_type])
+            elif isinstance(spec_type, int):
+                species_ids.append(spec_type)
+            else:
+                raise ValueError('not recognize particle type = %s' % spec_type)
+
+        species_names = []
+        for spec_id in species_ids:
+            for spec_name in species_dict:
+                if species_dict[spec_name] == spec_id:
+                    species_names.append(spec_name)
+
+        if np.min(species_ids) < 0 or np.max(species_ids) > 5:
+            print('not recognize particle types = %s' % species_types)
             return part
 
         file_name, file_name_base, file_name_extension = self.get_file_name(
             directory, snapshot_index, file_name_base=file_name_base, file_extension=file_extension,
-            use_four_character_number=use_four_character_number)
+            use_four_character_index=use_four_character_index)
 
         if file_name == 'NULL':
             print('! cannot find file')
             return part
+
         print('loading file: ' + file_name)
 
         # open file and parse its header information
@@ -116,12 +145,23 @@ class GizmoClass(ut.io.SayClass):
             file_in.close()
             return header
 
-        if header['particle.numbers.total'][particle_type] <= 0:
+        # check that have some particles
+        part_number_min = 0
+        for spec_name in species_names:
+            spec_id = species_dict[spec_name]
+            if header['particle.numbers.total'][spec_id] <= 0:
+                self.say('no particles for species id = %s' % spec_id)
+                species_ids.remove(spec_id)
+                species_names.remove(spec_name)
+            else:
+                part_number_min = header['particle.numbers.total'][spec_id]
+        if part_number_min == 0:
             file_in.close()
             return part
 
+        # check if simulation is cosmological
         if is_cosmological:
-            # assume other cosmology parameters from AGORA
+            # assume that cosmology parameters not in header are from AGORA
             omega_baryon = 0.0455
             sigma_8 = 0.807
             n_s = 0.961
@@ -131,33 +171,85 @@ class GizmoClass(ut.io.SayClass):
                 sigma_8, n_s, w)
 
         # initialize variables to read
-        poss = np.zeros([header['particle.numbers.total'][particle_type], 3], dtype=float) - 1
-        vels = np.copy(poss)
-        ids = np.zeros([header['particle.numbers.total'][particle_type]], dtype=long) - 1
-        masses = np.zeros([header['particle.numbers.total'][particle_type]], dtype=float) - 1
-        if particle_type == 0:
-            # gas
-            gas_energies_internal = np.copy(masses)
-            gas_densities = np.copy(masses)
-            gas_smoothing_lengths = np.copy(masses)
-            if header['cooling.flag'] > 0:
-                gas_electron_fracs = np.copy(masses)
-                gas_neutral_hydrogen_fracs = np.copy(masses)
-            if header['sfr.flag'] > 0:
-                gas_sfrs = np.copy(masses)
-        if (particle_type == 0 or particle_type == 4) and header['metal.flag'] > 0:
-            # gas or stars
-            metals = np.zeros([header['particle.numbers.total'][particle_type],
-                               header['metal.flag']], dtype=float)
-        if particle_type == 4 and header['sfr.flag'] > 0 and header['star.age.flag'] > 0:
-            # stars
-            star_form_aexps = np.copy(masses)
-        if particle_type == 5:
-            # black holes
-            bh_masses = np.copy(masses)
-            bh_dmdt = np.copy(masses)
+        for spec_name in species_names:
+            spec_id = species_dict[spec_name]
 
-        particle_index_lo = 0    # initial particle point to start at
+            if spec_id == 0:
+                gas = {}
+                self.initialize_common_properties(gas, spec_id, header)
+                gas['energy.internal'] = np.copy(gas['mass'])    # {physical}
+                gas['density'] = np.copy(gas['mass'])    # {physical}
+                gas['smooth.length'] = np.copy(gas['mass'])
+                if header['cooling.flag']:
+                    # average free-electron number per proton (hydrogen nucleon),
+                    # averaged over mass of gas particle
+                    gas['electron.frac'] = np.copy(gas['mass'])
+                    # neutral hydrogen fraction
+                    gas['neutral.hydrogen.frac'] = np.copy(gas['mass'])
+                if header['sfr.flag']:
+                    gas['sfr'] = np.copy(gas['mass'])    # {M_sun / yr}
+                if header['metal.flag']:
+                    # metallicity {mass fraction} ('solar' would be ~0.02 in total metallicity)
+                    # element [i,n] gives the metallicity of the n-th species for the i-th particle
+                    # n = 0: "total" metal mass (everything not H, He)
+                    # n = 1: He
+                    # n = 2: C
+                    # n = 3: N
+                    # n = 4: O
+                    # n = 5: Ne
+                    # n = 6: Mg
+                    # n = 7: Si
+                    # n = 8: S
+                    # n = 9: Ca
+                    # n = 10: Fe
+                    gas['metal'] = np.zeros([header['particle.numbers.total'][spec_id],
+                                             header['metal.flag']], dtype=self.float_dtype)
+                part[spec_name] = gas
+
+            elif spec_id == 1:
+                dark = {}
+                self.initialize_common_properties(dark, spec_id, header)
+                part[spec_name] = dark
+
+            elif spec_id == 2:
+                dark2 = {}
+                self.initialize_common_properties(dark2, spec_id, header)
+                part[spec_name] = dark2
+
+            elif spec_id == 3:
+                dark3 = {}
+                self.initialize_common_properties(dark3, spec_id, header)
+                part[spec_name] = dark3
+
+            elif spec_id == 4:
+                star = {}
+                self.initialize_common_properties(star, spec_id, header)
+                # star particles retain id of their origin gas particle
+                if header['sfr.flag'] and header['star.age.flag']:
+                    # 'time' when the star particle formed
+                    # for cosmological runs this is the scale factor when star particle formed
+                    # for non-cosmological runs this is the time {Gyr / h} when star particle formed
+                    star['form.time'] = np.copy(star['mass'])
+                if header['metal.flag']:
+                    # inherited metallicity from gas particle
+                    star['metal'] = np.zeros([header['particle.numbers.total'][spec_id],
+                                              header['metal.flag']], dtype=self.float_dtype)
+                part[spec_name] = star
+
+            elif spec_id == 5:
+                # can be used for black holes or dark matter at lowest resolution
+                blackhole = {}
+                self.initialize_common_properties(blackhole, spec_id, header)
+                if spec_name == 'black.hole':
+                    blackhole['bh.mass'] = np.copy(blackhole['mass'])
+                    blackhole['dm/dt'] = np.copy(blackhole['mass'])
+                part[spec_name] = blackhole
+
+            else:
+                raise ValueError('not recognize species id = %d' % spec_id)
+
+        # initial particle indices[s] to start
+        part_indices_lo = np.zeros(len(species_ids), self.int_dtype)
 
         # loop over snapshot parts to get different data pieces
         for file_i in range(header['file.number.per.snapshot']):
@@ -167,218 +259,212 @@ class GizmoClass(ut.io.SayClass):
                 file_in = h5py.File(file_name, 'r')    # open hdf5 snapshot file
 
             input_struct = file_in
-            particle_number_in_file = file_in['Header'].attrs['NumPart_ThisFile']
-            particle_type_name = 'PartType' + str(particle_type) + '/'
+            part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
-            # do actual reading
-            if particle_number_in_file[particle_type] > 0:
-                particle_index_hi = particle_index_lo + particle_number_in_file[particle_type]
-                poss[particle_index_lo:particle_index_hi, :] = \
-                    input_struct[particle_type_name + 'Coordinates']
-                vels[particle_index_lo:particle_index_hi, :] = \
-                    input_struct[particle_type_name + 'Velocities']
-                ids[particle_index_lo:particle_index_hi] = \
-                    input_struct[particle_type_name + 'ParticleIDs']
-                masses[particle_index_lo:particle_index_hi] = header['mass.array'][particle_type]
-                if header['mass.array'][particle_type] <= 0:
-                    masses[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'Masses']
-                if particle_type == 0:
-                    # gas
-                    gas_energies_internal[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'InternalEnergy']
-                    gas_densities[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'Density']
-                    gas_smoothing_lengths[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'SmoothingLength']
-                    if header['cooling.flag'] > 0:
-                        gas_electron_fracs[particle_index_lo:particle_index_hi] = \
-                            input_struct[particle_type_name + 'ElectronAbundance']
-                        gas_neutral_hydrogen_fracs[particle_index_lo:particle_index_hi] = \
-                            input_struct[particle_type_name + 'NeutralHydrogenAbundance']
-                    if header['sfr.flag'] > 0:
-                        gas_sfrs[particle_index_lo:particle_index_hi] = \
-                            input_struct[particle_type_name + 'StarFormationRate']
-                if (particle_type == 0 or particle_type == 4) and header['metal.flag'] > 0:
-                    # gas or stars
-                    metals_t = input_struct[particle_type_name + 'Metallicity']
-                    if header['metal.flag'] > 1:
-                        if metals_t.shape[0] != particle_number_in_file[particle_type]:
-                            metals_t = np.transpose(metals_t)
-                    else:
-                        metals_t = np.reshape(np.array(metals_t), (np.array(metals_t).size, 1))
-                    metals[particle_index_lo:particle_index_hi, :] = metals_t
-                if particle_type == 4 and header['sfr.flag'] > 0 and header['star.age.flag'] > 0:
-                    # stars
-                    star_form_aexps[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'StellarFormationTime']
-                if particle_type == 5:
-                    # black holes
-                    bh_masses[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'BH_Mass']
-                    bh_dmdt[particle_index_lo:particle_index_hi] = \
-                        input_struct[particle_type_name + 'BH_Mdot']
-                particle_index_lo = particle_index_hi    # set for next iteration
+            # read actual properties
+            for spec_i, spec_name in enumerate(species_names):
+                spec_id = species_dict[spec_name]
+                spec_input_name = 'PartType' + str(spec_id) + '/'
+                part_index_lo = part_indices_lo[spec_i]
 
-        # correct to same ID as original gas particle for new stars, if bit-flip applied
-        if np.min(ids) < 0 or np.max(ids) > 1e9:
-            bad = ids < 0 or ids > 1e9
-            ids[bad] += 1L << 31
+                if part_numbers_in_file[spec_id]:
+                    part_index_hi = part_index_lo + part_numbers_in_file[spec_id]
+                    part[spec_name]['position'][part_index_lo:part_index_hi, :] = \
+                        input_struct[spec_input_name + 'Coordinates']
+                    part[spec_name]['velocity'][part_index_lo:part_index_hi, :] = \
+                        input_struct[spec_input_name + 'Velocities']
+                    part[spec_name]['id'][part_index_lo:part_index_hi] = \
+                        input_struct[spec_input_name + 'ParticleIDs']
+                    part[spec_name]['mass'][part_index_lo:part_index_hi] = \
+                        header['mass.array'][spec_id]
+                    if header['mass.array'][spec_id] <= 0:
+                        part[spec_name]['mass'][part_index_lo:part_index_hi] = \
+                            input_struct[spec_input_name + 'Masses']
 
-        # do cosmological conversions on final vectors as needed
-        poss /= header['hubble']    # {kpc comoving}
-        masses *= 1e10 / header['hubble']    # {M_sun}
-        if np.min(masses) < 1 or np.max(masses) > 1e10:
-            self.say('unsure about particle mass units: read min, max = %.3f, %.3f' %
-                     (np.min(masses), np.max(masses)))
-        vels *= np.sqrt(header['scale.factor'])    # from gadget's weird units to {km / s physical}
-        if particle_type == 0:
-            # gas
-            gas_densities *= 1 / header['hubble'] / (header['scale.factor'] / header['hubble']) ** 3
-            gas_smoothing_lengths *= header['scale.factor'] / header['hubble']    # {kpc physical}
-        if particle_type == 4 and header['star.age.flag'] > 0 and not is_cosmological:
-            # stars
-            star_form_aexps /= header['hubble']
-        if particle_type == 5:
-            # black holes
-            bh_masses /= header['hubble']
+                    if spec_id == 0:
+                        # gas
+                        part[spec_name]['energy.internal'][part_index_lo:part_index_hi] = \
+                            input_struct[spec_input_name + 'InternalEnergy']
+                        part[spec_name]['density'][part_index_lo:part_index_hi] = \
+                            input_struct[spec_input_name + 'Density']
+                        part[spec_name]['smooth.length'][part_index_lo:part_index_hi] = \
+                            input_struct[spec_input_name + 'SmoothingLength']
+                        if header['cooling.flag']:
+                            part[spec_name]['electron.frac'][part_index_lo:part_index_hi] = \
+                                input_struct[spec_input_name + 'ElectronAbundance']
+                            part[spec_name]['neutral.hydrogen.frac'][part_index_lo:part_index_hi] = \
+                                input_struct[spec_input_name + 'NeutralHydrogenAbundance']
+                        if header['sfr.flag']:
+                            part[spec_name]['sfr'][part_index_lo:part_index_hi] = \
+                                input_struct[spec_input_name + 'StarFormationRate']
+                        metals_t = input_struct[spec_input_name + 'Metallicity']
+                        if header['metal.flag']:
+                            if metals_t.shape[0] != part_numbers_in_file[spec_id]:
+                                metals_t = np.transpose(metals_t)
+                        else:
+                            metals_t = np.reshape(np.array(metals_t), (np.array(metals_t).size, 1))
+                        part[spec_name]['metal'][part_index_lo:part_index_hi, :] = metals_t
+
+                    elif spec_id == 4:
+                        # stars
+                        if header['metal.flag']:
+                            metals_t = input_struct[spec_input_name + 'Metallicity']
+                            if header['metal.flag'] > 1:
+                                if metals_t.shape[0] != part_numbers_in_file[spec_id]:
+                                    metals_t = np.transpose(metals_t)
+                            else:
+                                metals_t = np.reshape(np.array(metals_t),
+                                                      (np.array(metals_t).size, 1))
+                            part[spec_name]['metal'][part_index_lo:part_index_hi, :] = metals_t
+
+                        if header['sfr.flag'] > 0 and header['star.age.flag'] > 0:
+                            part[spec_name]['form.time'][part_index_lo:part_index_hi] = \
+                                input_struct[spec_input_name + 'StellarFormationTime']
+
+                    elif spec_id == 5:
+                        # black holes or dark matter at lowest-resolution
+                        if spec_name == 'black.hole':
+                            part[spec_name]['bh.mass'][part_index_lo:part_index_hi] = \
+                                input_struct[spec_input_name + 'BH_Mass']
+                            part[spec_name]['dm/dt'][part_index_lo:part_index_hi] = \
+                                input_struct[spec_input_name + 'BH_Mdot']
+
+                    part_indices_lo[spec_i] = part_index_hi    # set for next iteration
 
         file_in.close()
 
-        if particle_type == 0:
-            # gas
-            part = {
-                'id': ids,    # star particles retain id of their origin gas particle
-                'position': poss,
-                'velocity': vels,
-                'mass': masses,
-                'energy.internal': gas_energies_internal,    # {physical}
-                'density': gas_densities,
-                'smooth.length': gas_smoothing_lengths,
-                # average free-electron number per proton (hydrogen nucleon),
-                # averaged over mass of gas particle
-                'electron.frac': gas_electron_fracs,
-                'neutral.hydrogen.frac': gas_neutral_hydrogen_fracs,    # neutral hydrogen fraction
-                'sfr': gas_sfrs,    # {M_sun / yr}
-                # metallicity {mass fraction} ('solar' would be ~0.02 in total metallicity)
-                # element [i,n] gives the metallicity of the n-th species for the i-th particle
-                # n=0: "total" metal mass (everything not H, He)
-                # n=1: He
-                # n=2: C
-                # n=3: N
-                # n=4: O
-                # n=5: Ne
-                # n=6: Mg
-                # n=7: Si
-                # n=8: S
-                # n=9: Ca
-                # n=10: Fe
-                'metal': metals
-            }
-        elif particle_type == 4:
-            # stars
-            part = {
-                'id': ids,    # star particles retain id of their origin gas particle
-                'position': poss,
-                'velocity': vels,
-                'mass': masses,
-                'metal': metals,    # inherited metallicity from gas particle
-                # 'time' when the star particle formed
-                # for cosmological runs this is the scale factor when star particle formed
-                # for non-cosmological runs it is time {Gyr / h} when star particle formed
-                'form.time': star_form_aexps
-            }
-        elif particle_type == 5:
-            # black holes
-            part = {
-                'id': ids,
-                'position': poss,
-                'velocity': vels,
-                'mass': masses,
-                'bh.mass': bh_masses,
-                'dm/dt': bh_dmdt
-            }
-        else:
-            # dark matter
-            part = {
-                'id': ids,
-                'position': poss,
-                'velocity': vels,
-                'mass': masses,
-            }
+        # correct to same ID as original gas particle for new stars, if bit-flip applied
+        for spec_name in species_names:
+            if len(part[spec_name]['id']):
+                if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 1e10:
+                    masks = part[spec_name]['id'] < 0 or part[spec_name]['id'] > 2e9
+                    part[spec_name]['id'][masks] += 1L << 31
 
-        # convert particle structure to generalized dictinary class to increase flexibility
+        # cosmological conversions on final vectors as needed
+        for spec_name in species_names:
+            spec_id = species_dict[spec_name]
+
+            part[spec_name]['position'] /= header['hubble']    # {kpc comoving}
+            part[spec_name]['mass'] *= 1e10 / header['hubble']    # {M_sun}
+            if (np.min(part[spec_name]['mass']) < 10 or np.max(part[spec_name]['mass']) > 1e10):
+                self.say('unsure about particle mass units: read min, max = %.3f, %.3f' %
+                         (np.min(part[spec_name]['mass']),
+                          np.max(part[spec_name]['mass'])))
+
+            # gadget's weird units to {km / s physical}
+            part[spec_name]['velocity'] *= np.sqrt(header['scale.factor'])
+
+            if spec_id == 0:
+                # gas
+                part[spec_name]['density'] *= (1 / header['hubble'] /
+                                               (header['scale.factor'] / header['hubble']) ** 3)
+                # {kpc physical}
+                part[spec_name]['smooth.length'] *= header['scale.factor'] / header['hubble']
+
+            elif spec_id == 4 and header['star.age.flag'] and not is_cosmological:
+                # stars
+                part[spec_name]['star.form.time'] /= header['hubble']
+
+            elif spec_id == 5:
+                # black holes or dark matter at lowest resolution
+                if spec_name == 'black.hole':
+                    part[spec_name]['bh.mass'] /= header['hubble']
+
+        # convert particle structure to generalied dictinary class to increase flexibility
         part_use = ut.array.DictClass()
-        for k in part:
-            part_use[k] = part[k]
+        if len(species_names) == 1:
+            for k in part[species_names[0]]:
+                part_use[k] = part[species_names[0]][k]
+        else:
+            for k in part:
+                part_use[k] = part[k]
         part_use.Cosmo = Cosmo
         part_use.info = header
+        part_use.snap = {'redshift': header['redshift'], 'scale.factor': header['scale.factor'],
+                         'time': Cosmo.age(header['redshift'])}
 
         return part_use
 
+    def initialize_common_properties(self, part, species_id, header):
+        '''
+        Assign common properties to particle type dictionary.
+
+        Parameters
+        ----------
+        catalog of particles: dictionary
+        particle type id: int
+        header information: dictionary
+        '''
+        part['position'] = np.zeros([header['particle.numbers.total'][species_id],
+                                     self.dimension_num], self.float_dtype) - 1
+        part['velocity'] = np.zeros([header['particle.numbers.total'][species_id],
+                                     self.dimension_num], self.float_dtype)
+        # initialize so calling an un-itialized value leads to error
+        part['id'] = (np.zeros(header['particle.numbers.total'][species_id], self.int_dtype) -
+                      header['particle.numbers.total'][species_id] + 1)
+        part['mass'] = np.zeros(header['particle.numbers.total'][species_id], self.float_dtype) - 1
+
     def get_file_name(
         self, directory, snapshot_index, file_name_base='snapshot', file_extension='.hdf5',
-        use_four_character_number=False):
+        use_four_character_index=False):
         '''
-        .
-        '''
-        for extension_use in [file_extension, '.bin', '']:
-            file_name = directory + '/' + file_name_base + '_'
-            ext = '00' + str(snapshot_index)
-            if snapshot_index >= 10:
-                ext = '0' + str(snapshot_index)
-            if snapshot_index >= 100:
-                ext = str(snapshot_index)
-            if use_four_character_number:
-                ext = '0' + ext
-            if snapshot_index >= 1000:
-                ext = str(snapshot_index)
-            file_name += ext
-            file_name_base = file_name
+        Get name of file to read in.
 
-            s0 = directory.split('/')
-            snapshot_directory_specific = s0[len(s0) - 1]
-            if len(snapshot_directory_specific) <= 1:
-                snapshot_directory_specific = s0[len(s0) - 2]
+        Parameters
+        ----------
+        directory: string
+        index of snapshot: int
+        name base of file: string
+        extention of file: string
+        whether to use four characters in snapshot index: boolean
+        '''
+        directory = ut.io.get_safe_path(directory)
+
+        s0 = directory.split('/')
+        snapshot_directory_specific = s0[len(s0) - 1]
+        if len(snapshot_directory_specific) <= 1:
+            snapshot_directory_specific = s0[len(s0) - 2]
+
+        for file_extension_found in [file_extension, '.bin', '']:
+            snapshot_index_formatted = '00' + str(snapshot_index)
+            if snapshot_index >= 10:
+                snapshot_index_formatted = '0' + str(snapshot_index)
+            if snapshot_index >= 100:
+                snapshot_index_formatted = str(snapshot_index)
+            if use_four_character_index:
+                snapshot_index_formatted = '0' + snapshot_index_formatted
+            if snapshot_index >= 1000:
+                snapshot_index_formatted = str(snapshot_index)
+
+            file_name_base_snapshot = file_name_base + '_' + snapshot_index_formatted
 
             # try several common notations for directory/filename structure
-            file_name = file_name_base + extension_use
+            file_name_base = directory + file_name_base_snapshot
+            file_name = file_name_base + file_extension_found
             if not os.path.exists(file_name):
-                # is it a multi-part file?
-                file_name = file_name_base + '.0' + extension_use
+                # is a multi-part file?
+                file_name = file_name_base + '.0' + file_extension_found
             if not os.path.exists(file_name):
-                # is the filename 'snap' instead of 'snapshot'?
-                file_name_base = directory + '/snap_' + ext
-                file_name = file_name_base + extension_use
+                # is file name 'snap(snapdir)' instead of 'snapshot'?
+                file_name_base = (directory + 'snap_' + snapshot_directory_specific + '_' +
+                                  snapshot_index_formatted)
+                file_name = file_name_base + file_extension_found
             if not os.path.exists(file_name):
-                # is the filename 'snap' instead of 'snapshot', AND its a multi-part file?
-                file_name = file_name_base + '.0' + extension_use
-            if not os.path.exists(file_name):
-                # is the filename 'snap(snapdir)' instead of 'snapshot'?
-                file_name_base = directory + '/snap_' + snapshot_directory_specific + '_' + ext
-                file_name = file_name_base + extension_use
-            if not os.path.exists(file_name):
-                # is the filename 'snap' instead of 'snapshot', AND its a multi-part file?
-                file_name = file_name_base + '.0' + extension_use
-            if not os.path.exists(file_name):
-                # is it in a snapshot sub-directory? (we assume this means multi-part files)
-                file_name_base = directory + '/snapdir_' + ext + '/' + file_name_base + '_' + ext
-                file_name = file_name_base + '.0' + extension_use
-            if not os.path.exists(file_name):
-                # is it in a snapshot sub-directory AND named 'snap' instead of 'snapshot'?
-                file_name_base = directory + '/snapdir_' + ext + '/' + 'snap_' + ext
-                file_name = file_name_base + '.0' + extension_use
+                # is file in snapshot sub-directory? assume this means multi-part files
+                file_name_base = (directory + 'snapdir_' + snapshot_index_formatted + '/' +
+                                  file_name_base_snapshot)
+                file_name = file_name_base + '.0' + file_extension_found
             if not os.path.exists(file_name):
                 # give up
-                file_name_found = 'NULL'
-                file_name_base_found = 'NULL'
-                file_name_extension = 'NULL'
+                file_name = 'NULL'
+                file_name_base = 'NULL'
+                file_extension_found = 'NULL'
                 continue
+
             file_name_found = file_name
             file_name_base_found = file_name_base
-            file_name_extension = extension_use
             break    # filename does exist!
 
-        return file_name_found, file_name_base_found, file_name_extension
+        return file_name_found, file_name_base_found, file_extension_found
 
 Gizmo = GizmoClass()

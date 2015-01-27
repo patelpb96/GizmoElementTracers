@@ -215,7 +215,8 @@ def print_contamination_around_halo(
 
     Say = ut.io.SayClass(print_contamination_around_halo)
 
-    DistBin = ut.bin.DistanceBinClass(distance_scaling, [0, distance_max], wid=distance_bin_wid)
+    DistanceBin = ut.bin.DistanceBinClass(
+        distance_scaling, [0, distance_max], width=distance_bin_wid)
 
     pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_vir)
     Say.say('read %d particles around halo' % pids.size)
@@ -233,8 +234,8 @@ def print_contamination_around_halo(
         Say.say('yay! no contaminating particles out to distance_max = %.3f' % distance_max)
         return
 
-    for di in xrange(DistBin.num):
-        dist_bin_lim = DistBin.get_bin_limit(distance_scaling, di)
+    for di in xrange(DistanceBin.num):
+        dist_bin_lim = DistanceBin.get_bin_limit(distance_scaling, di)
         pis_d = pis[ut.array.elements(distances, dist_bin_lim)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
         num_frac = ut.math.Fraction.fraction(pis_contam_d.size, pis_d.size)
@@ -247,7 +248,7 @@ def print_contamination_around_halo(
 
 
 def print_contamination_in_box(
-    part, cen_position=None, distance_lim=None, distance_bin_num=20, scaling='lin',
+    part, center_pos=None, distance_lim=None, distance_bin_num=20, scaling='lin',
     geometry='cube'):
     '''
     Test lower resolution particle contamination around center.
@@ -265,13 +266,13 @@ def print_contamination_in_box(
     if distance_lim is None:
         distance_lim = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
 
-    if cen_position is None:
-        cen_position = np.zeros(part['position'].shape[1])
+    if center_pos is None:
+        center_pos = np.zeros(part['position'].shape[1])
         for dimension_i in xrange(part['position'].shape[1]):
-            cen_position[dimension_i] = 0.5 * part.info['box.length']
-    print('center position = %s' % cen_position)
+            center_pos[dimension_i] = 0.5 * part.info['box.length']
+    print('center position = %s' % center_pos)
 
-    DistBin = ut.bin.DistanceBinClass(scaling, distance_lim, distance_bin_num)
+    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_lim, distance_bin_num)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])
@@ -279,16 +280,16 @@ def print_contamination_in_box(
 
     if geometry == 'sphere':
         distances, neig_pis = ut.neighbor.Neighbor.get_neighbors(
-            cen_position, part['position'], part['mass'].size,
+            center_pos, part['position'], part['mass'].size,
             distance_lim, part.info['box.length'], neig_ids=pis_all)
         distances = distances[0]
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
         distance_vector = np.abs(ut.coord.distance(
-            'vector', part['position'], cen_position, part.info['box.length']))
+            'vector', part['position'], center_pos, part.info['box.length']))
 
-    for di in xrange(DistBin.num):
-        dist_bin_lim = DistBin.get_bin_limit(scaling, di)
+    for di in xrange(DistanceBin.num):
+        dist_bin_lim = DistanceBin.get_bin_limit(scaling, di)
 
         if geometry == 'sphere':
             pis_all_d = neig_pis[ut.array.elements(distances, dist_bin_lim)]
