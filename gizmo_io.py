@@ -292,7 +292,8 @@ class GizmoClass(ut.io.SayClass):
                         if header['cooling.flag']:
                             part[spec_name]['electron.frac'][part_index_lo:part_index_hi] = \
                                 input_struct[spec_input_name + 'ElectronAbundance']
-                            part[spec_name]['neutral.hydrogen.frac'][part_index_lo:part_index_hi] = \
+                            part[spec_name]['neutral.hydrogen.frac'][part_index_lo:
+                                                                     part_index_hi] = \
                                 input_struct[spec_input_name + 'NeutralHydrogenAbundance']
                         if header['sfr.flag']:
                             part[spec_name]['sfr'][part_index_lo:part_index_hi] = \
@@ -346,8 +347,8 @@ class GizmoClass(ut.io.SayClass):
 
             part[spec_name]['position'] /= header['hubble']    # {kpc comoving}
             part[spec_name]['mass'] *= 1e10 / header['hubble']    # {M_sun}
-            if (np.min(part[spec_name]['mass']) < 10 or np.max(part[spec_name]['mass']) > 1e10):
-                self.say('unsure about particle mass units: read min, max = %.3f, %.3f' %
+            if (np.min(part[spec_name]['mass']) < 10 or np.max(part[spec_name]['mass']) > 2e10):
+                self.say('unsure about particle mass units: read min, max = %.3e, %.3e' %
                          (np.min(part[spec_name]['mass']),
                           np.max(part[spec_name]['mass'])))
 

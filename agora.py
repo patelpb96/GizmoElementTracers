@@ -17,6 +17,8 @@ import yt.analysis_modules.halo_analysis.api as halo_analysis    # @UnresolvedIm
 #import yt.analysis_modules.halo_merger_tree.api as tree_io    # @UnresolvedImport
 from utilities import utility as ut
 
+Fraction = ut.math.FractionClass()
+
 # relatively isolated halos with M_vir ~ 2e11 M_sun
 # AGORA uses 473
 halo_ids = np.array([414, 415, 417, 438, 439, 457, 466, 468, 473, 497, 499, 503])
@@ -69,8 +71,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         Read HOP halo catalog, save as dictionary to self.
 
         first need to run finder via:
-            hc = halo_analysis.HaloCatalog(data_ds=self.snapshot[0], finder_method='hop',
-                                           output_dir='halo_catalog')
+            hc = halo_analysis.HaloCatalog(
+                data_ds=self.snapshot[0], finder_method='hop', output_dir='halo_catalog')
             hc.create()
         '''
         self.hal_yt = halo_io.LoadHaloes(
@@ -238,8 +240,8 @@ def print_contamination_around_halo(
         dist_bin_lim = DistanceBin.get_bin_limit(distance_scaling, di)
         pis_d = pis[ut.array.elements(distances, dist_bin_lim)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
-        num_frac = ut.math.Fraction.fraction(pis_contam_d.size, pis_d.size)
-        mass_frac = ut.math.Fraction.fraction(
+        num_frac = Fraction.get_fraction(pis_contam_d.size, pis_d.size)
+        mass_frac = Fraction.get_fraction(
             np.sum(Agora.part[zi]['mass'][pis_contam_d]), np.sum(Agora.part[zi]['mass'][pis_d]))
         Say.say('distance = [%.3f, %.3f]: fraction by number = %.5f, by mass = %.5f' %
                 (dist_bin_lim[0], dist_bin_lim[1], num_frac, mass_frac))
@@ -263,6 +265,8 @@ def print_contamination_in_box(
     '''
     Say = ut.io.SayClass(print_contamination_in_box)
 
+    Neighbor = ut.neighbor.NeighborClass()
+
     if distance_lim is None:
         distance_lim = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
 
@@ -279,7 +283,7 @@ def print_contamination_in_box(
     pis_contam = pis_all[part['mass'] != masses_unique.min()]
 
     if geometry == 'sphere':
-        distances, neig_pis = ut.neighbor.Neighbor.get_neighbors(
+        distances, neig_pis = Neighbor.get_neighbors(
             center_pos, part['position'], part['mass'].size,
             distance_lim, part.info['box.length'], neig_ids=pis_all)
         distances = distances[0]
@@ -296,11 +300,11 @@ def print_contamination_in_box(
         elif geometry == 'cube':
             pis_all_d = np.array(pis_all)
             for dimension_i in xrange(part['position'].shape[1]):
-                pis_all_d = ut.array.elements(distance_vector[:, dimension_i], dist_bin_lim,
-                                              pis_all_d)
+                pis_all_d = ut.array.elements(
+                    distance_vector[:, dimension_i], dist_bin_lim, pis_all_d)
 
         pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
-        frac = ut.math.Fraction.fraction(pis_contam_d.size, pis_all_d.size)
+        frac = Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
         Say.say('distance = [%.3f, %.3f], fraction = %.5f' %
                 (dist_bin_lim[0], dist_bin_lim[1], frac))
         if frac >= 1.0:
