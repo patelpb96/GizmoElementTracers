@@ -134,8 +134,8 @@ class GizmoClass(ut.io.SayClass):
 
         # infer whether simulation is cosmological
         if (0 < header_toparse['HubbleParam'] < 1 and 0 < header_toparse['Omega0'] < 1 and
-            0 < header_toparse['OmegaLambda'] < 1):
-                is_cosmological = True
+                0 < header_toparse['OmegaLambda'] < 1):
+            is_cosmological = True
         else:
             is_cosmological = False
             self.say('assuming that simulation is not cosmological')
