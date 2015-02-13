@@ -32,8 +32,8 @@ class GizmoClass(ut.io.SayClass):
         self.dimension_num = 3    # number of spatial dimensions
 
     def read_snapshot(
-        self, species_types, snapshot_index=441, directory='.', file_name_base='snapshot',
-        is_cosmological=True, use_four_character_index=False, get_header_only=False):
+        self, species_types, snapshot_index=440, directory='.', file_name_base='snapshot',
+        use_four_character_index=False, get_header_only=False):
         '''
         Read simulation snapshot, return as dictionary.
 
@@ -51,7 +51,6 @@ class GizmoClass(ut.io.SayClass):
         snapshot index: int
         directory: string
         snapshot file name base: string
-        whether simulation is cosmological: boolean
         whether to use four characters for snapshot index: boolean
         whether to read only header: boolean
         '''
@@ -117,12 +116,9 @@ class GizmoClass(ut.io.SayClass):
         header['particle.numbers.total'] = header_toparse['NumPart_Total']
         # mass for each particle type, if all are same (0 if they are different, usually true)
         header['mass.array'] = header_toparse['MassTable']
-        if is_cosmological:
-            header['scale.factor'] = header_toparse['Time']
-        else:
-            header['time'] = header_toparse['Time']    # time {Gyr/h}
+        time = header_toparse['Time']
         header['redshift'] = header_toparse['Redshift']
-        header['box.length'] = header_toparse['BoxSize']
+        box_length = header_toparse['BoxSize']
         # number of output files per snapshot
         header['file.number.per.snapshot'] = header_toparse['NumFilesPerSnapshot']
         header['omega_matter'] = header_toparse['Omega0']
@@ -136,10 +132,32 @@ class GizmoClass(ut.io.SayClass):
         print('particle number in file: ', header['particle.numbers.in.file'])
         print('particle number total: ', header['particle.numbers.total'])
 
-        header['box.length'] /= header['hubble']    # {kpc comoving}
+        # infer whether simulation is cosmological
+        if (0 < header_toparse['HubbleParam'] < 1 and 0 < header_toparse['Omega0'] < 1 and
+            0 < header_toparse['OmegaLambda'] < 1):
+                is_cosmological = True
+        else:
+            is_cosmological = False
+            self.say('assuming that simulation is not cosmological')
+            self.say('read h = %.3f, omega_matter_0 = %.3f, omega_lambda_0 = %>3f' %
+                     (header_toparse['HubbleParam'], header_toparse['Omega0'],
+                      header_toparse['OmegaLambda']))
+        header['is.cosmological'] = is_cosmological
 
-        if not is_cosmological:
-            header['time'] /= header['hubble']    # {Gyr}
+        if is_cosmological:
+            header['scale.factor'] = time
+            header['box.length/h'] = box_length
+            header['box.length'] = box_length / header['hubble']    # {kpc comoving}
+        else:
+            header['time'] = time / header['hubble']    # {Gyr}
+            header['box.length'] = box_length    # {kpc / h}
+
+        # check if simulation contains baryons
+        if ('gas' not in species_names and 'star' not in species_names and
+                'disk' not in species_names and 'bulge' not in species_names):
+            header['is.baryonic'] = False
+        else:
+            header['is.baryonic'] = True
 
         if get_header_only:
             file_in.close()
@@ -147,7 +165,7 @@ class GizmoClass(ut.io.SayClass):
 
         # check that have some particles
         part_number_min = 0
-        for spec_name in species_names:
+        for spec_name in species_dict.keys():
             spec_id = species_dict[spec_name]
             if header['particle.numbers.total'][spec_id] <= 0:
                 self.say('no particles for species id = %s' % spec_id)
@@ -159,9 +177,9 @@ class GizmoClass(ut.io.SayClass):
             file_in.close()
             return part
 
-        # check if simulation is cosmological
+        # assign cosmological parameters
         if is_cosmological:
-            # assume that cosmology parameters not in header are from AGORA
+            # assume that cosmology parameters not in header are from AGORA - kluge!
             omega_baryon = 0.0455
             sigma_8 = 0.807
             n_s = 0.961

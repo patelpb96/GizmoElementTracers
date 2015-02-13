@@ -130,7 +130,7 @@ def test_contamination(
         dist_name = 'dist'
         if vir_radius and scale_vir:
             dist_name += '.200m'
-        plot_name = 'mass.ratio_v_%s.pdf' % dist_name
+        plot_name = 'mass.ratio_v_%s_z.%.1f.pdf' % (dist_name, part.snap['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
     else:
@@ -227,10 +227,7 @@ def test_metal_v_distance(
         dist_name = 'dist'
         if vir_radius and scale_vir:
             dist_name += '.200m'
-        if plot_kind == 'metalicity':
-            plot_name = 'metalicity_v_%s.pdf' % dist_name
-        elif plot_kind == 'metal.mass':
-            plot_name = 'metal.mass_v_%s.pdf' % dist_name
+        plot_name = plot_kind + '_v_' + dist_name + '_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
     else:
