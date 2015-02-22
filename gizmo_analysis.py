@@ -105,7 +105,7 @@ def get_virial_radius(
     masses = np.array(masses)
 
     # correct for baryonic mass
-    if not part.info['is.baryonic'] and species == ['dark']:
+    if not part.info['has.baryons'] and species == ['dark']:
         masses *= 1 + part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter']
 
     if center_position is None or not len(center_position):
@@ -216,7 +216,7 @@ def print_initial_condition_points(
 
     volume_ini = ut.coord.volume_convex_hull(poss_ini)
     density_ini = part_ini.Cosmo.density_matter(part_ini.snap['redshift'])
-    if part_ini.info['is.baryonic']:
+    if part_ini.info['has.baryons']:
         # subtract baryonic mass
         density_ini *= part_ini.Cosmo['omega_dark'] / part_ini.Cosmo['omega_matter']
     mass_ini = volume_ini * density_ini    # assume cosmic density within volume
