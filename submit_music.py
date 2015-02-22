@@ -4,7 +4,7 @@
 ## job name
 #PBS -N music
 ## queue type
-##PBS -q <queue>
+##PBS -q longJobsQ
 ## total CPU resource allocation
 ## each node on Zwicky has 12 processors & 24 GB
 #PBS -l nodes=1:ppn=12
@@ -12,11 +12,11 @@
 #PBS -l walltime=00:08:00:00
 ## combine stderr & stdout into one file
 #PBS -j oe
-## where to put runtime information
-#PBS -o $PBS_JOBNAME.$PBS_JOBID
+## where to put run time information
+#PBS -o $PBS_JOBNAME_job$PBS_JOBID.txt
 ## email results: a = aborted, b = begin, e = end
 #PBS -M arwetzel@gmail.com
-#PBS -m ae
+#PBS -m a
 ## import terminal environmental variables
 #PBS -V
 
@@ -32,12 +32,12 @@ import time
 import datetime
 
 
-# directories & file names
+# set directories & file names
 executable = '%s/simulation/music/MUSIC' % os.environ['HOME']    # executable
 parameter_file_name = 'ic_*.conf'    # name of parameter file
 
-# parallel parameters
-omp_num = 8    # number of OpenMP threads per MPI process
+# set parallel parameters
+omp_num = 12    # number of OpenMP threads per MPI process
 os.system('export OMP_NUM_THREADS=%d' % omp_num)
 
 

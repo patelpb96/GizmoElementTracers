@@ -11,10 +11,10 @@ from __future__ import absolute_import, division, print_function
 import numpy as np
 from numpy import log10, Inf, int32, float32
 # local ----
-import yt    # @UnresolvedImport
-import yt.analysis_modules.halo_finding.api as halo_io    # @UnresolvedImport
-import yt.analysis_modules.halo_analysis.api as halo_analysis    # @UnresolvedImport #@UnusedImport
-#import yt.analysis_modules.halo_merger_tree.api as tree_io    # @UnresolvedImport
+import yt
+import yt.analysis_modules.halo_finding.api as halo_io
+#import yt.analysis_modules.halo_analysis.api as halo_analysis
+#import yt.analysis_modules.halo_merger_tree.api as tree_io
 from utilities import utility as ut
 
 Fraction = ut.math.FractionClass()

@@ -50,7 +50,6 @@ os.chdir(os.environ['PBS_O_WORKDIR'])    # move to directory am in when submit t
 os.system('date')    # print time
 time_ini = time.time()
 
-
 # execute
 #exec_command = 'mpirun -npernode %d ./%s %s' % (mpi_num_per_node, executable, parameter_file_name)
 exec_command = 'mpirun -np %d ./%s %s' % (mpi_num, executable, parameter_file_name)
@@ -60,6 +59,8 @@ if restart_from_restart:
     #if not os.path.isfile(snapshot_directory + 'restartfiles'):
 elif restart_from_snapshot:
     exec_command += ' 2'
+
+exec_command += ' 1> gizmo.out 2> gizmo.err'
 
 os.system(exec_command)
 
