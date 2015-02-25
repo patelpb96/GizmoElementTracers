@@ -80,6 +80,7 @@ def get_virial_radius(
         note: use this to scale dark matter mass if using only dark matter
     '''
     Say = ut.io.SayClass(get_virial_radius)
+
     HaloProperty = halo_property.HaloPropertyClass(part.Cosmo, part.snap['redshift'])
 
     DistanceBin = ut.bin.DistanceBinClass(radius_scaling, radius_lim, radius_bin_num,
@@ -95,14 +96,18 @@ def get_virial_radius(
     if np.isscalar(species):
         species = [species]
 
-    positions = []
-    masses = []
-    for spec in species:
-        if spec in part:
-            positions.extend(part[spec]['position'])
-            masses.extend(part[spec]['mass'])
-    positions = np.array(positions)
-    masses = np.array(masses)
+    if len(species) == 1:
+        positions = part[species[0]]['position']
+        masses = part[species[0]]['mass']
+    else:
+        positions = []
+        masses = []
+        for spec in species:
+            if spec in part:
+                positions.extend(part[spec]['position'])
+                masses.extend(part[spec]['mass'])
+        positions = np.array(positions)
+        masses = np.array(masses)
 
     # correct for baryonic mass
     if not part.info['has.baryons'] and species == ['dark']:
@@ -138,7 +143,8 @@ def get_virial_radius(
 #===================================================================================================
 def write_initial_condition_points(
     part_fin, part_ini, center_pos=None, distance_select=None, scale_to_halo_radius=True,
-    virial_kind='200m', use_onorbe_method=False, refinement_num=1, method='particles'):
+    halo_radius=None, virial_kind='200m',
+    use_onorbe_method=False, refinement_num=1, method='particles'):
     '''
     Print positions of initial conditions of dark-matter particles selected at z = 0.
     Use rules of thumb from Onorbe et al.
@@ -178,7 +184,8 @@ def write_initial_condition_points(
 
     distance_select_input = distance_select
     if not distance_select or scale_to_halo_radius:
-        halo_radius = get_virial_radius(part_fin, ['all'], center_pos, virial_kind, 'log')
+        if not halo_radius:
+            halo_radius = get_virial_radius(part_fin, ['all'], center_pos, virial_kind, 'log')
         if not distance_select:
             distance_select = halo_radius
         elif scale_to_halo_radius:
@@ -297,7 +304,7 @@ def write_initial_condition_points(
 # tests
 #===================================================================================================
 def test_contamination(
-    part, center_pos=[], distance_lim=[10, 3000], distance_bin_num=100,
+    part, center_pos=[], distance_lim=[1, 5000], distance_bin_num=100,
     distance_scaling='log', y_scaling='log', vir_radius=None, scale_vir=False,
     center_species=['star'], write_plot=False, plot_directory='.'):
     '''
