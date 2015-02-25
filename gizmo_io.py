@@ -22,7 +22,8 @@ class GizmoClass(ut.io.SayClass):
     '''
     def read_snapshot(
         self, species_types, snapshot_index=440, directory='.', file_name_base='snapshot',
-        file_extension='.hdf5', use_four_character_index=False, get_header_only=False):
+        file_extension='.hdf5', use_four_character_index=False, get_header_only=False,
+        subsample_factor=1):
         '''
         Read simulation snapshot, return as dictionary.
 
@@ -111,11 +112,13 @@ class GizmoClass(ut.io.SayClass):
         # converts each key in input particle dictionary to another naming preference
         # if comment out given property, will not read that one
         particle_name_dict = {
+            # all particles
             'ParticleIDs': 'id',
             'Coordinates': 'position',
-            'Velocities': 'velocity',
+            #'Velocities': 'velocity',
             'Masses': 'mass',
-            'Potential': 'potential',
+            #'Potential': 'potential',
+
             'InternalEnergy': 'energy.internal',
             'Density': 'density',
             'SmoothingLength': 'smooth.length',
@@ -353,7 +356,7 @@ class GizmoClass(ut.io.SayClass):
                         species_ids.append(species_name_dict[spec_name])
                 del(spec_indices)
 
-        # order dark matter particles by id - should be conserved across snapshots
+        # order dark-matter particles by id - should be conserved across snapshots
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
             if 'dark' in spec_name:
@@ -405,8 +408,15 @@ class GizmoClass(ut.io.SayClass):
 
         # convert particle dictionary to generalized dictionary class to increase flexibility
         part_return = ut.array.DictClass()
-        for k in part:
-            part_return[k] = part[k]
+        for spec_name in part:
+            part_return[spec_name] = part[spec_name]
+
+        # sub-sample highest-resolution particles for smaller memory
+        if subsample_factor > 1:
+            for spec_name in part:
+                if spec_name in ['dark', 'gas', 'star']:
+                    for prop in part[spec_name]:
+                        part[spec_name][prop] = part[spec_name][prop][::subsample_factor]
 
         # assign cosmological parameters
         if header['is.cosmological']:
