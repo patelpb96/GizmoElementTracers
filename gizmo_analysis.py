@@ -136,7 +136,7 @@ def get_virial_radius(
 #===================================================================================================
 # initial conditions
 #===================================================================================================
-def print_initial_condition_points(
+def write_initial_condition_points(
     part_fin, part_ini, center_pos=None, distance_select=None, scale_to_halo_radius=True,
     virial_kind='200m', use_onorbe_method=False, refinement_num=1, method='particles'):
     '''
@@ -157,9 +157,9 @@ def print_initial_condition_points(
     method to identify initial zoom-in regon: string
         options: particles, convex.hull, cube
     '''
-    file_name = 'ic_agora_m12i_ref12_points.txt'
+    file_name = 'ic_agora_m12i_points.txt'
 
-    Say = ut.io.SayClass(print_initial_condition_points)
+    Say = ut.io.SayClass(write_initial_condition_points)
 
     assert method in ['particles', 'convex.hull', 'cube']
 
