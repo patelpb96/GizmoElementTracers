@@ -45,7 +45,10 @@ def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[
 
     if len(species) == 1:
         positions = part[species[0]]['position']
-        masses = part[species[0]]['mass']
+        if np.unique(part[species[0]]['mass']).size == 1:
+            masses = None
+        else:
+            masses = part[species[0]]['mass']
     else:
         positions = []
         masses = []
@@ -81,8 +84,6 @@ def get_halo_radius(
         options: log, lin
     radius bin limits: list or array
     radius bin number: int
-    whether simulation includes baryons: boolean
-        note: use this to scale dark matter mass if using only dark matter
     '''
     Say = ut.io.SayClass(get_halo_radius)
 
@@ -124,24 +125,47 @@ def get_halo_radius(
 
     rads = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
 
-    pro = DistanceBin.get_mass_profile(rads, masses)
+    # get masses in bins
+    if 'log' in radius_scaling:
+        rads = log10(rads)
+        radius_lim = log10(radius_lim)
+
+    mass_in_bins = np.histogram(rads, radius_bin_num, radius_lim, False, masses)[0]
+
+    # get mass within distance minimum, for computing cumulative values
+    rad_indices = np.where(rads < np.min(radius_lim))[0]
+    masses_cum = np.sum(masses[rad_indices]) + np.cumsum(mass_in_bins)
+
+    # cumulative densities in bins
+    density_cum_in_bins = masses_cum / DistanceBin.volumes_cum
+
+    # import ipdb; ipdb.set_trace()
+    # mass_in_bins[100000000000]
 
     for dist_bin_i in xrange(DistanceBin.num - 1):
-        if (pro['density.cum'][dist_bin_i] >= virial_density and
-                pro['density.cum'][dist_bin_i + 1] < virial_density):
-            log_den_inner = log10(pro['density.cum'][dist_bin_i])
-            log_den_outer = log10(pro['density.cum'][dist_bin_i + 1])
+        if (density_cum_in_bins[dist_bin_i] >= virial_density and
+                density_cum_in_bins[dist_bin_i + 1] < virial_density):
+            log_den_inner = log10(density_cum_in_bins[dist_bin_i])
+            log_den_outer = log10(density_cum_in_bins[dist_bin_i + 1])
             # use interpolation in log space, assuming log density profile
-            log_rad_inner = DistanceBin.log_mins[dist_bin_i]
-            log_rad_outer = DistanceBin.log_mins[dist_bin_i + 1]
+            log_rad_inner = DistanceBin.log_maxs[dist_bin_i]
+            log_rad_outer = DistanceBin.log_maxs[dist_bin_i + 1]
             log_slope = (log_rad_outer - log_rad_inner) / (log_den_inner - log_den_outer)
+
             halo_radius = 10 ** (log_rad_inner + log_slope *
                                  (log_den_inner - log10(virial_density)))
-            halo_mass = np.sum(masses[rads < halo_radius])
-            Say.say('halo M_%s = %.3e M_sun' % (virial_kind, halo_mass))
+
+            if 'log' in radius_scaling:
+                halo_mass = np.sum(masses[rads < log10(halo_radius)])
+            else:
+                halo_mass = np.sum(masses[rads < halo_radius])
+
+            Say.say('R_%s = %.3f kpc, M_%s = %.3e M_sun' %
+                    (virial_kind, halo_radius, virial_kind, halo_mass))
+
             return halo_radius
     else:
-        Say.say('! could not find virial radius')
+        Say.say('! could not find virial radius - might need to increase radius limits')
 
 
 #===================================================================================================

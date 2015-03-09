@@ -56,10 +56,10 @@ class GizmoClass(ut.io.SayClass):
             'dark': 1,
             'dark.2': 2,
             'dark.3': 3,
-            #'bulge': 2,
-            #'disk': 3,
+            # 'bulge': 2,
+            # 'disk': 3,
             'star': 4,
-            #'black.hole': 5,
+            # 'black.hole': 5,
             'dark.4': 5,
 
             # use below types to divvy out coarser dark matter
@@ -92,8 +92,8 @@ class GizmoClass(ut.io.SayClass):
             'NumPart_Total_HighWord': 'particle.numbers.total.high.word',
             # mass for each particle type, if all are same (0 if they are different, usually true)
             'MassTable': 'mass.array',
-            'Time': 'time',    # {Gyr / h}
-            'BoxSize': 'box.length',    # {kpc / h comoving}
+            'Time': 'time',  # {Gyr / h}
+            'BoxSize': 'box.length',  # {kpc / h comoving}
             'Redshift': 'redshift',
             # number of output files per snapshot
             'NumFilesPerSnapshot': 'file.number.per.snapshot',
@@ -115,14 +115,14 @@ class GizmoClass(ut.io.SayClass):
             # all particles
             'ParticleIDs': 'id',
             'Coordinates': 'position',
-            #'Velocities': 'velocity',
+            # 'Velocities': 'velocity',
             'Masses': 'mass',
-            #'Potential': 'potential',
+            # 'Potential': 'potential',
 
             'InternalEnergy': 'energy.internal',
             'Density': 'density',
             'SmoothingLength': 'smooth.length',
-            #'ArtificialViscosity': 'artificial.viscosity',
+            # 'ArtificialViscosity': 'artificial.viscosity',
 
             # average free-electron number per proton, averaged over mass of gas particle
             'ElectronAbundance': 'electron.fraction',
@@ -130,7 +130,7 @@ class GizmoClass(ut.io.SayClass):
             # neutral hydrogen fraction
             'NeutralHydrogenAbundance': 'neutral.hydrogen.fraction',
 
-            'StarFormationRate': 'sfr',    # {M_sun / yr}
+            'StarFormationRate': 'sfr',  # {M_sun / yr}
 
             # metallicity {mass fraction} ('solar' would be ~0.02 in total metallicity)
             # for stars, this is inherited metallicity from gas particle
@@ -145,7 +145,7 @@ class GizmoClass(ut.io.SayClass):
             # 8 = S
             # 9 = Ca
             # 10 = Fe
-            #'Metallicity': 'metallicity',
+            # 'Metallicity': 'metallicity',
 
             # 'time' when the star particle formed
             # for cosmological runs, this is the scale factor
@@ -156,8 +156,8 @@ class GizmoClass(ut.io.SayClass):
             'BH_Mdot': 'dm/dt'
         }
 
-        header = {}    # custom dictionary to store header information
-        part = {}    # custom dictionary to store properties for all particle species
+        header = {}  # custom dictionary to store header information
+        part = {}  # custom dictionary to store properties for all particle species
 
         # if input 'all', read everything possible
         if species_types == 'all' or species_types == ['all']:
@@ -191,16 +191,16 @@ class GizmoClass(ut.io.SayClass):
             directory, snapshot_index, file_name_base=file_name_base, file_extension=file_extension,
             use_four_character_index=use_four_character_index)
 
-        self.say('loading file: ' + file_name)
+        self.say('reading header from file: ' + file_name)
 
         ### start reading/assigning header ###
 
         # open file and parse header
-        file_in = h5py.File(file_name, 'r')    # open hdf5 snapshot file
-        header_in = file_in['Header'].attrs    # load header dictionary
+        file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
+        header_in = file_in['Header'].attrs  # load header dictionary
 
         for prop in header_in:
-            header[header_name_dict[prop]] = header_in[prop]    # transfer to custom header dict
+            header[header_name_dict[prop]] = header_in[prop]  # transfer to custom header dict
 
         # infer whether simulation is cosmological
         if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] < 1 and
@@ -217,9 +217,9 @@ class GizmoClass(ut.io.SayClass):
             header['scale.factor'] = float(header['time'])
             del(header['time'])
             header['box.length/h'] = float(header['box.length'])
-            header['box.length'] /= header['hubble']    # convert to {kpc comoving}
+            header['box.length'] /= header['hubble']  # convert to {kpc comoving}
         else:
-            header['time'] /= header['hubble']    # convert to {Gyr}
+            header['time'] /= header['hubble']  # convert to {Gyr}
 
         # check which species have any particles
         part_number_min = 0
@@ -264,7 +264,7 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
             part_in = file_in['PartType' + str(spec_id)]
-            part[spec_name] = {}    # add species to particle dictionary
+            part[spec_name] = {}  # add species to particle dictionary
             part_num_tot = header['particle.numbers.total'][spec_id]
 
             for prop_in in part_in:
@@ -298,7 +298,9 @@ class GizmoClass(ut.io.SayClass):
             if header['file.number.per.snapshot'] > 1:
                 file_in.close()
                 file_name = file_name_base + '.' + str(file_i) + file_extension
-                file_in = h5py.File(file_name, 'r')    # open snapshot file
+                file_in = h5py.File(file_name, 'r')  # open snapshot file
+
+            self.say('loading file: ' + file_name)
 
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
@@ -327,7 +329,7 @@ class GizmoClass(ut.io.SayClass):
                                 part[spec_name][prop][part_index_lo:part_index_hi, :] = \
                                     part_in[prop_in]
 
-                    part_indices_lo[spec_i] = part_index_hi    # set indices for next file
+                    part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 
         file_in.close()
 
@@ -376,10 +378,10 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
             if 'position' in part[spec_name]:
-                part[spec_name]['position'] /= header['hubble']    # convert to {kpc comoving}
+                part[spec_name]['position'] /= header['hubble']  # convert to {kpc comoving}
 
             if 'mass' in part[spec_name]:
-                part[spec_name]['mass'] *= 1e10 / header['hubble']    # convert to {M_sun}
+                part[spec_name]['mass'] *= 1e10 / header['hubble']  # convert to {M_sun}
                 if np.min(part[spec_name]['mass']) < 10 or np.max(part[spec_name]['mass']) > 2e10:
                     self.say('! unsure about masses: read [min, max] = [%.3e, %.3e] M_sun' %
                              (np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
@@ -428,9 +430,9 @@ class GizmoClass(ut.io.SayClass):
             Cosmo = cosmology.CosmologyClass(
                 header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
                 sigma_8, n_s, w)
-            part_return.Cosmo = Cosmo    # store cosmology information
+            part_return.Cosmo = Cosmo  # store cosmology information
 
-        part_return.info = header    # store header information
+        part_return.info = header  # store header information
         # store snapshot time information
         part_return.snap = {'redshift': header['redshift'], 'scale.factor': header['scale.factor'],
                             'time': Cosmo.age(header['redshift'])}
