@@ -62,7 +62,7 @@ def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[
 
 def get_halo_radius(
     part, species=['dark', 'star', 'gas'], center_position=[], virial_kind='200m',
-    radius_scaling='log', radius_lim=[10, 3000], radius_bin_num=100):
+    radius_scaling='log', radius_lim=[10, 1000], radius_bin_num=100):
     '''
     Parameters
     ----------
@@ -88,8 +88,8 @@ def get_halo_radius(
 
     HaloProperty = halo_property.HaloPropertyClass(part.Cosmo, part.snap['redshift'])
 
-    DistanceBin = ut.bin.DistanceBinClass(radius_scaling, radius_lim, radius_bin_num,
-                                          dimension_num=3)
+    DistanceBin = ut.bin.DistanceBinClass(
+        radius_scaling, radius_lim, radius_bin_num, dimension_num=3)
 
     overdensity, reference_density = HaloProperty.overdensity(virial_kind)
     virial_density = overdensity * reference_density
@@ -126,22 +126,22 @@ def get_halo_radius(
 
     pro = DistanceBin.get_mass_profile(rads, masses)
 
-    for dist_bin_i in reversed(xrange(DistanceBin.num)):
-        if (pro['density.cum'][dist_bin_i] < virial_density and
-                pro['density.cum'][dist_bin_i - 1] > virial_density):
-            # use linear interpolation in log space to get virial radius
-            log_den_inner = log10(pro['density.cum'][dist_bin_i - 1])
-            log_den_outer = log10(pro['density.cum'][dist_bin_i])
+    for dist_bin_i in xrange(DistanceBin.num - 1):
+        if (pro['density.cum'][dist_bin_i] >= virial_density and
+                pro['density.cum'][dist_bin_i + 1] < virial_density):
+            log_den_inner = log10(pro['density.cum'][dist_bin_i])
+            log_den_outer = log10(pro['density.cum'][dist_bin_i + 1])
+            # use interpolation in log space, assuming log density profile
             log_rad_inner = DistanceBin.log_mins[dist_bin_i]
-            log_rad_outer = DistanceBin.log_maxs[dist_bin_i]
+            log_rad_outer = DistanceBin.log_mins[dist_bin_i + 1]
             log_slope = (log_rad_outer - log_rad_inner) / (log_den_inner - log_den_outer)
-            virial_radius = 10 ** (log_rad_inner + log_slope *
-                                   (log_den_inner - log10(virial_density)))
-            virial_mass = np.sum(masses[rads < virial_radius])
-            Say.say('virial mass = %.3e' % virial_mass)
-            return virial_radius
+            halo_radius = 10 ** (log_rad_inner + log_slope *
+                                 (log_den_inner - log10(virial_density)))
+            halo_mass = np.sum(masses[rads < halo_radius])
+            Say.say('halo M_%s = %.3e M_sun' % (virial_kind, halo_mass))
+            return halo_radius
     else:
-        Say.say('could not find virial radius')
+        Say.say('! could not find virial radius')
 
 
 #===================================================================================================
