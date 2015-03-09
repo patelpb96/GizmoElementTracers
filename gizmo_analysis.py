@@ -43,14 +43,18 @@ def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[
     if species == ['all']:
         species = ['star', 'dark', 'gas']
 
-    positions = []
-    masses = []
-    for spec in species:
-        if spec in part:
-            positions.extend(part[spec]['position'])
-            masses.extend(part[spec]['mass'])
-    positions = np.array(positions)
-    masses = np.array(masses)
+    if len(species) == 1:
+        positions = part[species[0]]['position']
+        masses = part[species[0]]['mass']
+    else:
+        positions = []
+        masses = []
+        for spec in species:
+            if spec in part:
+                positions.extend(part[spec]['position'])
+                masses.extend(part[spec]['mass'])
+        positions = np.array(positions)
+        masses = np.array(masses)
 
     return ut.coord.position_center_of_mass_zoom(
         positions, masses, part.info['box.length'], center_position, radius_max)
@@ -314,7 +318,7 @@ def write_initial_condition_points(
 #===================================================================================================
 def test_contamination(
     part, center_pos=[], distance_lim=[1, 5000], distance_bin_num=100,
-    distance_scaling='log', y_scaling='log', halo_radius=None, scale_halo_radius=False,
+    distance_scaling='log', y_scaling='log', halo_radius=None, scale_to_halo_radius=False,
     center_species=['star'], write_plot=False, plot_directory='.'):
     '''
     Test lower resolution particle contamination around center.
@@ -346,7 +350,7 @@ def test_contamination(
         center_pos = get_center_position(part, center_species)
 
     x_lim = np.array(distance_lim)
-    if halo_radius and scale_halo_radius:
+    if halo_radius and scale_to_halo_radius:
         x_lim *= halo_radius
 
     DistanceBin = ut.bin.DistanceBinClass(distance_scaling, x_lim, distance_bin_num)
@@ -381,7 +385,7 @@ def test_contamination(
     Say.say('%s cumulative mass/number:' % spec)
     dists = 10 ** pros[spec]['distance.cum']
     print_string = '  d < %.3f kpc: mass = %.2e, number = %d'
-    if scale_halo_radius:
+    if scale_to_halo_radius:
         dists /= halo_radius
         print_string = '  d/R_halo < %.3f: mass = %.2e, number = %d'
     for dist_i in xrange(pros[spec]['mass.cum'].size):
@@ -392,7 +396,7 @@ def test_contamination(
     # plot ----------
     colors = plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
-    if halo_radius and scale_halo_radius:
+    if halo_radius and scale_to_halo_radius:
         xs /= halo_radius
 
     plt.close()
@@ -404,7 +408,7 @@ def test_contamination(
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
 
     subplot.set_ylabel('$M_{\\rm spec} / M_{\\rm %s}$' % species_ref, fontsize=20)
-    if scale_halo_radius:
+    if scale_to_halo_radius:
         x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
         x_label = 'distance [$\\rm kpc\,comoving$]'
@@ -413,7 +417,7 @@ def test_contamination(
     plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
 
     if halo_radius:
-        if scale_halo_radius:
+        if scale_to_halo_radius:
             x_ref = 1
         else:
             x_ref = halo_radius
@@ -432,7 +436,7 @@ def test_contamination(
     if write_plot:
         plot_directory = ut.io.get_safe_path(plot_directory)
         dist_name = 'dist'
-        if halo_radius and scale_halo_radius:
+        if halo_radius and scale_to_halo_radius:
             dist_name += '.200m'
         plot_name = 'mass.ratio_v_%s_z.%.1f.pdf' % (dist_name, part.snap['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
@@ -443,7 +447,7 @@ def test_contamination(
 
 def test_metal_v_distance(
     part, center_pos=[], distance_lim=[10, 3000], distance_bin_num=100,
-    distance_scaling='log', y_scaling='log', vir_radius=None, scale_vir=False,
+    distance_scaling='log', y_scaling='log', vir_radius=None, scale_to_halo_radius=False,
     center_species=['star'],
     plot_kind='metalicity', write_plot=False, plot_directory='.'):
     '''
@@ -466,7 +470,7 @@ def test_metal_v_distance(
         center_pos = get_center_position(part, center_species)
 
     x_lim = np.array(distance_lim)
-    if vir_radius and scale_vir:
+    if vir_radius and scale_to_halo_radius:
         x_lim *= vir_radius
 
     DistanceBin = ut.bin.DistanceBinClass(distance_scaling, x_lim, distance_bin_num)
@@ -487,7 +491,7 @@ def test_metal_v_distance(
     # plot ----------
     # colors = plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
-    if vir_radius and scale_vir:
+    if vir_radius and scale_to_halo_radius:
         xs /= vir_radius
 
     plt.close()
@@ -502,7 +506,7 @@ def test_metal_v_distance(
         subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=20)
     elif plot_kind == 'metal.mass':
         subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=20)
-    if scale_vir:
+    if scale_to_halo_radius:
         x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
         x_label = 'distance [$\\rm kpc\,comoving$]'
@@ -511,7 +515,7 @@ def test_metal_v_distance(
     plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
 
     if vir_radius:
-        if scale_vir:
+        if scale_to_halo_radius:
             x_ref = 1
         else:
             x_ref = vir_radius
@@ -529,7 +533,7 @@ def test_metal_v_distance(
     if write_plot:
         plot_directory = ut.io.get_safe_path(plot_directory)
         dist_name = 'dist'
-        if vir_radius and scale_vir:
+        if vir_radius and scale_to_halo_radius:
             dist_name += '.200m'
         plot_name = plot_kind + '_v_' + dist_name + '_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
