@@ -116,10 +116,6 @@ def get_halo_radius(
         positions = np.array(positions)
         masses = np.array(masses)
 
-    # correct for baryonic mass
-    if not part.info['has.baryons'] and species == ['dark']:
-        masses *= 1 + part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter']
-
     # if center_position is None or not len(center_position):
     #    center_position = get_center_position(part, positions, masses)
 
@@ -135,6 +131,12 @@ def get_halo_radius(
     # get mass within distance minimum, for computing cumulative values
     rad_indices = np.where(rads < np.min(radius_lim))[0]
     masses_cum = np.sum(masses[rad_indices]) + np.cumsum(mass_in_bins)
+
+    if part.info['has.baryons'] and species == ['dark']:
+        # correct for baryonic mass if analyzing only dark matter in baryonic simulation
+        mass_factor = 1 + part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter']
+        mass_in_bins *= mass_factor
+        masses_cum *= mass_factor
 
     # cumulative densities in bins
     density_cum_in_bins = masses_cum / DistanceBin.volumes_cum
@@ -340,18 +342,17 @@ def write_initial_condition_points(
 #===================================================================================================
 # tests
 #===================================================================================================
-def test_contamination(
+def plot_mass_contamination(
     part, center_pos=[], distance_lim=[1, 5000], distance_bin_num=100,
     distance_scaling='log', y_scaling='log', halo_radius=None, scale_to_halo_radius=False,
-    center_species=['star'], write_plot=False, plot_directory='.'):
+    write_plot=False, plot_directory='.'):
     '''
-    Test lower resolution particle contamination around center.
+    Plot lower resolution particle contamination v distance from input center.
 
     Parameters
     ----------
     catalog of particles: dict
     position of galaxy center: array
-        note: if not input, generate
     distance limits: list or array
     distance scaling: float
         options: log, lin
@@ -360,7 +361,7 @@ def test_contamination(
 
     species_ref = 'dark'
 
-    Say = ut.io.SayClass(test_contamination)
+    Say = ut.io.SayClass(plot_mass_contamination)
 
     species_test_t = []
     for spec_test in species_test:
@@ -369,9 +370,6 @@ def test_contamination(
         else:
             Say.say('! no %s in particle dictionary' % spec_test)
     species_test = species_test_t
-
-    if center_pos is None or not len(center_pos):
-        center_pos = get_center_position(part, center_species)
 
     x_lim = np.array(distance_lim)
     if halo_radius and scale_to_halo_radius:
@@ -386,8 +384,8 @@ def test_contamination(
     ratios = {}
 
     for spec in pros:
-        dists = ut.coord.distance('scalar', part[spec]['position'], center_pos,
-                                  part.info['box.length'])
+        dists = ut.coord.distance(
+            'scalar', part[spec]['position'], center_pos, part.info['box.length'])
         pros[spec] = DistanceBin.get_mass_profile(dists, part[spec]['mass'], get_spline=False)
 
     for spec in species_test:
