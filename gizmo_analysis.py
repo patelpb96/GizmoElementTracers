@@ -37,10 +37,11 @@ def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[
     maximum radius to consider {kpc comoving}: float
     '''
     # ensure is list even if just one species
-    if species == 'all' or species == ['all']:
-        species = ['star', 'dark', 'gas']
     if np.isscalar(species):
         species = [species]
+
+    if species == ['all']:
+        species = ['star', 'dark', 'gas']
 
     positions = []
     masses = []
@@ -55,7 +56,7 @@ def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[
         positions, masses, part.info['box.length'], center_position, radius_max)
 
 
-def get_virial_radius(
+def get_halo_radius(
     part, species=['dark', 'star', 'gas'], center_position=[], virial_kind='200m',
     radius_scaling='log', radius_lim=[10, 3000], radius_bin_num=100):
     '''
@@ -79,7 +80,7 @@ def get_virial_radius(
     whether simulation includes baryons: boolean
         note: use this to scale dark matter mass if using only dark matter
     '''
-    Say = ut.io.SayClass(get_virial_radius)
+    Say = ut.io.SayClass(get_halo_radius)
 
     HaloProperty = halo_property.HaloPropertyClass(part.Cosmo, part.snap['redshift'])
 
@@ -90,11 +91,12 @@ def get_virial_radius(
     virial_density = overdensity * reference_density
 
     # ensure is list even if just one species
-    if species == 'all' or species == ['all']:
-        #species = part.keys()
-        species = ['star', 'dark', 'gas']
     if np.isscalar(species):
         species = [species]
+
+    if species == ['all']:
+        species = part.keys()
+        # species = ['star', 'dark', 'gas']
 
     if len(species) == 1:
         positions = part[species[0]]['position']
@@ -113,8 +115,8 @@ def get_virial_radius(
     if not part.info['has.baryons'] and species == ['dark']:
         masses *= 1 + part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter']
 
-    if center_position is None or not len(center_position):
-        center_position = get_center_position(part, positions, masses)
+    # if center_position is None or not len(center_position):
+    #    center_position = get_center_position(part, positions, masses)
 
     rads = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
 
@@ -185,7 +187,7 @@ def write_initial_condition_points(
     distance_select_input = distance_select
     if not distance_select or scale_to_halo_radius:
         if not halo_radius:
-            halo_radius = get_virial_radius(part_fin, ['all'], center_pos, virial_kind, 'log')
+            halo_radius = get_halo_radius(part_fin, 'all', center_pos, virial_kind, 'log')
         if not distance_select:
             distance_select = halo_radius
         elif scale_to_halo_radius:
@@ -226,17 +228,19 @@ def write_initial_condition_points(
     if part_ini.info['has.baryons']:
         # subtract baryonic mass
         density_ini *= part_ini.Cosmo['omega_dark'] / part_ini.Cosmo['omega_matter']
-    mass_ini = volume_ini * density_ini    # assume cosmic density within volume
+    mass_ini = volume_ini * density_ini  # assume cosmic density within volume
 
     Say.say('final redshift = %.3f, initial redshift = %.3f' %
             (part_fin.snap['redshift'], part_ini.snap['redshift']))
-    Say.say('center of volume at final time = [%.3f, %.3f, %.3f] kpc comoving' %
+    Say.say('centering on volume at final time = [%.3f, %.3f, %.3f] kpc comoving' %
             (center_pos[0], center_pos[1], center_pos[2]))
-    Say.say('radius of selection volume at final time = %.3f kpc comoving' % distance_select)
     if scale_to_halo_radius:
-        Say.say('  = %.2f x R_%s' % (distance_select_input, virial_kind))
+        Say.say('selecting radius as %.2f x R_%s, R_%s = %.2f kpc comoving' %
+                (distance_select_input, virial_kind, virial_kind, halo_radius))
+    Say.say('radius of selection volume at final time = %.3f kpc comoving' % distance_select)
     if use_onorbe_method:
-        Say.say('radius of uncontaminated volume at final time = %.3f kpc comoving' % distance_pure)
+        Say.say('radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc comoving' %
+                distance_pure)
     Say.say('number of particles in selection volume at final time = %d' % np.sum(spec_select_num))
     for spec_i in xrange(len(spec_names)):
         spec_name = spec_names[spec_i]
@@ -246,7 +250,7 @@ def write_initial_condition_points(
             part_ini['dark']['mass'].sum())
     Say.say('  in selection volume at final time = %.2e M_sun' % mass_select)
     if use_onorbe_method:
-        Say.say('  in uncontaminated volume at final time = %.2e M_sun' % mass_pure)
+        Say.say('  in uncontaminated volume (Onorbe et al) at final time = %.2e M_sun' % mass_pure)
     Say.say('  in convex hull at initial time = %.2e M_sun' % mass_ini)
     Say.say('volume of convex hull at initial time = %.1f Mpc ^ 3 comoving' %
             (volume_ini * const.mega_per_kilo ** 3))
@@ -256,24 +260,29 @@ def write_initial_condition_points(
     file_io = open(log_file_name, 'w')
     file_io.write('# final redshift = %.3f, initial redshift = %.3f\n' %
                   (part_fin.snap['redshift'], part_ini.snap['redshift']))
-    file_io.write('# center of volume at final time = [%.3f, %.3f, %.3f] kpc comoving\n' %
+    file_io.write('# centering on volume at final time = [%.3f, %.3f, %.3f] kpc comoving\n' %
                   (center_pos[0], center_pos[1], center_pos[2]))
+    if scale_to_halo_radius:
+        file_io.write('# selecting radius as %.2f x R_%s, R_%s = %.2f kpc comoving\n' %
+                      (distance_select_input, virial_kind, virial_kind, halo_radius))
     file_io.write('# radius of selection volume at final time = %.3f kpc comoving\n' %
                   distance_select)
-    if scale_to_halo_radius:
-        file_io.write('#   = %.2f x R_%s\n' % (distance_select_input, virial_kind))
     if use_onorbe_method:
-        file_io.write('# radius of uncontaminated volume at final time = %.3f kpc comoving\n' %
-                      distance_pure)
+        file_io.write(
+            '# radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc comoving\n' %
+            distance_pure)
     file_io.write('# number of particles in selection volume at final time = %d\n' %
                   poss_ini.shape[0])
     for spec_i in xrange(len(spec_names)):
         file_io.write('#   species %s: number = %d\n' %
                       (spec_names[spec_i], spec_select_num[spec_i]))
     file_io.write('# mass of all dark-matter particles:\n')
+    file_io.write('#   at highest-resolution in input catalog = %.2e M_sun\n' %
+                  part_ini['dark']['mass'].sum())
     file_io.write('#   in selection volume at final time = %.2e M_sun\n' % mass_select)
     if use_onorbe_method:
-        file_io.write('#   in uncontaminated volume at final time = %.2e M_sun\n' % mass_pure)
+        file_io.write('#   in uncontaminated volume (Onorbe et al) at final time = %.2e M_sun\n' %
+                      mass_pure)
     file_io.write('#   in convex hull at initial time = %.2e M_sun\n' % mass_ini)
     file_io.write('# volume of convex hull at initial time = %.1f Mpc ^ 3 comoving\n' %
                   (volume_ini * const.mega_per_kilo ** 3))
@@ -283,7 +292,7 @@ def write_initial_condition_points(
                        ut.array.get_limits(poss_ini_limits[dimen_i] / part_ini.info['box.length'],
                                            digit_num=8)))
 
-    poss_ini /= part_ini.info['box.length']    # renormalize to box units
+    poss_ini /= part_ini.info['box.length']  # renormalize to box units
 
     if method == 'convex.hull':
         # use convex hull to define initial region to reduce memory
@@ -305,7 +314,7 @@ def write_initial_condition_points(
 #===================================================================================================
 def test_contamination(
     part, center_pos=[], distance_lim=[1, 5000], distance_bin_num=100,
-    distance_scaling='log', y_scaling='log', vir_radius=None, scale_vir=False,
+    distance_scaling='log', y_scaling='log', halo_radius=None, scale_halo_radius=False,
     center_species=['star'], write_plot=False, plot_directory='.'):
     '''
     Test lower resolution particle contamination around center.
@@ -337,8 +346,8 @@ def test_contamination(
         center_pos = get_center_position(part, center_species)
 
     x_lim = np.array(distance_lim)
-    if vir_radius and scale_vir:
-        x_lim *= vir_radius
+    if halo_radius and scale_halo_radius:
+        x_lim *= halo_radius
 
     DistanceBin = ut.bin.DistanceBinClass(distance_scaling, x_lim, distance_bin_num)
 
@@ -372,8 +381,8 @@ def test_contamination(
     Say.say('%s cumulative mass/number:' % spec)
     dists = 10 ** pros[spec]['distance.cum']
     print_string = '  d < %.3f kpc: mass = %.2e, number = %d'
-    if scale_vir:
-        dists /= vir_radius
+    if scale_halo_radius:
+        dists /= halo_radius
         print_string = '  d/R_halo < %.3f: mass = %.2e, number = %d'
     for dist_i in xrange(pros[spec]['mass.cum'].size):
         if pros[spec]['mass.cum'][dist_i] > 0:
@@ -383,19 +392,19 @@ def test_contamination(
     # plot ----------
     colors = plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
-    if vir_radius and scale_vir:
-        xs /= vir_radius
+    if halo_radius and scale_halo_radius:
+        xs /= halo_radius
 
     plt.close()
     plt.minorticks_on()
     fig, subplot = plt.subplots(1, 1, sharex=True)
     subplot.set_xlim(distance_lim)
-    #subplot.set_ylim([0, 0.1])
+    # subplot.set_ylim([0, 0.1])
     subplot.set_ylim([0.0001, 3])
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
 
     subplot.set_ylabel('$M_{\\rm spec} / M_{\\rm %s}$' % species_ref, fontsize=20)
-    if scale_vir:
+    if scale_halo_radius:
         x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
         x_label = 'distance [$\\rm kpc\,comoving$]'
@@ -403,14 +412,14 @@ def test_contamination(
 
     plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
 
-    if vir_radius:
-        if scale_vir:
+    if halo_radius:
+        if scale_halo_radius:
             x_ref = 1
         else:
-            x_ref = vir_radius
+            x_ref = halo_radius
         plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-    #import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
 
     for spec_i, spec in enumerate(species_test):
         plot_func(xs, ratios[spec]['bin'], color=colors[spec_i], alpha=0.6, label=spec)
@@ -418,12 +427,12 @@ def test_contamination(
     legend = subplot.legend(loc='best', prop=FontProperties(size=12))
     legend.get_frame().set_alpha(0.7)
 
-    #plt.tight_layout(pad=0.02)
+    # plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_safe_path(plot_directory)
         dist_name = 'dist'
-        if vir_radius and scale_vir:
+        if halo_radius and scale_halo_radius:
             dist_name += '.200m'
         plot_name = 'mass.ratio_v_%s_z.%.1f.pdf' % (dist_name, part.snap['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
@@ -449,7 +458,7 @@ def test_metal_v_distance(
     distance scaling: float
         options: log, lin
     '''
-    metal_index = 0    # overall metalicity
+    metal_index = 0  # overall metalicity
 
     Say = ut.io.SayClass(test_metal_v_distance)
 
@@ -464,7 +473,7 @@ def test_metal_v_distance(
 
     dists = ut.coord.distance('scalar', part['gas']['position'], center_pos,
                               part.info['box.length'])
-    metal_masses = part['gas']['metal'][:, metal_index] * part['gas']['mass'] / 0.02    # solar
+    metal_masses = part['gas']['metal'][:, metal_index] * part['gas']['mass'] / 0.02  # solar
 
     pro_metal = DistanceBin.get_mass_profile(dists, metal_masses, get_spline=False)
     if plot_kind == 'metalicity':
@@ -476,7 +485,7 @@ def test_metal_v_distance(
         y_lim = [0.001, 1]
 
     # plot ----------
-    #colors = plot.get_colors(len(species_test), use_black=False)
+    # colors = plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
     if vir_radius and scale_vir:
         xs /= vir_radius
@@ -485,7 +494,7 @@ def test_metal_v_distance(
     plt.minorticks_on()
     fig, subplot = plt.subplots(1, 1, sharex=True)
     subplot.set_xlim(distance_lim)
-    #subplot.set_ylim([0, 0.1])
+    # subplot.set_ylim([0, 0.1])
     subplot.set_ylim(y_lim)
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
 
@@ -508,14 +517,14 @@ def test_metal_v_distance(
             x_ref = vir_radius
         plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-    #import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
 
     plot_func(xs, ys, color='blue', alpha=0.6)
 
-    #legend = subplot.legend(loc='best', prop=FontProperties(size=12))
-    #legend.get_frame().set_alpha(0.7)
+    # legend = subplot.legend(loc='best', prop=FontProperties(size=12))
+    # legend.get_frame().set_alpha(0.7)
 
-    #plt.tight_layout(pad=0.02)
+    # plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_safe_path(plot_directory)
@@ -540,7 +549,7 @@ def get_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001):
         pis = np.arange(part['mass'].size, dtype=np.int32)
     pis_sort = np.argsort(part['form.time'])
     star_form_aexps = part['form.time'][pis_sort]
-    #star_form_redshifts = 1 / star_form_aexps - 1
+    # star_form_redshifts = 1 / star_form_aexps - 1
     star_masses = part['mass'][pis_sort]
     star_masses_cum = np.cumsum(star_masses)
 
@@ -553,13 +562,13 @@ def get_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001):
     aexp_bins = np.arange(aexp_lim.min(), aexp_lim.max(), aexp_wid)
     redshift_bins = 1 / aexp_bins - 1
     time_bins = part.Cosmo.age(redshift_bins)
-    #time_bins = part.Cosmo.age(0) - time_bins
-    time_bins *= 1e9    # {yr}
+    # time_bins = part.Cosmo.age(0) - time_bins
+    time_bins *= 1e9  # {yr}
 
     star_mass_cum_bins = np.interp(aexp_bins, star_form_aexps, star_masses_cum)
-    dm_dts = np.diff(star_mass_cum_bins) / np.diff(time_bins) / 0.7    # account for mass loss
+    dm_dts = np.diff(star_mass_cum_bins) / np.diff(time_bins) / 0.7  # account for mass loss
 
-    time_mids = time_bins[0: time_bins.size - 1] + np.diff(time_bins)    # midpoints
+    time_mids = time_bins[0: time_bins.size - 1] + np.diff(time_bins)  # midpoints
 
     time_mids /= 1e9
 
@@ -578,13 +587,13 @@ def plot_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001, write_
     fig, subplot = plt.subplots(1, 1, sharex=True)
     fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
 
-    #subplot.xscale('linear')
-    #subplot.yscale('log')
+    # subplot.xscale('linear')
+    # subplot.yscale('log')
     subplot.set_xlabel(r'time [Gyr]')
-    #pylab.ylabel(r'${\rm SFR}\ \ \dot{M}_{\ast}\ \  [{\rm M_{\odot}\,yr^{-1}}]$')
+    # pylab.ylabel(r'${\rm SFR}\ \ \dot{M}_{\ast}\ \  [{\rm M_{\odot}\,yr^{-1}}]$')
     subplot.set_ylabel(r'${\rm SFR}\,[{\rm M_{\odot}\,yr^{-1}}]$')
     subplot.semilogy(times, sfrs, linewidth=2.0, color='r')
 
-    #plt.tight_layout(pad=0.02)
+    # plt.tight_layout(pad=0.02)
     if write_plot:
         plt.savefig('sfr_v_time.pdf', format='pdf')
