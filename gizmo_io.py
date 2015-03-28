@@ -117,7 +117,7 @@ class GizmoClass(ut.io.SayClass):
             'Coordinates': 'position',
             # 'Velocities': 'velocity',
             'Masses': 'mass',
-            # 'Potential': 'potential',
+            'Potential': 'potential',
 
             'InternalEnergy': 'energy.internal',
             'Density': 'density',
@@ -145,7 +145,7 @@ class GizmoClass(ut.io.SayClass):
             # 8 = S
             # 9 = Ca
             # 10 = Fe
-            # 'Metallicity': 'metallicity',
+            'Metallicity': 'metallicity',
 
             # 'time' when the star particle formed
             # for cosmological runs, this is the scale factor
@@ -387,7 +387,7 @@ class GizmoClass(ut.io.SayClass):
                              (np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
 
             if 'bh.mass' in part[spec_name]:
-                part[spec_name]['bh.mass'] /= header['hubble']
+                part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
 
             if 'velocity' in part[spec_name]:
                 # convert to {km / s physical}
@@ -395,12 +395,13 @@ class GizmoClass(ut.io.SayClass):
 
             if 'density' in part[spec_name]:
                 # convert to {M_sun / kpc ** 3 physical}
-                part[spec_name]['density'] *= (1 / header['hubble'] /
+                part[spec_name]['density'] *= (1e10 / header['hubble'] /
                                                (header['scale.factor'] / header['hubble']) ** 3)
 
             if 'smooth.length' in part[spec_name]:
                 # convert to {kpc physical}
                 part[spec_name]['smooth.length'] *= header['scale.factor'] / header['hubble']
+                part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
 
             if 'form.time' in part[spec_name]:
                 # convert to {Gyr}

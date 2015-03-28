@@ -23,6 +23,48 @@ from utilities import plot
 #===================================================================================================
 # utility
 #===================================================================================================
+def get_species_positions_masses(part, species):
+    '''
+    Parameters
+    ----------
+    catalog of particles: dict
+    list of species: string or list
+    '''
+    Say = ut.io.SayClass(get_species_positions_masses)
+
+    if np.isscalar(species):
+        species = [species]
+
+    if len(species) == 1:
+        positions = part[species[0]]['position']
+        if np.unique(part[species[0]]['mass']).size == 1:
+            masses = None
+        else:
+            masses = part[species[0]]['mass']
+    else:
+        particle_num = 0
+        for spec in species:
+            if spec in part:
+                particle_num += part[spec]['position'].shape[0]
+
+        if particle_num > 1e8:
+            Say.say('! warning: allocating positions & masses for %d particles!' % particle_num)
+
+        positions = np.zeros([particle_num, part[spec]['position'].shape[1]],
+                             dtype=part[spec]['position'].dtype)
+        masses = np.zeros(particle_num, dtype=part[spec]['mass'].dtype)
+
+        particle_index = 0
+        for spec in species:
+            if spec in part:
+                spec_part_num = part[spec]['position'].shape[0]
+                positions[particle_index: spec_part_num + particle_index] = part[spec]['position']
+                masses[particle_index: spec_part_num + particle_index] = part[spec]['mass']
+                particle_index += spec_part_num
+
+    return positions, masses
+
+
 def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[0, 0, 0],
                         radius_max=1e10):
     '''
@@ -43,21 +85,7 @@ def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[
     if species == ['all']:
         species = ['star', 'dark', 'gas']
 
-    if len(species) == 1:
-        positions = part[species[0]]['position']
-        if np.unique(part[species[0]]['mass']).size == 1:
-            masses = None
-        else:
-            masses = part[species[0]]['mass']
-    else:
-        positions = []
-        masses = []
-        for spec in species:
-            if spec in part:
-                positions.extend(part[spec]['position'])
-                masses.extend(part[spec]['mass'])
-        positions = np.array(positions)
-        masses = np.array(masses)
+    positions, masses = get_species_positions_masses(part, species)
 
     return ut.coord.position_center_of_mass_zoom(
         positions, masses, part.info['box.length'], center_position, radius_max)
@@ -84,6 +112,10 @@ def get_halo_radius(
         options: log, lin
     radius bin limits: list or array
     radius bin number: int
+
+    Returns
+    -------
+    halo virial radius {kpc comoving}: float
     '''
     Say = ut.io.SayClass(get_halo_radius)
 
@@ -103,22 +135,12 @@ def get_halo_radius(
         species = part.keys()
         # species = ['star', 'dark', 'gas']
 
-    if len(species) == 1:
-        positions = part[species[0]]['position']
-        masses = part[species[0]]['mass']
-    else:
-        positions = []
-        masses = []
-        for spec in species:
-            if spec in part:
-                positions.extend(part[spec]['position'])
-                masses.extend(part[spec]['mass'])
-        positions = np.array(positions)
-        masses = np.array(masses)
+    positions, masses = get_species_positions_masses(part, species)
 
     # if center_position is None or not len(center_position):
     #    center_position = get_center_position(part, positions, masses)
 
+    # {kpc comoving}
     rads = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
 
     # get masses in bins
@@ -162,7 +184,7 @@ def get_halo_radius(
             else:
                 halo_mass = np.sum(masses[rads < halo_radius])
 
-            Say.say('R_%s = %.3f kpc, M_%s = %.3e M_sun' %
+            Say.say('R_%s = %.3f kpc comoving, M_%s = %.3e M_sun' %
                     (virial_kind, halo_radius, virial_kind, halo_mass))
 
             return halo_radius
@@ -467,11 +489,10 @@ def plot_mass_contamination(
         plt.show(block=False)
 
 
-def test_metal_v_distance(
+def plot_metal_v_distance(
     part, center_pos=[], distance_lim=[10, 3000], distance_bin_num=100,
-    distance_scaling='log', y_scaling='log', vir_radius=None, scale_to_halo_radius=False,
-    center_species=['star'],
-    plot_kind='metalicity', write_plot=False, plot_directory='.'):
+    distance_scaling='log', y_scaling='log', halo_radius=None, scale_to_halo_radius=False,
+    plot_kind='gas.metallicity', write_plot=False, plot_directory='.'):
     '''
     Test lower resolution particle contamination around center.
 
@@ -481,40 +502,49 @@ def test_metal_v_distance(
     position of galaxy center: array
         note: if not input, generate
     distance limits: list or array
-    distance scaling: float
+    distance bin number: int
+    distance scaling: string
         options: log, lin
+    y-axis scaling: string
+        options: log, lin
+    halo radius: float
+    whether to scale distance to halo radius: boolean
+    plot king: string
+        options: gas.metallicity, gas.metal.mass.cum
+    whether to write plot to file: boolean
+    directory to place plot: string
     '''
-    metal_index = 0  # overall metalicity
+    metal_index = 0  # overall metallicity
 
-    Say = ut.io.SayClass(test_metal_v_distance)
+    Say = ut.io.SayClass(plot_metal_v_distance)
 
-    if center_pos is None or not len(center_pos):
-        center_pos = get_center_position(part, center_species)
+    # if center_pos is None or not len(center_pos):
+    #    center_pos = get_center_position(part, center_species)
 
     x_lim = np.array(distance_lim)
-    if vir_radius and scale_to_halo_radius:
-        x_lim *= vir_radius
+    if halo_radius and scale_to_halo_radius:
+        x_lim *= halo_radius
 
     DistanceBin = ut.bin.DistanceBinClass(distance_scaling, x_lim, distance_bin_num)
 
     dists = ut.coord.distance('scalar', part['gas']['position'], center_pos,
                               part.info['box.length'])
-    metal_masses = part['gas']['metal'][:, metal_index] * part['gas']['mass'] / 0.02  # solar
+    metal_masses = part['gas']['metallicity'][:, metal_index] * part['gas']['mass'] / 0.02  # solar
 
-    pro_metal = DistanceBin.get_mass_profile(dists, metal_masses, get_spline=False)
-    if plot_kind == 'metalicity':
-        pro_mass = DistanceBin.get_mass_profile(dists, part['gas']['mass'], get_spline=False)
+    pro_metal = DistanceBin.get_mass_profile(dists, metal_masses, get_mass_fraction=True)
+    if 'metallicity' in plot_kind:
+        pro_mass = DistanceBin.get_mass_profile(dists, part['gas']['mass'])
         ys = pro_metal['mass'] / pro_mass['mass']
         y_lim = np.clip(plot.get_limits(ys), 0.0001, 10)
-    elif plot_kind == 'metal.mass':
-        ys = pro_metal['frac.cum']
+    elif 'metal.mass.cum' in plot_kind:
+        ys = pro_metal['fraction.cum']
         y_lim = [0.001, 1]
 
     # plot ----------
     # colors = plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
-    if vir_radius and scale_to_halo_radius:
-        xs /= vir_radius
+    if halo_radius and scale_to_halo_radius:
+        xs /= halo_radius
 
     plt.close()
     plt.minorticks_on()
@@ -524,9 +554,9 @@ def test_metal_v_distance(
     subplot.set_ylim(y_lim)
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
 
-    if plot_kind == 'metalicity':
+    if 'metallicity' in plot_kind:
         subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=20)
-    elif plot_kind == 'metal.mass':
+    elif 'metal.mass.cum' in plot_kind:
         subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=20)
     if scale_to_halo_radius:
         x_label = '$d \, / \, R_{\\rm 200m}$'
@@ -536,11 +566,11 @@ def test_metal_v_distance(
 
     plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
 
-    if vir_radius:
+    if halo_radius:
         if scale_to_halo_radius:
             x_ref = 1
         else:
-            x_ref = vir_radius
+            x_ref = halo_radius
         plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
     # import ipdb; ipdb.set_trace()
@@ -555,7 +585,7 @@ def test_metal_v_distance(
     if write_plot:
         plot_directory = ut.io.get_safe_path(plot_directory)
         dist_name = 'dist'
-        if vir_radius and scale_to_halo_radius:
+        if halo_radius and scale_to_halo_radius:
             dist_name += '.200m'
         plot_name = plot_kind + '_v_' + dist_name + '_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
