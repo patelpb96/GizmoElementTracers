@@ -368,9 +368,14 @@ class GizmoClass(ut.io.SayClass):
 
         # check if need bit-flip
         for spec_name in species_names:
-            if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 5e9:
-                masks = part[spec_name]['id'] < 0 or part[spec_name]['id'] > 5e9
-                self.say('detected possible bit-flip for %d particles of species: %s' %
+            if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 2 ** 32:
+                masks = part[spec_name]['id'] < 0
+                self.say('%d particles of species: %s have id < 0, possible bit-flip' %
+                         (np.sum(masks), spec_name))
+                part[spec_name]['id'][masks] += 1L << 31
+
+                masks = part[spec_name]['id'] > 2 ** 32
+                self.say('%d particles of species: %s have id > 2 ** 32, possible bit-flip' %
                          (np.sum(masks), spec_name))
                 part[spec_name]['id'][masks] += 1L << 31
 
