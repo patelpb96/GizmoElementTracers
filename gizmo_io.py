@@ -370,14 +370,17 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in species_names:
             if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 2 ** 32:
                 masks = part[spec_name]['id'] < 0
-                self.say('%d particles of species: %s have id < 0, possible bit-flip' %
-                         (np.sum(masks), spec_name))
-                part[spec_name]['id'][masks] += 1L << 31
+                if np.sum(masks):
+                    # masks[-1e9]
+                    self.say('! %d %s particles have id < 0, possible bit flip' %
+                             (np.sum(masks), spec_name))
+                    part[spec_name]['id'][masks] += 1L << 31
 
                 masks = part[spec_name]['id'] > 2 ** 32
-                self.say('%d particles of species: %s have id > 2 ** 32, possible bit-flip' %
-                         (np.sum(masks), spec_name))
-                part[spec_name]['id'][masks] += 1L << 31
+                if np.sum(masks):
+                    self.say('! %d %s particles have id > 2 ^ 32, possible bit flip' %
+                             (np.sum(masks), spec_name))
+                    part[spec_name]['id'][masks] += 1L << 31
 
         # apply cosmological conversions
         for spec_name in species_names:
