@@ -558,10 +558,12 @@ def plot_metal_v_distance(
         subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=20)
     elif 'metal.mass.cum' in plot_kind:
         subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=20)
+
     if scale_to_halo_radius:
         x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
         x_label = 'distance [$\\rm kpc\,comoving$]'
+
     subplot.set_xlabel(x_label, fontsize=20)
 
     plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
@@ -597,6 +599,49 @@ def plot_metal_v_distance(
 #===================================================================================================
 # analysis
 #===================================================================================================
+def plot_prop_v_prop(part, spec_name='gas', prop_x='density', prop_y='energy.internal',
+                     distance_lim=[20, 300]):
+    '''
+    .
+    '''
+    from matplotlib.colors import LogNorm
+
+    try:
+        center_pos = part['dark']['position'][np.argmin(part['dark']['potential'])]
+    except:
+        center_pos = get_center_position(part, 'dark')
+
+    dists = ut.coord.distance('scalar', part[spec_name]['position'], center_pos,
+                              part.info['box.length'])
+
+    masks = ut.array.elements(dists, distance_lim)
+
+    props_x = log10(part[spec_name][prop_x][masks])
+    props_y = log10(part[spec_name][prop_y][masks])
+
+    # plot ----------
+    plt.close()
+    plt.minorticks_on()
+
+    plt.hist2d(props_x, props_y, bins=200, norm=LogNorm())
+    plt.colorbar()
+    plt.show()
+
+    # fig, subplot = plt.subplots(1, 1, sharex=True)
+    # fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
+
+    # subplot.xscale('linear')
+    # subplot.yscale('log')
+    # subplot.set_xlabel(prop_x)
+    # subplot.set_ylabel(prop_y)
+
+    # subplot.loglog(props_x, props_y, '.', color='green', alpha=0.1, linewidth=0.1)
+    # plot_func = plot.get_plot_function(subplot, 'log', 'log')
+    # plot_func(props_x, props_y, 'o', color='green', alpha=0.5)
+
+    # plt.tight_layout(pad=0.02)
+
+
 def get_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001):
     '''
     .
