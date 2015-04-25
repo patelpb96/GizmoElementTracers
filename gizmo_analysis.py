@@ -38,7 +38,7 @@ def get_species_positions_masses(part, species):
     if len(species) == 1:
         positions = part[species[0]]['position']
         if np.unique(part[species[0]]['mass']).size == 1:
-            masses = None
+            masses = np.unique(part[species[0]]['mass'])
         else:
             masses = part[species[0]]['mass']
     else:
@@ -148,23 +148,28 @@ def get_halo_radius(
         rads = log10(rads)
         radius_lim = log10(radius_lim)
 
-    mass_in_bins = np.histogram(rads, radius_bin_num, radius_lim, False, masses)[0]
+    if np.isscalar(masses):
+        mass_in_bins = np.histogram(rads, radius_bin_num, radius_lim, False, None)[0]
+    else:
+        mass_in_bins = np.histogram(rads, radius_bin_num, radius_lim, False, masses)[0]
 
     # get mass within distance minimum, for computing cumulative values
     rad_indices = np.where(rads < np.min(radius_lim))[0]
-    masses_cum = np.sum(masses[rad_indices]) + np.cumsum(mass_in_bins)
+    if np.isscalar(masses):
+        masses_cum = masses * (rad_indices.size + np.cumsum(mass_in_bins))
+    else:
+        masses_cum = np.sum(masses[rad_indices]) + np.cumsum(mass_in_bins)
 
     if part.info['has.baryons'] and species == ['dark']:
         # correct for baryonic mass if analyzing only dark matter in baryonic simulation
         mass_factor = 1 + part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter']
-        mass_in_bins *= mass_factor
         masses_cum *= mass_factor
 
     # cumulative densities in bins
     density_cum_in_bins = masses_cum / DistanceBin.volumes_cum
 
     # import ipdb; ipdb.set_trace()
-    # mass_in_bins[100000000000]
+    # mass_in_bins[1e10]
 
     for dist_bin_i in xrange(DistanceBin.num - 1):
         if (density_cum_in_bins[dist_bin_i] >= virial_density and
