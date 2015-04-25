@@ -169,7 +169,7 @@ def get_halo_radius(
     density_cum_in_bins = masses_cum / DistanceBin.volumes_cum
 
     # import ipdb; ipdb.set_trace()
-    # mass_in_bins[1e10]
+    # mass_in_bins[1e99]
 
     for dist_bin_i in xrange(DistanceBin.num - 1):
         if (density_cum_in_bins[dist_bin_i] >= virial_density and
