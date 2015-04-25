@@ -38,7 +38,7 @@ def get_species_positions_masses(part, species):
     if len(species) == 1:
         positions = part[species[0]]['position']
         if np.unique(part[species[0]]['mass']).size == 1:
-            masses = np.unique(part[species[0]]['mass'])
+            masses = np.unique(part[species[0]]['mass'])[0]
         else:
             masses = part[species[0]]['mass']
     else:
