@@ -185,9 +185,14 @@ def get_halo_radius(
                                  (log_den_inner - log10(virial_density)))
 
             if 'log' in radius_scaling:
-                halo_mass = np.sum(masses[rads < log10(halo_radius)])
+                rad_use = log10(halo_radius)
             else:
-                halo_mass = np.sum(masses[rads < halo_radius])
+                rad_use = halo_radius
+
+            if np.isscalar(masses):
+                halo_mass = masses * np.sum(rads < rad_use)
+            else:
+                halo_mass = np.sum(masses[rads < rad_use])
 
             Say.say('R_%s = %.3f kpc comoving, M_%s = %.3e M_sun' %
                     (virial_kind, halo_radius, virial_kind, halo_mass))
