@@ -194,8 +194,8 @@ def get_halo_radius(
             else:
                 halo_mass = np.sum(masses[rads < rad_use])
 
-            Say.say('R_%s = %.3f kpc comoving, M_%s = %.3e M_sun' %
-                    (virial_kind, halo_radius, virial_kind, halo_mass))
+            Say.say('M_%s = %.3e M_sun, log = %.3f\n  R_%s = %.3f kpc comoving' %
+                    (virial_kind, halo_mass, log10(halo_mass), virial_kind, halo_radius))
 
             return halo_radius
     else:
@@ -239,8 +239,9 @@ def write_initial_condition_points(
         if spec_name in part_fin:
             spec_names.append(spec_name)
             if np.min(part_fin[spec_name]['id'] == part_ini[spec_name]['id']) == False:
-                Say.say('! ids in final and initial particle catalogs not match')
-                return
+                Say.say('! species = %s: ids in final and initial catalogs not match' % spec_name)
+                if spec_name in ['dark', 'dark.2']:
+                    return
     Say.say('using species: %s' % spec_names)
 
     if center_pos is None or not len(center_pos):
@@ -650,6 +651,72 @@ def plot_prop_v_prop(part, spec_name='gas', prop_x='density', prop_y='energy.int
     # plot_func(props_x, props_y, 'o', color='green', alpha=0.5)
 
     # plt.tight_layout(pad=0.02)
+
+
+def plot_density_v_distance(
+    parts, species='dark', center_positions=[], distance_scaling='log', distance_lim=[1, 1000],
+    distance_bin_num=100):
+    '''
+    .
+    '''
+    DistanceBin = ut.bin.DistanceBinClass(
+        distance_scaling, distance_lim, distance_bin_num, dimension_num=3)
+
+    # ensure is list even if just one species
+    if np.isscalar(species):
+        species = [species]
+
+    if species == ['all']:
+        species = parts[0].keys()
+        # species = ['star', 'dark', 'gas']
+
+    pros = []
+    for part_i, part in enumerate(parts):
+        positions, masses = get_species_positions_masses(part, species)
+
+        if np.isscalar(masses):
+            masses = np.zeros(positions.shape[0], dtype=masses.dtype) + masses
+
+        # {kpc comoving}
+        dists = ut.coord.distance('scalar', positions, center_positions[part_i],
+                                  part.info['box.length'])
+
+        # get masses in bins
+        #if 'log' in distance_scaling:
+        #    dists = log10(dists)
+        #    distance_lim = log10(distance_lim)
+
+        #if np.isscalar(masses):
+        #    mass_in_bins = np.histogram(rads, distance_bin_num, distance_lim, False, None)[0]
+        #else:
+        #    mass_in_bins = np.histogram(rads, distance_bin_num, distance_lim, False, masses)[0]
+
+        pros.append(DistanceBin.get_mass_profile(dists, masses))
+        if part_i > 0:
+            print(pros[part_i]['density'] / pros[0]['density'])
+
+    #import ipdb; ipdb.set_trace()
+
+    colors = ['blue', 'green', 'red']
+    # plot ----------
+    plt.close()
+    plt.minorticks_on()
+
+    fig, subplot = plt.subplots(1, 1, sharex=True)
+    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
+
+    subplot.set_xlim(distance_lim)
+    subplot.set_ylim([pros[0]['density'].min(), pros[0]['density'].max()])
+    subplot.set_xlabel('radius [kpc]')
+    subplot.set_ylabel('density [$M_\odot / {\\rm kpc} ^ 3$]')
+
+    for pro_i, pro in enumerate(pros):
+        subplot.loglog(10 ** pro['distance'], pro['density'], color=colors[pro_i],
+                       alpha=0.5, linewidth=2, linestyle='-')
+        # plot_func = plot.get_plot_function(subplot, 'log', 'log')
+        # plot_func(props_x, props_y, 'o', color='green', alpha=0.5)
+
+    #plt.tight_layout(pad=0.02)
 
 
 def get_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001):

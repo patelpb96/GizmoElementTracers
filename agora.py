@@ -16,11 +16,11 @@ import yt.analysis_modules.halo_finding.api as halo_io
 #import yt.analysis_modules.halo_analysis.api as halo_analysis
 #import yt.analysis_modules.halo_merger_tree.api as tree_io
 from utilities import utility as ut
+from utilities import cosmology
 
 Fraction = ut.math.FractionClass()
 
-# relatively isolated halos with M_vir ~ 2e11 M_sun
-# AGORA uses 473
+# isolated halos with M_vir ~ 2e11 M_sun in agora_ref9 (AGORA uses 473)
 halo_ids = np.array([414, 415, 417, 438, 439, 457, 466, 468, 473, 497, 499, 503])
 
 # pc = yt.SlicePlot(pf, 'y', ('deposit', 'all_density'),
@@ -36,8 +36,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
     Use for generating initial conditions.
     '''
     def __init__(
-        self, agora_dir='/Users/awetzel/work/research/simulation/agora/refinement-09_60Mpc/',
-        snapshot_final_dir='DD0320/', snapshot_initial_dir='DD0000/', read_halo=True):
+        self, agora_dir='.', snapshot_final_dir='DD0320/', snapshot_initial_dir='DD0000/',
+        read_halo=True):
         '''
         Parameters
         ----------
@@ -46,7 +46,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         directory of initial snapshot: string
         whether to read halo catalog: boolean
         '''
-        self.agora_directory = agora_dir
+        self.agora_directory = ut.io.get_safe_path(agora_dir)
         self.snapshot_final_directory = self.agora_directory + snapshot_final_dir
         self.snapshot_initial_directory = self.agora_directory + snapshot_initial_dir
 
@@ -62,6 +62,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.data = []
         self.data.append(self.snapshot[0].h.all_data())
         self.data.append(self.snapshot[1].h.all_data())
+
+        self.Cosmo = cosmology.CosmologyClass(source='agora')
 
         if read_halo:
             self.read_halo_catalog()
@@ -81,10 +83,12 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         #    data_ds=self.snapshot[0], self.snapshot_final_directory + 'MergerHalos')
 
         self.hal = ut.array.DictClass()
-        self.hal.snap = {}
-        self.hal.snap['scale.factor'] = 1 / (1 + self['redshifts'][0])
         self.hal.info = {}
         self.hal.info['box.length'] = self['box.length']
+        self.hal.snap = {}
+        self.hal.snap['redshift'] = self['redshifts'][0]
+        self.hal.snap['scale.factor'] = 1 / (1 + self['redshifts'][0])
+        self.hal.Cosmo = self.Cosmo
 
         self.hal['position'] = np.zeros((len(self.hal_yt), 3), dtype=float32)
         self.hal['mass'] = np.zeros(len(self.hal_yt), dtype=float32)
@@ -96,38 +100,49 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.hal['radius'][hi] = self.hal_yt[hi].maximum_radius()
             self.hal['position'][hi] = self.hal_yt[hi].center_of_mass()
             self.hal['particle.num'][hi] = self.hal_yt[hi].get_size()
-        self.hal['mass'] = log10(self.hal['mass'])    # {log M_sun}
-        self.hal['radius'] *= self.hal.info['box.length']    # {kpc comoving}
-        self.hal['position'] *= self.hal.info['box.length']    # {kpc comoving}
+        self.hal['mass'] = log10(self.hal['mass'])  # {log M_sun}
+        self.hal['radius'] *= self.hal.info['box.length']  # {kpc comoving}
+        self.hal['position'] *= self.hal.info['box.length']  # {kpc comoving}
 
-        NearestNeig = ut.catalog.NearestNeigClass()
-        NearestNeig.assign(self.hal, 'mass', [1, Inf], [1, Inf], 200, 8, 'comoving', 'virial')
+        NearestNeig = ut.catalog.NearestNeighborClass()
+        NearestNeig.assign_to_self(
+            self.hal, 'mass', [1, Inf], [1, Inf], 200, 8000, 'comoving', 'virial')
         NearestNeig.assign_to_catalog(self.hal)
 
-    def read_particles(self, zis=[1, 0]):
+    def read_particles(self, zis=[0, 1], divvy_by_mass=False):
         '''
         Read particles, save as dictionary to self.
 
         Parameters
         ----------
-        snapshot indices to read: int or list
+        zis : int or list : snapshot indices to read
+        divvy_by_mass : boolean : whether to divvy particles by species
         '''
         dimension_names = ['x', 'y', 'z']
         if np.isscalar(zis):
             zis = [zis]
 
         self.part = ut.array.ListClass()
-        for _ in zis:
-            part_z = ut.array.DictClass()
-            part_z['id'] = []
-            part_z['id-to-index'] = []
-            part_z['mass'] = []
-            part_z['position'] = []
-            part_z.info = {}
-            part_z.info['box.length'] = self['box.length']
-            self.part.append(part_z)
+        for zi in zis:
+            self.part.append(ut.array.DictClass())
+        for zi in zis:
+            self.part[zi]
+            self.part[zi]['id'] = []
+            self.part[zi]['id-to-index'] = []
+            self.part[zi]['mass'] = []
+            self.part[zi]['position'] = []
+            self.part[zi].info = {}
+            self.part[zi].info['box.length'] = self['box.length']
+            self.part[zi].info['has.baryons'] = False
+            self.part[zi].snap = {}
+            self.part[zi].snap['redshift'] = self['redshifts'][zi]
+            self.part[zi].snap['scale.factor'] = 1 / (1 + self['redshifts'][zi])
+            self.part[zi].Cosmo = self.Cosmo
+
         self.part.info = {}
         self.part.info['box.length'] = self['box.length']
+        self.part.info['has.baryons'] = False
+        self.part.Cosmo = self.Cosmo
 
         for zi in zis:
             # in yt, particle_index = id
@@ -138,8 +153,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 
             ut.catalog.assign_id_to_index(self.part[zi], 'id', 0)
 
-            self.part[zi]['mass'] = np.array(self.data[zi]['particle_mass'].in_units('Msun'),
-                                             dtype=float32)    # {M_sun}
+            self.part[zi]['mass'] = np.array(
+                self.data[zi]['particle_mass'].in_units('Msun'), dtype=float32)  # {M_sun}
             del(self.data[zi]['particle_mass'])
 
             self.part[zi]['position'] = np.zeros(
@@ -153,34 +168,101 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 
             self.part[zi].info['mass.unique'] = np.unique(self.part[zi]['mass'])
 
+        if divvy_by_mass:
+            self.divvy_particles_by_mass(zis)
+
+        self.order_particles_by_id(zis)
+
+    def divvy_particles_by_mass(self, zis=[0, 1]):
+        '''
+        Divvy particles into separate dictionaries by mass.
+
+        Parameters
+        ----------
+        zis : int or list : snapshot indices to read
+        '''
+        self.say('separating particle species by mass')
+
+        for zi in zis:
+            self.say('  zi = %d' % (zi))
+            spec_masses = np.unique(self.part[zi]['mass'])
+
+            props = tuple(self.part[zi].keys())
+
+            for spec_i, spec_mass in enumerate(spec_masses):
+                spec_indices = np.where(self.part[zi]['mass'] == spec_mass)[0]
+
+                if spec_i == 0:
+                    spec_name = 'dark'
+                else:
+                    spec_name = 'dark.%d' % (spec_i + 1)
+
+                self.part[zi][spec_name] = {}
+                for prop in props:
+                    if prop != 'id-to-index':
+                        self.part[zi][spec_name][prop] = self.part[zi][prop][spec_indices]
+                self.say('  %s: %d particles' % (spec_name, spec_indices.size))
+
+            for prop in props:
+                del(self.part[zi][prop])
+
+    def order_particles_by_id(self, zis=[0, 1]):
+        '''
+        Order particles in catalog by id.
+
+        Parameters
+        ----------
+        zis : int or list : snapshot indices to read
+        '''
+        self.say('ordering particles by id')
+
+        if 'dark' in self.part[0]:
+            for zi in zis:
+                spec_names = [spec_name for spec_name in self.part[zi] if 'dark' in spec_name]
+                for spec_name in spec_names:
+                    indices_sorted_by_id = np.argsort(self.part[zi][spec_name]['id'])
+                    for prop in self.part[zi][spec_name]:
+                        self.part[zi][spec_name][prop] = \
+                            self.part[zi][spec_name][prop][indices_sorted_by_id]
+        else:
+            for zi in zis:
+                indices_sorted_by_id = np.argsort(self.part[zi]['id'])
+                for prop in self.part[zi]:
+                    self.part[zi][prop] = self.part[zi][prop][indices_sorted_by_id]
+
 
 #===================================================================================================
 # analysis
 #===================================================================================================
-def get_halos_around_halo(hal, halo_index, distance_max, neig_mass_frac_min=0.5):
+def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig_mass_frac_min=0.5):
     '''
-    Get neig_distances & indices of halos that are within distance_max of center of given halo.
+    Get distances & indices of halos that are within distance_max of center of given halo.
 
     Parameters
     ----------
-    halo index: int
-    maximum distance {kpc physical}: float
-    minimum fraction of input mass to keep neighboring halos: float
+    hal : dict : catalog of halos
+    halo_index : int : index of halo to select
+    distance_max : float : maximum distance {kpc physical or R_vir}
+    distance_kind : string : kind for maximum distance
+        options: physical, virial
+    neig_mass_frac_min : float : minimum fraction of input mass to select neighboring halos
     '''
     Neighbor = ut.neighbor.NeighborClass()
 
-    distance_max *= hal['radius'][halo_index]
-    mass_min = hal['mass'] + log10(neig_mass_frac_min)
+    if scale_virial:
+        distance_max *= hal['radius'][halo_index]
+    mass_min = hal['mass'][halo_index] + log10(neig_mass_frac_min)
     his_m = ut.array.elements(hal['mass'], [mass_min, Inf])
     neig_distances, neig_indices = Neighbor.get_neighbors(
         hal['position'][[halo_index]], hal['position'][his_m], 200, [1e-6, distance_max],
         hal.info['box.length'], neig_ids=his_m)
-    neig_distances /= hal['radius'][halo_index]
+    if scale_virial:
+        neig_distances /= hal['radius'][halo_index]
 
     return neig_distances, neig_indices
 
 
-def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_vir=True):
+def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial=True):
     '''
     Get ids of particles that are within distance_max of center of given halo.
 
@@ -190,7 +272,7 @@ def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_vir=True
     maximum distance {kpc comoving or in units of virial radius}: float
     whether to scale distance by virial radius: boolean
     '''
-    if scale_vir:
+    if scale_virial:
         distance_max *= Agora.hal['radius'][halo_index]
     # convert distance_max to simulation units [0, 1)
     distance_max /= Agora['box.length']
@@ -200,17 +282,17 @@ def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_vir=True
 
 
 def print_contamination_around_halo(
-    Agora, halo_index, distance_max, distance_bin_wid=0.5, scale_vir=True):
+    Agora, halo_index, distance_max, distance_bin_wid=0.5, scale_virial=True):
     '''
     Test lower resolution particle contamination around halo as a function of distance.
 
     Parameters
     ----------
-    Agora data: class
-    halo index: int
-    maximum distance from center to check: float
-    distance bin width: float
-    whether to scale distances by virial radius: boolean
+    Agora : class : Agora data class
+    halo_index: int : index of halo
+    distance_max : float : maximum distance from halo center to check
+    distance_bin_wid : float : width of distance bin for printing
+    scale_virial : boolean : whether to scale distances by virial radius
     '''
     distance_scaling = 'lin'
     zi = 0
@@ -220,14 +302,14 @@ def print_contamination_around_halo(
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, [0, distance_max], width=distance_bin_wid)
 
-    pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_vir)
+    pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial)
     Say.say('read %d particles around halo' % pids.size)
 
     pis = Agora.part[zi]['id-to-index'][pids]
     distances = ut.coord.distance(
         'scalar', Agora.part[zi]['position'][pis], Agora.hal['position'][halo_index],
         Agora['box.length'])
-    if scale_vir:
+    if scale_virial:
         distances /= Agora.hal['radius'][halo_index]
         Say.say('halo radius = %.3f kpc comoving' % Agora.hal['radius'][halo_index])
 
