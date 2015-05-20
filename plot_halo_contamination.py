@@ -15,11 +15,9 @@ import sys
 import numpy as np
 # local ----
 from utilities import utility as ut
-from . import gizmo_io
-from . import gizmo_analysis
+from gizmo import gizmo_io
+from gizmo import gizmo_analysis
 
-
-snapshot_indices = [0, 1, 2, 14, 18, 22, 28, 35, 45, 59, 80, 95, 114, 142, 184, 253, 390, 400]
 
 if len(sys.argv) > 1:
     directory = str(sys.argv[1])
@@ -33,6 +31,10 @@ else:
 
 pos_dif_max = 5  # {kpc comoving}, more than this print warning
 radius_bin_num = 100
+radius_lim_phys = [1, 4000]  # {kpc comoving}
+radius_lim_vir = [0.01, 10]  # {units of R_halo}
+virial_kind = '200m'
+
 
 os.chdir(directory)
 
@@ -45,7 +47,7 @@ print('# dark center_pos {kpc comoving}')
 print('  center-of-mass: ', end='')
 ut.io.print_array(center_pos_dark_cm, '%.3f')
 
-print('  potential.min: ', end='')
+print('  potential.min:  ', end='')
 ut.io.print_array(center_pos_dark_pot, '%.3f')
 
 for dimen_i in xrange(center_pos_dark_cm.size):
@@ -55,11 +57,12 @@ for dimen_i in xrange(center_pos_dark_cm.size):
 
 center_pos = center_pos_dark_cm
 
-halo_radius = gizmo_analysis.get_halo_radius(part, 'all', center_pos, '200m')
+halo_radius = gizmo_analysis.get_halo_radius(part, 'all', center_pos, virial_kind)
 
 gizmo_analysis.plot_mass_contamination(
-    part, center_pos, [1, 5000], radius_bin_num, halo_radius=halo_radius, write_plot=True,
-    plot_directory='plot');
+    part, center_pos, radius_lim_phys, radius_bin_num, halo_radius=halo_radius, write_plot=True,
+    plot_directory='plot')
+
 gizmo_analysis.plot_mass_contamination(
-    part, center_pos, [0.003, 20], radius_bin_num, halo_radius=halo_radius,
-    scale_to_halo_radius=True, write_plot=True, plot_directory='plot');
+    part, center_pos, radius_lim_vir, radius_bin_num, halo_radius=halo_radius,
+    scale_to_halo_radius=True, write_plot=True, plot_directory='plot')

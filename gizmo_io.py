@@ -467,7 +467,7 @@ class GizmoClass(ut.io.SayClass):
         full file name (with relative path): string
         file file name basse (with relative path): string
         '''
-        directory = ut.io.get_safe_path(directory)
+        directory = ut.io.get_path(directory)
 
         s0 = directory.split('/')
         snapshot_directory_specific = s0[len(s0) - 1]

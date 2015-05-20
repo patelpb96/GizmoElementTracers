@@ -489,7 +489,7 @@ def plot_mass_contamination(
     # plt.tight_layout(pad=0.02)
 
     if write_plot:
-        plot_directory = ut.io.get_safe_path(plot_directory)
+        plot_directory = ut.io.get_path(plot_directory, create_path=True)
         dist_name = 'dist'
         if halo_radius and scale_to_halo_radius:
             dist_name += '.200m'
@@ -596,7 +596,7 @@ def plot_metal_v_distance(
     # plt.tight_layout(pad=0.02)
 
     if write_plot:
-        plot_directory = ut.io.get_safe_path(plot_directory)
+        plot_directory = ut.io.get_path(plot_directory)
         dist_name = 'dist'
         if halo_radius and scale_to_halo_radius:
             dist_name += '.200m'

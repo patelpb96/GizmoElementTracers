@@ -46,7 +46,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         directory of initial snapshot: string
         whether to read halo catalog: boolean
         '''
-        self.agora_directory = ut.io.get_safe_path(agora_dir)
+        self.agora_directory = ut.io.get_path(agora_dir)
         self.snapshot_final_directory = self.agora_directory + snapshot_final_dir
         self.snapshot_initial_directory = self.agora_directory + snapshot_initial_dir
 
