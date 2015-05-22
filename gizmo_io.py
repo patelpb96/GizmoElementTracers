@@ -145,7 +145,7 @@ class GizmoClass(ut.io.SayClass):
             # 8 = S
             # 9 = Ca
             # 10 = Fe
-            'Metallicity': 'metallicity',
+            #'Metallicity': 'metallicity',
 
             # 'time' when the star particle formed
             # for cosmological runs, this is the scale factor

@@ -653,14 +653,91 @@ def plot_prop_v_prop(part, spec_name='gas', prop_x='density', prop_y='energy.int
     # plt.tight_layout(pad=0.02)
 
 
-def plot_density_v_distance(
-    parts, species='dark', center_positions=[], distance_scaling='log', distance_lim=[1, 1000],
-    distance_bin_num=100):
+def plot_property_distr(
+    parts, spec_name='gas', prop_name='density', prop_scaling='log', prop_lim=[], prop_bin_num=100,
+    center_poss=[], distance_lim=[], prop_stat='number', y_scaling='log'):
+    '''
+    .
+    '''
+    Say = ut.io.SayClass(plot_property_distr)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+    if np.ndim(center_poss) == 1:
+        center_poss = [center_poss]
+
+    Stat = ut.math.StatisticClass()
+
+    for part_i, part in enumerate(parts):
+        prop_vals = part[spec_name][prop_name]
+
+        if distance_lim:
+            dists = ut.coord.distance(
+                'scalar', part[spec_name]['position'], center_poss[part_i],
+                part.info['box.length'])
+            dists *= part.snap['scale.factor']  # {kpc physical}
+            prop_is = ut.array.elements(dists, distance_lim)
+            prop_vals = prop_vals[prop_is]
+
+        Say.say('keeping %s %s particles' % (prop_vals.size, spec_name))
+
+        if prop_scaling == 'log':
+            prop_vals = log10(prop_vals)
+            if prop_name == 'density':
+                prop_vals += log10(const.proton_per_sun) + 3 * log10(const.kpc_per_cm)
+            elif prop_name == 'smooth.length':
+                prop_vals += 3
+
+        #Say.say('%s %s range = %s' %
+        #        (prop_name, prop_scaling, ut.array.get_limits(prop_vals, digit_num=2)))
+
+        Stat.append_to_dictionary(prop_vals, prop_lim, prop_bin_num)
+
+        Stat.print_statistics(-1)
+
+    #import ipdb; ipdb.set_trace()
+
+    # plot ----------
+    colors = plot.get_colors(len(parts))
+    plt.close()
+    plt.minorticks_on()
+
+    fig = plt.figure()
+    subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+
+    subplot.set_xlabel(prop_name)
+    subplot.set_ylabel('dN/dP')
+    subplot.set_xlim(10 ** np.array(prop_lim))
+
+    plot_func = plot.get_plot_function(subplot, prop_scaling, y_scaling)
+    for part_i in xrange(len(parts)):
+        if prop_scaling == 'log':
+            vals_x = 10 ** Stat.distr['bin.mid'][part_i]
+        else:
+            vals_x = Stat.distr['bin.mid'][part_i]
+        plot_func(vals_x, Stat.distr[prop_stat][part_i],
+                  color=colors[part_i], alpha=0.5, linewidth=2)
+        # subplot.loglog(props_x, props_y, '.', color='green', alpha=0.1, linewidth=0.1)
+
+    #plt.tight_layout(pad=0.02)
+
+
+def plot_mass_v_distance(
+    parts, species='dark', prop='density', center_positions=[], distance_scaling='log',
+    distance_lim=[1, 1000], distance_bin_num=100, y_scaling='log', y_lim=[]):
     '''
     .
     '''
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, distance_lim, distance_bin_num, dimension_num=3)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    if np.ndim(center_positions) == 1:
+        center_positions = [center_positions]
 
     # ensure is list even if just one species
     if np.isscalar(species):
@@ -672,49 +749,64 @@ def plot_density_v_distance(
 
     pros = []
     for part_i, part in enumerate(parts):
-        positions, masses = get_species_positions_masses(part, species)
+        for spec_i, spec in enumerate(species):
+            # split up species to make more memory efficient
+            positions, masses = get_species_positions_masses(part, spec)
 
-        if np.isscalar(masses):
-            masses = np.zeros(positions.shape[0], dtype=masses.dtype) + masses
+            if np.isscalar(masses):
+                masses = np.zeros(positions.shape[0], dtype=masses.dtype) + masses
 
-        # {kpc comoving}
-        dists = ut.coord.distance('scalar', positions, center_positions[part_i],
-                                  part.info['box.length'])
+            # {kpc comoving}
+            dists = ut.coord.distance(
+                'scalar', positions, center_positions[part_i], part.info['box.length'])
 
-        # get masses in bins
-        #if 'log' in distance_scaling:
-        #    dists = log10(dists)
-        #    distance_lim = log10(distance_lim)
+            dists *= part.snap['scale.factor']  # {kpc physical}
 
-        #if np.isscalar(masses):
-        #    mass_in_bins = np.histogram(rads, distance_bin_num, distance_lim, False, None)[0]
-        #else:
-        #    mass_in_bins = np.histogram(rads, distance_bin_num, distance_lim, False, masses)[0]
+            pro = DistanceBin.get_mass_profile(dists, masses)
 
-        pros.append(DistanceBin.get_mass_profile(dists, masses))
+            if spec_i == 0:
+                pros.append(pro)
+            else:
+                ks = [k for k in pro if 'distance' not in k]
+                for k in ks:
+                    if 'log' in k:
+                        pros[-1][k] = log10(10 ** pros[-1][k] + 10 ** pro[k])
+                    else:
+                        pros[-1][k] += pro[k]
+
+        if prop == 'vel.circ':
+            pros[-1]['vel.circ'] = (pros[-1]['mass.cum'] / pros[-1]['distance.cum'] *
+                                    const.grav_kpc_msun_yr)
+            pros[-1]['vel.circ'] = np.sqrt(pros[-1]['vel.circ'])
+            pros[-1]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+
         if part_i > 0:
-            print(pros[part_i]['density'] / pros[0]['density'])
+            print(pros[part_i][prop] / pros[0][prop])
 
     #import ipdb; ipdb.set_trace()
 
-    colors = ['blue', 'green', 'red']
+    colors = plot.get_colors(len(parts))
     # plot ----------
     plt.close()
     plt.minorticks_on()
 
     fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
+    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(distance_lim)
-    subplot.set_ylim([pros[0]['density'].min(), pros[0]['density'].max()])
-    subplot.set_xlabel('radius [kpc]')
-    subplot.set_ylabel('density [$M_\odot / {\\rm kpc} ^ 3$]')
+
+    if y_lim:
+        subplot.set_ylim(y_lim)
+    else:
+        subplot.set_ylim(plot.get_limits(pros[0][prop]))
+
+    subplot.set_xlabel('radius $r$ $[\\rm kpc]$')
+    subplot.set_ylabel(plot.get_label(prop, get_symbol=True, get_units=True))
 
     for pro_i, pro in enumerate(pros):
-        subplot.loglog(10 ** pro['distance'], pro['density'], color=colors[pro_i],
-                       alpha=0.5, linewidth=2, linestyle='-')
-        # plot_func = plot.get_plot_function(subplot, 'log', 'log')
-        # plot_func(props_x, props_y, 'o', color='green', alpha=0.5)
+        plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
+        plot_func(pro['distance'], pro[prop], color=colors[pro_i],
+                  alpha=0.5, linewidth=2, linestyle='-')
 
     #plt.tight_layout(pad=0.02)
 
