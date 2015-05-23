@@ -65,18 +65,18 @@ def get_species_positions_masses(part, species):
     return positions, masses
 
 
-def get_center_position(part, species=['star', 'dark', 'gas'], center_position=[0, 0, 0],
-                        radius_max=1e10):
+def get_center_position(
+    part, species=['star', 'dark', 'gas'], center_position=[0, 0, 0], radius_max=1e10):
     '''
     Get position of center of mass, using iterative zoom-in on species.
 
     Parameters
     ----------
-    catalog of particles: dict
-    names of species to use: string or list
+    part : dict : dictionary of particles
+    species : string or list: names of species to use
         note: 'all' = use all in particle dictionary
-    initial center position: list or array
-    maximum radius to consider {kpc comoving}: float
+    center_pos : list/array : initial center position
+    radius_max : float : maximum initial radius to consider during iteration {kpc comoving}
     '''
     # ensure is list even if just one species
     if np.isscalar(species):
@@ -811,45 +811,67 @@ def plot_mass_v_distance(
     #plt.tight_layout(pad=0.02)
 
 
-def get_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001):
+def get_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001):
     '''
-    .
+    Get array of times and star-formation rate at each time.
+
+    Parameters
+    ----------
+    part : dict : dictionary of particle species
+    pis : array : list of star particle indices
+    redshift_lim : list : redshift limits of times to get
+    scalefactor_wid : float : width of scale factor for time binning
+
+    Returns
+    -------
+    time_mids : array : times {Gyr}
+    dm_dts : array : total star-formation rate at each time {M_sun / yr}
     '''
+    spec_name = 'star'
+
     if pis is None:
-        pis = np.arange(part['mass'].size, dtype=np.int32)
-    pis_sort = np.argsort(part['form.time'])
-    star_form_aexps = part['form.time'][pis_sort]
-    # star_form_redshifts = 1 / star_form_aexps - 1
-    star_masses = part['mass'][pis_sort]
+        pis = np.arange(part[spec_name]['mass'].size, dtype=np.int32)
+
+    pis_sort = np.argsort(part[spec_name]['form.time'])
+    star_form_aexps = part[spec_name]['form.time'][pis_sort]  # form.time = scale factor
+    star_masses = part[spec_name]['mass'][pis_sort]
     star_masses_cum = np.cumsum(star_masses)
 
     if redshift_lim:
         redshift_lim = np.array(redshift_lim)
-        aexp_lim = np.sort(1 / (1 + redshift_lim))
+        scalefactor_lim = np.sort(1 / (1 + redshift_lim))
     else:
-        aexp_lim = [np.min(star_form_aexps), np.max(star_form_aexps)]
+        scalefactor_lim = [np.min(star_form_aexps), np.max(star_form_aexps)]
 
-    aexp_bins = np.arange(aexp_lim.min(), aexp_lim.max(), aexp_wid)
-    redshift_bins = 1 / aexp_bins - 1
+    scalefactor_bins = np.arange(scalefactor_lim.min(), scalefactor_lim.max(), scalefactor_wid)
+    redshift_bins = 1 / scalefactor_bins - 1
     time_bins = part.Cosmo.age(redshift_bins)
-    # time_bins = part.Cosmo.age(0) - time_bins
-    time_bins *= 1e9  # {yr}
+    # time_bins = part.Cosmo.age(0) - time_bins    # lookback time
+    time_bins *= 1e9  # convert to {yr}
 
-    star_mass_cum_bins = np.interp(aexp_bins, star_form_aexps, star_masses_cum)
+    star_mass_cum_bins = np.interp(scalefactor_bins, star_form_aexps, star_masses_cum)
     dm_dts = np.diff(star_mass_cum_bins) / np.diff(time_bins) / 0.7  # account for mass loss
 
-    time_mids = time_bins[0: time_bins.size - 1] + np.diff(time_bins)  # midpoints
+    time_mids = time_bins[0: time_bins.size - 1] + np.diff(time_bins)  # midpoints of bins
 
-    time_mids /= 1e9
+    time_mids /= 1e9  # convert to {Gyr}
 
     return time_mids, dm_dts
 
 
-def plot_sfr_history(part, pis=None, redshift_lim=[0, 1], aexp_wid=0.001, write_plot=False):
+def plot_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001, write_plot=False):
     '''
-    .
+    Plot star-formation rate v cosmic time.
+
+    Parameters
+    ----------
+    part : dict : dictionary of particle species
+    pis : array : list of star particle indices
+    redshift_lim : list : redshift limits of times to get
+    scalefactor_wid : float : width of scale factor for time binning
+    write_plot : boolean : whether to write plot
     '''
-    times, sfrs = get_sfr_history(part, pis, redshift_lim, aexp_wid)
+    times, sfrs = get_sfr_history(part, pis, redshift_lim, scalefactor_wid)
 
     # plot ----------
     plt.close()

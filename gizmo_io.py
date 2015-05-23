@@ -418,17 +418,17 @@ class GizmoClass(ut.io.SayClass):
 
         ### end adjusting properties for each species ###
 
-        # convert particle dictionary to generalized dictionary class to increase flexibility
-        part_return = ut.array.DictClass()
-        for spec_name in part:
-            part_return[spec_name] = part[spec_name]
-
         # sub-sample highest-resolution particles for smaller memory
         if subsample_factor > 1:
             for spec_name in part:
                 if spec_name in ['dark', 'gas', 'star']:
                     for prop in part[spec_name]:
                         part[spec_name][prop] = part[spec_name][prop][::subsample_factor]
+
+        # convert particle dictionary to generalized dictionary class to increase flexibility
+        part_return = ut.array.DictClass()
+        for spec_name in part:
+            part_return[spec_name] = part[spec_name]
 
         # assign cosmological parameters
         if header['is.cosmological']:
@@ -441,11 +441,18 @@ class GizmoClass(ut.io.SayClass):
                 header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
                 sigma_8, n_s, w)
             part_return.Cosmo = Cosmo  # store cosmology information
+            for spec_name in part:
+                part[spec_name]
 
-        part_return.info = header  # store header information
+        # store header information
+        part_return.info = header
+
         # store snapshot time information
-        part_return.snap = {'redshift': header['redshift'], 'scale.factor': header['scale.factor'],
-                            'time': Cosmo.age(header['redshift'])}
+        part_return.snap = {
+            'redshift': header['redshift'],
+            'scale.factor': header['scale.factor'],
+            'time': Cosmo.age(header['redshift'])
+        }
 
         return part_return
 
