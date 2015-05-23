@@ -29,7 +29,7 @@ class GizmoClass(ut.io.SayClass):
 
         Parameters
         ----------
-        type[s] of particle species: string or int, or list thereof
+        species_types : string or int, or list of these : type[s] of particle species
             options:
             0 or gas = gas
             1 or dark = dark matter at highest resolution
@@ -39,12 +39,13 @@ class GizmoClass(ut.io.SayClass):
             5 or dark.4 = dark matter at all lower resolutions for cosmological, non black hole runs
             5 or black.hole = black holes, if run contains them
             2 or bulge, 3 or disk = stars for non-cosmological run
-        snapshot index: int
-        directory: string
-        snapshot file name base: string
-        snapshot file extension: string
-        whether to use four characters for snapshot index: boolean
-        whether to read only header: boolean
+        snapshot_index : int : snapshot index
+        directory: string : directory of snapshot files
+        file_name_base : string : snapshot file name base
+        file_extension : string : snapshot file extension
+        use_four_character_index : boolean : whether to use four characters for snapshot index
+        get_header_only : boolean : whether to read only header
+        subsample_factor : int : factor by which to periodically sub-sample particles, to save space
 
         Returns
         -------
@@ -115,7 +116,7 @@ class GizmoClass(ut.io.SayClass):
             # all particles
             'ParticleIDs': 'id',
             'Coordinates': 'position',
-            # 'Velocities': 'velocity',
+            'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
 
@@ -145,7 +146,7 @@ class GizmoClass(ut.io.SayClass):
             # 8 = S
             # 9 = Ca
             # 10 = Fe
-            #'Metallicity': 'metallicity',
+            'Metallicity': 'metallicity',
 
             # 'time' when the star particle formed
             # for cosmological runs, this is the scale factor
@@ -456,11 +457,11 @@ class GizmoClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directory: string
-        index of snapshot: int
-        name base of file: string
-        extention of file: string
-        whether to use four characters in snapshot index: boolean
+        directory: string : directory to check for files
+        snapshot_index : int : index of snapshot
+        file_name_base : string : name base of file
+        file_extension : string : extention of file
+        use_four_character_index : boolean : whether to use four characters in snapshot index
 
         Returns
         -------
