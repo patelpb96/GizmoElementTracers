@@ -231,8 +231,6 @@ class GizmoClass(ut.io.SayClass):
                             prop_name == str.lower(property_name_dict[prop_name_in])):
                         property_names.remove(prop_name_in)
 
-        print(property_names)
-
         # get file name
         file_name, file_name_base = self.get_file_name(directory, snapshot_index)
 

@@ -38,7 +38,7 @@ virial_kind = '200m'
 
 os.chdir(directory)
 
-part = gizmo_io.Gizmo.read_snapshot(['all'], snapshot_index, 'output')
+part = gizmo_io.Gizmo.read_snapshot(['dark', 'dark.2'], snapshot_index, 'output', ['position', 'mass'])
 
 center_pos_dark_cm = gizmo_analysis.get_center_position(part, 'dark')
 center_pos_dark_pot = part['dark']['position'][np.argmin(part['dark']['potential'])]
