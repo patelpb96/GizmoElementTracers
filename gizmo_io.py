@@ -20,10 +20,22 @@ class GizmoClass(ut.io.SayClass):
     '''
     Read in gizmo/gadget snapshots.
     '''
+    def __init__(
+        self, file_name_base='snapshot', file_extension='.hdf5', use_four_character_index=False):
+        '''
+        Set properties for snapshot file names.
+
+        file_name_base : string : snapshot file name base
+        file_extension : string : snapshot file extension
+        use_four_character_index : boolean : whether to use four characters for snapshot index
+        '''
+        self.file_name_base = file_name_base
+        self.file_extension = file_extension
+        self.use_four_character_index = use_four_character_index
+
     def read_snapshot(
-        self, species_types, snapshot_index=440, directory='.', file_name_base='snapshot',
-        file_extension='.hdf5', use_four_character_index=False, get_header_only=False,
-        subsample_factor=1):
+        self, species_types='all', snapshot_index=400, directory='.', property_names='all',
+        property_names_exclude=[], particle_subsample_factor=1, get_header_only=False):
         '''
         Read simulation snapshot, return as dictionary.
 
@@ -31,6 +43,7 @@ class GizmoClass(ut.io.SayClass):
         ----------
         species_types : string or int, or list of these : type[s] of particle species
             options:
+            'all' = all species in file
             0 or gas = gas
             1 or dark = dark matter at highest resolution
             2 or dark.2 = dark matter at 2nd highest resolutions for cosmological
@@ -39,13 +52,16 @@ class GizmoClass(ut.io.SayClass):
             5 or dark.4 = dark matter at all lower resolutions for cosmological, non black hole runs
             5 or black.hole = black holes, if run contains them
             2 or bulge, 3 or disk = stars for non-cosmological run
-        snapshot_index : int : snapshot index
-        directory: string : directory of snapshot files
-        file_name_base : string : snapshot file name base
-        file_extension : string : snapshot file extension
-        use_four_character_index : boolean : whether to use four characters for snapshot index
+        snapshot_index : int : index (number) of snapshot file
+        directory: string : directory of snapshot file
+        property_names : string or list : name[s] of particle properties to read
+            options:
+            'all' = all species in file
+            otherwise, choose subset from among property_name_dict
+        property_names_exclude : string or list : name[s] of particle properties not to read
+            note: can use this instead of property_names if just want to exclude a few properties
+        particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         get_header_only : boolean : whether to read only header
-        subsample_factor : int : factor by which to periodically sub-sample particles, to save space
 
         Returns
         -------
@@ -111,48 +127,46 @@ class GizmoClass(ut.io.SayClass):
         }
 
         # converts each key in input particle dictionary to another naming preference
-        # if comment out given property, will not read that one
-        particle_name_dict = {
-            # all particles
+        # if comment out any property, will not read it
+        property_name_dict = {
+            ## all particles ##
             'ParticleIDs': 'id',
             'Coordinates': 'position',
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
 
+            ## gas particles ##
             'InternalEnergy': 'energy.internal',
             'Density': 'density',
             'SmoothingLength': 'smooth.length',
-            # 'ArtificialViscosity': 'artificial.viscosity',
-
+            #'ArtificialViscosity': 'artificial.viscosity',
             # average free-electron number per proton, averaged over mass of gas particle
             'ElectronAbundance': 'electron.fraction',
-
-            # neutral hydrogen fraction
-            'NeutralHydrogenAbundance': 'neutral.hydrogen.fraction',
-
+            'NeutralHydrogenAbundance': 'neutral.hydrogen.fraction',  # neutral hydrogen fraction
             'StarFormationRate': 'sfr',  # {M_sun / yr}
 
-            # metallicity {mass fraction} ('solar' would be ~0.02 in total metallicity)
-            # for stars, this is inherited metallicity from gas particle
-            # 0 = 'total' metal mass (everything not H, He)
-            # 1 = He
-            # 2 = C
-            # 3 = N
-            # 4 = O
-            # 5 = Ne
-            # 6 = Mg
-            # 7 = Si
-            # 8 = S
-            # 9 = Ca
-            # 10 = Fe
+            ## star/gas metallicity {mass fraction} ('solar' is ~0.02 in total metallicity) ##
+            ## stars inherit metallicity from gas particle
+            ## 0 = 'total' metal mass (everything not H, He)
+            ## 1 = He
+            ## 2 = C
+            ## 3 = N
+            ## 4 = O
+            ## 5 = Ne
+            ## 6 = Mg
+            ## 7 = Si
+            ## 8 = S
+            ## 9 = Ca
+            ## 10 = Fe
             'Metallicity': 'metallicity',
 
-            # 'time' when the star particle formed
-            # for cosmological runs, this is the scale factor
-            # for non-cosmological runs, this is the time {Gyr / h}
+            ## star particles ##
+            ## 'time' when star particle formed
+            ## for cosmological runs, = scale factor; for non-cosmological runs, = time {Gyr / h}
             'StellarFormationTime': 'form.time',
 
+            ## black hole particles ##
             'BH_Mass': 'bh.mass',
             'BH_Mdot': 'dm/dt'
         }
@@ -160,13 +174,14 @@ class GizmoClass(ut.io.SayClass):
         header = {}  # custom dictionary to store header information
         part = {}  # custom dictionary to store properties for all particle species
 
-        # if input 'all', read everything possible
-        if species_types == 'all' or species_types == ['all']:
-            species_types = [spec for spec in species_name_list if spec in species_name_dict.keys()]
+        ## parse input species list ##
 
-        # ensure species is list even if just one
-        if np.isscalar(species_types):
-            species_types = [species_types]
+        # if input 'all' for species, read all species in snapshot
+        if species_types == 'all' or species_types == ['all'] or not species_types:
+            species_types = [spec for spec in species_name_list if spec in species_name_dict.keys()]
+        else:
+            if np.isscalar(species_types):
+                species_types = [species_types]  # ensure is list
 
         # check if input species types are string or int, and assign species id list
         species_ids = []
@@ -187,10 +202,39 @@ class GizmoClass(ut.io.SayClass):
                 if species_name_dict[spec_name] == spec_id:
                     species_names.append(spec_name)
 
+        ## parse input property list ##
+
+        # if input 'all' for particle properties, read all properties in snapshot
+        if property_names == 'all' or property_names == ['all'] or not property_names:
+            property_names = [prop_name for prop_name in property_name_dict]
+        else:
+            if np.isscalar(property_names):
+                property_names = [property_names]  # ensure is list
+            # make safe list of property names to read in
+            property_names_temp = []
+            for prop_name in property_names:
+                prop_name = str.lower(prop_name)
+                for prop_name_in in property_name_dict:
+                    if (prop_name == str.lower(prop_name_in) or
+                            prop_name == str.lower(property_name_dict[prop_name_in])):
+                        property_names_temp.append(prop_name_in)
+            property_names = property_names_temp
+            del(property_names_temp)
+
+        if property_names_exclude:
+            if np.isscalar(property_names_exclude):
+                property_names_exclude = [property_names_exclude]  # ensure is list
+            for prop_name in property_names_exclude:
+                prop_name = str.lower(prop_name)
+                for prop_name_in in property_names:
+                    if (prop_name == str.lower(prop_name_in) or
+                            prop_name == str.lower(property_name_dict[prop_name_in])):
+                        property_names.remove(prop_name_in)
+
+        print(property_names)
+
         # get file name
-        file_name, file_name_base = self.get_file_name(
-            directory, snapshot_index, file_name_base=file_name_base, file_extension=file_extension,
-            use_four_character_index=use_four_character_index)
+        file_name, file_name_base = self.get_file_name(directory, snapshot_index)
 
         self.say('reading header from file: ' + file_name)
 
@@ -200,8 +244,9 @@ class GizmoClass(ut.io.SayClass):
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
         header_in = file_in['Header'].attrs  # load header dictionary
 
-        for prop in header_in:
-            header[header_name_dict[prop]] = header_in[prop]  # transfer to custom header dict
+        for prop_name_in in header_in:
+            prop_name = header_name_dict[prop_name_in]
+            header[prop_name] = header_in[prop_name_in]  # transfer to custom header dict
 
         # infer whether simulation is cosmological
         if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] < 1 and
@@ -268,26 +313,27 @@ class GizmoClass(ut.io.SayClass):
             part[spec_name] = {}  # add species to particle dictionary
             part_num_tot = header['particle.numbers.total'][spec_id]
 
-            for prop_in in part_in:
-                if prop_in in particle_name_dict:
-                    prop = particle_name_dict[prop_in]
+            for prop_name_in in part_in:
+                if prop_name_in in property_names:
+                    prop_name = property_name_dict[prop_name_in]
                     # determine shape of property array
-                    if len(part_in[prop_in].shape) == 1:
+                    if len(part_in[prop_name_in].shape) == 1:
                         prop_shape = part_num_tot
-                    elif len(part_in[prop_in].shape) == 2:
-                        prop_shape = [part_num_tot, part_in[prop_in].shape[1]]
+                    elif len(part_in[prop_name_in].shape) == 2:
+                        prop_shape = [part_num_tot, part_in[prop_name_in].shape[1]]
                     # initialize to -1's
-                    part[spec_name][prop] = np.zeros(prop_shape, part_in[prop_in].dtype) - 1
-                    if prop == 'id':
+                    part[spec_name][prop_name] = \
+                        np.zeros(prop_shape, part_in[prop_name_in].dtype) - 1
+                    if prop_name == 'id':
                         # initialize so calling an un-itialized value leads to error
-                        part[spec_name][prop] -= part_num_tot
+                        part[spec_name][prop_name] -= part_num_tot
                 else:
-                    self.say('not reading %s for species %s' % (prop_in, spec_name))
+                    self.say('not reading %s for species %s' % (prop_name_in, spec_name))
 
             # check for special case: particle mass is fixed and is given in mass array in header
-            if 'Masses' in particle_name_dict and 'Masses' not in part_in:
-                prop = particle_name_dict['Masses']
-                part[spec_name][prop] = np.zeros(part_num_tot, dtype=np.float32)
+            if 'Masses' in property_names and 'Masses' not in part_in:
+                prop_name = property_name_dict['Masses']
+                part[spec_name][prop_name] = np.zeros(part_num_tot, dtype=np.float32)
 
         # initial particle indices[s] to assign to each species from each file
         part_indices_lo = np.zeros(len(species_names))
@@ -298,7 +344,7 @@ class GizmoClass(ut.io.SayClass):
         for file_i in xrange(header['file.number.per.snapshot']):
             if header['file.number.per.snapshot'] > 1:
                 file_in.close()
-                file_name = file_name_base + '.' + str(file_i) + file_extension
+                file_name = file_name_base + '.' + str(file_i) + self.file_extension
                 file_in = h5py.File(file_name, 'r')  # open snapshot file
 
             self.say('loading file: ' + file_name)
@@ -315,20 +361,20 @@ class GizmoClass(ut.io.SayClass):
                     part_index_hi = part_index_lo + part_numbers_in_file[spec_id]
 
                     # check if mass of species is fixed, according to header mass array
-                    if 'Masses' in particle_name_dict and header['mass.array'][spec_id] > 0:
-                        prop = particle_name_dict['Masses']
-                        part[spec_name][prop][part_index_lo:part_index_hi] = \
+                    if 'Masses' in property_names and header['mass.array'][spec_id] > 0:
+                        prop_name = property_name_dict['Masses']
+                        part[spec_name][prop_name][part_index_lo:part_index_hi] = \
                             header['mass.array'][spec_id]
 
-                    for prop_in in part_in:
-                        if prop_in in particle_name_dict:
-                            prop = particle_name_dict[prop_in]
-                            if len(part_in[prop_in].shape) == 1:
-                                part[spec_name][prop][part_index_lo:part_index_hi] = \
-                                    part_in[prop_in]
-                            elif len(part_in[prop_in].shape) == 2:
-                                part[spec_name][prop][part_index_lo:part_index_hi, :] = \
-                                    part_in[prop_in]
+                    for prop_name_in in part_in:
+                        if prop_name_in in property_names:
+                            prop_name = property_name_dict[prop_name_in]
+                            if len(part_in[prop_name_in].shape) == 1:
+                                part[spec_name][prop_name][part_index_lo:part_index_hi] = \
+                                    part_in[prop_name_in]
+                            elif len(part_in[prop_name_in].shape) == 2:
+                                part[spec_name][prop_name][part_index_lo:part_index_hi, :] = \
+                                    part_in[prop_name_in]
 
                     part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 
@@ -338,20 +384,21 @@ class GizmoClass(ut.io.SayClass):
 
         ### start adjusting properties for each species ###
 
-        # if dark.2 contains several resolution levels of dark matter, separate them by mass
-        if 'dark.2' in part:
-            dark_lowres_masses = np.unique(part['dark.2']['mass'])
+        # if species dark.2 contains several mass levels of dark matter, split into separate dicts
+        spec_name = 'dark.2'
+        if spec_name in part and 'mass' in part[spec_name]:
+            dark_lowres_masses = np.unique(part[spec_name]['mass'])
             if dark_lowres_masses.size > 1:
                 self.say('separating lower-resolution dark-matter species:')
                 dark_lowres = {}
-                for prop in part['dark.2']:
-                    dark_lowres[prop] = np.array(part['dark.2'][prop])
+                for prop_name in part[spec_name]:
+                    dark_lowres[prop_name] = np.array(part[spec_name][prop_name])
                 for dark_i, dark_mass in enumerate(dark_lowres_masses):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
                     spec_name = 'dark.%d' % (dark_i + 2)
                     part[spec_name] = {}
-                    for prop in dark_lowres:
-                        part[spec_name][prop] = dark_lowres[prop][spec_indices]
+                    for prop_name in dark_lowres:
+                        part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
                     self.say('  %s: %d particles' % (spec_name, spec_indices.size))
                     if spec_name not in species_names:
                         species_names.append(spec_name)
@@ -361,27 +408,26 @@ class GizmoClass(ut.io.SayClass):
 
         # order dark-matter particles by id - should be conserved across snapshots
         for spec_name in species_names:
-            spec_id = species_name_dict[spec_name]
-            if 'dark' in spec_name:
+            if 'dark' in spec_name and 'id' in part[spec_name]:
                 indices_sorted_by_id = np.argsort(part[spec_name]['id'])
-                for prop in part[spec_name]:
-                    part[spec_name][prop] = part[spec_name][prop][indices_sorted_by_id]
+                for prop_name in part[spec_name]:
+                    part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted_by_id]
 
         # check if need bit-flip
         for spec_name in species_names:
-            if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 2 ** 32:
-                masks = part[spec_name]['id'] < 0
-                if np.sum(masks):
-                    # masks[-1e9]
-                    self.say('! %d %s particles have id < 0, possible bit flip' %
-                             (np.sum(masks), spec_name))
-                    part[spec_name]['id'][masks] += 1L << 31
+            if 'id' in part[spec_name]:
+                if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 2 ** 32:
+                    masks = part[spec_name]['id'] < 0
+                    if np.sum(masks):
+                        self.say('! %d %s particles have id < 0, possible bit flip' %
+                                 (np.sum(masks), spec_name))
+                        part[spec_name]['id'][masks] += 1L << 31
 
-                masks = part[spec_name]['id'] > 2 ** 32
-                if np.sum(masks):
-                    self.say('! %d %s particles have id > 2 ^ 32, possible bit flip' %
-                             (np.sum(masks), spec_name))
-                    part[spec_name]['id'][masks] += 1L << 31
+                    masks = part[spec_name]['id'] > 2 ** 32
+                    if np.sum(masks):
+                        self.say('! %d %s particles have id > 2 ^ 32, possible bit flip' %
+                                 (np.sum(masks), spec_name))
+                        part[spec_name]['id'][masks] += 1L << 31
 
         # apply cosmological conversions
         for spec_name in species_names:
@@ -419,11 +465,12 @@ class GizmoClass(ut.io.SayClass):
         ### end adjusting properties for each species ###
 
         # sub-sample highest-resolution particles for smaller memory
-        if subsample_factor > 1:
+        if particle_subsample_factor > 1:
             for spec_name in part:
                 if spec_name in ['dark', 'gas', 'star']:
-                    for prop in part[spec_name]:
-                        part[spec_name][prop] = part[spec_name][prop][::subsample_factor]
+                    for prop_name in part[spec_name]:
+                        part[spec_name][prop_name] = \
+                            part[spec_name][prop_name][::particle_subsample_factor]
 
         # convert particle dictionary to generalized dictionary class to increase flexibility
         part_return = ut.array.DictClass()
@@ -456,9 +503,7 @@ class GizmoClass(ut.io.SayClass):
 
         return part_return
 
-    def get_file_name(
-        self, directory, snapshot_index, file_name_base='snapshot', file_extension='.hdf5',
-        use_four_character_index=False):
+    def get_file_name(self, directory, snapshot_index):
         '''
         Get full name (with relative path) of file to read in.
 
@@ -466,9 +511,6 @@ class GizmoClass(ut.io.SayClass):
         ----------
         directory: string : directory to check for files
         snapshot_index : int : index of snapshot
-        file_name_base : string : name base of file
-        file_extension : string : extention of file
-        use_four_character_index : boolean : whether to use four characters in snapshot index
 
         Returns
         -------
@@ -487,33 +529,33 @@ class GizmoClass(ut.io.SayClass):
             snapshot_index_formatted = '0' + str(snapshot_index)
         if snapshot_index >= 100:
             snapshot_index_formatted = str(snapshot_index)
-        if use_four_character_index:
+        if self.use_four_character_index:
             snapshot_index_formatted = '0' + snapshot_index_formatted
         if snapshot_index >= 1000:
             snapshot_index_formatted = str(snapshot_index)
 
-        file_name_base_snapshot = file_name_base + '_' + snapshot_index_formatted
+        file_name_base_snapshot = self.file_name_base + '_' + snapshot_index_formatted
 
         # try several common notations for directory/filename structure
         file_name_base = directory + file_name_base_snapshot
-        file_name = file_name_base + file_extension
+        file_name = file_name_base + self.file_extension
         if not os.path.exists(file_name):
             # is a multi-part file?
-            file_name = file_name_base + '.0' + file_extension
+            file_name = file_name_base + '.0' + self.file_extension
         if not os.path.exists(file_name):
             # is file name 'snap(snapdir)' instead of 'snapshot'?
             file_name_base = (directory + 'snap_' + snapshot_directory_specific + '_' +
                               snapshot_index_formatted)
-            file_name = file_name_base + file_extension
+            file_name = file_name_base + self.file_extension
         if not os.path.exists(file_name):
             # is file in snapshot sub-directory? assume this means multi-part files
             file_name_base = (directory + 'snapdir_' + snapshot_index_formatted + '/' +
                               file_name_base_snapshot)
-            file_name = file_name_base + '.0' + file_extension
+            file_name = file_name_base + '.0' + self.file_extension
         if not os.path.exists(file_name):
             # give up
             raise ValueError('! cannot find file to read with name = %s*%s' %
-                             (file_name_base, file_extension))
+                             (file_name_base, self.file_extension))
 
         return file_name, file_name_base
 
