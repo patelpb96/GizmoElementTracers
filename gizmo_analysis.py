@@ -161,8 +161,6 @@ def get_halo_radius(
     else:
         masses_cum = np.sum(masses[rad_indices]) + np.cumsum(mass_in_bins)
 
-    del(rads)
-
     if part.info['has.baryons'] and species == ['dark']:
         # correct for baryonic mass if analyzing only dark matter in baryonic simulation
         mass_factor = 1 + part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter']
@@ -419,9 +417,11 @@ def plot_mass_contamination(
 
     ratios = {}
 
+    #periodic_len = part.info['box.length']
+    periodic_len = None
+
     for spec in pros:
-        dists = ut.coord.distance(
-            'scalar', part[spec]['position'], center_pos, part.info['box.length'])
+        dists = ut.coord.distance('scalar', part[spec]['position'], center_pos, periodic_len)
         pros[spec] = DistanceBin.get_mass_profile(dists, part[spec]['mass'], get_spline=False)
 
     for spec in species_test:
