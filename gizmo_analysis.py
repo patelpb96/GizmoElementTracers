@@ -112,7 +112,7 @@ def get_halo_radius(
       'fof.60m' -> edge density is 60 x matter, for FoF(ll=0.2)
     radius_scaling : string : radius bin scaling
         options: log, lin
-    radius_lim : list/array : limits for radius bins {kpc physical}
+    radius_lim : list/array : limits for radius bins {kpc comoving}
     radius_bin_num : int : number of radius bins
 
     Returns
@@ -142,7 +142,7 @@ def get_halo_radius(
     periodic_len = None  # assume zoom-in run far from box edge, for speed
 
     rads = ut.coord.distance('scalar', positions, center_position, periodic_len)  # {kpc comoving}
-    rads *= part.snap['scale.factor']  # {kpc physical}
+    #rads *= part.snap['scale.factor']  # {kpc physical}
 
     # get masses in bins
     if 'log' in radius_scaling:
@@ -177,7 +177,7 @@ def get_halo_radius(
                 density_cum_in_bins[dist_bin_i + 1] < virial_density):
             log_den_inner = log10(density_cum_in_bins[dist_bin_i])
             log_den_outer = log10(density_cum_in_bins[dist_bin_i + 1])
-            # use interpolation in log space, assuming log density profile
+            # interpolate in log space
             log_rad_inner = DistanceBin.log_maxs[dist_bin_i]
             log_rad_outer = DistanceBin.log_maxs[dist_bin_i + 1]
             log_slope = (log_rad_outer - log_rad_inner) / (log_den_inner - log_den_outer)
@@ -441,7 +441,7 @@ def plot_mass_contamination(
     # print diagnostics
     spec = 'dark.2'
     Say.say('%s cumulative mass/number:' % spec)
-    dists = 10 ** pros[spec]['distance.cum']
+    dists = pros[spec]['distance.cum']
     print_string = '  d < %.3f kpc: mass = %.2e, number = %d'
     if scale_to_halo_radius:
         dists /= halo_radius
