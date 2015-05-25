@@ -86,31 +86,34 @@ def get_center_position(
 
     positions, masses = get_species_positions_masses(part, species)
 
+    #periodic_len = part.info['box.length']
+    periodic_len = None  # assume zoom-in run, far from box edge, for speed
+
     return ut.coord.position_center_of_mass_zoom(
-        positions, masses, part.info['box.length'], center_position, radius_max)
+        positions, masses, periodic_len, center_position, radius_max)
 
 
 def get_halo_radius(
     part, species=['dark', 'star', 'gas'], center_position=[], virial_kind='200m',
-    radius_scaling='log', radius_lim=[10, 1000], radius_bin_num=100):
+    radius_scaling='log', radius_lim=[10, 500], radius_bin_num=100):
     '''
     Parameters
     ----------
-    catalog of particles: dict
-    names of species to use: string or list
+    part : dict : catalog of particles
+    species : string or list : name[s] of species to use
         note: 'all' = use all in particle dictionary
-    center position to use: list or array
+    center_position : list/array : center position to use
         note: if input none, will find it using the input species list
-    virial overdensity definition: string
+    virial_kind : string : virial overdensity definition
       '180m' -> average density is 180 x matter
       '200c' -> average density is 200 x critical
       'vir' -> average density is Bryan & Norman
       'fof.100m' -> edge density is 100 x matter, for FoF(ll=0.168)
       'fof.60m' -> edge density is 60 x matter, for FoF(ll=0.2)
-    radius bin scaling: string
+    radius_scaling : string : radius bin scaling
         options: log, lin
-    radius bin limits: list or array
-    radius bin number: int
+    radius_lim : list/array : limits for radius bins
+    radius_bin_num : int : number of radius bins
 
     Returns
     -------
@@ -126,9 +129,8 @@ def get_halo_radius(
     overdensity, reference_density = HaloProperty.overdensity(virial_kind)
     virial_density = overdensity * reference_density
 
-    # ensure is list even if just one species
     if np.isscalar(species):
-        species = [species]
+        species = [species]  # ensure is list
 
     if species == ['all']:
         species = part.keys()
@@ -375,7 +377,7 @@ def write_initial_condition_points(
 # tests
 #===================================================================================================
 def plot_mass_contamination(
-    part, center_pos=[], distance_lim=[1, 5000], distance_bin_num=100,
+    part, center_pos=[], distance_lim=[1, 2000], distance_bin_num=100,
     distance_scaling='log', y_scaling='log', halo_radius=None, scale_to_halo_radius=False,
     write_plot=False, plot_directory='.'):
     '''
