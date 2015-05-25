@@ -78,9 +78,8 @@ def get_center_position(
     center_pos : list/array : initial center position
     radius_max : float : maximum initial radius to consider during iteration {kpc comoving}
     '''
-    # ensure is list even if just one species
     if np.isscalar(species):
-        species = [species]
+        species = [species]  # ensure is list
 
     if species == ['all']:
         species = ['star', 'dark', 'gas']

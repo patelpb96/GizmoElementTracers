@@ -35,7 +35,8 @@ class GizmoClass(ut.io.SayClass):
 
     def read_snapshot(
         self, species_types='all', snapshot_index=400, directory='.', property_names='all',
-        property_names_exclude=[], particle_subsample_factor=1, get_header_only=False):
+        property_names_exclude=[], sort_dark_by_id=True, force_float32=False,
+        particle_subsample_factor=1, get_header_only=False):
         '''
         Read simulation snapshot, return as dictionary.
 
@@ -60,6 +61,8 @@ class GizmoClass(ut.io.SayClass):
             otherwise, choose subset from among property_name_dict
         property_names_exclude : string or list : name[s] of particle properties not to read
             note: can use this instead of property_names if just want to exclude a few properties
+        sort_dark_by_id : boolean : whether to sort dark-matter particles by id
+        force_float32 : boolean : whether to force floats to 32-bit, to save memory
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         get_header_only : boolean : whether to read only header
 
@@ -314,21 +317,28 @@ class GizmoClass(ut.io.SayClass):
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
                     prop_name = property_name_dict[prop_name_in]
+
                     # determine shape of property array
                     if len(part_in[prop_name_in].shape) == 1:
                         prop_shape = part_num_tot
                     elif len(part_in[prop_name_in].shape) == 2:
                         prop_shape = [part_num_tot, part_in[prop_name_in].shape[1]]
+
+                    # determine data type to store
+                    prop_in_dtype = part_in[prop_name_in].dtype
+                    if force_float32 and prop_in_dtype == 'float64':
+                        prop_in_dtype = np.float32
+
                     # initialize to -1's
-                    part[spec_name][prop_name] = \
-                        np.zeros(prop_shape, part_in[prop_name_in].dtype) - 1
+                    part[spec_name][prop_name] = np.zeros(prop_shape, prop_in_dtype) - 1
+
                     if prop_name == 'id':
                         # initialize so calling an un-itialized value leads to error
                         part[spec_name][prop_name] -= part_num_tot
                 else:
                     self.say('not reading %s for species %s' % (prop_name_in, spec_name))
 
-            # check for special case: particle mass is fixed and is given in mass array in header
+            # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
                 prop_name = property_name_dict['Masses']
                 part[spec_name][prop_name] = np.zeros(part_num_tot, dtype=np.float32)
@@ -405,27 +415,13 @@ class GizmoClass(ut.io.SayClass):
                 del(spec_indices)
 
         # order dark-matter particles by id - should be conserved across snapshots
-        for spec_name in species_names:
-            if 'dark' in spec_name and 'id' in part[spec_name]:
-                indices_sorted_by_id = np.argsort(part[spec_name]['id'])
-                for prop_name in part[spec_name]:
-                    part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted_by_id]
-
-        # check if need bit-flip
-        for spec_name in species_names:
-            if 'id' in part[spec_name]:
-                if np.min(part[spec_name]['id']) < 0 or np.max(part[spec_name]['id']) > 2 ** 32:
-                    masks = part[spec_name]['id'] < 0
-                    if np.sum(masks):
-                        self.say('! %d %s particles have id < 0, possible bit flip' %
-                                 (np.sum(masks), spec_name))
-                        part[spec_name]['id'][masks] += 1L << 31
-
-                    masks = part[spec_name]['id'] > 2 ** 32
-                    if np.sum(masks):
-                        self.say('! %d %s particles have id > 2 ^ 32, possible bit flip' %
-                                 (np.sum(masks), spec_name))
-                        part[spec_name]['id'][masks] += 1L << 31
+        if sort_dark_by_id:
+            for spec_name in species_names:
+                if 'dark' in spec_name and 'id' in part[spec_name]:
+                    indices_sorted_by_id = np.argsort(part[spec_name]['id'])
+                    for prop_name in part[spec_name]:
+                        part[spec_name][prop_name] = \
+                            part[spec_name][prop_name][indices_sorted_by_id]
 
         # apply cosmological conversions
         for spec_name in species_names:
