@@ -138,11 +138,9 @@ def get_halo_radius(
 
     positions, masses = get_species_positions_masses(part, species)
 
-    # if center_position is None or not len(center_position):
-    #    center_position = get_center_position(part, positions, masses)
-
     #periodic_len = part.info['box.length']
     periodic_len = None  # assume zoom-in run far from box edge, for speed
+
     rads = ut.coord.distance('scalar', positions, center_position, periodic_len)  # {kpc comoving}
     rads *= part.snap['scale.factor']  # {kpc physical}
 
@@ -162,6 +160,8 @@ def get_halo_radius(
         masses_cum = masses * (rad_indices.size + np.cumsum(mass_in_bins))
     else:
         masses_cum = np.sum(masses[rad_indices]) + np.cumsum(mass_in_bins)
+
+    del(rads)
 
     if part.info['has.baryons'] and species == ['dark']:
         # correct for baryonic mass if analyzing only dark matter in baryonic simulation
