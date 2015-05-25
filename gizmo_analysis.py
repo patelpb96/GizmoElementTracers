@@ -87,7 +87,7 @@ def get_center_position(
     positions, masses = get_species_positions_masses(part, species)
 
     #periodic_len = part.info['box.length']
-    periodic_len = None  # assume zoom-in run, far from box edge, for speed
+    periodic_len = None  # assume zoom-in run far from box edge, for speed
 
     return ut.coord.position_center_of_mass_zoom(
         positions, masses, periodic_len, center_position, radius_max)
@@ -112,7 +112,7 @@ def get_halo_radius(
       'fof.60m' -> edge density is 60 x matter, for FoF(ll=0.2)
     radius_scaling : string : radius bin scaling
         options: log, lin
-    radius_lim : list/array : limits for radius bins
+    radius_lim : list/array : limits for radius bins {kpc physical}
     radius_bin_num : int : number of radius bins
 
     Returns
@@ -141,8 +141,10 @@ def get_halo_radius(
     # if center_position is None or not len(center_position):
     #    center_position = get_center_position(part, positions, masses)
 
-    # {kpc comoving}
-    rads = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
+    #periodic_len = part.info['box.length']
+    periodic_len = None  # assume zoom-in run far from box edge, for speed
+    rads = ut.coord.distance('scalar', positions, center_position, periodic_len)  # {kpc comoving}
+    rads *= part.snap['scale.factor']  # {kpc physical}
 
     # get masses in bins
     if 'log' in radius_scaling:
