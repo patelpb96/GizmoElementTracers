@@ -442,7 +442,7 @@ def plot_mass_contamination(
     spec = 'dark.2'
     Say.say('%s cumulative mass/number:' % spec)
     dists = pros[spec]['distance.cum']
-    print_string = '  d < %.3f kpc: mass = %.2e, number = %d'
+    print_string = '  d < %.3f kpc: cumulative contamination mass = %.2e, number = %d'
     if scale_to_halo_radius:
         dists /= halo_radius
         print_string = '  d/R_halo < %.3f: mass = %.2e, number = %d'
@@ -613,8 +613,9 @@ def plot_metal_v_distance(
 #===================================================================================================
 # analysis
 #===================================================================================================
-def plot_prop_v_prop(part, spec_name='gas', prop_x='density', prop_y='energy.internal',
-                     distance_lim=[20, 300]):
+def plot_property_v_property(
+    part, species='gas', prop_x='density', prop_y='energy.internal', distance_lim=[20, 300],
+    write_plot=False, plot_directory='.'):
     '''
     .
     '''
@@ -625,13 +626,13 @@ def plot_prop_v_prop(part, spec_name='gas', prop_x='density', prop_y='energy.int
     except:
         center_pos = get_center_position(part, 'dark')
 
-    dists = ut.coord.distance('scalar', part[spec_name]['position'], center_pos,
+    dists = ut.coord.distance('scalar', part[species]['position'], center_pos,
                               part.info['box.length'])
 
     masks = ut.array.elements(dists, distance_lim)
 
-    props_x = log10(part[spec_name][prop_x][masks])
-    props_y = log10(part[spec_name][prop_y][masks])
+    props_x = log10(part[species][prop_x][masks])
+    props_y = log10(part[species][prop_y][masks])
 
     # plot ----------
     plt.close()
@@ -655,10 +656,24 @@ def plot_prop_v_prop(part, spec_name='gas', prop_x='density', prop_y='energy.int
 
     # plt.tight_layout(pad=0.02)
 
+    if write_plot:
+        plot_directory = ut.io.get_path(plot_directory)
+        if len(species) == 1:
+            spec_name = species[0]
+        else:
+            spec_name = 'total'
+        plot_name = (spec_name + '.' + prop_y + '_v_' + prop_x + '_z.%.1f.pdf' %
+                     part.info['redshift'])
+        plt.savefig(plot_directory + plot_name, format='pdf')
+    else:
+        plt.show(block=False)
+
 
 def plot_property_distr(
-    parts, spec_name='gas', prop_name='density', prop_scaling='log', prop_lim=[], prop_bin_num=100,
-    center_poss=[], distance_lim=[], prop_stat='number', y_scaling='log'):
+    parts, species='gas', prop_name='density', prop_scaling='log', prop_lim=[], prop_bin_wid=None,
+    prop_bin_num=100, prop_stat='probability',
+    center_poss=[], distance_lim=[], part_labels=[],
+    axis_y_scaling='log', axis_y_lim=[], write_plot=False, plot_directory='.'):
     '''
     .
     '''
@@ -669,70 +684,122 @@ def plot_property_distr(
     if np.ndim(center_poss) == 1:
         center_poss = [center_poss]
 
+    prop_name_dict = prop_name
+    if prop_name == 'density.num':
+        prop_name_dict = 'density'
+
     Stat = ut.math.StatisticClass()
 
     for part_i, part in enumerate(parts):
-        prop_vals = part[spec_name][prop_name]
+        prop_vals = part[species][prop_name_dict]
 
         if distance_lim:
             dists = ut.coord.distance(
-                'scalar', part[spec_name]['position'], center_poss[part_i],
+                'scalar', part[species]['position'], center_poss[part_i],
                 part.info['box.length'])
             dists *= part.snap['scale.factor']  # {kpc physical}
             prop_is = ut.array.elements(dists, distance_lim)
             prop_vals = prop_vals[prop_is]
 
-        Say.say('keeping %s %s particles' % (prop_vals.size, spec_name))
+        Say.say('keeping %s %s particles' % (prop_vals.size, species))
 
         if prop_scaling == 'log':
             prop_vals = log10(prop_vals)
-            if prop_name == 'density':
+            if prop_name == 'density.num':
+                # convert to {cm ^ -3 physical}
                 prop_vals += log10(const.proton_per_sun) + 3 * log10(const.kpc_per_cm)
-            elif prop_name == 'smooth.length':
-                prop_vals += 3
 
         #Say.say('%s %s range = %s' %
         #        (prop_name, prop_scaling, ut.array.get_limits(prop_vals, digit_num=2)))
 
-        Stat.append_to_dictionary(prop_vals, prop_lim, prop_bin_num)
+        Stat.append_to_dictionary(prop_vals, prop_lim, prop_bin_wid, prop_bin_num)
 
         Stat.print_statistics(-1)
 
     #import ipdb; ipdb.set_trace()
 
-    # plot ----------
     colors = plot.get_colors(len(parts))
+    if not part_labels:
+        part_labels = [None for _ in xrange(len(parts))]
+
+    # plot ----------
     plt.close()
     plt.minorticks_on()
 
     fig = plt.figure()
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
-    subplot.set_xlabel(prop_name)
-    subplot.set_ylabel('dN/dP')
-    subplot.set_xlim(10 ** np.array(prop_lim))
+    subplot.set_xlabel(plot.get_label(prop_name, species, get_units=True))
+    draw_log = False
+    if prop_scaling == 'log':
+        draw_log = True
+    subplot.set_ylabel('${\\rm d}f/{\\rm d}$%s' %
+                       plot.get_label(prop_name, species, get_symbol=True, get_units=False,
+                                      draw_log=draw_log))
+    if prop_scaling == 'log':
+        prop_lim = 10 ** np.array(prop_lim)
+    subplot.set_xlim(prop_lim)
 
-    plot_func = plot.get_plot_function(subplot, prop_scaling, y_scaling)
+    if not axis_y_lim:
+        axis_y_lim = plot.get_limits(Stat.distr[prop_stat][0], axis_y_scaling, exclude_zero=True)
+    subplot.set_ylim(axis_y_lim)
+
+    plot_func = plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i in xrange(len(parts)):
         if prop_scaling == 'log':
             vals_x = 10 ** Stat.distr['bin.mid'][part_i]
         else:
             vals_x = Stat.distr['bin.mid'][part_i]
         plot_func(vals_x, Stat.distr[prop_stat][part_i],
-                  color=colors[part_i], alpha=0.5, linewidth=2)
-        # subplot.loglog(props_x, props_y, '.', color='green', alpha=0.1, linewidth=0.1)
+                  color=colors[part_i], alpha=0.5, linewidth=2, label=part_labels[part_i])
+
+    # redshift legend
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
+                              ['$z=%.1f$' % parts[0].snap['redshift']],
+                              loc='lower left', prop=FontProperties(size=16))
+    legend_z.get_frame().set_alpha(0.5)
+
+    if part_labels[0]:
+        # property legend
+        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
+        legend_prop.get_frame().set_alpha(0.5)
+        subplot.add_artist(legend_z)
 
     #plt.tight_layout(pad=0.02)
+
+    if write_plot:
+        plot_directory = ut.io.get_path(plot_directory)
+        if not np.isscalar(species):
+            if len(species) == 1:
+                species = species[0]
+            else:
+                species = 'total'
+        plot_name = species + '.' + prop_name + '_distr_z.%.1f.pdf' % part.info['redshift']
+        plt.savefig(plot_directory + plot_name, format='pdf')
+        Say.say('wrote %s' % plot_directory + plot_name)
+    else:
+        plt.show(block=False)
 
 
 def plot_mass_v_distance(
     parts, species='dark', prop='density', center_positions=[], distance_scaling='log',
-    distance_lim=[1, 1000], distance_bin_num=100, y_scaling='log', y_lim=[]):
+    distance_lim=[1, 1000], distance_bin_num=100, axis_y_scaling='log', axis_y_lim=[],
+    part_labels=[], write_plot=False, plot_directory='.'):
     '''
-    .
+    parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
+    species : string or list : species to compute total mass of
+    prop : string : mass-related property to compute
+    center_positions : list : center position for each particle catalog
+    distance_scaling : string : lin or log
+    distance_lim : list : min and max distance for binning
+    distance_bin_num : int : number of bins between limits
+    axis_y_scaling : string : scaling for y-axis, lin or log
+    axis_y_lim : list : limits to impose on y-axis
     '''
+    Say = ut.io.SayClass(plot_mass_v_distance)
+
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, distance_lim, distance_bin_num, dimension_num=3)
 
@@ -789,6 +856,9 @@ def plot_mass_v_distance(
     #import ipdb; ipdb.set_trace()
 
     colors = plot.get_colors(len(parts))
+    if not part_labels:
+        part_labels = [None for _ in xrange(len(parts))]
+
     # plot ----------
     plt.close()
     plt.minorticks_on()
@@ -798,23 +868,42 @@ def plot_mass_v_distance(
 
     subplot.set_xlim(distance_lim)
 
-    if y_lim:
-        subplot.set_ylim(y_lim)
+    if axis_y_lim:
+        subplot.set_ylim(axis_y_lim)
     else:
+        print(plot.get_limits(pros[0][prop]))
         subplot.set_ylim(plot.get_limits(pros[0][prop]))
 
-    subplot.set_xlabel('radius $r$ $[\\rm kpc]$')
-    subplot.set_ylabel(plot.get_label(prop, get_symbol=True, get_units=True))
+    subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
+    subplot.set_ylabel(plot.get_label(prop, species, get_symbol=True, get_units=True))
 
     for pro_i, pro in enumerate(pros):
-        plot_func = plot.get_plot_function(subplot, distance_scaling, y_scaling)
+        plot_func = plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
         plot_func(pro['distance'], pro[prop], color=colors[pro_i],
-                  alpha=0.5, linewidth=2, linestyle='-')
+                  alpha=0.5, linewidth=2, linestyle='-', label=part_labels[pro_i])
+
+    if part_labels[0]:
+        # property legend
+        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
+        legend_prop.get_frame().set_alpha(0.5)
 
     #plt.tight_layout(pad=0.02)
 
+    if write_plot:
+        plot_directory = ut.io.get_path(plot_directory)
+        if not np.isscalar(species):
+            if len(species) == 1:
+                species = species[0]
+            else:
+                species = 'total'
+        plot_name = species + '.' + prop + '_v_dist_z.%.1f.pdf' % part.info['redshift']
+        plt.savefig(plot_directory + plot_name, format='pdf')
+        Say.say('wrote %s' % plot_directory + plot_name)
+    else:
+        plt.show(block=False)
 
-def get_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001):
+
+def get_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time'):
     '''
     Get array of times and star-formation rate at each time.
 
@@ -830,14 +919,14 @@ def get_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001):
     time_mids : array : times {Gyr}
     dm_dts : array : total star-formation rate at each time {M_sun / yr}
     '''
-    spec_name = 'star'
+    species = 'star'
 
     if pis is None:
-        pis = np.arange(part[spec_name]['mass'].size, dtype=np.int32)
+        pis = np.arange(part[species]['mass'].size, dtype=np.int32)
 
-    pis_sort = np.argsort(part[spec_name]['form.time'])
-    star_form_aexps = part[spec_name]['form.time'][pis_sort]  # form.time = scale factor
-    star_masses = part[spec_name]['mass'][pis_sort]
+    pis_sort = np.argsort(part[species]['form.time'])
+    star_form_aexps = part[species]['form.time'][pis_sort]  # form.time = scale factor
+    star_masses = part[species]['mass'][pis_sort]
     star_masses_cum = np.cumsum(star_masses)
 
     if redshift_lim:
@@ -855,14 +944,21 @@ def get_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001):
     star_mass_cum_bins = np.interp(scalefactor_bins, star_form_aexps, star_masses_cum)
     dm_dts = np.diff(star_mass_cum_bins) / np.diff(time_bins) / 0.7  # account for mass loss
 
-    time_mids = time_bins[0: time_bins.size - 1] + np.diff(time_bins)  # midpoints of bins
-
+    time_mids = time_bins[: time_bins.size - 1] + np.diff(time_bins)  # midpoints of bins
     time_mids /= 1e9  # convert to {Gyr}
 
-    return time_mids, dm_dts
+    redshift_mids = redshift_bins[: redshift_bins.size - 1] + np.diff(redshift_bins)
+
+    if time_kind == 'time':
+        return time_mids, dm_dts
+    elif time_kind == 'redshift':
+        return redshift_mids, dm_dts
 
 
-def plot_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001, write_plot=False):
+def plot_sfr_history(
+    parts, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time',
+    center_positions=[], distance_lim=[0, 10], part_labels=['ref12', 'ref13'],
+    write_plot=False, plot_directory='.'):
     '''
     Plot star-formation rate v cosmic time.
 
@@ -874,21 +970,75 @@ def plot_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001,
     scalefactor_wid : float : width of scale factor for time binning
     write_plot : boolean : whether to write plot
     '''
-    times, sfrs = get_sfr_history(part, pis, redshift_lim, scalefactor_wid)
+    Say = ut.io.SayClass(plot_sfr_history)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    if np.ndim(center_positions) == 1:
+        center_positions = [center_positions]
+
+    sfrs = []
+    times = []
+    for part_i, part in enumerate(parts):
+        if center_positions:
+            periodic_len = part.info['box.length']
+            periodic_len = None
+            # {kpc comoving}
+            dists = ut.coord.distance(
+                'scalar', part['star']['position'], center_positions[part_i], periodic_len)
+
+            dists *= part.snap['scale.factor']  # {kpc physical}
+
+            pis = ut.array.elements(dists, distance_lim)
+        else:
+            pis = np.arange(part['star']['form.time'].size, dtype=np.int32)
+
+        times_t, sfrs_t = get_sfr_history(part, pis, redshift_lim, scalefactor_wid, time_kind)
+        times.append(times_t)
+        sfrs.append(sfrs_t)
+
+    colors = plot.get_colors(len(parts))
+    if not part_labels:
+        part_labels = [None for _ in xrange(len(parts))]
 
     # plot ----------
     plt.close()
     plt.minorticks_on()
     fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
+    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     # subplot.xscale('linear')
     # subplot.yscale('log')
-    subplot.set_xlabel(r'time [Gyr]')
+    if time_kind == 'time':
+        subplot.set_xlabel('time $[{\\rm Gyr}]$')
+    elif time_kind == 'redshift':
+        subplot.set_xlabel('redshift')
     # pylab.ylabel(r'${\rm SFR}\ \ \dot{M}_{\ast}\ \  [{\rm M_{\odot}\,yr^{-1}}]$')
-    subplot.set_ylabel(r'${\rm SFR}\,[{\rm M_{\odot}\,yr^{-1}}]$')
-    subplot.semilogy(times, sfrs, linewidth=2.0, color='r')
+    subplot.set_ylabel('${\\rm SFR}\,[{\\rm M_{\odot}\,yr^{-1}}]$')
+
+    for part_i in xrange(len(parts)):
+        subplot.semilogy(times[part_i], sfrs[part_i], linewidth=2.0, color=colors[part_i],
+                         alpha=0.5, label=part_labels[part_i])
+
+    # redshift legend
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
+                              ['$z=%.1f$' % parts[0].snap['redshift']],
+                              loc='lower left', prop=FontProperties(size=16))
+    legend_z.get_frame().set_alpha(0.5)
+
+    if part_labels[0]:
+        # property legend
+        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
+        legend_prop.get_frame().set_alpha(0.5)
+        subplot.add_artist(legend_z)
 
     # plt.tight_layout(pad=0.02)
+
     if write_plot:
-        plt.savefig('sfr_v_time.pdf', format='pdf')
+        plot_directory = ut.io.get_path(plot_directory)
+        plot_name = 'star.fr_v_time_z.%.1f.pdf' % part.info['redshift']
+        plt.savefig(plot_directory + plot_name, format='pdf')
+        Say.say('wrote %s' % plot_directory + plot_name)
+    else:
+        plt.show(block=False)

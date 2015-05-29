@@ -10,7 +10,6 @@ Masses in {M_sun}, positions in {kpc comoving}, distances & radii in {kpc physic
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import h5py as h5py
-import os
 # local ----
 from utilities import utility as ut
 from utilities import cosmology
@@ -21,24 +20,23 @@ class GizmoClass(ut.io.SayClass):
     Read in gizmo/gadget snapshots.
     '''
     def __init__(
-        self, file_name_base='snapshot', file_extension='.hdf5', use_four_character_index=False):
+        self, snapshot_name_base='snap*', file_extension='.hdf5'):
         '''
         Set properties for snapshot file names.
 
-        file_name_base : string : snapshot file name base
+        snapshot_name_base : string : name base of snapshot file/directory
         file_extension : string : snapshot file extension
-        use_four_character_index : boolean : whether to use four characters for snapshot index
         '''
-        self.file_name_base = file_name_base
+        self.snapshot_name_base = snapshot_name_base
         self.file_extension = file_extension
-        self.use_four_character_index = use_four_character_index
 
     def read_snapshot(
         self, species_types='all', snapshot_index=400, directory='.', property_names='all',
         property_names_exclude=[], sort_dark_by_id=True, force_float32=False,
         particle_subsample_factor=1, get_header_only=False):
         '''
-        Read simulation snapshot, return as dictionary.
+        Read given properties for given particle species from simulation snapshot file[s].
+        Return as dictionary.
 
         Parameters
         ----------
@@ -235,11 +233,12 @@ class GizmoClass(ut.io.SayClass):
                         property_names.remove(prop_name_in)
 
         # get file name
-        file_name, file_name_base = self.get_file_name(directory, snapshot_index)
+        file_name = self.get_file_name(directory, snapshot_index)
 
-        self.say('reading header from file: ' + file_name)
+        self.say('reading header from: ' + file_name)
+        print()
 
-        ### start reading/assigning header ###
+        ## start reading/assigning header ##
 
         # open file and parse header
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
@@ -274,14 +273,13 @@ class GizmoClass(ut.io.SayClass):
         species_ids_keep = []
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
-            if header['particle.numbers.total'][spec_id] <= 0:
-                self.say('species name = %8s (id = %s): no particles' % (spec_name, spec_id))
-            else:
-                self.say('species name = %8s (id = %s): %d particles' %
-                         (spec_name, spec_id, header['particle.numbers.total'][spec_id]))
+            self.say('species name = %7s (id = %s): %d particles' %
+                     (spec_name, spec_id, header['particle.numbers.total'][spec_id]))
+            if header['particle.numbers.total'][spec_id] > 0:
                 part_number_min = header['particle.numbers.total'][spec_id]
                 species_ids_keep.append(spec_id)
                 species_names_keep.append(spec_name)
+        print()
         # keep only names & ids of species that have particles
         species_names = species_names_keep
         species_ids = species_ids_keep
@@ -350,12 +348,15 @@ class GizmoClass(ut.io.SayClass):
 
         # loop over all files at given snapshot
         for file_i in xrange(header['file.number.per.snapshot']):
-            if header['file.number.per.snapshot'] > 1:
+            if file_i == 0:
+                file_name_i = file_name
+            else:
+                # open i'th of multiple files for snapshot
                 file_in.close()
-                file_name = file_name_base + '.' + str(file_i) + self.file_extension
-                file_in = h5py.File(file_name, 'r')  # open snapshot file
+                file_name_i = file_name.replace('.0.', '.%d.' % file_i)
+                file_in = h5py.File(file_name_i, 'r')
 
-            self.say('loading file: ' + file_name)
+            self.say('reading properties from: ' + file_name_i.split('/')[-1])
 
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
@@ -387,10 +388,10 @@ class GizmoClass(ut.io.SayClass):
                     part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 
         file_in.close()
+        print()
+        ## end reading properties for each species ##
 
-        ### end reading properties for each species ###
-
-        ### start adjusting properties for each species ###
+        ## start adjusting properties for each species ##
 
         # if species dark.2 contains several mass levels of dark matter, split into separate dicts
         spec_name = 'dark.2'
@@ -401,6 +402,7 @@ class GizmoClass(ut.io.SayClass):
                 dark_lowres = {}
                 for prop_name in part[spec_name]:
                     dark_lowres[prop_name] = np.array(part[spec_name][prop_name])
+
                 for dark_i, dark_mass in enumerate(dark_lowres_masses):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
                     spec_name = 'dark.%d' % (dark_i + 2)
@@ -412,10 +414,13 @@ class GizmoClass(ut.io.SayClass):
                         species_names.append(spec_name)
                     if spec_id not in species_ids:
                         species_ids.append(species_name_dict[spec_name])
+
                 del(spec_indices)
+                print()
 
         # order dark-matter particles by id - should be conserved across snapshots
         if sort_dark_by_id:
+            self.say('sorting dark-matter particles by id\n')
             for spec_name in species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
                     indices_sorted_by_id = np.argsort(part[spec_name]['id'])
@@ -451,17 +456,21 @@ class GizmoClass(ut.io.SayClass):
                 # convert to {kpc physical}
                 part[spec_name]['smooth.length'] *= header['scale.factor'] / header['hubble']
                 part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
+                part[spec_name]['smooth.length'] *= 1000  # convert to {pc physical}
 
             if 'form.time' in part[spec_name]:
                 # convert to {Gyr}
                 part[spec_name]['form.time'] /= header['hubble']
 
-        ### end adjusting properties for each species ###
+        ## end adjusting properties for each species ##
 
         # sub-sample highest-resolution particles for smaller memory
         if particle_subsample_factor > 1:
+            spec_names = ['dark', 'gas', 'star']
+            self.say('subsampling (periodically) %s particles by factor = %d\n' %
+                     (spec_names, particle_subsample_factor))
             for spec_name in part:
-                if spec_name in ['dark', 'gas', 'star']:
+                if spec_name in spec_names:
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = \
                             part[spec_name][prop_name][::particle_subsample_factor]
@@ -499,7 +508,8 @@ class GizmoClass(ut.io.SayClass):
 
     def get_file_name(self, directory, snapshot_index):
         '''
-        Get full name (with relative path) of file to read in.
+        Get name (with relative path) of file to read in.
+        If multiple files per snapshot, get name of 0th one.
 
         Parameters
         ----------
@@ -508,49 +518,30 @@ class GizmoClass(ut.io.SayClass):
 
         Returns
         -------
-        full file name (with relative path): string
-        file file name basse (with relative path): string
+        file name (with relative path): string
         '''
         directory = ut.io.get_path(directory)
 
-        s0 = directory.split('/')
-        snapshot_directory_specific = s0[len(s0) - 1]
-        if len(snapshot_directory_specific) <= 1:
-            snapshot_directory_specific = s0[len(s0) - 2]
+        path_names, file_indices = ut.io.get_file_names(directory + self.snapshot_name_base, int)
 
-        snapshot_index_formatted = '00' + str(snapshot_index)
-        if snapshot_index >= 10:
-            snapshot_index_formatted = '0' + str(snapshot_index)
-        if snapshot_index >= 100:
-            snapshot_index_formatted = str(snapshot_index)
-        if self.use_four_character_index:
-            snapshot_index_formatted = '0' + snapshot_index_formatted
-        if snapshot_index >= 1000:
-            snapshot_index_formatted = str(snapshot_index)
+        if snapshot_index < 0:
+            snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
+        elif snapshot_index not in file_indices:
+            raise ValueError('cannot find snapshot index = %d in: %s' % path_names)
 
-        file_name_base_snapshot = self.file_name_base + '_' + snapshot_index_formatted
+        path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
 
-        # try several common notations for directory/filename structure
-        file_name_base = directory + file_name_base_snapshot
-        file_name = file_name_base + self.file_extension
-        if not os.path.exists(file_name):
-            # is a multi-part file?
-            file_name = file_name_base + '.0' + self.file_extension
-        if not os.path.exists(file_name):
-            # is file name 'snap(snapdir)' instead of 'snapshot'?
-            file_name_base = (directory + 'snap_' + snapshot_directory_specific + '_' +
-                              snapshot_index_formatted)
-            file_name = file_name_base + self.file_extension
-        if not os.path.exists(file_name):
-            # is file in snapshot sub-directory? assume this means multi-part files
-            file_name_base = (directory + 'snapdir_' + snapshot_index_formatted + '/' +
-                              file_name_base_snapshot)
-            file_name = file_name_base + '.0' + self.file_extension
-        if not os.path.exists(file_name):
-            # give up
-            raise ValueError('! cannot find file to read with name = %s*%s' %
-                             (file_name_base, self.file_extension))
+        if self.file_extension in path_name:
+            # got actual file, so good to go
+            path_file_name = path_name
+        else:
+            # got snapshot directory with multiple files, return only 0th one
+            path_file_names = ut.io.get_file_names(path_name + '/' + self.snapshot_name_base)
+            if len(path_file_names) and '.0.' in path_file_names[0]:
+                path_file_name = path_file_names[0]
+            else:
+                raise ValueError('cannot find 0th snapshot file in: %s' % path_file_names)
 
-        return file_name, file_name_base
+        return path_file_name
 
 Gizmo = GizmoClass()
