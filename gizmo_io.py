@@ -12,6 +12,7 @@ import numpy as np
 import h5py as h5py
 # local ----
 from utilities import utility as ut
+from utilities import constants as const
 from utilities import cosmology
 
 
@@ -29,6 +30,7 @@ class GizmoClass(ut.io.SayClass):
         '''
         self.snapshot_name_base = snapshot_name_base
         self.file_extension = file_extension
+        self.eos = 5 / 3  # gas equation of state
 
     def read_snapshot(
         self, species_types='all', snapshot_index=400, directory='.', property_names='all',
@@ -138,7 +140,7 @@ class GizmoClass(ut.io.SayClass):
             'Potential': 'potential',
 
             ## gas particles ##
-            'InternalEnergy': 'energy.internal',
+            'InternalEnergy': 'temperature',
             'Density': 'density',
             'SmoothingLength': 'smooth.length',
             #'ArtificialViscosity': 'artificial.viscosity',
@@ -231,6 +233,14 @@ class GizmoClass(ut.io.SayClass):
                     if (prop_name == str.lower(prop_name_in) or
                             prop_name == str.lower(property_name_dict[prop_name_in])):
                         property_names.remove(prop_name_in)
+
+        if 'InternalEnergy' in property_names:
+            # need helium and electron fraction to compute temperature
+            for prop_name in ['ElectronAbundance', 'Metallicity']:
+                if prop_name not in property_names:
+                    property_names.append(prop_name)
+
+        print(property_names)
 
         # get file name
         file_name = self.get_file_name(directory, snapshot_index)
@@ -428,7 +438,7 @@ class GizmoClass(ut.io.SayClass):
                         part[spec_name][prop_name] = \
                             part[spec_name][prop_name][indices_sorted_by_id]
 
-        # apply cosmological conversions
+        # apply unit conversions
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
             if 'position' in part[spec_name]:
@@ -461,6 +471,16 @@ class GizmoClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 # convert to {Gyr}
                 part[spec_name]['form.time'] /= header['hubble']
+
+            if 'temperature' in part[spec_name]:
+                # convert from {(km / s) ^ 2} to {Kelvin}
+                # ignore small corrections from metals
+                helium_mass_fracs = part[spec_name]['metallicity'][:, 1]
+                ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
+                mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
+                molecular_weights = mus * const.proton_mass
+                part[spec_name]['temperature'] *= \
+                    const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights / const.boltzmann
 
         ## end adjusting properties for each species ##
 

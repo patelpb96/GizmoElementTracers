@@ -871,7 +871,6 @@ def plot_mass_v_distance(
     if axis_y_lim:
         subplot.set_ylim(axis_y_lim)
     else:
-        print(plot.get_limits(pros[0][prop]))
         subplot.set_ylim(plot.get_limits(pros[0][prop]))
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
