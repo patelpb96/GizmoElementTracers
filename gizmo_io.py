@@ -240,8 +240,6 @@ class GizmoClass(ut.io.SayClass):
                 if prop_name not in property_names:
                     property_names.append(prop_name)
 
-        print(property_names)
-
         # get file name
         file_name = self.get_file_name(directory, snapshot_index)
 
@@ -270,7 +268,7 @@ class GizmoClass(ut.io.SayClass):
 
         # convert some header quantities
         if header['is.cosmological']:
-            header['scale.factor'] = float(header['time'])
+            header['scale-factor'] = float(header['time'])
             del(header['time'])
             header['box.length/h'] = float(header['box.length'])
             header['box.length'] /= header['hubble']  # convert to {kpc comoving}
@@ -442,31 +440,33 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
             if 'position' in part[spec_name]:
-                part[spec_name]['position'] /= header['hubble']  # convert to {kpc comoving}
+                # convert to {kpc comoving}
+                part[spec_name]['position'] /= header['hubble']
 
             if 'mass' in part[spec_name]:
-                part[spec_name]['mass'] *= 1e10 / header['hubble']  # convert to {M_sun}
+                # convert to {M_sun}
+                part[spec_name]['mass'] *= 1e10 / header['hubble']
                 if np.min(part[spec_name]['mass']) < 10 or np.max(part[spec_name]['mass']) > 2e10:
                     self.say('! unsure about masses: read [min, max] = [%.3e, %.3e] M_sun' %
                              (np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
 
             if 'bh.mass' in part[spec_name]:
+                # convert to {M_sun}
                 part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
 
             if 'velocity' in part[spec_name]:
                 # convert to {km / s physical}
-                part[spec_name]['velocity'] *= np.sqrt(header['scale.factor'])
+                part[spec_name]['velocity'] *= np.sqrt(header['scale-factor'])
 
             if 'density' in part[spec_name]:
                 # convert to {M_sun / kpc ** 3 physical}
                 part[spec_name]['density'] *= (1e10 / header['hubble'] /
-                                               (header['scale.factor'] / header['hubble']) ** 3)
+                                               (header['scale-factor'] / header['hubble']) ** 3)
 
             if 'smooth.length' in part[spec_name]:
-                # convert to {kpc physical}
-                part[spec_name]['smooth.length'] *= header['scale.factor'] / header['hubble']
+                # convert to {pc physical}
+                part[spec_name]['smooth.length'] *= 1000 * header['scale-factor'] / header['hubble']
                 part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
-                part[spec_name]['smooth.length'] *= 1000  # convert to {pc physical}
 
             if 'form.time' in part[spec_name]:
                 # convert to {Gyr}
@@ -520,7 +520,7 @@ class GizmoClass(ut.io.SayClass):
         # store snapshot time information
         part_return.snap = {
             'redshift': header['redshift'],
-            'scale.factor': header['scale.factor'],
+            'scale-factor': header['scale-factor'],
             'time': Cosmo.age(header['redshift'])
         }
 

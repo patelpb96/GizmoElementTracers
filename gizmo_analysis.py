@@ -142,7 +142,7 @@ def get_halo_radius(
     periodic_len = None  # assume zoom-in run far from box edge, for speed
 
     rads = ut.coord.distance('scalar', positions, center_position, periodic_len)  # {kpc comoving}
-    #rads *= part.snap['scale.factor']  # {kpc physical}
+    #rads *= part.snap['scale-factor']  # {kpc physical}
 
     # get masses in bins
     if 'log' in radius_scaling:
@@ -697,7 +697,7 @@ def plot_property_distr(
             dists = ut.coord.distance(
                 'scalar', part[species]['position'], center_poss[part_i],
                 part.info['box.length'])
-            dists *= part.snap['scale.factor']  # {kpc physical}
+            dists *= part.snap['scale-factor']  # {kpc physical}
             prop_is = ut.array.elements(dists, distance_lim)
             prop_vals = prop_vals[prop_is]
 
@@ -830,7 +830,7 @@ def plot_mass_v_distance(
             dists = ut.coord.distance(
                 'scalar', positions, center_positions[part_i], part.info['box.length'])
 
-            dists *= part.snap['scale.factor']  # {kpc physical}
+            dists *= part.snap['scale-factor']  # {kpc physical}
 
             pro = DistanceBin.get_mass_profile(dists, masses)
 
@@ -987,7 +987,7 @@ def plot_sfr_history(
             dists = ut.coord.distance(
                 'scalar', part['star']['position'], center_positions[part_i], periodic_len)
 
-            dists *= part.snap['scale.factor']  # {kpc physical}
+            dists *= part.snap['scale-factor']  # {kpc physical}
 
             pis = ut.array.elements(dists, distance_lim)
         else:
