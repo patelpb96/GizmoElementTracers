@@ -27,8 +27,8 @@ def get_species_positions_masses(part, species):
     '''
     Parameters
     ----------
-    catalog of particles: dict
-    list of species: string or list
+    part : dict : catalog of particles
+    species : string or list : list of species
     '''
     Say = ut.io.SayClass(get_species_positions_masses)
 
@@ -66,7 +66,8 @@ def get_species_positions_masses(part, species):
 
 
 def get_center_position(
-    part, species=['star', 'dark', 'gas'], center_position=[0, 0, 0], radius_max=1e10):
+    part, species=['star', 'dark', 'gas'], center_position=[0, 0, 0], radius_max=1e10,
+    method='cm'):
     '''
     Get position of center of mass, using iterative zoom-in on species.
 
@@ -77,6 +78,8 @@ def get_center_position(
         note: 'all' = use all in particle dictionary
     center_pos : list/array : initial center position
     radius_max : float : maximum initial radius to consider during iteration {kpc comoving}
+    method : string : method of centering
+        options: cm, potential
     '''
     if np.isscalar(species):
         species = [species]  # ensure is list
@@ -89,8 +92,14 @@ def get_center_position(
     #periodic_len = part.info['box.length']
     periodic_len = None  # assume zoom-in run far from box edge, for speed
 
-    return ut.coord.position_center_of_mass_zoom(
-        positions, masses, periodic_len, center_position, radius_max)
+    if method == 'cm':
+        center_pos = ut.coord.position_center_of_mass_zoom(
+            positions, masses, periodic_len, center_position, radius_max)
+    elif method == 'potential':
+        species = species[0]
+        center_pos = part[species]['position'][np.argmin(part[species]['potential'])]
+
+    return center_pos
 
 
 def get_halo_radius(
@@ -675,7 +684,9 @@ def plot_property_distr(
     center_poss=[], distance_lim=[], part_labels=[],
     axis_y_scaling='log', axis_y_lim=[], write_plot=False, plot_directory='.'):
     '''
-    .
+    parts : dict or list : catalog of particles
+    species : string : particle species
+    prop_name : string : property to get distribution of
     '''
     Say = ut.io.SayClass(plot_property_distr)
 
@@ -785,8 +796,8 @@ def plot_property_distr(
 
 def plot_mass_v_distance(
     parts, species='dark', prop='density', center_positions=[], distance_scaling='log',
-    distance_lim=[1, 1000], distance_bin_num=100, axis_y_scaling='log', axis_y_lim=[],
-    part_labels=[], write_plot=False, plot_directory='.'):
+    distance_lim=[1, 1000], distance_bin_wid=None, distance_bin_num=100, axis_y_scaling='log',
+    axis_y_lim=[], part_labels=[], write_plot=False, plot_directory='.'):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
     species : string or list : species to compute total mass of
@@ -794,6 +805,7 @@ def plot_mass_v_distance(
     center_positions : list : center position for each particle catalog
     distance_scaling : string : lin or log
     distance_lim : list : min and max distance for binning
+    distance_bin_wid : float : width of distance bin
     distance_bin_num : int : number of bins between limits
     axis_y_scaling : string : scaling for y-axis, lin or log
     axis_y_lim : list : limits to impose on y-axis
@@ -801,7 +813,8 @@ def plot_mass_v_distance(
     Say = ut.io.SayClass(plot_mass_v_distance)
 
     DistanceBin = ut.bin.DistanceBinClass(
-        distance_scaling, distance_lim, distance_bin_num, dimension_num=3)
+        distance_scaling, distance_lim, number=distance_bin_num, width=distance_bin_wid,
+        dimension_num=3)
 
     if isinstance(parts, dict):
         parts = [parts]
@@ -850,8 +863,8 @@ def plot_mass_v_distance(
             pros[-1]['vel.circ'] = np.sqrt(pros[-1]['vel.circ'])
             pros[-1]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
 
-        if part_i > 0:
-            print(pros[part_i][prop] / pros[0][prop])
+        #if part_i > 0:
+        #    print(pros[part_i][prop] / pros[0][prop])
 
     #import ipdb; ipdb.set_trace()
 
@@ -954,12 +967,12 @@ def get_sfr_history(part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001, 
         return redshift_mids, dm_dts
 
 
-def plot_sfr_history(
+def plot_star_form_history(
     parts, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time',
     center_positions=[], distance_lim=[0, 10], part_labels=['ref12', 'ref13'],
     write_plot=False, plot_directory='.'):
     '''
-    Plot star-formation rate v cosmic time.
+    Plot star-formation rate history v cosmic time.
 
     Parameters
     ----------
@@ -969,7 +982,7 @@ def plot_sfr_history(
     scalefactor_wid : float : width of scale factor for time binning
     write_plot : boolean : whether to write plot
     '''
-    Say = ut.io.SayClass(plot_sfr_history)
+    Say = ut.io.SayClass(plot_star_form_history)
 
     if isinstance(parts, dict):
         parts = [parts]
@@ -1036,7 +1049,7 @@ def plot_sfr_history(
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        plot_name = 'star.fr_v_time_z.%.1f.pdf' % part.info['redshift']
+        plot_name = 'star.form_v_time_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
     else:

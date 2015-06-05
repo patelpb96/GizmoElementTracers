@@ -428,13 +428,14 @@ class GizmoClass(ut.io.SayClass):
 
         # order dark-matter particles by id - should be conserved across snapshots
         if sort_dark_by_id:
-            self.say('sorting dark-matter particles by id\n')
             for spec_name in species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
+                    self.say('sorting %s particles by id' % spec_name)
                     indices_sorted_by_id = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = \
                             part[spec_name][prop_name][indices_sorted_by_id]
+            print()
 
         # apply unit conversions
         for spec_name in species_names:
