@@ -288,7 +288,83 @@ def get_galaxy_radius(
     return halo_radius
 
 
-#def get_momentum_ang_vector():
+def get_species_mass_profiles(part, species=['all'], center_position=[], DistanceBin=None):
+    '''
+    part : dict : catalog of particles
+    species : string or list : species to compute total mass of
+    center_position : list : center position
+    DistanceBin : class : distance bin class
+    '''
+    pros = {}
+
+    # ensure is list even if just one species
+    if np.isscalar(species):
+        species = [species]
+
+    if species == ['all'] or species == ['total']:
+        species = ['dark', 'gas', 'star', 'dark.2']
+        #species = part.keys()
+
+    for spec in species:
+        positions, masses = get_species_positions_masses(part, spec)
+
+        if np.isscalar(masses):
+            masses = np.zeros(positions.shape[0], dtype=masses.dtype) + masses
+
+        # {kpc comoving}
+        distances = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
+        distances *= part.snap['scale-factor']  # convert to {kpc physical}
+
+        pros[spec] = DistanceBin.get_mass_profile(distances, masses)
+
+    props = [prop for prop in pros[species[0]] if 'distance' not in prop]
+    props_dist = [prop for prop in pros[species[0]] if 'distance' in prop]
+
+    # create dictionary for total mass
+    spec_new = 'total'
+    pros[spec_new] = {}
+    for spec in species:
+        for prop in props:
+            if prop not in pros[spec_new]:
+                pros[spec_new][prop] = np.array(pros[spec][prop])
+            elif 'log' in prop:
+                pros[spec_new][prop] = log10(10 ** pros[spec_new][prop] + 10 ** pros[spec][prop])
+            else:
+                pros[spec_new][prop] += pros[spec][prop]
+    for prop in props_dist:
+        pros[spec_new][prop] = pros[species[0]][prop]
+    species.append(spec_new)
+
+    # create dictionary for baryonic mass
+    if 'star' in species or 'gas' in species:
+        spec_new = 'baryon'
+        pros[spec_new] = {}
+        for spec in np.intersect1d(species, ['star', 'gas']):
+            for prop in props:
+                if prop not in pros[spec_new]:
+                    pros[spec_new][prop] = np.array(pros[spec][prop])
+                elif 'log' in prop:
+                    pros[spec_new][prop] = log10(10 ** pros[spec_new][prop] +
+                                                 10 ** pros[spec][prop])
+                else:
+                    pros[spec_new][prop] += pros[spec][prop]
+        for prop in props_dist:
+            pros[spec_new][prop] = pros[species[0]][prop]
+        species.append(spec_new)
+
+    # create mass fraction wrt total mass
+    for spec in np.setdiff1d(species, ['total']):
+        for prop in ['mass', 'mass.cum']:
+            pros[spec][prop + '.fraction'] = pros[spec][prop] / pros['total'][prop]
+
+    # create circular velocity = sqrt (G m(<r) / r)
+    for spec in species:
+        pros[spec]['vel.circ'] = (pros[spec]['mass.cum'] / pros[spec]['distance.cum'] *
+                                  const.grav_kpc_msun_yr)
+        pros[spec]['vel.circ'] = np.sqrt(pros[spec]['vel.circ'])
+        pros[spec]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+
+    return pros
 
 
 #===================================================================================================
@@ -557,13 +633,16 @@ def plot_mass_contamination(
     if halo_radius and scale_to_halo_radius:
         xs /= halo_radius
 
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
-    fig, subplot = plt.subplots(1, 1, sharex=True)
+    fig = plt.figure(1)
+    subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
+
     subplot.set_xlim(distance_lim)
     # subplot.set_ylim([0, 0.1])
     subplot.set_ylim([0.0001, 3])
-    fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
 
     subplot.set_ylabel('$M_{\\rm spec} / M_{\\rm %s}$' % species_ref, fontsize=20)
     if scale_to_halo_radius:
@@ -663,13 +742,16 @@ def plot_metal_v_distance(
     if halo_radius and scale_to_halo_radius:
         xs /= halo_radius
 
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
-    fig, subplot = plt.subplots(1, 1, sharex=True)
+    fig = plt.figure(1)
+    subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
+
     subplot.set_xlim(distance_lim)
     # subplot.set_ylim([0, 0.1])
     subplot.set_ylim(axis_y_lim)
-    fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
 
     if 'metallicity' in plot_kind:
         subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=20)
@@ -699,7 +781,7 @@ def plot_metal_v_distance(
     # legend = subplot.legend(loc='best', prop=FontProperties(size=12))
     # legend.get_frame().set_alpha(0.7)
 
-    # plt.tight_layout(pad=0.02)
+    plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
@@ -709,8 +791,8 @@ def plot_metal_v_distance(
         plot_name = plot_kind + '_v_' + dist_name + '_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
-    else:
-        plt.show(block=False)
+    #else:
+    #    plt.show(block=False)
 
 
 #===================================================================================================
@@ -739,15 +821,17 @@ def plot_property_v_property(
     props_y = log10(part[species][prop_y][masks])
 
     # plot ----------
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
 
     plt.hist2d(props_x, props_y, bins=200, norm=LogNorm())
     plt.colorbar()
     plt.show()
 
-    # fig, subplot = plt.subplots(1, 1, sharex=True)
-    # fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
+    #fig = plt.figure(1)
+    #subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.14, hspace=0.03)
 
     # subplot.xscale('linear')
     # subplot.yscale('log')
@@ -826,13 +910,12 @@ def plot_property_distr(
         part_labels = [None for _ in xrange(len(parts))]
 
     # plot ----------
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
-
-    fig = plt.figure()
+    fig = plt.figure(1)
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlabel(plot.get_label(prop_name, species, get_units=True))
     draw_log = False
@@ -885,7 +968,7 @@ def plot_property_distr(
     else:
         plt.show(block=False)
 
-
+"""
 def plot_property_v_distance(
     parts, species='star', prop_name='distance', prop_scaling='log', prop_stat='med',
     center_positions=[],
@@ -966,11 +1049,12 @@ def plot_property_v_distance(
         part_labels = [part[i].info['catalog.name'] for i in xrange(len(parts))]
 
     # plot ----------
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
-
-    fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig = plt.figure()
+    subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(distance_lim)
 
@@ -1006,6 +1090,7 @@ def plot_property_v_distance(
         Say.say('wrote %s' % plot_directory + plot_name)
     else:
         plt.show(block=False)
+"""
 
 
 def plot_mass_v_distance(
@@ -1016,6 +1101,8 @@ def plot_mass_v_distance(
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
     species : string or list : species to compute total mass of
     prop : string : mass-related property to compute
+        options: density, density.cum, mass, mass.cum, vel.circ,
+            baryon.fraction, baryon.fraction.cum
     center_positions : list : center position for each particle catalog
     distance_scaling : string : lin or log
     distance_lim : list : min and max distance for binning
@@ -1036,45 +1123,10 @@ def plot_mass_v_distance(
     if np.ndim(center_positions) == 1:
         center_positions = [center_positions]
 
-    # ensure is list even if just one species
-    if np.isscalar(species):
-        species = [species]
-
-    if species == ['all']:
-        species = parts[0].keys()
-        # species = ['star', 'dark', 'gas']
-
     pros = []
     for part_i, part in enumerate(parts):
-        for spec_i, spec in enumerate(species):
-            # split up species to make more memory efficient
-            positions, masses = get_species_positions_masses(part, spec)
-
-            if np.isscalar(masses):
-                masses = np.zeros(positions.shape[0], dtype=masses.dtype) + masses
-
-            # {kpc comoving}
-            dists = ut.coord.distance(
-                'scalar', positions, center_positions[part_i], part.info['box.length'])
-            dists *= part.snap['scale-factor']  # convert to {kpc physical}
-
-            pro = DistanceBin.get_mass_profile(dists, masses)
-
-            if spec_i == 0:
-                pros.append(pro)
-            else:
-                ks = [k for k in pro if 'distance' not in k]
-                for k in ks:
-                    if 'log' in k:
-                        pros[-1][k] = log10(10 ** pros[-1][k] + 10 ** pro[k])
-                    else:
-                        pros[-1][k] += pro[k]
-
-        if prop == 'vel.circ':
-            pros[-1]['vel.circ'] = (pros[-1]['mass.cum'] / pros[-1]['distance.cum'] *
-                                    const.grav_kpc_msun_yr)
-            pros[-1]['vel.circ'] = np.sqrt(pros[-1]['vel.circ'])
-            pros[-1]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+        pros_part = get_species_mass_profiles(part, species, center_positions[part_i], DistanceBin)
+        pros.append(pros_part)
 
         #if part_i > 0:
         #    print(pros[part_i][prop] / pros[0][prop])
@@ -1086,25 +1138,25 @@ def plot_mass_v_distance(
         part_labels = [None for _ in xrange(len(parts))]
 
     # plot ----------
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
-
-    fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig = plt.figure(1)
+    subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig, subplot = plt.subplots()
+    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(distance_lim)
-
-    if axis_y_lim:
-        subplot.set_ylim(axis_y_lim)
-    else:
-        subplot.set_ylim(plot.get_limits(pros[0][prop]))
+    if not axis_y_lim:
+        axis_y_lim = plot.get_limits(pros[0][species][prop], axis_y_scaling)
+    subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
     subplot.set_ylabel(plot.get_label(prop, species, get_symbol=True, get_units=True))
 
     for pro_i, pro in enumerate(pros):
         plot_func = plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
-        plot_func(pro['distance'], pro[prop], color=colors[pro_i],
+        plot_func(pro[species]['distance'], pro[species][prop], color=colors[pro_i],
                   alpha=0.5, linewidth=2, linestyle='-', label=part_labels[pro_i])
 
     if part_labels[0]:
@@ -1112,31 +1164,26 @@ def plot_mass_v_distance(
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
 
-    #plt.tight_layout(pad=0.02)
+    plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        if not np.isscalar(species):
-            if len(species) == 1:
-                species = species[0]
-            else:
-                species = 'total'
         plot_name = species + '.' + prop + '_v_dist_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
-    else:
-        plt.show(block=False)
+    #else:
+    #    plt.show(block=False)
 
 
 def get_star_form_history(
-    part, pis=None, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time'):
+    part, part_is=None, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time'):
     '''
     Get array of times and star-formation rate at each time.
 
     Parameters
     ----------
     part : dict : dictionary of particle species
-    pis : array : list of star particle indices
+    part_is : array : list of star particle indices
     redshift_lim : list : redshift limits of times to get
     scalefactor_wid : float : width of scale factor for time binning
 
@@ -1147,10 +1194,10 @@ def get_star_form_history(
     '''
     species = 'star'
 
-    if pis is None:
-        pis = np.arange(part[species]['mass'].size, dtype=np.int32)
+    if part_is is None:
+        part_is = np.arange(part[species]['mass'].size, dtype=np.int32)
 
-    pis_sort = np.argsort(part[species]['form.time'])
+    pis_sort = part_is[np.argsort(part[species]['form.time'][part_is])]
     star_form_aexps = part[species]['form.time'][pis_sort]  # form.time = scale factor
     star_masses = part[species]['mass'][pis_sort]
     star_masses_cum = np.cumsum(star_masses)
@@ -1229,10 +1276,12 @@ def plot_star_form_history(
         part_labels = [None for _ in xrange(len(parts))]
 
     # plot ----------
-    plt.close()
+    plt.clf()
     plt.minorticks_on()
-    fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig = plt.figure(1)
+    subplot = fig.add_subplot(111)
+    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     # subplot.xscale('linear')
     # subplot.yscale('log')
