@@ -358,7 +358,7 @@ def print_contamination_in_box(
             center_pos[dimension_i] = 0.5 * part.info['box.length']
     print('center position = %s' % center_pos)
 
-    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_lim, distance_bin_num)
+    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_lim, number=distance_bin_num)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])

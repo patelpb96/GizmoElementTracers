@@ -34,8 +34,8 @@ class GizmoClass(ut.io.SayClass):
 
     def read_snapshot(
         self, species_types='all', snapshot_index=400, directory='.', property_names='all',
-        property_names_exclude=[], sort_dark_by_id=True, force_float32=False,
-        particle_subsample_factor=1, get_header_only=False):
+        property_names_exclude=[], particle_subsample_factor=1, catalog_name='',
+        sort_dark_by_id=True, force_float32=False, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary.
@@ -61,9 +61,10 @@ class GizmoClass(ut.io.SayClass):
             otherwise, choose subset from among property_name_dict
         property_names_exclude : string or list : name[s] of particle properties not to read
             note: can use this instead of property_names if just want to exclude a few properties
+        particle_subsample_factor : int : factor to periodically subsample particles, to save memory
+        catalog_name : string : name to give to catalog information for future identification
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force floats to 32-bit, to save memory
-        particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         get_header_only : boolean : whether to read only header
 
         Returns
@@ -299,6 +300,9 @@ class GizmoClass(ut.io.SayClass):
         else:
             header['has.baryons'] = True
 
+        header['catalog.kind'] = 'particle'
+        header['catalog.name'] = catalog_name
+
         # only want to return header?
         if get_header_only:
             file_in.close()
@@ -522,7 +526,8 @@ class GizmoClass(ut.io.SayClass):
         part_return.snap = {
             'redshift': header['redshift'],
             'scale-factor': header['scale-factor'],
-            'time': Cosmo.age(header['redshift'])
+            'time': Cosmo.age(header['redshift']),
+            'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
         }
 
         return part_return
@@ -571,3 +576,32 @@ class GizmoClass(ut.io.SayClass):
         return path_file_name
 
 Gizmo = GizmoClass()
+
+
+def assign_orbit(part, species=['star'], center_pos=[], center_vel=[], include_hubble_flow=True):
+    '''
+    Assign derived orbital properties to species.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    species : string or list : particle species to compute
+    center_position : array : center position to use
+    include_hubble_flow : boolean : whether to include hubble flow
+    '''
+    if np.isscalar(species):
+        species = [species]
+
+    for spec_name in species:
+        dist_vecs = ut.coord.distance(
+            'vector', part[spec_name]['position'], center_pos, part.info['box.length'])
+        dist_vecs *= part.snap['scale-factor']  # convert to {kpc physical}
+
+        vel_vecs = ut.coord.velocity_difference(
+            'vector', center_vel, part[spec_name]['velocity'], include_hubble_flow,
+            center_pos, part[spec_name]['position'], part.snap['scale-factor'],
+            part.snap['time.hubble'], part.info['box.length'])
+
+        orb = ut.orbit.get_orbit_dictionary(dist_vecs, vel_vecs, get_integrals=False)
+        for k in orb:
+            part[spec_name][k] = orb[k]
