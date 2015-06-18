@@ -317,7 +317,7 @@ def get_species_mass_profiles(part, species=['all'], center_position=[], Distanc
         distances = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
         distances *= part.snap['scale-factor']  # convert to {kpc physical}
 
-        pros[spec] = DistanceBin.get_mass_profile(distances, masses)
+        pros[spec] = DistanceBin.get_histogram_profile(distances, masses)
 
     props = [prop for prop in pros[species[0]] if 'distance' not in prop]
     props_dist = [prop for prop in pros[species[0]] if 'distance' in prop]
@@ -356,7 +356,7 @@ def get_species_mass_profiles(part, species=['all'], center_position=[], Distanc
 
     # create mass fraction wrt total mass
     for spec in np.setdiff1d(species, ['total']):
-        for prop in ['mass', 'mass.cum']:
+        for prop in ['hist', 'hist.cum']:
             pros[spec][prop + '.fraction'] = pros[spec][prop] / pros['total'][prop]
             if spec == 'baryon':
                 # units of cosmic baryon fraction
@@ -365,7 +365,7 @@ def get_species_mass_profiles(part, species=['all'], center_position=[], Distanc
 
     # create circular velocity = sqrt (G m(<r) / r)
     for spec in species:
-        pros[spec]['vel.circ'] = (pros[spec]['mass.cum'] / pros[spec]['distance.cum'] *
+        pros[spec]['vel.circ'] = (pros[spec]['hist.cum'] / pros[spec]['distance.cum'] *
                                   const.grav_kpc_msun_yr)
         pros[spec]['vel.circ'] = np.sqrt(pros[spec]['vel.circ'])
         pros[spec]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
@@ -636,7 +636,7 @@ def plot_mass_contamination(
     for spec in pros:
         dists = ut.coord.distance('scalar', part[spec]['position'], center_pos, periodic_len)
         dists *= part.snap['scale-factor']  # convert to {kpc physical}
-        pros[spec] = DistanceBin.get_mass_profile(dists, part[spec]['mass'], get_spline=False)
+        pros[spec] = DistanceBin.get_histogram_profile(dists, part[spec]['mass'], get_spline=False)
 
     for spec in species_test:
         mass_ratio_bin = pros[spec]['mass'] / pros[species_ref]['mass']
@@ -765,9 +765,9 @@ def plot_metal_v_distance(
     metal_masses = part[species]['metallicity'][:, metal_index] * part[species]['mass']
     metal_masses /= 0.02  # convert to {wrt Solar}
 
-    pro_metal = DistanceBin.get_mass_profile(dists, metal_masses, get_mass_fraction=True)
+    pro_metal = DistanceBin.get_histogram_profile(dists, metal_masses, get_fraction=True)
     if 'metallicity' in plot_kind:
-        pro_mass = DistanceBin.get_mass_profile(dists, part['gas']['mass'])
+        pro_mass = DistanceBin.get_histogram_profile(dists, part['gas']['mass'])
         ys = pro_metal['mass'] / pro_mass['mass']
         axis_y_lim = np.clip(plot.get_limits(ys), 0.0001, 10)
     elif 'metal.mass.cum' in plot_kind:
@@ -1003,7 +1003,7 @@ def plot_property_distr(
 
 
 def plot_property_v_distance(
-    parts, species='dark', prop_name='density', prop_scaling='log', prop_stat='med',
+    parts, species='dark', prop_name='mass', prop_scaling='log', prop_stat='med',
     center_positions=[],
     distance_scaling='log', distance_lim=[1, 1000], distance_bin_wid=0.02, distance_bin_num=None,
     axis_y_lim=[], write_plot=False, plot_directory='.'):
@@ -1012,8 +1012,10 @@ def plot_property_v_distance(
     species : string or list : species to compute total mass of
         options: dark, star, gas, baryon, total
     prop_name : string : property to compute
-        options: mass, mass.cum, density, density.cum, vel.circ, mass.fraction, mass.cum.fraction
     prop_scaling : string : scaling for property (y-axis): lin, log
+    prop_stat : string : statistic/type to plot
+        options: hist, hist.cum, density, density.cum, vel.circ, hist.fraction, hist.cum.fraction,
+            med, ave
     center_positions : list : center position for each particle catalog
     distance_scaling : string : lin or log
     distance_lim : list : min and max distance for binning
@@ -1035,11 +1037,9 @@ def plot_property_v_distance(
 
     pros = []
     for part_i, part in enumerate(parts):
-        if ('mass' in prop_name or 'density' in prop_name or 'fraction' in prop_name or
-                'vel.circ' in prop_name):
+        if 'mass' in prop_name:
             pros_part = get_species_mass_profiles(
                 part, species, center_positions[part_i], DistanceBin)
-            prop_stat = prop_name
         else:
             pros_part = get_species_statistics_profiles(
                 part, species, prop_name, center_positions[part_i], DistanceBin)
@@ -1092,16 +1092,17 @@ def plot_property_v_distance(
 
 
 def get_star_form_history(
-    part, part_is=None, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time'):
+    part, part_is=None, time_kind='time', time_lim=[0, 3], time_wid=0.01):
     '''
     Get array of times and star-formation rate at each time.
 
     Parameters
     ----------
-    part : dict : dictionary of particle species
-    part_is : array : list of star particle indices
-    redshift_lim : list : redshift limits of times to get
-    scalefactor_wid : float : width of scale factor for time binning
+    part : dict : dictionary of particles
+    part_is : array : star particle indices
+    time_kind : string : time kind to use: time, time.lookback, redshift
+    time_lim : list : min and max limits of time_kind to get
+    time_wid : float : width of time_kind bin
 
     Returns
     -------
@@ -1113,50 +1114,49 @@ def get_star_form_history(
     if part_is is None:
         part_is = np.arange(part[species]['mass'].size, dtype=np.int32)
 
-    pis_sort = part_is[np.argsort(part[species]['form.time'][part_is])]
-    star_form_aexps = part[species]['form.time'][pis_sort]  # form.time = scale factor
-    star_masses = part[species]['mass'][pis_sort]
+    part_is_sort = part_is[np.argsort(part[species]['form.time'][part_is])]
+    star_form_times = part[species]['form.time'][part_is_sort]
+    star_masses = part[species]['mass'][part_is_sort]
     star_masses_cum = np.cumsum(star_masses)
 
-    if redshift_lim:
-        redshift_lim = np.array(redshift_lim)
-        scalefactor_lim = np.sort(1 / (1 + redshift_lim))
-    else:
-        scalefactor_lim = [np.min(star_form_aexps), np.max(star_form_aexps)]
+    time_bins = np.arange(min(time_lim), max(time_lim), time_wid)
+    if time_kind == 'redshift':
+        # input redshift limits and bins, need to convert to time
+        redshift_bins = time_bins
+        time_bins = np.sort(part.Cosmo.age(time_bins))
 
-    scalefactor_bins = np.arange(scalefactor_lim.min(), scalefactor_lim.max(), scalefactor_wid)
-    redshift_bins = 1 / scalefactor_bins - 1
-    time_bins = part.Cosmo.age(redshift_bins)
-    # time_bins = part.Cosmo.age(0) - time_bins    # lookback time
-    time_bins *= 1e9  # convert to {yr}
+    star_mass_cum_bins = np.interp(time_bins, star_form_times, star_masses_cum)
+    # convert to {M_sun / yr} and crudely account for stellar mass loss
+    dm_dts = np.diff(star_mass_cum_bins) / (np.diff(time_bins) * 1e9) / 0.7
 
-    star_mass_cum_bins = np.interp(scalefactor_bins, star_form_aexps, star_masses_cum)
-    dm_dts = np.diff(star_mass_cum_bins) / np.diff(time_bins) / 0.7  # account for mass loss
-
-    time_mids = time_bins[: time_bins.size - 1] + np.diff(time_bins)  # midpoints of bins
-    time_mids /= 1e9  # convert to {Gyr}
-
-    redshift_mids = redshift_bins[: redshift_bins.size - 1] + np.diff(redshift_bins)
-
-    if time_kind == 'time':
-        return time_mids, dm_dts
+    if 'time' in time_kind:
+        # convert to midpoints of bins
+        time_bins = time_bins[: time_bins.size - 1] + np.diff(time_bins)
+        if 'lookback' in time_kind:
+            time_bins = part.Cosmo.age(0) - time_bins  # convert to lookback time
     elif time_kind == 'redshift':
-        return redshift_mids, dm_dts
+        # convert to midpoints of bins
+        time_bins = redshift_bins[: redshift_bins.size - 1] + np.diff(redshift_bins)
+        time_bins = time_bins[::-1]
+
+    return time_bins, dm_dts
 
 
 def plot_star_form_history(
-    parts, redshift_lim=[0, 1], scalefactor_wid=0.001, time_kind='time',
-    center_positions=[], distance_lim=[0, 10], part_labels=['ref12', 'ref13'],
+    parts, time_kind='redshift', time_lim=[0, 1], time_wid=0.01,
+    center_positions=[], distance_lim=[0, 10],
     write_plot=False, plot_directory='.'):
     '''
-    Plot star-formation rate history v cosmic time.
+    Plot star-formation rate history v time_kind.
 
     Parameters
     ----------
-    part : dict : dictionary of particle species
-    pis : array : list of star particle indices
-    redshift_lim : list : redshift limits of times to get
-    scalefactor_wid : float : width of scale factor for time binning
+    parts : dict or list : catalog[s] of particles
+    time_kind : string : time kind to use: time, time.lookback, redshift
+    time_lim : list : min and max limits of time_kind to get
+    time_wid : float : width of time_kind bin
+    center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
+    distance_lim : list : min and max limits of distance to select star particles
     write_plot : boolean : whether to write plot
     '''
     Say = ut.io.SayClass(plot_star_form_history)
@@ -1170,26 +1170,20 @@ def plot_star_form_history(
     sfrs = []
     times = []
     for part_i, part in enumerate(parts):
-        if center_positions:
-            periodic_len = part.info['box.length']
-            periodic_len = None
-            # {kpc comoving}
+        if len(center_positions[part_i]):
             dists = ut.coord.distance(
-                'scalar', part['star']['position'], center_positions[part_i], periodic_len)
-
+                'scalar', part['star']['position'], center_positions[part_i],
+                part.info['box.length'])  # {kpc comoving}
             dists *= part.snap['scale-factor']  # {kpc physical}
-
-            pis = ut.array.elements(dists, distance_lim)
+            part_is = ut.array.elements(dists, distance_lim)
         else:
-            pis = np.arange(part['star']['form.time'].size, dtype=np.int32)
+            part_is = np.arange(part['star']['form.time'].size, dtype=np.int32)
 
-        times_t, sfrs_t = get_star_form_history(part, pis, redshift_lim, scalefactor_wid, time_kind)
+        times_t, sfrs_t = get_star_form_history(part, part_is, time_kind, time_lim, time_wid)
         times.append(times_t)
         sfrs.append(sfrs_t)
 
     colors = plot.get_colors(len(parts))
-    if not part_labels:
-        part_labels = [None for _ in xrange(len(parts))]
 
     # plot ----------
     plt.clf()
@@ -1197,20 +1191,20 @@ def plot_star_form_history(
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
-    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
-    # subplot.xscale('linear')
-    # subplot.yscale('log')
+    subplot.set_xlim(time_lim)
+    subplot.set_ylim(plot.get_limits(sfrs, 'log'))
+
     if time_kind == 'time':
         subplot.set_xlabel('time $[{\\rm Gyr}]$')
     elif time_kind == 'redshift':
         subplot.set_xlabel('redshift')
-    # pylab.ylabel(r'${\rm SFR}\ \ \dot{M}_{\ast}\ \  [{\rm M_{\odot}\,yr^{-1}}]$')
     subplot.set_ylabel('${\\rm SFR}\,[{\\rm M_{\odot}\,yr^{-1}}]$')
 
-    for part_i in xrange(len(parts)):
+    for part_i, part in enumerate(parts):
         subplot.semilogy(times[part_i], sfrs[part_i], linewidth=2.0, color=colors[part_i],
-                         alpha=0.5, label=part_labels[part_i])
+                         alpha=0.5, label=part.info['catalog.name'])
 
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
@@ -1218,13 +1212,13 @@ def plot_star_form_history(
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
-    if part_labels[0]:
+    if len(parts) > 1:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
         subplot.add_artist(legend_z)
 
-    # plt.tight_layout(pad=0.02)
+    #plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
