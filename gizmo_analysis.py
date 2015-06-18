@@ -304,6 +304,8 @@ def get_species_mass_profiles(part, species=['all'], center_position=[], Distanc
     if species == ['all'] or species == ['total']:
         species = ['dark', 'gas', 'star', 'dark.2']
         #species = part.keys()
+    elif species == ['baryon']:
+        species = ['dark', 'gas', 'star', 'dark.2']
 
     for spec in species:
         positions, masses = get_species_positions_masses(part, spec)
@@ -356,6 +358,10 @@ def get_species_mass_profiles(part, species=['all'], center_position=[], Distanc
     for spec in np.setdiff1d(species, ['total']):
         for prop in ['mass', 'mass.cum']:
             pros[spec][prop + '.fraction'] = pros[spec][prop] / pros['total'][prop]
+            if spec == 'baryon':
+                # units of cosmic baryon fraction
+                pros[spec][prop + '.fraction'] /= (part.Cosmo['omega_baryon'] /
+                                                   part.Cosmo['omega_matter'])
 
     # create circular velocity = sqrt (G m(<r) / r)
     for spec in species:
@@ -363,6 +369,38 @@ def get_species_mass_profiles(part, species=['all'], center_position=[], Distanc
                                   const.grav_kpc_msun_yr)
         pros[spec]['vel.circ'] = np.sqrt(pros[spec]['vel.circ'])
         pros[spec]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+
+    return pros
+
+
+def get_species_statistics_profiles(
+    part, species=['all'], prop_name='', center_position=[], DistanceBin=None):
+    '''
+    part : dict : catalog of particles
+    species : string or list : species to compute total mass of
+    prop_name : string : name of property to get statistics of
+    center_position : list : center position
+    DistanceBin : class : distance bin class
+    '''
+    pros = {}
+
+    # ensure is list even if just one species
+    if np.isscalar(species):
+        species = [species]
+
+    if species == ['all'] or species == ['total']:
+        species = ['dark', 'gas', 'star', 'dark.2']
+        #species = part.keys()
+    elif species == ['baryon']:
+        species = ['gas', 'star']
+
+    for spec in species:
+        # {kpc comoving}
+        distances = ut.coord.distance(
+            'scalar', part[spec]['position'], center_position, part.info['box.length'])
+        distances *= part.snap['scale-factor']  # convert to {kpc physical}
+
+        pros[spec] = DistanceBin.get_statistics_profile(distances, part[spec][prop_name])
 
     return pros
 
@@ -957,36 +995,31 @@ def plot_property_distr(
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        if not np.isscalar(species):
-            if len(species) == 1:
-                species = species[0]
-            else:
-                species = 'total'
         plot_name = species + '.' + prop_name + '_distr_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
     else:
         plt.show(block=False)
 
-"""
+
 def plot_property_v_distance(
-    parts, species='star', prop_name='distance', prop_scaling='log', prop_stat='med',
+    parts, species='dark', prop_name='density', prop_scaling='log', prop_stat='med',
     center_positions=[],
     distance_scaling='log', distance_lim=[1, 1000], distance_bin_wid=0.02, distance_bin_num=None,
-    axis_y_lim=[],
-    write_plot=False, plot_directory='.'):
+    axis_y_lim=[], write_plot=False, plot_directory='.'):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
-    species : string or list : species to compute property of
+    species : string or list : species to compute total mass of
+        options: dark, star, gas, baryon, total
     prop_name : string : property to compute
-    prop_scaling : string : scaling for property: lin or log
-    prop_stat : string : statistic to compute for property
+        options: mass, mass.cum, density, density.cum, vel.circ, mass.fraction, mass.cum.fraction
+    prop_scaling : string : scaling for property (y-axis): lin, log
     center_positions : list : center position for each particle catalog
     distance_scaling : string : lin or log
     distance_lim : list : min and max distance for binning
     distance_bin_wid : float : width of distance bin
     distance_bin_num : int : number of bins between limits
-    axis_y_lim : list : min and max limits to impose on y-axis
+    axis_y_lim : list : limits to impose on y-axis
     '''
     Say = ut.io.SayClass(plot_property_v_distance)
 
@@ -1000,42 +1033,18 @@ def plot_property_v_distance(
     if np.ndim(center_positions) == 1:
         center_positions = [center_positions]
 
-    # ensure is list even if just one species
-    if np.isscalar(species):
-        species = [species]
-
     pros = []
     for part_i, part in enumerate(parts):
-        for spec_i, spec in enumerate(species):
-            prop_vals = part[spec][prop_name]
+        if ('mass' in prop_name or 'density' in prop_name or 'fraction' in prop_name or
+                'vel.circ' in prop_name):
+            pros_part = get_species_mass_profiles(
+                part, species, center_positions[part_i], DistanceBin)
+            prop_stat = prop_name
+        else:
+            pros_part = get_species_statistics_profiles(
+                part, species, prop_name, center_positions[part_i], DistanceBin)
 
-            Stat = ut.math.StatisticClass
-            pro = DistanceBin.get_
-            if np.isscalar(masses):
-                masses = np.zeros(positions.shape[0], dtype=masses.dtype) + masses
-
-            # {kpc comoving}
-            dists = ut.coord.distance(
-                'scalar', positions, center_positions[part_i], part.info['box.length'])
-            dists *= part.snap['scale-factor']  # convert to {kpc physical}
-
-            pro = DistanceBin.get_mass_profile(dists, masses)
-
-            if spec_i == 0:
-                pros.append(pro)
-            else:
-                ks = [k for k in pro if 'distance' not in k]
-                for k in ks:
-                    if 'log' in k:
-                        pros[-1][k] = log10(10 ** pros[-1][k] + 10 ** pro[k])
-                    else:
-                        pros[-1][k] += pro[k]
-
-        if prop_name == 'vel.circ':
-            pros[-1]['vel.circ'] = (pros[-1]['mass.cum'] / pros[-1]['distance.cum'] *
-                                    const.grav_kpc_msun_yr)
-            pros[-1]['vel.circ'] = np.sqrt(pros[-1]['vel.circ'])
-            pros[-1]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+        pros.append(pros_part)
 
         #if part_i > 0:
         #    print(pros[part_i][prop_name] / pros[0][prop_name])
@@ -1043,99 +1052,6 @@ def plot_property_v_distance(
     #import ipdb; ipdb.set_trace()
 
     colors = plot.get_colors(len(parts))
-    if len(parts) == 1:
-        part_labels = [None]
-    else:
-        part_labels = [part[i].info['catalog.name'] for i in xrange(len(parts))]
-
-    # plot ----------
-    plt.clf()
-    plt.minorticks_on()
-    fig = plt.figure()
-    subplot = fig.add_subplot(111)
-    #fig, subplot = plt.subplots(1, 1, sharex=True)
-    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
-
-    subplot.set_xlim(distance_lim)
-
-    if axis_y_lim:
-        subplot.set_ylim(axis_y_lim)
-    else:
-        subplot.set_ylim(plot.get_limits(pros[0][prop_name]))
-
-    subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
-    subplot.set_ylabel(plot.get_label(prop_name, species, get_symbol=True, get_units=True))
-
-    for pro_i, pro in enumerate(pros):
-        plot_func = plot.get_plot_function(subplot, distance_scaling, prop_scaling)
-        plot_func(pro['distance'], pro[prop_name], color=colors[pro_i],
-                  alpha=0.5, linewidth=2, linestyle='-', label=part_labels[pro_i])
-
-    if part_labels[0]:
-        # property legend
-        legend_prop = subplot.legend(loc='best', prop_name=FontProperties(size=16))
-        legend_prop.get_frame().set_alpha(0.5)
-
-    #plt.tight_layout(pad=0.02)
-
-    if write_plot:
-        plot_directory = ut.io.get_path(plot_directory)
-        if not np.isscalar(species):
-            if len(species) == 1:
-                species = species[0]
-            else:
-                species = 'total'
-        plot_name = species + '.' + prop_name + '_v_dist_z.%.1f.pdf' % part.info['redshift']
-        plt.savefig(plot_directory + plot_name, format='pdf')
-        Say.say('wrote %s' % plot_directory + plot_name)
-    else:
-        plt.show(block=False)
-"""
-
-
-def plot_mass_v_distance(
-    parts, species='dark', prop='density', center_positions=[], distance_scaling='log',
-    distance_lim=[1, 1000], distance_bin_wid=0.02, distance_bin_num=None, axis_y_scaling='log',
-    axis_y_lim=[], part_labels=[], write_plot=False, plot_directory='.'):
-    '''
-    parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
-    species : string or list : species to compute total mass of
-    prop : string : mass-related property to compute
-        options: density, density.cum, mass, mass.cum, vel.circ,
-            baryon.fraction, baryon.fraction.cum
-    center_positions : list : center position for each particle catalog
-    distance_scaling : string : lin or log
-    distance_lim : list : min and max distance for binning
-    distance_bin_wid : float : width of distance bin
-    distance_bin_num : int : number of bins between limits
-    axis_y_scaling : string : scaling for y-axis, lin or log
-    axis_y_lim : list : limits to impose on y-axis
-    '''
-    Say = ut.io.SayClass(plot_mass_v_distance)
-
-    DistanceBin = ut.bin.DistanceBinClass(
-        distance_scaling, distance_lim, width=distance_bin_wid, number=distance_bin_num,
-        dimension_num=3)
-
-    if isinstance(parts, dict):
-        parts = [parts]
-
-    if np.ndim(center_positions) == 1:
-        center_positions = [center_positions]
-
-    pros = []
-    for part_i, part in enumerate(parts):
-        pros_part = get_species_mass_profiles(part, species, center_positions[part_i], DistanceBin)
-        pros.append(pros_part)
-
-        #if part_i > 0:
-        #    print(pros[part_i][prop] / pros[0][prop])
-
-    #import ipdb; ipdb.set_trace()
-
-    colors = plot.get_colors(len(parts))
-    if not part_labels:
-        part_labels = [None for _ in xrange(len(parts))]
 
     # plot ----------
     plt.clf()
@@ -1144,35 +1060,35 @@ def plot_mass_v_distance(
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
     #fig, subplot = plt.subplots()
-    #fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(distance_lim)
     if not axis_y_lim:
-        axis_y_lim = plot.get_limits(pros[0][species][prop], axis_y_scaling)
+        axis_y_lim = plot.get_limits(pros[0][species][prop_stat], prop_scaling)
     subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
-    subplot.set_ylabel(plot.get_label(prop, species, get_symbol=True, get_units=True))
+    subplot.set_ylabel(plot.get_label(prop_name, species, get_symbol=True, get_units=True))
 
     for pro_i, pro in enumerate(pros):
-        plot_func = plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
-        plot_func(pro[species]['distance'], pro[species][prop], color=colors[pro_i],
-                  alpha=0.5, linewidth=2, linestyle='-', label=part_labels[pro_i])
+        plot_func = plot.get_plot_function(subplot, distance_scaling, prop_scaling)
+        plot_func(pro[species]['distance'], pro[species][prop_stat], color=colors[pro_i],
+                  alpha=0.5, linewidth=2, linestyle='-', label=part.info['catalog.name'])
 
-    if part_labels[0]:
+    if len(parts) > 1:
         # property legend
-        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
+        legend_prop = subplot.legend(loc='best', prop_name=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
 
-    plt.tight_layout(pad=0.02)
+    #plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        plot_name = species + '.' + prop + '_v_dist_z.%.1f.pdf' % part.info['redshift']
+        plot_name = species + '.' + prop_name + '_v_dist_z.%.1f.pdf' % part.info['redshift']
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
-    #else:
-    #    plt.show(block=False)
+    else:
+        plt.show(block=False)
 
 
 def get_star_form_history(

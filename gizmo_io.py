@@ -34,8 +34,8 @@ class GizmoClass(ut.io.SayClass):
 
     def read_snapshot(
         self, species_types='all', snapshot_index=400, directory='.', property_names='all',
-        property_names_exclude=[], particle_subsample_factor=1, catalog_name='',
-        sort_dark_by_id=True, force_float32=False, get_header_only=False):
+        property_names_exclude=[], metal_index_max=1, particle_subsample_factor=1,
+        catalog_name='', sort_dark_by_id=True, force_float32=False, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary.
@@ -61,6 +61,8 @@ class GizmoClass(ut.io.SayClass):
             otherwise, choose subset from among property_name_dict
         property_names_exclude : string or list : name[s] of particle properties not to read
             note: can use this instead of property_names if just want to exclude a few properties
+        metal_index_max : int : maximum metal index to keep
+            options: 0 = total, 1 = total + helium, 10 = iron (no rprocess)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         catalog_name : string : name to give to catalog information for future identification
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
@@ -316,6 +318,17 @@ class GizmoClass(ut.io.SayClass):
             file_in.close()
             return
 
+        # assign cosmological parameters
+        if header['is.cosmological']:
+            # assume that cosmology parameters not in header are from AGORA
+            omega_baryon = 0.0455
+            sigma_8 = 0.807
+            n_s = 0.961
+            w = -1.0
+            Cosmo = cosmology.CosmologyClass(
+                header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
+                sigma_8, n_s, w)
+
         ### initialize arrays to store each property for each species ###
 
         for spec_name in species_names:
@@ -333,6 +346,8 @@ class GizmoClass(ut.io.SayClass):
                         prop_shape = part_num_tot
                     elif len(part_in[prop_name_in].shape) == 2:
                         prop_shape = [part_num_tot, part_in[prop_name_in].shape[1]]
+                        if prop_name_in == 'Metallicity' and metal_index_max:
+                            prop_shape = [part_num_tot, metal_index_max + 1]
 
                     # determine data type to store
                     prop_in_dtype = part_in[prop_name_in].dtype
@@ -394,8 +409,11 @@ class GizmoClass(ut.io.SayClass):
                                 part[spec_name][prop_name][part_index_lo:part_index_hi] = \
                                     part_in[prop_name_in]
                             elif len(part_in[prop_name_in].shape) == 2:
-                                part[spec_name][prop_name][part_index_lo:part_index_hi, :] = \
-                                    part_in[prop_name_in]
+                                if prop_name_in == 'Metallicity' and metal_index_max:
+                                    prop_in = part_in[prop_name_in][:, :metal_index_max + 1]
+                                else:
+                                    prop_in = part_in[prop_name_in]
+                                part[spec_name][prop_name][part_index_lo:part_index_hi, :] = prop_in
 
                     part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 
@@ -444,6 +462,7 @@ class GizmoClass(ut.io.SayClass):
         # apply unit conversions
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
+
             if 'position' in part[spec_name]:
                 # convert to {kpc comoving}
                 part[spec_name]['position'] /= header['hubble']
@@ -474,8 +493,14 @@ class GizmoClass(ut.io.SayClass):
                 part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
 
             if 'form.time' in part[spec_name]:
-                # convert to {Gyr}
-                part[spec_name]['form.time'] /= header['hubble']
+                if header['is.cosmological']:
+                    # convert from units of scale factor to {Gyr}
+                    part[spec_name]['form.time'] = Cosmo.age(
+                        1 / part[spec_name]['form.time'] - 1).astype(
+                            part[spec_name]['form.time'].dtype)
+                else:
+                    # convert to {Gyr}
+                    part[spec_name]['form.time'] /= header['hubble']
 
             if 'temperature' in part[spec_name]:
                 # convert from {(km / s) ^ 2} to {Kelvin}
@@ -505,19 +530,7 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in part:
             part_return[spec_name] = part[spec_name]
 
-        # assign cosmological parameters
-        if header['is.cosmological']:
-            # assume that cosmology parameters not in header are from AGORA
-            omega_baryon = 0.0455
-            sigma_8 = 0.807
-            n_s = 0.961
-            w = -1.0
-            Cosmo = cosmology.CosmologyClass(
-                header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
-                sigma_8, n_s, w)
-            part_return.Cosmo = Cosmo  # store cosmology information
-            for spec_name in part:
-                part[spec_name]
+        part_return.Cosmo = Cosmo  # store cosmology information
 
         # store header information
         part_return.info = header
