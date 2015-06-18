@@ -495,7 +495,7 @@ class GizmoClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale factor to {Gyr}
-                    part[spec_name]['form.time'] = Cosmo.age(
+                    part[spec_name]['form.time'] = Cosmo.time_from_redshift(
                         1 / part[spec_name]['form.time'] - 1).astype(
                             part[spec_name]['form.time'].dtype)
                 else:
@@ -539,7 +539,7 @@ class GizmoClass(ut.io.SayClass):
         part_return.snap = {
             'redshift': header['redshift'],
             'scale-factor': header['scale-factor'],
-            'time': Cosmo.age(header['redshift']),
+            'time': Cosmo.time_from_redshift(header['redshift']),
             'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
         }
 

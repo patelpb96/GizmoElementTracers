@@ -1123,7 +1123,7 @@ def get_star_form_history(
     if time_kind == 'redshift':
         # input redshift limits and bins, need to convert to time
         redshift_bins = time_bins
-        time_bins = np.sort(part.Cosmo.age(time_bins))
+        time_bins = np.sort(part.Cosmo.time_from_redshift(time_bins))
 
     star_mass_cum_bins = np.interp(time_bins, star_form_times, star_masses_cum)
     # convert to {M_sun / yr} and crudely account for stellar mass loss
@@ -1133,7 +1133,7 @@ def get_star_form_history(
         # convert to midpoints of bins
         time_bins = time_bins[: time_bins.size - 1] + np.diff(time_bins)
         if 'lookback' in time_kind:
-            time_bins = part.Cosmo.age(0) - time_bins  # convert to lookback time
+            time_bins = part.Cosmo.time_from_redshift(0) - time_bins  # convert to lookback time
     elif time_kind == 'redshift':
         # convert to midpoints of bins
         time_bins = redshift_bins[: redshift_bins.size - 1] + np.diff(redshift_bins)
