@@ -1076,7 +1076,7 @@ def plot_property_v_property(
                                       draw_log=prop_y_scaling))
 
     plt.hist2d(prop_x_vals, prop_y_vals, bins=prop_bin_num, norm=LogNorm(),
-               cmap=plt.cm.Greens) @UndefinedVariable
+               cmap=plt.cm.Greens)  # @UndefinedVariable
     plt.colorbar()
 
     # plt.tight_layout(pad=0.02)
