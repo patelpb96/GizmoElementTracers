@@ -62,7 +62,7 @@ class GizmoClass(ut.io.SayClass):
         property_names_exclude : string or list : name[s] of particle properties not to read
             note: can use this instead of property_names if just want to exclude a few properties
         metal_index_max : int : maximum metal index to keep
-            options: 0 = total, 1 = total + helium, 10 = iron (no rprocess)
+            options: 0 = total, 1 = total + helium, 10 = iron (no r-process)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         catalog_name : string : name to give to catalog information for future identification
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
@@ -542,6 +542,9 @@ class GizmoClass(ut.io.SayClass):
             'time': Cosmo.time_from_redshift(header['redshift']),
             'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
         }
+
+        # use to store center position later
+        part_return.center_position = []
 
         return part_return
 
