@@ -246,11 +246,9 @@ def get_galaxy_radius(
     RadiusBin = ut.bin.DistanceBinClass(
         radius_scaling, radius_lim, width=radius_bin_wid, dimension_num=3)
 
-    #periodic_len = part.info['box.length']
-    periodic_len = None  # assume zoom-in run far from box edge, for speed
-
     # {kpc comoving}
-    rads = ut.coord.distance('scalar', part[species]['position'], center_position, periodic_len)
+    rads = ut.coord.distance('scalar', part[species]['position'], center_position,
+                             part.info['box.length'])
     rads *= part.snap['scale-factor']  # {kpc physical}
 
     # get masses in bins
@@ -288,7 +286,7 @@ def get_galaxy_radius(
 
     galaxy_mass = np.sum(part[species]['mass'][rads < rad_use])
 
-    Say.say('M_star = %.2e M_sun, log = %.2f\n  R_%.0f = %.2f kpc comoving' %
+    Say.say('M_star = %.2e M_sun, log = %.2f\n  R_%.0f = %.2f kpc physical' %
             (galaxy_mass, log10(galaxy_mass), mass_percent, halo_radius))
 
     return halo_radius
@@ -316,11 +314,11 @@ def get_species_histogram_profiles(
     else:
         species = copy.copy(species)
 
-    if species == ['all'] or species == ['total']:
-        species = ['dark', 'gas', 'star', 'dark.2']
+    if species == ['all'] or species == ['total'] or species == ['baryon']:
+        species = ['dark', 'gas', 'star']
         #species = part.keys()
-    elif species == ['baryon']:
-        species = ['dark', 'gas', 'star', 'dark.2']
+        if 'dark.2' in part:
+            species.append('dark.2')
 
     if not len(center_position) and len(part.center_position):
         center_position = part.center_position
