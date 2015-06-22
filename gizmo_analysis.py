@@ -972,7 +972,8 @@ def plot_property_distribution(
 
     subplot.set_xlim(prop_lim)
     if not axis_y_lim:
-        axis_y_lim = plot.get_limits(Stat.distr[prop_stat][0], axis_y_scaling, exclude_zero=True)
+        y_vals = [Stat.distr[prop_stat][part_i] for part_i in xrange(len(parts))]
+        axis_y_lim = plot.get_limits(y_vals, axis_y_scaling, exclude_zero=True)
     subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel(plot.get_label(prop_name, species=species, get_units=True))
@@ -1158,7 +1159,8 @@ def plot_property_v_distance(
 
     subplot.set_xlim(distance_lim)
     if not axis_y_lim:
-        axis_y_lim = plot.get_limits(pros[0][species][prop_stat], prop_scaling)
+        y_vals = [pro[species][prop_stat] for pro in pros]
+        axis_y_lim = plot.get_limits(y_vals, prop_scaling)
         if prop_name == 'consume.time':
             axis_y_lim = plot.get_limits(
                 pros[0][species][prop_stat][pros[0][species][prop_stat] < 10], prop_scaling)
