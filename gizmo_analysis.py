@@ -1379,13 +1379,12 @@ def plot_star_form_history(
 #===================================================================================================
 # galaxy disk mass and radius over time, with james and shea
 #===================================================================================================
-def get_galaxy_mass_v_redshift(directory='.'):
+def get_galaxy_mass_v_redshift(
+    directory='.',
+    redshifts=[3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0]):
     '''
     .
     '''
-    #redshifts = [3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0]
-    redshifts = [3.0, 2.0, 1.0, 0.0]
-
     property_names = ['mass', 'position', 'velocity']
 
     species = ['star', 'gas', 'dark']
