@@ -14,6 +14,7 @@ import h5py as h5py
 from utilities import utility as ut
 from utilities import constants as const
 from utilities import cosmology
+from utilities import simulation
 
 
 class GizmoClass(ut.io.SayClass):
@@ -33,9 +34,10 @@ class GizmoClass(ut.io.SayClass):
         self.eos = 5 / 3  # gas equation of state
 
     def read_snapshot(
-        self, species_types='all', snapshot_index=400, directory='.', property_names='all',
-        property_names_exclude=[], metal_index_max=1, particle_subsample_factor=1,
-        catalog_name='', sort_dark_by_id=True, force_float32=False, get_header_only=False):
+        self, species_types='all', snapshot_number_kind='index', snapshot_number=400, directory='.',
+        property_names='all', property_names_exclude=[], simulation_name='', metal_index_max=1,
+        particle_subsample_factor=1,
+        sort_dark_by_id=True, force_float32=False, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary.
@@ -53,7 +55,8 @@ class GizmoClass(ut.io.SayClass):
             5 or dark.4 = dark matter at all lower resolutions for cosmological, non black hole runs
             5 or black.hole = black holes, if run contains them
             2 or bulge, 3 or disk = stars for non-cosmological run
-        snapshot_index : int : index (number) of snapshot file
+        snapshot_number_kind : string : input snapshot number kind: index, redshift
+        snapshot_number : int or float : index (number) of snapshot file
         directory: string : directory of snapshot file
         property_names : string or list : name[s] of particle properties to read
             options:
@@ -61,12 +64,12 @@ class GizmoClass(ut.io.SayClass):
             otherwise, choose subset from among property_name_dict
         property_names_exclude : string or list : name[s] of particle properties not to read
             note: can use this instead of property_names if just want to exclude a few properties
+        simulation_name : string : name to store for future identification
         metal_index_max : int : maximum metal index to keep
             options: 0 = total, 1 = total + helium, 10 = iron (no r-process)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
-        catalog_name : string : name to give to catalog information for future identification
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
-        force_float32 : boolean : whether to force floats to 32-bit, to save memory
+        force_float32 : boolean : whether to force all floats to 32-bit, to save memory
         get_header_only : boolean : whether to read only header
 
         Returns
@@ -243,8 +246,28 @@ class GizmoClass(ut.io.SayClass):
                 if prop_name not in property_names:
                     property_names.append(prop_name)
 
+        # try to read snapshot time file
+        directory = ut.io.get_path(directory)
+        snapshot_time_file_name = 'snapshot_times.txt'
+        snapshot_time_file_directory = directory + '../'
+        Snapshot = simulation.SnapshotClass()
+
+        try:
+            Snapshot.read_snapshots(snapshot_time_file_directory, snapshot_time_file_name)
+        except:
+            if snapshot_number_kind == 'redshift':
+                raise ValueError(
+                    'input snapshot redshift but cannot convert to index because cannot read %s' %
+                    (snapshot_time_file_directory + snapshot_time_file_name))
+
+        if snapshot_number_kind == 'redshift':
+            snapshot_redshift = snapshot_number
+            snapshot_number = Snapshot.get_index(snapshot_number)
+            self.say('input snapshot redshift = %.3f -> snapshot index = %d\n' %
+                     (snapshot_redshift, snapshot_number))
+
         # get file name
-        file_name = self.get_file_name(directory, snapshot_index)
+        file_name = self.get_file_name(directory, snapshot_number)
 
         self.say('reading header from: ' + file_name)
         print()
@@ -303,7 +326,7 @@ class GizmoClass(ut.io.SayClass):
             header['has.baryons'] = True
 
         header['catalog.kind'] = 'particle'
-        header['catalog.name'] = catalog_name
+        header['simulation.name'] = simulation_name
 
         # only want to return header?
         if get_header_only:
@@ -530,18 +553,22 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in part:
             part_return[spec_name] = part[spec_name]
 
-        part_return.Cosmo = Cosmo  # store cosmology information
+        # store cosmology class
+        part_return.Cosmo = Cosmo
 
-        # store header information
+        # store header dictionary
         part_return.info = header
 
-        # store snapshot time information
-        part_return.snap = {
+        # store information on snapshot time
+        part_return.snapshot = {
             'redshift': header['redshift'],
             'scale-factor': header['scale-factor'],
             'time': Cosmo.time_from_redshift(header['redshift']),
             'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
         }
+
+        # store information on all snapshot times - may or may not be initialized
+        part_return.Snapshot = Snapshot
 
         # use to store center position later
         part_return.center_position = []
@@ -591,6 +618,21 @@ class GizmoClass(ut.io.SayClass):
 
         return path_file_name
 
+    def read_snapshot_times(self, directory, file_name='snapshot_times.txt'):
+        '''
+        Reads expansion scale factors, redshifts, ages, time spacings from snapshot file.
+
+        Parameters
+        ----------
+        directory : string : directory of snaphot file
+        file_name : string : name of snapshot file
+
+        Returns
+        -------
+        class dictionary of snapshot information
+        '''
+        return simulation.Snapshot.read_snapshots(directory, file_name)
+
 Gizmo = GizmoClass()
 
 
@@ -611,12 +653,12 @@ def assign_orbit(part, species=['star'], center_pos=[], center_vel=[], include_h
     for spec_name in species:
         dist_vecs = ut.coord.distance(
             'vector', part[spec_name]['position'], center_pos, part.info['box.length'])
-        dist_vecs *= part.snap['scale-factor']  # convert to {kpc physical}
+        dist_vecs *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
         vel_vecs = ut.coord.velocity_difference(
             'vector', center_vel, part[spec_name]['velocity'], include_hubble_flow,
-            center_pos, part[spec_name]['position'], part.snap['scale-factor'],
-            part.snap['time.hubble'], part.info['box.length'])
+            center_pos, part[spec_name]['position'], part.snapshot['scale-factor'],
+            part.snapshot['time.hubble'], part.info['box.length'])
 
         orb = ut.orbit.get_orbit_dictionary(dist_vecs, vel_vecs, get_integrals=False)
         for k in orb:

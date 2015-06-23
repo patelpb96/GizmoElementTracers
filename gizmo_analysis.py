@@ -19,6 +19,7 @@ from utilities import utility as ut
 from utilities import constants as const
 from utilities import halo_property
 from utilities import plot
+from . import gizmo_io
 
 
 #===================================================================================================
@@ -67,20 +68,17 @@ def get_species_positions_masses(part, species):
 
 
 def get_center_position(
-    part, species=['star', 'dark', 'gas'], center_position=[0, 0, 0], radius_max=1e10,
-    method='cm'):
+    part, species=['star', 'dark', 'gas'], center_position=[], radius_max=1e10, method='cm'):
     '''
     Get position of center of mass, using iterative zoom-in on species.
 
     Parameters
     ----------
     part : dict : dictionary of particles
-    species : string or list: names of species to use
-        note: 'all' = use all in particle dictionary
-    center_pos : list/array : initial center position
-    radius_max : float : maximum initial radius to consider during iteration {kpc comoving}
-    method : string : method of centering
-        options: cm, potential
+    species : string or list: names of species to use: 'all' = use all in particle dictionary
+    center_position : array : initial center position
+    radius_max : float : maximum initial radius to consider during iteration {kpc physical}
+    method : string : method of centering: cm, potential
     '''
     if np.isscalar(species):
         species = [species]  # ensure is list
@@ -103,9 +101,39 @@ def get_center_position(
     return center_pos
 
 
+def get_center_velocity(
+    part, species='star', center_position=[], radius_max=100):
+    '''
+    Get velocity of center of mass.
+
+    Parameters
+    ----------
+    part : dict : dictionary of particles
+    species : string: name of species to use
+    center_position : array : center position
+    radius_max : float : maximum radius to consider {kpc physical}
+    '''
+    if not len(center_position) and len(part.center_position):
+        center_position = part.center_position
+
+    if np.unique(part[species]['mass']).size == 1:
+        masses = None
+    else:
+        masses = part[species]['mass']
+
+    #periodic_len = part.info['box.length']
+    periodic_len = None  # assume zoom-in run far from box edge, for speed
+
+    radius_max /= part.snapshot['scale-factor']  # convert to {kpc comoving} to match positions
+
+    return ut.coord.velocity_center_of_mass(
+        part[species]['velocity'], masses, part[species]['position'], center_position,
+        radius_max, periodic_len)
+
+
 def get_halo_radius(
     part, species=['dark', 'star', 'gas'], center_position=[], virial_kind='200m',
-    radius_scaling='log', radius_lim=[10, 600], radius_bin_wid=0.02):
+    radius_scaling='log', radius_lim=[5, 600], radius_bin_wid=0.02):
     '''
     Parameters
     ----------
@@ -134,7 +162,7 @@ def get_halo_radius(
     if not len(center_position) and len(part.center_position):
         center_position = part.center_position
 
-    HaloProperty = halo_property.HaloPropertyClass(part.Cosmo, part.snap['redshift'])
+    HaloProperty = halo_property.HaloPropertyClass(part.Cosmo, part.snapshot['redshift'])
 
     RadiusBin = ut.bin.DistanceBinClass(
         radius_scaling, radius_lim, width=radius_bin_wid, dimension_num=3)
@@ -209,7 +237,7 @@ def get_halo_radius(
     else:
         halo_mass = np.sum(masses[rads < rad_use])
 
-    halo_radius *= part.snap['scale-factor']  # convert to {kpc physical}
+    halo_radius *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
     Say.say('M_%s = %.3e M_sun, log = %.3f\n  R_%s = %.3f kpc physical' %
             (virial_kind, halo_mass, log10(halo_mass), virial_kind, halo_radius))
@@ -218,7 +246,7 @@ def get_halo_radius(
 
 
 def get_galaxy_radius(
-    part, center_position=[], mass_percent=90, radius_max=50, radius_bin_wid=0.01,
+    part, center_position=[], mass_percent=90, radius_max=30, radius_bin_wid=0.01,
     radius_scaling='log'):
     '''
     Parameters
@@ -249,7 +277,7 @@ def get_galaxy_radius(
     # {kpc comoving}
     rads = ut.coord.distance('scalar', part[species]['position'], center_position,
                              part.info['box.length'])
-    rads *= part.snap['scale-factor']  # {kpc physical}
+    rads *= part.snapshot['scale-factor']  # {kpc physical}
 
     # get masses in bins
     if 'log' in radius_scaling:
@@ -334,9 +362,8 @@ def get_species_histogram_profiles(
             positions = part[spec]['position']
             prop_vals = part[spec][prop_name]
 
-        # {kpc comoving}
         distances = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
-        distances *= part.snap['scale-factor']  # convert to {kpc physical}
+        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
         pros[spec] = DistanceBin.get_histogram_profile(distances, prop_vals)
 
@@ -434,7 +461,7 @@ def get_species_statistics_profiles(
         # {kpc comoving}
         distances = ut.coord.distance(
             'scalar', part[spec]['position'], center_position, part.info['box.length'])
-        distances *= part.snap['scale-factor']  # convert to {kpc physical}
+        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
         pros[spec] = DistanceBin.get_statistics_profile(distances, part[spec][prop_name])
 
@@ -514,7 +541,7 @@ def write_initial_condition_points(
     for spec_name in spec_names:
         poss_fin = part_fin[spec_name]['position']
         dists = ut.coord.distance('scalar', poss_fin, center_position, part_fin.info['box.length'])
-        dists *= part_fin.snap['scale-factor']  # convert to {kpc physical}
+        dists *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
         pure_indices = ut.array.elements(dists, [0, distance_pure])
         select_indices = ut.array.elements(dists, [0, distance_select])
@@ -530,14 +557,14 @@ def write_initial_condition_points(
                        xrange(poss_ini.shape[1])]
 
     volume_ini = ut.coord.volume_convex_hull(poss_ini)
-    density_ini = part_ini.Cosmo.density_matter(part_ini.snap['redshift'])
+    density_ini = part_ini.Cosmo.density_matter(part_ini.snapshot['redshift'])
     if part_ini.info['has.baryons']:
         # subtract baryonic mass
         density_ini *= part_ini.Cosmo['omega_dark'] / part_ini.Cosmo['omega_matter']
     mass_ini = volume_ini * density_ini  # assume cosmic density within volume
 
     Say.say('final redshift = %.3f, initial redshift = %.3f' %
-            (part_fin.snap['redshift'], part_ini.snap['redshift']))
+            (part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
     Say.say('centering on volume at final time = [%.3f, %.3f, %.3f] kpc comoving' %
             (center_position[0], center_position[1], center_position[2]))
     if scale_to_halo_radius:
@@ -565,7 +592,7 @@ def write_initial_condition_points(
     log_file_name = file_name.replace('.txt', '_log.txt')
     file_io = open(log_file_name, 'w')
     file_io.write('# final redshift = %.3f, initial redshift = %.3f\n' %
-                  (part_fin.snap['redshift'], part_ini.snap['redshift']))
+                  (part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
     file_io.write('# centering on volume at final time = [%.3f, %.3f, %.3f] kpc comoving\n' %
                   (center_position[0], center_position[1], center_position[2]))
     if scale_to_halo_radius:
@@ -672,7 +699,7 @@ def plot_mass_contamination(
     for spec in pros:
         distances = ut.coord.distance(
             'scalar', part[spec]['position'], center_position, part.info['box.length'])
-        distances *= part.snap['scale-factor']  # convert to {kpc physical}
+        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
         pros[spec] = DistanceBin.get_histogram_profile(distances, part[spec]['mass'])
 
     for spec in species_test:
@@ -750,7 +777,7 @@ def plot_mass_contamination(
         dist_name = 'dist'
         if halo_radius and scale_to_halo_radius:
             dist_name += '.200m'
-        plot_name = 'mass.ratio_v_%s_z.%.1f.pdf' % (dist_name, part.snap['redshift'])
+        plot_name = 'mass.ratio_v_%s_z.%.1f.pdf' % (dist_name, part.snapshot['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
     else:
@@ -797,7 +824,7 @@ def plot_metal_v_distance(
 
     distances = ut.coord.distance(
         'scalar', part[species]['position'], center_position, part.info['box.length'])
-    distances *= part.snap['scale-factor']  # convert to {kpc physical}
+    distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
     metal_masses = part[species]['metallicity'][:, metal_index] * part[species]['mass']
     metal_masses /= 0.02  # convert to {wrt Solar}
@@ -943,7 +970,7 @@ def plot_property_distribution(
             distances = ut.coord.distance(
                 'scalar', part[species]['position'], center_positions[part_i],
                 part.info['box.length'])
-            distances *= part.snap['scale-factor']  # {kpc physical}
+            distances *= part.snapshot['scale-factor']  # {kpc physical}
             prop_is = ut.array.elements(distances, distance_lim)
             prop_vals = prop_vals[prop_is]
 
@@ -980,14 +1007,16 @@ def plot_property_distribution(
     subplot.set_ylabel(plot.get_label(prop_name, prop_stat, species, get_symbol=True,
                                       get_units=False, draw_log=prop_scaling))
 
+    #import ipdb; ipdb.set_trace()
+
     plot_func = plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i, part in enumerate(parts):
         plot_func(Stat.distr['bin.mid'][part_i], Stat.distr[prop_stat][part_i],
-                  color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['catalog.name'])
+                  color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['simulation.name'])
 
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
-                              ['$z=%.1f$' % parts[0].snap['redshift']],
+                              ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
@@ -1038,7 +1067,7 @@ def plot_property_v_property(
     if len(center_position) and len(distance_lim):
         distances = ut.coord.distance(
             'scalar', part[species]['position'], center_position, part.info['box.length'])
-        distances *= part.snap['scale-factor']
+        distances *= part.snapshot['scale-factor']
         masks = ut.array.elements(distances, distance_lim)
     else:
         masks = np.arange(part[species][prop_x_name].size, dtype=np.int32)
@@ -1178,11 +1207,12 @@ def plot_property_v_distance(
 
     for part_i, pro in enumerate(pros):
         plot_func(pro[species]['distance'], pro[species][prop_stat], color=colors[part_i],
-                  linestyle='-', alpha=0.5, linewidth=2, label=parts[part_i].info['catalog.name'])
+                  linestyle='-', alpha=0.5, linewidth=2,
+                  label=parts[part_i].info['simulation.name'])
 
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
-                              ['$z=%.1f$' % parts[0].snap['redshift']],
+                              ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
@@ -1198,7 +1228,8 @@ def plot_property_v_distance(
         plot_directory = ut.io.get_path(plot_directory)
         plot_name = (species + '.' + prop_name + '.' + prop_stat +
                      '_v_dist_z.%.1f.pdf' % part.info['redshift'])
-        plot_name = plot_name.replace('.hist', '').replace('mass.vel.circ', 'vel.circ')
+        plot_name = plot_name.replace('.hist', '')
+        plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
         plot_name = plot_name.replace('mass.density', 'density')
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
@@ -1259,7 +1290,7 @@ def get_star_form_history(
 
 def plot_star_form_history(
     parts, time_kind='redshift', time_lim=[0, 1], time_wid=0.01,
-    center_positions=[], distance_lim=[0, 10],
+    distance_lim=[0, 10], center_positions=[],
     write_plot=False, plot_directory='.'):
     '''
     Plot star-formation rate history v time_kind.
@@ -1270,8 +1301,8 @@ def plot_star_form_history(
     time_kind : string : time kind to use: time, time.lookback, redshift
     time_lim : list : min and max limits of time_kind to get
     time_wid : float : width of time_kind bin
-    center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
     distance_lim : list : min and max limits of distance to select star particles
+    center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
     write_plot : boolean : whether to write plot
     plot_directory : string
     '''
@@ -1289,7 +1320,7 @@ def plot_star_form_history(
             distances = ut.coord.distance(
                 'scalar', part['star']['position'], center_positions[part_i],
                 part.info['box.length'])
-            distances *= part.snap['scale-factor']  # {kpc physical}
+            distances *= part.snapshot['scale-factor']  # {kpc physical}
             part_is = ut.array.elements(distances, distance_lim)
         else:
             part_is = np.arange(part['star']['form.time'].size, dtype=np.int32)
@@ -1324,7 +1355,7 @@ def plot_star_form_history(
 
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
-                              ['$z=%.1f$' % parts[0].snap['redshift']],
+                              ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
@@ -1343,3 +1374,97 @@ def plot_star_form_history(
         Say.say('wrote %s' % plot_directory + plot_name)
     else:
         plt.show(block=False)
+
+
+#===================================================================================================
+# galaxy disk mass and radius over time, with james and shea
+#===================================================================================================
+def get_galaxy_mass_v_redshift(directory='.'):
+    '''
+    .
+    '''
+    #redshifts = [3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0]
+    redshifts = [3.0, 2.0, 1.0, 0.0]
+
+    property_names = ['mass', 'position', 'velocity']
+
+    species = ['star', 'gas', 'dark']
+    mass_percents = [50, 90]
+
+    gal = {
+        'redshift': [],
+        'scale-factor': [],
+        'time': [],
+        'position': [],
+        'star.velocity': [],
+        'dark.velocity': [],
+    }
+    for mass_percent in mass_percents:
+        gal['radius.%.0f' % mass_percent] = []
+        for spec in species:
+            gal[spec + '.mass.%.0f' % mass_percent] = []
+
+    for redshift in redshifts:
+        part = gizmo_io.Gizmo.read_snapshot(
+            species, 'redshift', redshift, directory, property_names, metal_index_max=1,
+            force_float32=True)
+        part.center_position = get_center_position(part, 'star')
+
+        gal_radius = get_galaxy_radius(part, [], 50, 30)
+        hal_radius = get_halo_radius(part, species, virial_kind='200m')
+
+        for k in ['redshift', 'scale-factor', 'time']:
+            gal[k].append(part.snapshot[k])
+
+        gal['position'].append(part.center_position)
+        gal['star.velocity'].append(get_center_velocity(part, 'star', radius_max=gal_radius))
+        gal['dark.velocity'].append(get_center_velocity(part, 'dark', radius_max=hal_radius / 2))
+
+        for mass_percent in mass_percents:
+            gal_radius = get_galaxy_radius(part, [], mass_percent, 30)
+            gal['radius.%.0f' % mass_percent].append(gal_radius)
+
+            for spec in species:
+                distances = ut.coord.distance(
+                    'scalar', part[spec]['position'], part.center_position, part.info['box.length'])
+                distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+
+                gal[spec + '.mass.%.0f' % mass_percent].append(
+                    np.sum(part[spec]['mass'][distances < gal_radius]))
+
+    for prop in gal:
+        gal[prop] = np.array(gal[prop])
+
+    return gal
+
+
+def print_galaxy_mass_v_redshift(gal):
+    '''
+    Parameters
+    ----------
+    gal : dict : dictionary of galaxy properties across snapshots
+    '''
+    print('# redshift scale_factor time[Gyr] ', end='')
+    print('star_position(x,y,z)[kpc comov] ', end='')
+    print('star_velocity(x,y,z)[km/s phys] dark_velocity(x,y,z)[km/s phys] ', end='')
+    print('r_50[kpc phys] star_mass_50[M_sun] gas_mass_50[M_sun] dark_mass_50[M_sun] ', end='')
+    print('r_90[kpc phys] star_mass_90[M_sun] gas_mass_90[M_sun] dark_mass_90[M_sun]', end='')
+    print()
+    for i in xrange(gal['redshift'].size):
+        print('%.5f %.5f %.5f ' %
+              (gal['redshift'][i], gal['scale-factor'][i], gal['time'][i]), end='')
+        print('%.3f %.3f %.3f ' %
+              (gal['position'][i][0], gal['position'][i][1], gal['position'][i][2]), end='')
+        print('%.3f %.3f %.3f ' %
+              (gal['star.velocity'][i][0], gal['star.velocity'][i][1], gal['star.velocity'][i][2]),
+              end='')
+        print('%.3f %.3f %.3f ' %
+              (gal['dark.velocity'][i][0], gal['dark.velocity'][i][1], gal['dark.velocity'][i][2]),
+              end='')
+        print('%.3e %.3e %.3e %.3e ' %
+              (gal['radius.50'][i], gal['star.mass.50'][i], gal['gas.mass.50'][i],
+               gal['dark.mass.50'][i]), end='')
+        print('%.3e %.3e %.3e %.3e' %
+              (gal['radius.90'][i], gal['star.mass.90'][i], gal['gas.mass.90'][i],
+               gal['dark.mass.90'][i]), end='')
+        print()

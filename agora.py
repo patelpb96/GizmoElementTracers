@@ -85,9 +85,9 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.hal = ut.array.DictClass()
         self.hal.info = {}
         self.hal.info['box.length'] = self['box.length']
-        self.hal.snap = {}
-        self.hal.snap['redshift'] = self['redshifts'][0]
-        self.hal.snap['scale-factor'] = 1 / (1 + self['redshifts'][0])
+        self.hal.snapshot = {}
+        self.hal.snapshot['redshift'] = self['redshifts'][0]
+        self.hal.snapshot['scale-factor'] = 1 / (1 + self['redshifts'][0])
         self.hal.Cosmo = self.Cosmo
 
         self.hal['position'] = np.zeros((len(self.hal_yt), 3), dtype=float32)
@@ -134,9 +134,9 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.part[zi].info = {}
             self.part[zi].info['box.length'] = self['box.length']
             self.part[zi].info['has.baryons'] = False
-            self.part[zi].snap = {}
-            self.part[zi].snap['redshift'] = self['redshifts'][zi]
-            self.part[zi].snap['scale-factor'] = 1 / (1 + self['redshifts'][zi])
+            self.part[zi].snapshot = {}
+            self.part[zi].snapshot['redshift'] = self['redshifts'][zi]
+            self.part[zi].snapshot['scale-factor'] = 1 / (1 + self['redshifts'][zi])
             self.part[zi].Cosmo = self.Cosmo
 
         self.part.info = {}
