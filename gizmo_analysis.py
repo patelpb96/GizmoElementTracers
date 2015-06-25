@@ -393,7 +393,7 @@ def get_species_histogram_profiles(
             # create dictionary for total mass
             spec_new = 'total'
             pros[spec_new] = {}
-            for spec in species:
+            for spec in np.setdiff1d(species, ['baryon', 'total']):
                 for pro_prop in props:
                     if pro_prop not in pros[spec_new]:
                         pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
