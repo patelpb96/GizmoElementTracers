@@ -570,8 +570,9 @@ class GizmoClass(ut.io.SayClass):
         # store information on all snapshot times - may or may not be initialized
         part_return.Snapshot = Snapshot
 
-        # use to store center position later
+        # use to store center position and velocity later
         part_return.center_position = []
+        part_return.center_velocity = []
 
         return part_return
 
@@ -636,7 +637,8 @@ class GizmoClass(ut.io.SayClass):
 Gizmo = GizmoClass()
 
 
-def assign_orbit(part, species=['star'], center_pos=[], center_vel=[], include_hubble_flow=True):
+def assign_orbit(
+    part, species=['star'], center_position=[], center_velocity=[], include_hubble_flow=True):
     '''
     Assign derived orbital properties to species.
 
@@ -650,16 +652,23 @@ def assign_orbit(part, species=['star'], center_pos=[], center_vel=[], include_h
     if np.isscalar(species):
         species = [species]
 
+    if not len(center_position) and len(part.center_position):
+        center_position = part.center_position
+
+    if not len(center_velocity) and len(part.center_velocity):
+        center_velocity = part.center_velocity
+
     for spec_name in species:
         dist_vecs = ut.coord.distance(
-            'vector', part[spec_name]['position'], center_pos, part.info['box.length'])
+            'vector', part[spec_name]['position'], center_position, part.info['box.length'])
         dist_vecs *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
         vel_vecs = ut.coord.velocity_difference(
-            'vector', center_vel, part[spec_name]['velocity'], include_hubble_flow,
-            center_pos, part[spec_name]['position'], part.snapshot['scale-factor'],
+            'vector', center_velocity, part[spec_name]['velocity'], include_hubble_flow,
+            center_position, part[spec_name]['position'], part.snapshot['scale-factor'],
             part.snapshot['time.hubble'], part.info['box.length'])
 
         orb = ut.orbit.get_orbit_dictionary(dist_vecs, vel_vecs, get_integrals=False)
+
         for k in orb:
             part[spec_name][k] = orb[k]

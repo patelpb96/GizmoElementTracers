@@ -68,7 +68,7 @@ def get_species_positions_masses(part, species):
 
 
 def get_center_position(
-    part, species=['star', 'dark', 'gas'], center_position=[], radius_max=1e10, method='cm'):
+    part, species=['star', 'dark', 'gas'], method='cm'):
     '''
     Get position of center of mass, using iterative zoom-in on species.
 
@@ -76,14 +76,12 @@ def get_center_position(
     ----------
     part : dict : dictionary of particles
     species : string or list: names of species to use: 'all' = use all in particle dictionary
-    center_position : array : initial center position
-    radius_max : float : maximum initial radius to consider during iteration {kpc physical}
     method : string : method of centering: cm, potential
     '''
     if np.isscalar(species):
         species = [species]  # ensure is list
 
-    if species == ['all']:
+    if species == ['all'] or species == ['total']:
         species = ['star', 'dark', 'gas']
 
     positions, masses = get_species_positions_masses(part, species)
@@ -92,17 +90,16 @@ def get_center_position(
     periodic_len = None  # assume zoom-in run far from box edge, for speed
 
     if method == 'cm':
-        center_pos = ut.coord.position_center_of_mass_zoom(
-            positions, masses, periodic_len, center_position, radius_max)
+        center_position = ut.coord.position_center_of_mass_zoom(positions, masses, periodic_len)
     elif method == 'potential':
         species = species[0]
-        center_pos = part[species]['position'][np.argmin(part[species]['potential'])]
+        center_position = part[species]['position'][np.argmin(part[species]['potential'])]
 
-    return center_pos
+    return center_position
 
 
 def get_center_velocity(
-    part, species='star', center_position=[], radius_max=100):
+    part, species='star', radius_max=50, center_position=[]):
     '''
     Get velocity of center of mass.
 
@@ -110,8 +107,8 @@ def get_center_velocity(
     ----------
     part : dict : dictionary of particles
     species : string: name of species to use
-    center_position : array : center position
     radius_max : float : maximum radius to consider {kpc physical}
+    center_position : array : center position {kpc comoving}
     '''
     if not len(center_position) and len(part.center_position):
         center_position = part.center_position
@@ -429,7 +426,8 @@ def get_species_histogram_profiles(
 
 
 def get_species_statistics_profiles(
-    part, species=['all'], prop_name='', center_position=[], DistanceBin=None):
+    part, species=['all'], prop_name='', center_position=[], DistanceBin=None,
+    weight_by_mass=False):
     '''
     Get dictionary of profiles of statistics (such as median, average) for given property for each
     particle species.
@@ -441,6 +439,7 @@ def get_species_statistics_profiles(
     prop_name : string : name of property to get statistics of
     center_position : list : center position
     DistanceBin : class : distance bin class
+    weight_by_mass : boolean : whether to weight property by species mass
     '''
     pros = {}
 
@@ -463,7 +462,11 @@ def get_species_statistics_profiles(
             'scalar', part[spec]['position'], center_position, part.info['box.length'])
         distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
-        pros[spec] = DistanceBin.get_statistics_profile(distances, part[spec][prop_name])
+        if weight_by_mass:
+            masses = part[spec]['mass']
+        else:
+            masses = None
+        pros[spec] = DistanceBin.get_statistics_profile(distances, part[spec][prop_name], masses)
 
     return pros
 
@@ -1120,6 +1123,7 @@ def plot_property_v_property(
 
 def plot_property_v_distance(
     parts, species='dark', prop_name='mass', prop_stat='hist', prop_scaling='log',
+    weight_by_mass=False,
     distance_scaling='log', distance_lim=[0.1, 300], distance_bin_wid=0.02, distance_bin_num=None,
     center_positions=[], axis_y_lim=[], write_plot=False, plot_directory='.'):
     '''
@@ -1131,6 +1135,7 @@ def plot_property_v_distance(
         options: hist, hist.cum, density, density.cum, vel.circ, hist.fraction, hist.cum.fraction,
             med, ave
     prop_scaling : string : scaling for property (y-axis): lin, log
+    weight_by_mass : boolean : whether to weight property by species mass
     distance_scaling : string : lin or log
     distance_lim : list : min and max distance for binning
     distance_bin_wid : float : width of distance bin
@@ -1168,7 +1173,7 @@ def plot_property_v_distance(
                     pros_part['gas'][k] = pros_part_mass['gas'][k] / pros_part_sfr['gas'][k] / 1e9
         else:
             pros_part = get_species_statistics_profiles(
-                part, species, prop_name, center_positions[part_i], DistanceBin)
+                part, species, prop_name, center_positions[part_i], DistanceBin, weight_by_mass)
 
         pros.append(pros_part)
 
@@ -1351,7 +1356,7 @@ def plot_star_form_history(
 
     for part_i, part in enumerate(parts):
         subplot.semilogy(times[part_i], sfrs[part_i], linewidth=2.0, color=colors[part_i],
-                         alpha=0.5, label=part.info['catalog.name'])
+                         alpha=0.5, label=part.info['simulation.name'])
 
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
