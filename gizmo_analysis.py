@@ -9,10 +9,11 @@ Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc phys
 # system ----
 from __future__ import absolute_import, division, print_function
 import numpy as np
-from numpy import log10
+from numpy import log10, Inf
 from scipy import spatial
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
+from matplotlib.colors import LogNorm
 import copy
 # local ----
 from utilities import utility as ut
@@ -646,6 +647,137 @@ def write_initial_condition_points(
 
 
 #===================================================================================================
+# visualize
+#===================================================================================================
+def plot_positions(
+    part, species='dark', dimen_indices=[0, 1], distance_max=1000, distance_bin_wid=1,
+    center_position=[], subsample_factor=None, write_plot=False, plot_directory='.'):
+    '''
+    Visualize the positions of given partcle species, using either a single panel for 2 axes or
+    3 panels for all axes.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles
+    species : string : particle species to plot
+    dimen_indices : list : which dimensions to plot
+        if 2, plot one v other, if 3, plot all via 3 panels
+    distance_max : float : maximum distance from center to plot
+    distance_bin_wid : float : length of histogram bin
+    center_position : array-like : position of center
+    subsample_factor : int : factor by which periodically to sub-sample particles
+    write_plot : boolean : whether to write plot to file
+    plot_directory : string : where to put plot file
+    '''
+    dimen_labels = {0: 'x', 1: 'y', 2: 'z'}
+
+    positions = [[] for _ in xrange(part[species]['position'].shape[1])]
+    for dimen_i in dimen_indices:
+        positions[dimen_i] = np.array(part[species]['position'][:, dimen_i])
+
+    if subsample_factor > 1:
+        for dimen_i in dimen_indices:
+            positions[dimen_i] = positions[dimen_i][::subsample_factor]
+
+    if not len(center_position) and len(part.center_position):
+        center_position = part.center_position
+
+    if center_position is not None and len(center_position):
+        masks = positions[dimen_indices[0]] < Inf
+        for dimen_i in dimen_indices:
+            positions[dimen_i] -= center_position[dimen_i]
+            positions[dimen_i] *= part.snapshot['scale-factor']
+            masks *= (positions[dimen_i] <= distance_max) * (positions[dimen_i] >= -distance_max)
+
+        for dimen_i in dimen_indices:
+            positions[dimen_i] = positions[dimen_i][masks]
+        masses = part[species]['mass'][masks]
+    else:
+        position_dif_max = 0
+        for dimen_i in dimen_indices:
+            position_dif = np.max(positions[dimen_i]) - np.min(positions[dimen_i])
+            if position_dif > position_dif_max:
+                position_dif_max = position_dif
+        distance_max = 0.5 * position_dif_max
+        masses = part[species]['mass']
+
+    position_bin_num = int(np.round(2 * distance_max / distance_bin_wid))
+    position_lims = np.array([[-distance_max, distance_max], [-distance_max, distance_max]])
+
+    # plot ----------
+    plt.clf()
+
+    if len(dimen_indices) == 2:
+        plt.minorticks_on()
+        fig = plt.figure(1)
+        subplot = fig.add_subplot(111)
+        fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
+
+        subplot.set_xlim(position_lims[0])
+        subplot.set_ylim(position_lims[1])
+
+        subplot.set_xlabel('position %s $[\\rm kpc\,physical]$' % dimen_labels[dimen_indices[0]])
+        subplot.set_ylabel('position %s $[\\rm kpc\,physical]$' % dimen_labels[dimen_indices[1]])
+
+        H = subplot.hist2d(positions[dimen_indices[0]], positions[dimen_indices[1]], weights=masses,
+                           range=position_lims, bins=position_bin_num, norm=LogNorm(),
+                           cmap=plt.cm.Greens)  # @UndefinedVariable
+
+        fig.colorbar(H[3])
+
+    elif len(dimen_indices) == 3:
+        #position_lims *= 0.99999  # ensure that tick labels do not overlap
+        position_lims[0, 0] *= 0.9999
+        position_lims[1, 0] *= 0.9999
+
+        fig, subplots = plt.subplots(2, 2, num=1, sharex=True, sharey=True)
+        fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
+
+        plot_dimen_iss = [
+            [dimen_indices[0], dimen_indices[1]],
+            [dimen_indices[0], dimen_indices[2]],
+            [dimen_indices[1], dimen_indices[2]],
+        ]
+
+        subplot_iss = [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+        ]
+
+        for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
+            subplot_is = subplot_iss[plot_i]
+            subplot = subplots[subplot_is[0], subplot_is[1]]
+            subplot.set_ylim([position_lims[1, 0] * 0.9, position_lims[1, 1]])
+
+            if subplot_is == [0, 0]:
+                subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[1]])
+            elif subplot_is == [1, 0]:
+                subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[0]])
+                subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[1]])
+            elif subplot_is == [1, 1]:
+                subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[0]])
+
+            subplot.set_xlim(position_lims[0])
+            subplot.set_ylim(position_lims[1])
+
+            H = subplot.hist2d(
+                positions[plot_dimen_is[0]], positions[plot_dimen_is[1]], weights=masses,
+                range=position_lims, bins=position_bin_num, norm=LogNorm(),
+                cmap=plt.cm.Greens)  # @UndefinedVariable
+            #fig.colorbar(H[3])  #, ax=subplot)
+
+    #plt.tight_layout(pad=0.02)
+
+    if write_plot:
+        plot_directory = ut.io.get_path(plot_directory)
+        plot_name = 'test'
+        plt.savefig(plot_directory + plot_name, format='pdf')
+    else:
+        plt.show(block=False)
+
+
+#===================================================================================================
 # tests
 #===================================================================================================
 def plot_mass_contamination(
@@ -706,8 +838,8 @@ def plot_mass_contamination(
         pros[spec] = DistanceBin.get_histogram_profile(distances, part[spec]['mass'])
 
     for spec in species_test:
-        mass_ratio_bin = pros[spec]['mass'] / pros[species_ref]['mass']
-        mass_ratio_cum = pros[spec]['mass.cum'] / pros[species_ref]['mass.cum']
+        mass_ratio_bin = pros[spec]['hist'] / pros[species_ref]['hist']
+        mass_ratio_cum = pros[spec]['hist.cum'] / pros[species_ref]['hist.cum']
         ratios[spec] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
         """
         for dist_bin_i in xrange(DistanceBin.num):
@@ -727,10 +859,10 @@ def plot_mass_contamination(
     if scale_to_halo_radius:
         distances /= halo_radius
         print_string = '  d/R_halo < %.3f: mass = %.2e, number = %d'
-    for dist_i in xrange(pros[spec]['mass.cum'].size):
-        if pros[spec]['mass.cum'][dist_i] > 0:
-            Say.say(print_string % (distances[dist_i], pros[spec]['mass.cum'][dist_i],
-                                    pros[spec]['mass.cum'][dist_i] / part[spec]['mass'][0]))
+    for dist_i in xrange(pros[spec]['hist.cum'].size):
+        if pros[spec]['hist.cum'][dist_i] > 0:
+            Say.say(print_string % (distances[dist_i], pros[spec]['hist.cum'][dist_i],
+                                    pros[spec]['hist.cum'][dist_i] / part[spec]['mass'][0]))
 
     # plot ----------
     colors = plot.get_colors(len(species_test), use_black=False)
@@ -764,8 +896,6 @@ def plot_mass_contamination(
         else:
             x_ref = halo_radius
         plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
-
-    # import ipdb; ipdb.set_trace()
 
     for spec_i, spec in enumerate(species_test):
         plot_func(xs, ratios[spec]['bin'], color=colors[spec_i], alpha=0.6, label=spec)
@@ -1062,8 +1192,6 @@ def plot_property_v_property(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to put plot
     '''
-    from matplotlib.colors import LogNorm
-
     if not len(center_position) and len(part.center_position):
         center_position = part.center_position
 
@@ -1188,7 +1316,6 @@ def plot_property_v_distance(
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
-    #fig, subplot = plt.subplots()
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(distance_lim)
