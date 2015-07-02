@@ -69,7 +69,7 @@ def get_species_positions_masses(part, species):
 
 
 def get_center_position(
-    part, species=['star', 'dark', 'gas'], method='cm'):
+    part, species=['star', 'dark', 'gas'], method='center-of-mass'):
     '''
     Get position of center of mass, using iterative zoom-in on species.
 
@@ -77,7 +77,7 @@ def get_center_position(
     ----------
     part : dict : dictionary of particles
     species : string or list: names of species to use: 'all' = use all in particle dictionary
-    method : string : method of centering: cm, potential
+    method : string : method of centering: center-of-mass, potential
     '''
     if np.isscalar(species):
         species = [species]  # ensure is list
@@ -90,7 +90,7 @@ def get_center_position(
     #periodic_len = part.info['box.length']
     periodic_len = None  # assume zoom-in run far from box edge, for speed
 
-    if method == 'cm':
+    if method == 'center-of-mass':
         center_position = ut.coord.position_center_of_mass_zoom(positions, masses, periodic_len)
     elif method == 'potential':
         species = species[0]
@@ -100,7 +100,7 @@ def get_center_position(
 
 
 def get_center_velocity(
-    part, species='star', radius_max=50, center_position=[]):
+    part, species='star', radius_max=30, center_position=[]):
     '''
     Get velocity of center of mass.
 
@@ -1061,7 +1061,7 @@ def parse_center_positions(parts, center_positions):
 
 def plot_property_distribution(
     parts, species='gas', prop_name='density', prop_scaling='log', prop_lim=[], prop_bin_wid=None,
-    prop_bin_num=100, prop_stat='probability', center_positions=[], distance_lim=[],
+    prop_bin_num=100, prop_statistic='probability', center_positions=[], distance_lim=[],
     axis_y_scaling='log', axis_y_lim=[], write_plot=False, plot_directory='.'):
     '''
     Plot distribution of property.
@@ -1075,7 +1075,7 @@ def plot_property_distribution(
     prop_lim : list : min and max limits of property
     prop_bin_wid : float : width of property bin (use this or prop_bin_num)
     prop_bin_num : int : number of property bins within limits (use this or prop_bin_wid)
-    prop_stat : string : statistic to plot: probability,
+    prop_statistic : string : statistic to plot: probability,
     center_positions : array or list of arrays : position[s] of galaxy center[s]
     distance_lim : list : min and max limits for distance from galaxy
     axis_y_scaling : string : lin or log
@@ -1132,19 +1132,19 @@ def plot_property_distribution(
 
     subplot.set_xlim(prop_lim)
     if not axis_y_lim:
-        y_vals = [Stat.distr[prop_stat][part_i] for part_i in xrange(len(parts))]
+        y_vals = [Stat.distr[prop_statistic][part_i] for part_i in xrange(len(parts))]
         axis_y_lim = plot.get_limits(y_vals, axis_y_scaling, exclude_zero=True)
     subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel(plot.get_label(prop_name, species=species, get_units=True))
-    subplot.set_ylabel(plot.get_label(prop_name, prop_stat, species, get_symbol=True,
+    subplot.set_ylabel(plot.get_label(prop_name, prop_statistic, species, get_symbol=True,
                                       get_units=False, draw_log=prop_scaling))
 
     #import ipdb; ipdb.set_trace()
 
     plot_func = plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i, part in enumerate(parts):
-        plot_func(Stat.distr['bin.mid'][part_i], Stat.distr[prop_stat][part_i],
+        plot_func(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
                   color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['simulation.name'])
 
     # redshift legend
@@ -1250,7 +1250,7 @@ def plot_property_v_property(
 
 
 def plot_property_v_distance(
-    parts, species='dark', prop_name='mass', prop_stat='hist', prop_scaling='log',
+    parts, species='dark', prop_name='mass', prop_statistic='hist', prop_scaling='log',
     weight_by_mass=False,
     distance_scaling='log', distance_lim=[0.1, 300], distance_bin_wid=0.02, distance_bin_num=None,
     center_positions=[], axis_y_lim=[], write_plot=False, plot_directory='.'):
@@ -1259,7 +1259,7 @@ def plot_property_v_distance(
     species : string or list : species to compute total mass of
         options: dark, star, gas, baryon, total
     prop_name : string : property to get profile of
-    prop_stat : string : statistic/type to plot
+    prop_statistic : string : statistic/type to plot
         options: hist, hist.cum, density, density.cum, vel.circ, hist.fraction, hist.cum.fraction,
             med, ave
     prop_scaling : string : scaling for property (y-axis): lin, log
@@ -1320,25 +1320,26 @@ def plot_property_v_distance(
 
     subplot.set_xlim(distance_lim)
     if not axis_y_lim:
-        y_vals = [pro[species][prop_stat] for pro in pros]
+        y_vals = [pro[species][prop_statistic] for pro in pros]
         axis_y_lim = plot.get_limits(y_vals, prop_scaling)
         if prop_name == 'consume.time':
             axis_y_lim = plot.get_limits(
-                pros[0][species][prop_stat][pros[0][species][prop_stat] < 10], prop_scaling)
+                pros[0][species][prop_statistic][pros[0][species][prop_statistic] < 10],
+                prop_scaling)
     subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
-    label_y = plot.get_label(prop_name, prop_stat, species, get_symbol=True, get_units=True)
+    label_y = plot.get_label(prop_name, prop_statistic, species, get_symbol=True, get_units=True)
     subplot.set_ylabel(label_y)
 
     plot_func = plot.get_plot_function(subplot, distance_scaling, prop_scaling)
     colors = plot.get_colors(len(parts))
 
-    if 'fraction' in prop_stat:
+    if 'fraction' in prop_statistic:
         plot_func(distance_lim, [1, 1], color='black', linestyle=':', alpha=0.5, linewidth=2)
 
     for part_i, pro in enumerate(pros):
-        plot_func(pro[species]['distance'], pro[species][prop_stat], color=colors[part_i],
+        plot_func(pro[species]['distance'], pro[species][prop_statistic], color=colors[part_i],
                   linestyle='-', alpha=0.5, linewidth=2,
                   label=parts[part_i].info['simulation.name'])
 
@@ -1358,7 +1359,7 @@ def plot_property_v_distance(
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        plot_name = (species + '.' + prop_name + '.' + prop_stat +
+        plot_name = (species + '.' + prop_name + '.' + prop_statistic +
                      '_v_dist_z.%.1f.pdf' % part.info['redshift'])
         plot_name = plot_name.replace('.hist', '')
         plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')

@@ -15,6 +15,7 @@ from utilities import utility as ut
 from utilities import constants as const
 from utilities import cosmology
 from utilities import simulation
+from . import gizmo_analysis as gizmo_anal
 
 
 class GizmoClass(ut.io.SayClass):
@@ -35,9 +36,10 @@ class GizmoClass(ut.io.SayClass):
 
     def read_snapshot(
         self, species_types='all', snapshot_number_kind='index', snapshot_number=400, directory='.',
-        property_names='all', property_names_exclude=[], simulation_name='', metal_index_max=1,
-        particle_subsample_factor=1,
-        sort_dark_by_id=True, force_float32=False, get_header_only=False):
+        property_names='all', property_names_exclude=[],
+        simulation_name='',
+        metal_index_max=1, particle_subsample_factor=1,
+        sort_dark_by_id=True, force_float32=False, assign_center=True, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary.
@@ -70,6 +72,7 @@ class GizmoClass(ut.io.SayClass):
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
+        assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         get_header_only : boolean : whether to read only header
 
         Returns
@@ -248,17 +251,18 @@ class GizmoClass(ut.io.SayClass):
 
         # try to read snapshot time file
         directory = ut.io.get_path(directory)
-        snapshot_time_file_name = 'snapshot_times.txt'
         snapshot_time_file_directory = directory + '../'
         Snapshot = simulation.SnapshotClass()
 
         try:
-            Snapshot.read_snapshots(snapshot_time_file_directory, snapshot_time_file_name)
+            Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_times.txt')
         except:
+            Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_scale-factors.txt')
+        else:
             if snapshot_number_kind == 'redshift':
                 raise ValueError(
-                    'input snapshot redshift but cannot convert to index because cannot read %s' %
-                    (snapshot_time_file_directory + snapshot_time_file_name))
+                    'input redshift of snapshot but cannot read file of snapshot times in %s' %
+                    snapshot_time_file_directory)
 
         if snapshot_number_kind == 'redshift':
             snapshot_redshift = snapshot_number
@@ -547,6 +551,7 @@ class GizmoClass(ut.io.SayClass):
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = \
                             part[spec_name][prop_name][::particle_subsample_factor]
+            print()
 
         # convert particle dictionary to generalized dictionary class to increase flexibility
         part_return = ut.array.DictClass()
@@ -570,9 +575,14 @@ class GizmoClass(ut.io.SayClass):
         # store information on all snapshot times - may or may not be initialized
         part_return.Snapshot = Snapshot
 
-        # use to store center position and velocity later
+        # arrays to store center position and velocity
         part_return.center_position = []
         part_return.center_velocity = []
+        if assign_center:
+            # assign center now
+            self.say('assigning center position and velocity')
+            self.assign_center(part_return)
+            print()
 
         return part_return
 
@@ -633,6 +643,28 @@ class GizmoClass(ut.io.SayClass):
         class dictionary of snapshot information
         '''
         return simulation.Snapshot.read_snapshots(directory, file_name)
+
+    def assign_center(self, part, method='center-of-mass'):
+        '''
+        Assign center position and velocity to galaxy/halo, using stars for hydro simulation or
+        dark matter for dark matter simulation.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        method : string : method of centering: center-of-mass, potential
+        '''
+        if 'star' in part and len(part['star']['position']):
+            species = 'star'
+            velocity_radius_max = 15
+        else:
+            species = 'dark'
+            velocity_radius_max = 30
+
+        part.center_position = gizmo_anal.get_center_position(part, species, method)
+
+        part.center_velocity = gizmo_anal.get_center_velocity(
+            part, species, velocity_radius_max, part.center_position)
 
 Gizmo = GizmoClass()
 
