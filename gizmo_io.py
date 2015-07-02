@@ -1,21 +1,22 @@
 '''
 Read gizmo/gadget snapshots.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances & radii in {kpc physical}.
+Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
 
 @author: Andrew Wetzel
 '''
 
+
 # system ----
 from __future__ import absolute_import, division, print_function
 import numpy as np
+from numpy import log10, Inf  # @UnusedImport
 import h5py as h5py
 # local ----
 from utilities import utility as ut
 from utilities import constants as const
 from utilities import cosmology
 from utilities import simulation
-from . import gizmo_analysis as gizmo_anal
 
 
 class GizmoClass(ut.io.SayClass):
@@ -255,13 +256,14 @@ class GizmoClass(ut.io.SayClass):
         Snapshot = simulation.SnapshotClass()
 
         try:
-            Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_times.txt')
+            try:
+                Snapshot.read_snapshots(snapshot_time_file_directory, 'asnapshot_times.txt')
+            except:
+                Snapshot.read_snapshots(snapshot_time_file_directory, 'asnapshot_scale-factors.txt')
         except:
-            Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_scale-factors.txt')
-        else:
             if snapshot_number_kind == 'redshift':
                 raise ValueError(
-                    'input redshift of snapshot but cannot read file of snapshot times in %s' %
+                    'input redshift for snapshot, but cannot find file of snapshot times in %s' %
                     snapshot_time_file_directory)
 
         if snapshot_number_kind == 'redshift':
@@ -661,10 +663,15 @@ class GizmoClass(ut.io.SayClass):
             species = 'dark'
             velocity_radius_max = 30
 
-        part.center_position = gizmo_anal.get_center_position(part, species, method)
+        part.center_position = ut.particle.get_center_position(part, species, method)
 
-        part.center_velocity = gizmo_anal.get_center_velocity(
+        part.center_velocity = ut.particle.get_center_velocity(
             part, species, velocity_radius_max, part.center_position)
+
+        print('  center position: ', end='')
+        ut.io.print_array(part.center_position, '%.3f')
+        print('  center velocity: ', end='')
+        ut.io.print_array(part.center_velocity, '%.1f')
 
 Gizmo = GizmoClass()
 
