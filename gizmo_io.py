@@ -257,9 +257,9 @@ class GizmoClass(ut.io.SayClass):
 
         try:
             try:
-                Snapshot.read_snapshots(snapshot_time_file_directory, 'asnapshot_times.txt')
+                Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_times.txt')
             except:
-                Snapshot.read_snapshots(snapshot_time_file_directory, 'asnapshot_scale-factors.txt')
+                Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_scale-factors.txt')
         except:
             if snapshot_number_kind == 'redshift':
                 raise ValueError(
