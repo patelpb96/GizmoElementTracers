@@ -1,5 +1,8 @@
 '''
-Created on Jul 2, 2015
+Generate initial condition points by selecting particles at final time and tracing them back
+to initial time.
+
+Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
 
 @author: awetzel
 '''
@@ -19,21 +22,20 @@ from utilities import constants as const
 # initial conditions
 #===================================================================================================
 def write_initial_condition_points(
-    part_fin, part_ini, center_position=None, distance_select=None, scale_to_halo_radius=True,
+    part_fin, part_ini, center_position=None, distance_max=None, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m',
     use_onorbe_method=False, refinement_num=1, method='particles'):
     '''
-    Print positions of initial conditions of dark-matter particles selected at z = 0.
-    Use rules of thumb from Onorbe et al.
+    Print positions dark-matter particles at initial snapshot as selected at final snapshot.
+    Can use rules of thumb from Onorbe et al.
 
     Parameters
     ----------
     part_fin : dict : catalog of particles at final snapshot
     part_ini : dict : catalog of particles at initial snapshot
     center_position : list : center position at final time
-    distance_select : float : distance from center to select particles at final time
+    distance_max : float : distance from center to select particles at final time
         {kpc physical, or units of R_halo}
-        if None, use halo radius
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
     halo_radius : float : radius of halo
     virial_kind : string : virial kind for halo radius (if not input halo_radius)
@@ -42,7 +44,7 @@ def write_initial_condition_points(
     method : string : method to identify initial zoom-in regon
         options: particles, convex.hull, cube
     '''
-    file_name = 'ic_agora_m12i_points.txt'
+    file_name = 'ic_agora_mX_points.txt'
 
     Say = ut.io.SayClass(write_initial_condition_points)
 
@@ -62,23 +64,18 @@ def write_initial_condition_points(
     if not len(center_position) and len(part_fin.center_position):
         center_position = part_fin.center_position
 
-    distance_select_input = distance_select
-    if not distance_select or scale_to_halo_radius:
+    if scale_to_halo_radius:
         if not halo_radius:
-            halo_radius = ut.particle.get_halo_radius(
-                part_fin, 'all', center_position, virial_kind, 'log')
-        if not distance_select:
-            distance_select = halo_radius
-        elif scale_to_halo_radius:
-            distance_select *= halo_radius
+            halo_radius = ut.particle.get_halo_radius(part_fin, 'all', center_position, virial_kind)
+        distance_max *= halo_radius
 
     if use_onorbe_method:
         # convert distance_max according to Onorbe et al
-        distance_pure = distance_select
+        distance_pure = distance_max
         if method == 'cube':
-            distance_select = (1.5 * refinement_num + 1) * distance_pure
+            distance_max = (1.5 * refinement_num + 1) * distance_pure
         elif method in ['particles', 'convex.hull']:
-            distance_select = (1.5 * refinement_num + 7) * distance_pure
+            distance_max = (1.5 * refinement_num + 7) * distance_pure
     else:
         distance_pure = None
 
@@ -92,7 +89,7 @@ def write_initial_condition_points(
         dists *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
         pure_indices = ut.array.elements(dists, [0, distance_pure])
-        select_indices = ut.array.elements(dists, [0, distance_select])
+        select_indices = ut.array.elements(dists, [0, distance_max])
 
         poss_ini.extend(part_ini[spec_name]['position'][select_indices])
 
@@ -113,14 +110,14 @@ def write_initial_condition_points(
 
     Say.say('final redshift = %.3f, initial redshift = %.3f' %
             (part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
-    Say.say('centering on volume at final time = [%.3f, %.3f, %.3f] kpc comoving' %
+    Say.say('center of volume at final time = [%.3f, %.3f, %.3f] kpc comoving' %
             (center_position[0], center_position[1], center_position[2]))
     if scale_to_halo_radius:
-        Say.say('selecting radius as %.2f x R_%s, R_%s = %.2f kpc comoving' %
-                (distance_select_input, virial_kind, virial_kind, halo_radius))
-    Say.say('radius of selection volume at final time = %.3f kpc comoving' % distance_select)
+        Say.say('selection radius = %.2f x R_%s, R_%s = %.2f kpc physical' %
+                (distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
+    Say.say('radius of selection volume at final time = %.3f kpc physical' % distance_max)
     if use_onorbe_method:
-        Say.say('radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc comoving' %
+        Say.say('radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc physical' %
                 distance_pure)
     Say.say('number of particles in selection volume at final time = %d' % np.sum(spec_select_num))
     for spec_i in xrange(len(spec_names)):
@@ -141,16 +138,16 @@ def write_initial_condition_points(
     file_io = open(log_file_name, 'w')
     file_io.write('# final redshift = %.3f, initial redshift = %.3f\n' %
                   (part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
-    file_io.write('# centering on volume at final time = [%.3f, %.3f, %.3f] kpc comoving\n' %
+    file_io.write('# center of volume at final time = [%.3f, %.3f, %.3f] kpc comoving\n' %
                   (center_position[0], center_position[1], center_position[2]))
     if scale_to_halo_radius:
-        file_io.write('# selecting radius as %.2f x R_%s, R_%s = %.2f kpc comoving\n' %
-                      (distance_select_input, virial_kind, virial_kind, halo_radius))
-    file_io.write('# radius of selection volume at final time = %.3f kpc comoving\n' %
-                  distance_select)
+        file_io.write('# selection radius = %.2f x R_%s, R_%s = %.2f kpc physical\n' %
+                      (distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
+    file_io.write('# radius of selection volume at final time = %.3f kpc physical\n' %
+                  distance_max)
     if use_onorbe_method:
         file_io.write(
-            '# radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc comoving\n' %
+            '# radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc physical\n' %
             distance_pure)
     file_io.write('# number of particles in selection volume at final time = %d\n' %
                   poss_ini.shape[0])

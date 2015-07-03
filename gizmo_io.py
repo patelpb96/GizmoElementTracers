@@ -582,9 +582,7 @@ class GizmoClass(ut.io.SayClass):
         part_return.center_velocity = []
         if assign_center:
             # assign center now
-            self.say('assigning center position and velocity')
             self.assign_center(part_return)
-            print()
 
         return part_return
 
@@ -668,10 +666,12 @@ class GizmoClass(ut.io.SayClass):
         part.center_velocity = ut.particle.get_center_velocity(
             part, species, velocity_radius_max, part.center_position)
 
-        print('  center position: ', end='')
+        self.say('assigning center position and velocity')
+        print('    position: ', end='')
         ut.io.print_array(part.center_position, '%.3f')
-        print('  center velocity: ', end='')
+        print('    velocity: ', end='')
         ut.io.print_array(part.center_velocity, '%.1f')
+        print()
 
 Gizmo = GizmoClass()
 

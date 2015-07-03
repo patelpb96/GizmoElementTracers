@@ -901,15 +901,16 @@ def plot_property_v_distance(
 # star formation analysis
 #===================================================================================================
 def get_star_form_history(
-    part, part_is=None, time_kind='time', time_lim=[0, 3], time_wid=0.01):
+    part, part_indices=None, time_kind='time', time_scaling='lin', time_lim=[0, 3], time_wid=0.01):
     '''
     Get array of times and star-formation rate at each time.
 
     Parameters
     ----------
     part : dict : dictionary of particles
-    part_is : array : star particle indices
+    part_indices : array : star particle indices
     time_kind : string : time kind to use: time, time.lookback, redshift
+    time_scaling : string : scaling of time_kind: lin, log
     time_lim : list : min and max limits of time_kind to get
     time_wid : float : width of time_kind bin
 
@@ -920,15 +921,28 @@ def get_star_form_history(
     '''
     species = 'star'
 
-    if part_is is None:
-        part_is = np.arange(part[species]['mass'].size, dtype=np.int32)
+    if part_indices is None:
+        part_indices = np.arange(part[species]['mass'].size, dtype=np.int32)
 
-    part_is_sort = part_is[np.argsort(part[species]['form.time'][part_is])]
+    part_is_sort = part_indices[np.argsort(part[species]['form.time'][part_indices])]
     star_form_times = part[species]['form.time'][part_is_sort]
     star_masses = part[species]['mass'][part_is_sort]
     star_masses_cum = np.cumsum(star_masses)
 
-    time_bins = np.arange(min(time_lim), max(time_lim), time_wid)
+    time_lim = np.array(time_lim)
+
+    if 'lookback' in time_kind:
+        time_lim = np.sort(part.Cosmo.time_from_redshift(0) - time_lim)  # convert to age
+
+    if time_scaling == 'lin':
+        time_bins = np.arange(time_lim.min(), time_lim.max() + time_wid, time_wid)
+    elif time_scaling == 'log':
+        if time_kind == 'redshift':
+            time_lim += 1  # convert to z + 1 so log is well-defined
+        time_bins = 10 ** np.arange(log10(time_lim.min()), log10(time_lim.max()) + time_wid,
+                                    time_wid)
+        if time_kind == 'redshift':
+            time_bins -= 1
     if time_kind == 'redshift':
         # input redshift limits and bins, need to convert to time
         redshift_bins = time_bins
@@ -938,21 +952,24 @@ def get_star_form_history(
     # convert to {M_sun / yr} and crudely account for stellar mass loss
     dm_dts = np.diff(star_mass_cum_bins) / (np.diff(time_bins) * 1e9) / 0.7
 
+    #time_bins[1e9]
+
+    # convert to midpoints of bins
     if 'time' in time_kind:
-        # convert to midpoints of bins
-        time_bins = time_bins[: time_bins.size - 1] + np.diff(time_bins)
+        time_bins = time_bins[: time_bins.size - 1] + 0.5 * np.diff(time_bins)
         if 'lookback' in time_kind:
             time_bins = part.Cosmo.time_from_redshift(0) - time_bins  # convert to lookback time
     elif time_kind == 'redshift':
-        # convert to midpoints of bins
-        time_bins = redshift_bins[: redshift_bins.size - 1] + np.diff(redshift_bins)
+        time_bins = redshift_bins[: redshift_bins.size - 1] + 0.5 * np.diff(redshift_bins)
         time_bins = np.sort(time_bins)[::-1]
+
+    print(time_bins)
 
     return time_bins, dm_dts
 
 
 def plot_star_form_history(
-    parts, time_kind='redshift', time_lim=[0, 1], time_wid=0.01,
+    parts, time_kind='redshift', time_scaling='lin', time_lim=[0, 1], time_wid=0.01,
     distance_lim=[0, 10], center_positions=[],
     write_plot=False, plot_directory='.'):
     '''
@@ -962,6 +979,7 @@ def plot_star_form_history(
     ----------
     parts : dict or list : catalog[s] of particles
     time_kind : string : time kind to use: time, time.lookback, redshift
+    time_scaling : string : scaling of time_kind: lin, log
     time_lim : list : min and max limits of time_kind to get
     time_wid : float : width of time_kind bin
     distance_lim : list : min and max limits of distance to select star particles
@@ -976,6 +994,8 @@ def plot_star_form_history(
 
     center_positions = parse_center_positions(parts, center_positions)
 
+    time_lim = np.array(time_lim)
+
     sfrs = []
     times = []
     for part_i, part in enumerate(parts):
@@ -988,10 +1008,14 @@ def plot_star_form_history(
         else:
             part_is = np.arange(part['star']['form.time'].size, dtype=np.int32)
 
-        times_t, sfrs_t = get_star_form_history(part, part_is, time_kind, time_lim, time_wid)
+        times_p, sfrs_p = get_star_form_history(
+            part, part_is, time_kind, time_scaling, time_lim, time_wid)
 
-        times.append(times_t)
-        sfrs.append(sfrs_t)
+        times.append(times_p)
+        sfrs.append(sfrs_p)
+
+    if time_kind == 'redshift' and time_scaling == 'log':
+        time_lim += 1  # convert to z + 1 so log is well-defined
 
     # plot ----------
     plt.clf()
@@ -1004,17 +1028,28 @@ def plot_star_form_history(
     subplot.set_xlim(time_lim)
     subplot.set_ylim(plot.get_limits(sfrs, 'log'))
 
-    if time_kind == 'time':
-        subplot.set_xlabel('time $[{\\rm Gyr}]$')
+    if 'time' in time_kind:
+        label = 'time $[{\\rm Gyr}]$'
+        if 'lookback' in time_kind:
+            label = 'lookback ' + label
+        subplot.set_xlabel(label)
     elif time_kind == 'redshift':
-        subplot.set_xlabel('redshift')
+        if time_scaling == 'lin':
+            subplot.set_xlabel('redshift')
+        elif time_scaling == 'log':
+            subplot.set_xlabel('z + 1')
     subplot.set_ylabel(plot.get_label('sfr', get_symbol=True, get_units=True))
 
     colors = plot.get_colors(len(parts))
 
+    if time_scaling == 'lin':
+        plot_func = subplot.semilogy
+    else:
+        plot_func = subplot.loglog
+
     for part_i, part in enumerate(parts):
-        subplot.semilogy(times[part_i], sfrs[part_i], linewidth=2.0, color=colors[part_i],
-                         alpha=0.5, label=part.info['simulation.name'])
+        plot_func(times[part_i], sfrs[part_i], linewidth=2.0, color=colors[part_i], alpha=0.5,
+                  label=part.info['simulation.name'])
 
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
