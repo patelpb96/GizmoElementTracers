@@ -18,6 +18,9 @@ import glob
 from utilities import utility as ut
 
 
+#===================================================================================================
+# simulation diagnostic
+#===================================================================================================
 def print_run_times(directory='.', print_lines=False):
     '''
     Print run times (average per MPI taks) at given scale factors from cpu.txt for Gizmo run.
@@ -119,6 +122,9 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
         scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
 
 
+#===================================================================================================
+# simulation utility
+#===================================================================================================
 def delete_snapshots(directory='.'):
     '''
     Delete all snapshots in given directory, except for those given below.

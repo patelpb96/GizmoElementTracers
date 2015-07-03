@@ -10,21 +10,23 @@ Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc phys
 
 # system ----
 from __future__ import absolute_import, division, print_function
+import sys
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 from scipy import spatial
 # local ----
 from utilities import utility as ut
 from utilities import constants as const
+from . import gizmo_io
 
 
 #===================================================================================================
 # initial conditions
 #===================================================================================================
 def write_initial_condition_points(
-    part_fin, part_ini, center_position=None, distance_max=None, scale_to_halo_radius=True,
+    part_fin, part_ini, center_position=[], distance_max=None, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m',
-    use_onorbe_method=False, refinement_num=1, method='particles'):
+    use_onorbe_method=False, refinement_num=1, method='convex-hull'):
     '''
     Print positions dark-matter particles at initial snapshot as selected at final snapshot.
     Can use rules of thumb from Onorbe et al.
@@ -42,13 +44,13 @@ def write_initial_condition_points(
     use_onorbe_method : boolean : whether to use method of Onorbe et al to get uncontaminated region
     refinement_num : int : if above is true, number of refinement levels beyond current for region
     method : string : method to identify initial zoom-in regon
-        options: particles, convex.hull, cube
+        options: particles, convex-hull, cube
     '''
     file_name = 'ic_agora_mX_points.txt'
 
     Say = ut.io.SayClass(write_initial_condition_points)
 
-    assert method in ['particles', 'convex.hull', 'cube']
+    assert method in ['particles', 'convex-hull', 'cube']
 
     # sanity check
     spec_names = []
@@ -74,26 +76,22 @@ def write_initial_condition_points(
         distance_pure = distance_max
         if method == 'cube':
             distance_max = (1.5 * refinement_num + 1) * distance_pure
-        elif method in ['particles', 'convex.hull']:
+        elif method in ['particles', 'convex-hull']:
             distance_max = (1.5 * refinement_num + 7) * distance_pure
-    else:
-        distance_pure = None
 
-    mass_pure = 0
     mass_select = 0
     poss_ini = []
     spec_select_num = []
     for spec_name in spec_names:
         poss_fin = part_fin[spec_name]['position']
+
         dists = ut.coord.distance('scalar', poss_fin, center_position, part_fin.info['box.length'])
         dists *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
-        pure_indices = ut.array.elements(dists, [0, distance_pure])
         select_indices = ut.array.elements(dists, [0, distance_max])
 
         poss_ini.extend(part_ini[spec_name]['position'][select_indices])
 
-        mass_pure += part_ini[spec_name]['mass'][pure_indices].sum()
         mass_select += part_ini[spec_name]['mass'][select_indices].sum()
         spec_select_num.append(select_indices.size)
 
@@ -127,8 +125,6 @@ def write_initial_condition_points(
     Say.say('  at highest-resolution in input catalog = %.2e M_sun' %
             part_ini['dark']['mass'].sum())
     Say.say('  in selection volume at final time = %.2e M_sun' % mass_select)
-    if use_onorbe_method:
-        Say.say('  in uncontaminated volume (Onorbe et al) at final time = %.2e M_sun' % mass_pure)
     Say.say('  in convex hull at initial time = %.2e M_sun' % mass_ini)
     Say.say('volume of convex hull at initial time = %.1f Mpc ^ 3 comoving' %
             (volume_ini * const.mega_per_kilo ** 3))
@@ -158,9 +154,6 @@ def write_initial_condition_points(
     file_io.write('#   at highest-resolution in input catalog = %.2e M_sun\n' %
                   part_ini['dark']['mass'].sum())
     file_io.write('#   in selection volume at final time = %.2e M_sun\n' % mass_select)
-    if use_onorbe_method:
-        file_io.write('#   in uncontaminated volume (Onorbe et al) at final time = %.2e M_sun\n' %
-                      mass_pure)
     file_io.write('#   in convex hull at initial time = %.2e M_sun\n' % mass_ini)
     file_io.write('# volume of convex hull at initial time = %.1f Mpc ^ 3 comoving\n' %
                   (volume_ini * const.mega_per_kilo ** 3))
@@ -172,7 +165,7 @@ def write_initial_condition_points(
 
     poss_ini /= part_ini.info['box.length']  # renormalize to box units
 
-    if method == 'convex.hull':
+    if method == 'convex-hull':
         # use convex hull to define initial region to reduce memory
         ConvexHull = spatial.ConvexHull(poss_ini)
         poss_ini = poss_ini[ConvexHull.vertices]
@@ -185,3 +178,29 @@ def write_initial_condition_points(
     for pi in xrange(poss_ini.shape[0]):
         file_io.write('%.8f %.8f %.8f\n' % (poss_ini[pi, 0], poss_ini[pi, 1], poss_ini[pi, 2]))
     file_io.close()
+
+
+#===================================================================================================
+# running from command line
+#===================================================================================================
+if __name__ == '__main__':
+    if len(sys.argv) <= 1:
+        raise ValueError('must specify selection radius, in terms of R_200m')
+
+    distance_max = float(sys.argv[1])
+    if distance_max < 1 or distance_max > 100:
+        raise ValueError('selection radius = %s seems odd. you shall not pass.' % distance_max)
+
+    part_fin = gizmo_io.Gizmo.read_snapshot(
+        ['dark', 'dark.2'], 'redshift', 0, 'output', ['position', 'id', 'mass'],
+        sort_dark_by_id=True, force_float32=False, assign_center=False)
+
+    part_ini = gizmo_io.Gizmo.read_snapshot(
+        ['dark', 'dark.2'], 'index', 0, 'output', ['position', 'id', 'mass'],
+        sort_dark_by_id=True, force_float32=False, assign_center=False)
+
+    center_position = ut.particle.get_center_position(part_fin, 'dark')
+
+    write_initial_condition_points(
+        part_fin, part_ini, center_position, distance_max, scale_to_halo_radius=True,
+        method='convex-hull')
