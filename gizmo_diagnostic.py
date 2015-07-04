@@ -2,7 +2,7 @@
 
 
 '''
-Diagnostic / utility functions for Gizmo runs.
+Diagnostic and utility functions for Gizmo simulations.
 
 @author: Andrew Wetzel
 '''
@@ -21,7 +21,10 @@ from utilities import utility as ut
 #===================================================================================================
 # simulation diagnostic
 #===================================================================================================
-def print_run_times(directory='.', print_lines=False):
+def print_run_times(
+    directory='.', print_lines=False,
+    scalefactors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
+                  0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
     '''
     Print run times (average per MPI taks) at given scale factors from cpu.txt for Gizmo run.
 
@@ -30,9 +33,7 @@ def print_run_times(directory='.', print_lines=False):
     directory : string : directory of cpu.txt file
     print_lines : boolean : whether to print full lines from cpu.txt as get them
     '''
-    scale_factors = np.array([
-        0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.666, 0.7,
-        0.75, 0.8, 0.85, 0.9, 0.95, 1.0])
+    scalefactors = np.array(scalefactors)
 
     run_times = []
 
@@ -45,7 +46,7 @@ def print_run_times(directory='.', print_lines=False):
     a_i = 0
     print_next_line = False
     for line in file_in:
-        if 'Time: %.3f' % scale_factors[a_i] in line or 'Time: 1,' in line:
+        if 'Time: %.3f' % scalefactors[a_i] in line or 'Time: 1,' in line:
             if print_lines:
                 print(line, end='')
             print_next_line = True
@@ -55,15 +56,15 @@ def print_run_times(directory='.', print_lines=False):
             run_times.append(float(line.split()[1]))
             print_next_line = False
             a_i += 1
-            if a_i >= len(scale_factors):
+            if a_i >= len(scalefactors):
                 break
 
     run_times = np.array(run_times)
 
     print('# scale-factor redshift run-time-percent run-time[hr]')
     for a_i in xrange(len(run_times)):
-        print('%.2f %5.2f  %5.1f  %7.1f' %
-              (scale_factors[a_i], 1 / scale_factors[a_i] - 1,
+        print('%.2f %5.2f  %5.1f  %8.2f' %
+              (scalefactors[a_i], 1 / scalefactors[a_i] - 1,
                100 * run_times[a_i] / run_times.max(), run_times[a_i] / 3600))
 
     #for scale_factor in scale_factors:

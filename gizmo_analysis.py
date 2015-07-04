@@ -118,7 +118,7 @@ def plot_mass_contamination(
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
-    #fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
+    fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(distance_lim)
     # subplot.set_ylim([0, 0.1])
