@@ -249,15 +249,19 @@ if __name__ == '__main__':
     assert ('runtime' in function_kind or 'contamination' in function_kind or
             'delete' in function_kind)
 
+    directory = '.'
+
     if 'runtime' in function_kind:
-        directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        print_run_times(directory)
+        cpu_number = None
+        if len(sys.argv) > 3:
+            cpu_number = int(sys.argv[3])
+
+        print_run_times(directory, cpu_number)
 
     elif 'contamination' in function_kind:
-        directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
@@ -268,7 +272,6 @@ if __name__ == '__main__':
         plot_halo_contamination(directory, snapshot_redshift)
 
     elif 'delete' in function_kind:
-        directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 

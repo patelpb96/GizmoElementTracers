@@ -660,9 +660,8 @@ def plot_property_distribution(
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(prop_lim)
-    if not axis_y_lim:
-        y_vals = [Stat.distr[prop_statistic][part_i] for part_i in xrange(len(parts))]
-        axis_y_lim = plot.get_limits(y_vals, axis_y_scaling, exclude_zero=True)
+    y_vals = [Stat.distr[prop_statistic][part_i] for part_i in xrange(len(parts))]
+    axis_y_lim = plot.parse_axis_limits(axis_y_lim, y_vals, axis_y_scaling)
     subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel(plot.get_label(prop_name, species=species, get_units=True))
@@ -843,16 +842,11 @@ def plot_property_v_distance(
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
     #fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(distance_lim)
-    if not axis_y_lim:
-        y_vals = [pro[species][prop_statistic] for pro in pros]
-        axis_y_lim = plot.get_limits(y_vals, prop_scaling)
-        if prop_name == 'consume.time':
-            axis_y_lim = plot.get_limits(
-                pros[0][species][prop_statistic][pros[0][species][prop_statistic] < 10],
-                prop_scaling)
+    y_vals = [pro[species][prop_statistic] for pro in pros]
+    axis_y_lim = plot.parse_axis_limits(axis_y_lim, y_vals, prop_scaling)
     subplot.set_ylim(axis_y_lim)
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
