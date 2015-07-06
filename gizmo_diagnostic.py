@@ -12,8 +12,9 @@ Diagnostic and utility functions for Gizmo simulations.
 from __future__ import absolute_import, division, print_function
 import os
 import sys
-import numpy as np
 import glob
+import numpy as np
+from numpy import log10, Inf  # @UnusedImport
 # local ----
 from utilities import utility as ut
 
@@ -22,18 +23,21 @@ from utilities import utility as ut
 # simulation diagnostic
 #===================================================================================================
 def print_run_times(
-    directory='.',
+    directory='.', cpu_number=None,
     scalefactors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
-    print_lines=False):
+    print_lines=False, get_values=False):
     '''
-    Print run times (average per MPI taks) at given scale factors from cpu.txt for Gizmo run.
+    Print wall [and CPU] times (average per MPI task) at input scale factors from cpu.txt for
+    Gizmo simulation.
 
     Parameters
     ----------
     directory : string : directory of cpu.txt file
+    cpu_number : int : number of CPUs used for simulation (to compute total CPU hours)
     scalefactors : array-like : list of scale factors at which to print run times
     print_lines : boolean : whether to print full lines from cpu.txt as get them
+    get_values : boolean : whether to return arrays of scale factors, redshifts, run times
     '''
     scalefactors = np.array(scalefactors)
 
@@ -61,17 +65,94 @@ def print_run_times(
             if a_i >= len(scalefactors):
                 break
 
-    run_times = np.array(run_times)
+    run_times = np.array(run_times) / 3600  # convert to {hr}
+    if cpu_number:
+        cpu_times = run_times * cpu_number
 
-    print('# scale-factor redshift run-time-percent run-time[hr]')
+    # sanity check - simulation might not have run to all input scale factors
+    scalefactors = scalefactors[: run_times.size]
+    redshifts = 1 / scalefactors - 1
+
+    print('# scale-factor redshift run-time-percent run-time[hr, day]', end='')
+    if cpu_number:
+        print(' cpu-time[hr]', end='')
+    print()
     for a_i in xrange(len(run_times)):
-        print('%.3f %5.2f  %5.1f  %8.2f' %
-              (scalefactors[a_i], 1 / scalefactors[a_i] - 1,
-               100 * run_times[a_i] / run_times.max(), run_times[a_i] / 3600))
+        print('%.3f %5.2f   %5.1f%% %7.2f %5.2f' %
+              (scalefactors[a_i], redshifts[a_i], 100 * run_times[a_i] / run_times.max(),
+               run_times[a_i], run_times[a_i] / 24), end='')
+        if cpu_number:
+            print(' %7.0f' % cpu_times[a_i], end='')
+        print()
 
     #for scale_factor in scale_factors:
     #    os.system('grep "Time: %.2f" %s --after-context=1 --max-count=2' %
     #              (scale_factor, file_path_name))
+
+    if get_values:
+        return scalefactors, redshifts, run_times
+
+
+def print_run_time_ratios(
+    directories=['.'], cpu_numbers=None,
+    scalefactors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
+                  0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
+    print_lines=False):
+    '''
+    Print ratios of wall [and CPU] times (average per MPI taks) for input simulations at input
+    scale factors from cpu.txt for Gizmo run
+
+    Parameters
+    ----------
+    directories : string or list : directory[s] of cpu.txt file for each simulation
+    cpu_numbers : int or list : number[s] of CPUs used for each simulation
+    scalefactors : array-like : list of scale factors at which to print run times
+    print_lines : boolean : whether to print full lines from cpu.txt as get them
+    '''
+    run_timess = []
+
+    if np.isscalar(directories):
+        directories = [directories]
+
+    print_cpu = False
+    if cpu_numbers is not None:
+        if np.isscalar(cpu_numbers):
+            cpu_numbers = [cpu_numbers]
+        if len(cpu_numbers):
+            assert len(cpu_numbers) == len(directories)
+            print_cpu = True
+            cpu_timess = []
+
+    for d_i, directory in enumerate(directories):
+        scalefactors, redshifts, run_times = print_run_times(
+            directory, cpu_numbers[d_i], scalefactors, print_lines, get_values=True)
+        run_timess.append(run_times)
+
+    run_time_num_min = Inf
+    for d_i, run_times in enumerate(run_timess):
+        if print_cpu:
+            cpu_timess.append(run_times * cpu_numbers[d_i])
+        if len(run_times) < run_time_num_min:
+            run_time_num_min = len(run_times)
+
+    # sanity check - simulations might not have run to each input scale factor
+    scalefactors = scalefactors[: run_time_num_min]
+    redshifts = redshifts[: run_time_num_min]
+
+    print('# scale-factor redshift', end='')
+    for _ in xrange(1, len(run_timess)):
+        print(' wall-time-ratio', end='')
+        if print_cpu:
+            print(' cpu-time-ratio', end='')
+    print()
+
+    for a_i in xrange(run_time_num_min):
+        print('%.3f %5.2f  ' % (scalefactors[a_i], redshifts[a_i]), end='')
+        for d_i in xrange(1, len(run_timess)):
+            print(' %7.3f' % (run_timess[d_i][a_i] / run_timess[0][a_i]), end='')
+            if print_cpu:
+                print(' %7.3f' % (cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
+        print()
 
 
 def plot_halo_contamination(directory='.', snapshot_redshift=0):
