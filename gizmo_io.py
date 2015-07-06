@@ -657,9 +657,12 @@ class GizmoClass(ut.io.SayClass):
         if 'star' in part and len(part['star']['position']):
             species = 'star'
             velocity_radius_max = 15
-        else:
+        elif 'dark' in part and len(part['dark']['position']):
             species = 'dark'
             velocity_radius_max = 30
+        else:
+            self.say('! catalog not contain star or dark particles, skipping center finding')
+            return
 
         part.center_position = ut.particle.get_center_position(part, species, method)
 
