@@ -21,14 +21,207 @@ from utilities import plot
 
 
 #===================================================================================================
+# analysis utility
+#===================================================================================================
+def parse_center_positions(parts, center_positions=None):
+    '''
+    Get center position, either from particle catalog or input.
+
+    Parameters
+    ----------
+    parts : dict or list : catalog[s] of particles
+    center_positions : list or list of lists : position[s] of center[s]
+    '''
+    if isinstance(parts, dict):
+        # single particle catalog
+        if center_positions is None or not len(center_positions):
+            if len(parts.center_position):
+                center_positions = parts.center_position
+            else:
+                raise ValueError('no input center and no center in input catalog')
+        elif np.ndim(center_positions) > 1:
+            raise ValueError('input multiple centers but only single catalog')
+        else:
+            center_positions = np.array(center_positions)
+    else:
+        # list of particle catalogs
+        if center_positions is None or not len(center_positions):
+            center_positions = [[] for part in parts]
+
+        if np.ndim(center_positions) != 2 or len(center_positions) != len(parts):
+            raise ValueError('shape of input centers does not match that of input catalogs')
+
+        for part_i, part in enumerate(parts):
+            if center_positions[part_i] is None or not len(center_positions[part_i]):
+                if len(part.center_position):
+                    center_positions[part_i] = part.center_position
+                else:
+                    raise ValueError('no input center and no center in input catalog')
+
+    return center_positions
+
+
+def get_species_histogram_profiles(
+    part, species=['all'], prop_name='mass', center_position=None, DistanceBin=None):
+    '''
+    Get dictionary of profiles of mass/density (or any summed quantity) for each particle species.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles
+    species : string or list : species to compute total mass of
+    center_position : list : center position
+    DistanceBin : class : distance bin class
+    '''
+    pros = {}
+
+    Fraction = ut.math.FractionClass()
+
+    # ensure is list even if just one species
+    if np.isscalar(species):
+        species = [species]
+    else:
+        species = copy.copy(species)
+
+    if species == ['all'] or species == ['total'] or species == ['baryon']:
+        species = ['dark', 'gas', 'star']
+        #species = part.keys()
+        if 'dark.2' in part:
+            species.append('dark.2')
+
+    center_position = parse_center_positions(part, center_position)
+
+    for spec in species:
+        if 'mass' in prop_name:
+            positions, prop_vals = ut.particle.get_species_positions_masses(part, spec)
+
+            if np.isscalar(prop_vals):
+                prop_vals = np.zeros(positions.shape[0], dtype=prop_vals.dtype) + prop_vals
+
+        else:
+            positions = part[spec]['position']
+            prop_vals = part[spec][prop_name]
+
+        distances = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
+        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+
+        pros[spec] = DistanceBin.get_histogram_profile(distances, prop_vals)
+
+    props = [pro_prop for pro_prop in pros[species[0]] if 'distance' not in pro_prop]
+    props_dist = [pro_prop for pro_prop in pros[species[0]] if 'distance' in pro_prop]
+
+    if prop_name == 'mass':
+        # create dictionary for baryonic mass
+        if 'star' in species or 'gas' in species:
+            spec_new = 'baryon'
+            pros[spec_new] = {}
+            for spec in np.intersect1d(species, ['star', 'gas']):
+                for pro_prop in props:
+                    if pro_prop not in pros[spec_new]:
+                        pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
+                    elif 'log' in pro_prop:
+                        pros[spec_new][pro_prop] = ut.math.get_log(
+                            10 ** pros[spec_new][pro_prop] + 10 ** pros[spec][pro_prop])
+                    else:
+                        pros[spec_new][pro_prop] += pros[spec][pro_prop]
+
+            for pro_prop in props_dist:
+                pros[spec_new][pro_prop] = pros[species[0]][pro_prop]
+            species.append(spec_new)
+
+        if len(species) > 1:
+            # create dictionary for total mass
+            spec_new = 'total'
+            pros[spec_new] = {}
+            for spec in np.setdiff1d(species, ['baryon', 'total']):
+                for pro_prop in props:
+                    if pro_prop not in pros[spec_new]:
+                        pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
+                    elif 'log' in pro_prop:
+                        pros[spec_new][pro_prop] = ut.math.get_log(
+                            10 ** pros[spec_new][pro_prop] + 10 ** pros[spec][pro_prop])
+                    else:
+                        pros[spec_new][pro_prop] += pros[spec][pro_prop]
+
+            for pro_prop in props_dist:
+                pros[spec_new][pro_prop] = pros[species[0]][pro_prop]
+            species.append(spec_new)
+
+            # create mass fraction wrt total mass
+            for spec in np.setdiff1d(species, ['total']):
+                for pro_prop in ['hist', 'hist.cum']:
+                    pros[spec][pro_prop + '.fraction'] = Fraction.get_fraction(
+                        pros[spec][pro_prop], pros['total'][pro_prop])
+
+                    if spec == 'baryon':
+                        # units of cosmic baryon fraction
+                        pros[spec][pro_prop + '.fraction'] /= (part.Cosmo['omega_baryon'] /
+                                                               part.Cosmo['omega_matter'])
+
+        # create circular velocity = sqrt (G m(<r) / r)
+        for spec in species:
+            pros[spec]['vel.circ'] = (pros[spec]['hist.cum'] / pros[spec]['distance.cum'] *
+                                      const.grav_kpc_msun_yr)
+            pros[spec]['vel.circ'] = np.sqrt(pros[spec]['vel.circ'])
+            pros[spec]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+
+    return pros
+
+
+def get_species_statistics_profiles(
+    part, species=['all'], prop_name='', center_position=[], DistanceBin=None,
+    weight_by_mass=False):
+    '''
+    Get dictionary of profiles of statistics (such as median, average) for given property for each
+    particle species.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles
+    species : string or list : species to compute total mass of
+    prop_name : string : name of property to get statistics of
+    center_position : list : center position
+    DistanceBin : class : distance bin class
+    weight_by_mass : boolean : whether to weight property by species mass
+    '''
+    pros = {}
+
+    # ensure is list even if just one species
+    if np.isscalar(species):
+        species = [species]
+
+    if species == ['all'] or species == ['total']:
+        species = ['dark', 'gas', 'star', 'dark.2']
+        #species = part.keys()
+    elif species == ['baryon']:
+        species = ['gas', 'star']
+
+    center_position = parse_center_positions(part, center_position)
+
+    for spec in species:
+        # {kpc comoving}
+        distances = ut.coord.distance(
+            'scalar', part[spec]['position'], center_position, part.info['box.length'])
+        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+
+        if weight_by_mass:
+            masses = part[spec]['mass']
+        else:
+            masses = None
+        pros[spec] = DistanceBin.get_statistics_profile(distances, part[spec][prop_name], masses)
+
+    return pros
+
+
+#===================================================================================================
 # diagnostic
 #===================================================================================================
 def plot_mass_contamination(
     part, distance_lim=[1, 2000], distance_bin_wid=0.02, distance_bin_num=None,
-    distance_scaling='log', halo_radius=None, scale_to_halo_radius=False, center_position=[],
+    distance_scaling='log', halo_radius=None, scale_to_halo_radius=False, center_position=None,
     axis_y_scaling='log', write_plot=False, plot_directory='.'):
     '''
-    Plot lower resolution particle contamination v distance from input center.
+    Plot contamination from lower-resolution particles v distance from center.
 
     Parameters
     ----------
@@ -58,8 +251,7 @@ def plot_mass_contamination(
             Say.say('! no %s in particle dictionary' % spec_test)
     species_test = species_test_t
 
-    if not len(center_position) and len(part.center_position):
-        center_position = part.center_position
+    center_position = parse_center_positions(part, center_position)
 
     distance_lim_use = np.array(distance_lim)
     if halo_radius and scale_to_halo_radius:
@@ -188,8 +380,7 @@ def plot_metal_v_distance(
 
     Say = ut.io.SayClass(plot_metal_v_distance)
 
-    if not len(center_position) and len(part.center_position):
-        center_position = part.center_position
+    center_position = parse_center_positions(part, center_position)
 
     distance_lim_use = np.array(distance_lim)
     if halo_radius and scale_to_halo_radius:
@@ -209,7 +400,7 @@ def plot_metal_v_distance(
     if 'metallicity' in plot_kind:
         pro_mass = DistanceBin.get_histogram_profile(distances, part['gas']['mass'])
         ys = pro_metal['mass'] / pro_mass['mass']
-        axis_y_lim = np.clip(plot.get_limits(ys), 0.0001, 10)
+        axis_y_lim = np.clip(plot.get_axis_limits(ys), 0.0001, 10)
     elif 'metal.mass.cum' in plot_kind:
         ys = pro_metal['fraction.cum']
         axis_y_lim = [0.001, 1]
@@ -304,8 +495,7 @@ def plot_positions(
         for dimen_i in dimen_indices:
             positions[dimen_i] = positions[dimen_i][::subsample_factor]
 
-    if not len(center_position) and len(part.center_position):
-        center_position = part.center_position
+    center_position = parse_center_positions(part, center_position)
 
     if center_position is not None and len(center_position):
         masks = positions[dimen_indices[0]] < Inf
@@ -403,194 +593,11 @@ def plot_positions(
 
 
 #===================================================================================================
-# analysis utility
-#===================================================================================================
-def parse_center_positions(parts, center_positions):
-    '''
-    Parameters
-    ----------
-    parts : dict or list : catalog[s] of particles
-    center_positions : list or list of lists : position[s] of center[s]
-    '''
-    if isinstance(parts, dict):
-        parts = [parts]
-
-    if center_positions is None or np.ndim(center_positions) == 1:
-        if not len(center_positions):
-            center_positions = []
-            for part in parts:
-                if len(part.center_position):
-                    center_positions.append(part.center_position)
-                else:
-                    center_positions.append([])
-        else:
-            center_positions = [center_positions]
-    else:
-        center_positions = center_positions
-
-    return center_positions
-
-
-def get_species_histogram_profiles(
-    part, species=['all'], prop_name='mass', center_position=[], DistanceBin=None):
-    '''
-    Get dictionary of profiles of mass/density (or any summed quantity) for each particle species.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    species : string or list : species to compute total mass of
-    center_position : list : center position
-    DistanceBin : class : distance bin class
-    '''
-    pros = {}
-
-    Fraction = ut.math.FractionClass()
-
-    # ensure is list even if just one species
-    if np.isscalar(species):
-        species = [species]
-    else:
-        species = copy.copy(species)
-
-    if species == ['all'] or species == ['total'] or species == ['baryon']:
-        species = ['dark', 'gas', 'star']
-        #species = part.keys()
-        if 'dark.2' in part:
-            species.append('dark.2')
-
-    if not len(center_position) and len(part.center_position):
-        center_position = part.center_position
-
-    for spec in species:
-        if 'mass' in prop_name:
-            positions, prop_vals = ut.particle.get_species_positions_masses(part, spec)
-
-            if np.isscalar(prop_vals):
-                prop_vals = np.zeros(positions.shape[0], dtype=prop_vals.dtype) + prop_vals
-
-        else:
-            positions = part[spec]['position']
-            prop_vals = part[spec][prop_name]
-
-        distances = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
-        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
-
-        pros[spec] = DistanceBin.get_histogram_profile(distances, prop_vals)
-
-    props = [pro_prop for pro_prop in pros[species[0]] if 'distance' not in pro_prop]
-    props_dist = [pro_prop for pro_prop in pros[species[0]] if 'distance' in pro_prop]
-
-    if prop_name == 'mass':
-        # create dictionary for baryonic mass
-        if 'star' in species or 'gas' in species:
-            spec_new = 'baryon'
-            pros[spec_new] = {}
-            for spec in np.intersect1d(species, ['star', 'gas']):
-                for pro_prop in props:
-                    if pro_prop not in pros[spec_new]:
-                        pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
-                    elif 'log' in pro_prop:
-                        pros[spec_new][pro_prop] = ut.math.get_log(
-                            10 ** pros[spec_new][pro_prop] + 10 ** pros[spec][pro_prop])
-                    else:
-                        pros[spec_new][pro_prop] += pros[spec][pro_prop]
-
-            for pro_prop in props_dist:
-                pros[spec_new][pro_prop] = pros[species[0]][pro_prop]
-            species.append(spec_new)
-
-        if len(species) > 1:
-            # create dictionary for total mass
-            spec_new = 'total'
-            pros[spec_new] = {}
-            for spec in np.setdiff1d(species, ['baryon', 'total']):
-                for pro_prop in props:
-                    if pro_prop not in pros[spec_new]:
-                        pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
-                    elif 'log' in pro_prop:
-                        pros[spec_new][pro_prop] = ut.math.get_log(
-                            10 ** pros[spec_new][pro_prop] + 10 ** pros[spec][pro_prop])
-                    else:
-                        pros[spec_new][pro_prop] += pros[spec][pro_prop]
-
-            for pro_prop in props_dist:
-                pros[spec_new][pro_prop] = pros[species[0]][pro_prop]
-            species.append(spec_new)
-
-            # create mass fraction wrt total mass
-            for spec in np.setdiff1d(species, ['total']):
-                for pro_prop in ['hist', 'hist.cum']:
-                    pros[spec][pro_prop + '.fraction'] = Fraction.get_fraction(
-                        pros[spec][pro_prop], pros['total'][pro_prop])
-
-                    if spec == 'baryon':
-                        # units of cosmic baryon fraction
-                        pros[spec][pro_prop + '.fraction'] /= (part.Cosmo['omega_baryon'] /
-                                                               part.Cosmo['omega_matter'])
-
-        # create circular velocity = sqrt (G m(<r) / r)
-        for spec in species:
-            pros[spec]['vel.circ'] = (pros[spec]['hist.cum'] / pros[spec]['distance.cum'] *
-                                      const.grav_kpc_msun_yr)
-            pros[spec]['vel.circ'] = np.sqrt(pros[spec]['vel.circ'])
-            pros[spec]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
-
-    return pros
-
-
-def get_species_statistics_profiles(
-    part, species=['all'], prop_name='', center_position=[], DistanceBin=None,
-    weight_by_mass=False):
-    '''
-    Get dictionary of profiles of statistics (such as median, average) for given property for each
-    particle species.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    species : string or list : species to compute total mass of
-    prop_name : string : name of property to get statistics of
-    center_position : list : center position
-    DistanceBin : class : distance bin class
-    weight_by_mass : boolean : whether to weight property by species mass
-    '''
-    pros = {}
-
-    # ensure is list even if just one species
-    if np.isscalar(species):
-        species = [species]
-
-    if species == ['all'] or species == ['total']:
-        species = ['dark', 'gas', 'star', 'dark.2']
-        #species = part.keys()
-    elif species == ['baryon']:
-        species = ['gas', 'star']
-
-    if not len(center_position) and len(part.center_position):
-        center_position = part.center_position
-
-    for spec in species:
-        # {kpc comoving}
-        distances = ut.coord.distance(
-            'scalar', part[spec]['position'], center_position, part.info['box.length'])
-        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
-
-        if weight_by_mass:
-            masses = part[spec]['mass']
-        else:
-            masses = None
-        pros[spec] = DistanceBin.get_statistics_profile(distances, part[spec][prop_name], masses)
-
-    return pros
-
-
-#===================================================================================================
 # general property analysis
 #===================================================================================================
 def plot_property_distribution(
     parts, species='gas', prop_name='density', prop_scaling='log', prop_lim=[], prop_bin_wid=None,
-    prop_bin_num=100, prop_statistic='probability', center_positions=[], distance_lim=[],
+    prop_bin_num=100, prop_statistic='probability', center_positions=None, distance_lim=[],
     axis_y_scaling='log', axis_y_lim=[], write_plot=False, plot_directory='.'):
     '''
     Plot distribution of property.
@@ -661,14 +668,11 @@ def plot_property_distribution(
 
     subplot.set_xlim(prop_lim)
     y_vals = [Stat.distr[prop_statistic][part_i] for part_i in xrange(len(parts))]
-    axis_y_lim = plot.parse_axis_limits(axis_y_lim, y_vals, axis_y_scaling)
-    subplot.set_ylim(axis_y_lim)
+    subplot.set_ylim(plot.parse_axis_limits(axis_y_lim, y_vals, axis_y_scaling))
 
     subplot.set_xlabel(plot.get_label(prop_name, species=species, get_units=True))
     subplot.set_ylabel(plot.get_label(prop_name, prop_statistic, species, get_symbol=True,
                                       get_units=False, draw_log=prop_scaling))
-
-    #import ipdb; ipdb.set_trace()
 
     plot_func = plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i, part in enumerate(parts):
@@ -720,8 +724,7 @@ def plot_property_v_property(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to put plot
     '''
-    if not len(center_position) and len(part.center_position):
-        center_position = part.center_position
+    center_position = parse_center_positions(part, center_position)
 
     if len(center_position) and len(distance_lim):
         distances = ut.coord.distance(
@@ -846,8 +849,7 @@ def plot_property_v_distance(
 
     subplot.set_xlim(distance_lim)
     y_vals = [pro[species][prop_statistic] for pro in pros]
-    axis_y_lim = plot.parse_axis_limits(axis_y_lim, y_vals, prop_scaling)
-    subplot.set_ylim(axis_y_lim)
+    subplot.set_ylim(plot.parse_axis_limits(axis_y_lim, y_vals, prop_scaling))
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
     label_y = plot.get_label(prop_name, prop_statistic, species, get_symbol=True, get_units=True)
@@ -989,6 +991,8 @@ def plot_star_form_history(
     center_positions = parse_center_positions(parts, center_positions)
 
     time_lim = np.array(time_lim)
+    if time_lim[1] is None:
+        time_lim[1] = parts[0].snapshot[time_kind]
 
     sfrs = []
     times = []
@@ -1020,7 +1024,7 @@ def plot_star_form_history(
     fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
 
     subplot.set_xlim(time_lim)
-    subplot.set_ylim(plot.get_limits(sfrs, 'log'))
+    subplot.set_ylim(plot.get_axis_limits(sfrs, 'log'))
 
     if 'time' in time_kind:
         label = 'time $[{\\rm Gyr}]$'

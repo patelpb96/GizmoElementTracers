@@ -567,10 +567,12 @@ class GizmoClass(ut.io.SayClass):
         part_return.info = header
 
         # store information on snapshot time
+        time = Cosmo.time_from_redshift(header['redshift'])
         part_return.snapshot = {
             'redshift': header['redshift'],
             'scale-factor': header['scale-factor'],
-            'time': Cosmo.time_from_redshift(header['redshift']),
+            'time': time,
+            'time.lookback': Cosmo.time_from_redshift(0) - time,
             'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
         }
 
