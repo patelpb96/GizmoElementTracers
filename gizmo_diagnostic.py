@@ -24,8 +24,8 @@ from utilities import utility as ut
 #===================================================================================================
 def print_run_times(
     directory='.', cpu_number=None,
-    scalefactors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                  0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
+    scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
+                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
     print_lines=False, get_values=False):
     '''
     Print wall [and CPU] times (average per MPI task) at input scale factors from cpu.txt for
@@ -35,11 +35,11 @@ def print_run_times(
     ----------
     directory : string : directory of cpu.txt file
     cpu_number : int : number of CPUs used for simulation (to compute total CPU hours)
-    scalefactors : array-like : list of scale factors at which to print run times
+    scale_factors : array-like : list of scale factors at which to print run times
     print_lines : boolean : whether to print full lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale factors, redshifts, run times
     '''
-    scalefactors = np.array(scalefactors)
+    scale_factors = np.array(scale_factors)
 
     run_times = []
 
@@ -49,10 +49,10 @@ def print_run_times(
 
     file_in = open(file_path_name, 'r')
 
-    a_i = 0
+    t_i = 0
     print_next_line = False
     for line in file_in:
-        if 'Time: %.3f' % scalefactors[a_i] in line or 'Time: 1,' in line:
+        if 'Time: %.3f' % scale_factors[t_i] in line or 'Time: 1,' in line:
             if print_lines:
                 print(line, end='')
             print_next_line = True
@@ -61,8 +61,8 @@ def print_run_times(
                 print(line)
             run_times.append(float(line.split()[1]))
             print_next_line = False
-            a_i += 1
-            if a_i >= len(scalefactors):
+            t_i += 1
+            if t_i >= len(scale_factors):
                 break
 
     run_times = np.array(run_times) / 3600  # convert to {hr}
@@ -70,19 +70,19 @@ def print_run_times(
         cpu_times = run_times * cpu_number
 
     # sanity check - simulation might not have run to all input scale factors
-    scalefactors = scalefactors[: run_times.size]
-    redshifts = 1 / scalefactors - 1
+    scale_factors = scale_factors[: run_times.size]
+    redshifts = 1 / scale_factors - 1
 
     print('# scale-factor redshift run-time-percent run-time[hr, day]', end='')
     if cpu_number:
         print(' cpu-time[hr]', end='')
     print()
-    for a_i in xrange(len(run_times)):
+    for t_i in xrange(len(run_times)):
         print('%.3f %5.2f   %5.1f%% %7.2f %5.2f' %
-              (scalefactors[a_i], redshifts[a_i], 100 * run_times[a_i] / run_times.max(),
-               run_times[a_i], run_times[a_i] / 24), end='')
+              (scale_factors[t_i], redshifts[t_i], 100 * run_times[t_i] / run_times.max(),
+               run_times[t_i], run_times[t_i] / 24), end='')
         if cpu_number:
-            print(' %7.0f' % cpu_times[a_i], end='')
+            print(' %7.0f' % cpu_times[t_i], end='')
         print()
 
     #for scale_factor in scale_factors:
@@ -90,7 +90,7 @@ def print_run_times(
     #              (scale_factor, file_path_name))
 
     if get_values:
-        return scalefactors, redshifts, run_times
+        return scale_factors, redshifts, run_times
 
 
 def print_run_time_ratios(
@@ -241,6 +241,10 @@ def delete_snapshots(directory='.'):
 # running from command line
 #===================================================================================================
 if __name__ == '__main__':
+
+    print(len(sys.argv))
+    for ti, t in enumerate(sys.argv):
+        print(t)
 
     if len(sys.argv) <= 1:
         raise ValueError('must specify function kind: runtime, contamination, delete')

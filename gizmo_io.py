@@ -1,5 +1,5 @@
 '''
-Read gizmo/gadget snapshots.
+Read Gizmo/Gadget snapshots.
 
 Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
 
@@ -188,7 +188,6 @@ class GizmoClass(ut.io.SayClass):
         part = {}  # custom dictionary to store properties for all particle species
 
         ## parse input species list ##
-
         # if input 'all' for species, read all species in snapshot
         if species_types == 'all' or species_types == ['all'] or not species_types:
             species_types = [spec for spec in species_name_list if spec in species_name_dict.keys()]
@@ -216,7 +215,6 @@ class GizmoClass(ut.io.SayClass):
                     species_names.append(spec_name)
 
         ## parse input property list ##
-
         # if input 'all' for particle properties, read all properties in snapshot
         if property_names == 'all' or property_names == ['all'] or not property_names:
             property_names = [prop_name for prop_name in property_name_dict]
@@ -250,7 +248,7 @@ class GizmoClass(ut.io.SayClass):
                 if prop_name not in property_names:
                     property_names.append(prop_name)
 
-        # try to read snapshot time file
+        ## try to read snapshot time file ##
         directory = ut.io.get_path(directory)
         snapshot_time_file_directory = directory + '../'
         Snapshot = simulation.SnapshotClass()
@@ -272,13 +270,10 @@ class GizmoClass(ut.io.SayClass):
             self.say('input snapshot redshift = %.3f -> snapshot index = %d\n' %
                      (snapshot_redshift, snapshot_number))
 
+        ## read and assign header ##
         # get file name
         file_name = self.get_file_name(directory, snapshot_number)
-
-        self.say('reading header from: ' + file_name)
-        print()
-
-        ## start reading/assigning header ##
+        self.say('reading header from: ' + file_name, end='\n\n')
 
         # open file and parse header
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
@@ -320,7 +315,8 @@ class GizmoClass(ut.io.SayClass):
                 species_ids_keep.append(spec_id)
                 species_names_keep.append(spec_name)
         print()
-        # keep only names & ids of species that have particles
+
+        # keep only names and ids of species that have particles
         species_names = species_names_keep
         species_ids = species_ids_keep
 
@@ -334,18 +330,14 @@ class GizmoClass(ut.io.SayClass):
         header['catalog.kind'] = 'particle'
         header['simulation.name'] = simulation_name
 
-        # only want to return header?
-        if get_header_only:
+        if get_header_only or part_number_min == 0:
+            # only return header
+            if part_number_min == 0:
+                self.say('! found no particles in file', end='\n\n')
             file_in.close()
             return header
 
-        ### end reading/assigning header ###
-
-        # sanity check
-        if part_number_min == 0:
-            self.say('! found no particles in file')
-            file_in.close()
-            return
+        ## end reading header ##
 
         # assign cosmological parameters
         if header['is.cosmological']:
@@ -358,8 +350,7 @@ class GizmoClass(ut.io.SayClass):
                 header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
                 sigma_8, n_s, w)
 
-        ### initialize arrays to store each property for each species ###
-
+        ## initialize arrays to store each property for each species ##
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
             part_in = file_in['PartType' + str(spec_id)]
@@ -390,7 +381,7 @@ class GizmoClass(ut.io.SayClass):
                         # initialize so calling an un-itialized value leads to error
                         part[spec_name][prop_name] -= part_num_tot
                 else:
-                    self.say('not reading %s for species %s' % (prop_name_in, spec_name))
+                    self.say('not reading %s %s' % (spec_name, prop_name_in))
 
             # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
@@ -400,8 +391,7 @@ class GizmoClass(ut.io.SayClass):
         # initial particle indices[s] to assign to each species from each file
         part_indices_lo = np.zeros(len(species_names))
 
-        ### start reading properties for each species ###
-
+        ## start reading properties for each species ##
         # loop over all files at given snapshot
         for file_i in xrange(header['file.number.per.snapshot']):
             if file_i == 0:
@@ -451,7 +441,6 @@ class GizmoClass(ut.io.SayClass):
         ## end reading properties for each species ##
 
         ## start adjusting properties for each species ##
-
         # if species dark.2 contains several mass levels of dark matter, split into separate dicts
         spec_name = 'dark.2'
         if spec_name in part and 'mass' in part[spec_name]:
@@ -541,20 +530,20 @@ class GizmoClass(ut.io.SayClass):
                 part[spec_name]['temperature'] *= \
                     const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights / const.boltzmann
 
-        ## end adjusting properties for each species ##
-
         # sub-sample highest-resolution particles for smaller memory
         if particle_subsample_factor > 1:
             spec_names = ['dark', 'gas', 'star']
-            self.say('subsampling (periodically) %s particles by factor = %d\n' %
-                     (spec_names, particle_subsample_factor))
+            self.say('subsampling (periodically) %s particles by factor = %d' %
+                     (spec_names, particle_subsample_factor), end='\n\n')
             for spec_name in part:
                 if spec_name in spec_names:
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = \
                             part[spec_name][prop_name][::particle_subsample_factor]
-            print()
 
+        ## end adjusting properties for each species ##
+
+        ## assign auxilliary information ##
         # convert particle dictionary to generalized dictionary class to increase flexibility
         part_return = ut.array.DictClass()
         for spec_name in part:
@@ -673,10 +662,11 @@ class GizmoClass(ut.io.SayClass):
 
         self.say('assigning center position and velocity')
         print('    position: ', end='')
-        ut.io.print_array(part.center_position, '%.3f')
+        ut.io.print_array(part.center_position, '%.3f', end='')
+        print(' kpc comoving')
         print('    velocity: ', end='')
-        ut.io.print_array(part.center_velocity, '%.1f')
-        print()
+        ut.io.print_array(part.center_velocity, '%.1f', end='')
+        print(' km / sec')
 
 Gizmo = GizmoClass()
 
@@ -696,23 +686,23 @@ def assign_orbit(
     if np.isscalar(species):
         species = [species]
 
-    if not len(center_position) and len(part.center_position):
+    if (center_position is None or not len(center_position)) and len(part.center_position):
         center_position = part.center_position
 
-    if not len(center_velocity) and len(part.center_velocity):
+    if (center_velocity is None or not len(center_velocity)) and len(part.center_velocity):
         center_velocity = part.center_velocity
 
     for spec_name in species:
-        dist_vecs = ut.coord.distance(
+        distance_vecs = ut.coord.distance(
             'vector', part[spec_name]['position'], center_position, part.info['box.length'])
-        dist_vecs *= part.snapshot['scale-factor']  # convert to {kpc physical}
+        distance_vecs *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
-        vel_vecs = ut.coord.velocity_difference(
+        velocity_vecs = ut.coord.velocity_difference(
             'vector', center_velocity, part[spec_name]['velocity'], include_hubble_flow,
             center_position, part[spec_name]['position'], part.snapshot['scale-factor'],
             part.snapshot['time.hubble'], part.info['box.length'])
 
-        orb = ut.orbit.get_orbit_dictionary(dist_vecs, vel_vecs, get_integrals=False)
+        orb = ut.orbit.get_orbit_dictionary(distance_vecs, velocity_vecs, get_integrals=False)
 
         for k in orb:
             part[spec_name][k] = orb[k]

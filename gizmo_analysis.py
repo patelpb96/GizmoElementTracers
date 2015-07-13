@@ -6,6 +6,7 @@ Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc phys
 @author: Andrew Wetzel
 '''
 
+
 # system ----
 from __future__ import absolute_import, division, print_function
 import numpy as np
@@ -309,7 +310,7 @@ def plot_mass_contamination(
     plt.minorticks_on()
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
-    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig, subplot = plt.subplots(1, 1, num=1, sharex=True)
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(distance_lim)
@@ -398,8 +399,8 @@ def plot_metal_v_distance(
 
     pro_metal = DistanceBin.get_histogram_profile(distances, metal_masses, get_fraction=True)
     if 'metallicity' in plot_kind:
-        pro_mass = DistanceBin.get_histogram_profile(distances, part['gas']['mass'])
-        ys = pro_metal['mass'] / pro_mass['mass']
+        pro_mass = DistanceBin.get_histogram_profile(distances, part[species]['mass'])
+        ys = pro_metal['hist'] / pro_mass['hist']
         axis_y_lim = np.clip(plot.get_axis_limits(ys), 0.0001, 10)
     elif 'metal.mass.cum' in plot_kind:
         ys = pro_metal['fraction.cum']
@@ -430,7 +431,7 @@ def plot_metal_v_distance(
     if scale_to_halo_radius:
         x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
-        x_label = 'distance [$\\rm kpc\,comoving$]'
+        x_label = 'distance $[\\rm kpc\,physical]$'
 
     subplot.set_xlabel(x_label, fontsize=20)
 
@@ -448,7 +449,7 @@ def plot_metal_v_distance(
     # legend = subplot.legend(loc='best', prop=FontProperties(size=12))
     # legend.get_frame().set_alpha(0.7)
 
-    plt.tight_layout(pad=0.02)
+    #plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
@@ -466,8 +467,9 @@ def plot_metal_v_distance(
 # visualize
 #===================================================================================================
 def plot_positions(
-    part, species='dark', dimen_indices=[0, 1], distance_max=1000, distance_bin_wid=1,
-    center_position=[], subsample_factor=None, write_plot=False, plot_directory='.'):
+    part, species='dark', dimen_indices_plot=[0, 1], dimen_indices_select=[0, 1, 2],
+    distance_max=1000, distance_bin_wid=1, center_position=[],
+    subsample_factor=None, write_plot=False, plot_directory='.'):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
     3 panels for all axes.
@@ -476,7 +478,7 @@ def plot_positions(
     ----------
     part : dict : catalog of particles
     species : string : particle species to plot
-    dimen_indices : list : which dimensions to plot
+    dimen_indices_plot : list : which dimensions to plot
         if 2, plot one v other, if 3, plot all via 3 panels
     distance_max : float : maximum distance from center to plot
     distance_bin_wid : float : length of histogram bin
@@ -485,31 +487,35 @@ def plot_positions(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : where to put plot file
     '''
-    dimen_labels = {0: 'x', 1: 'y', 2: 'z'}
+    dimen_label = {0: 'x', 1: 'y', 2: 'z'}
+
+    if dimen_indices_select is None or not len(dimen_indices_select):
+        dimen_indices_select = dimen_indices_plot
 
     positions = [[] for _ in xrange(part[species]['position'].shape[1])]
-    for dimen_i in dimen_indices:
+    for dimen_i in dimen_indices_select:
         positions[dimen_i] = np.array(part[species]['position'][:, dimen_i])
 
     if subsample_factor > 1:
-        for dimen_i in dimen_indices:
+        for dimen_i in dimen_indices_select:
             positions[dimen_i] = positions[dimen_i][::subsample_factor]
 
     center_position = parse_center_positions(part, center_position)
 
     if center_position is not None and len(center_position):
-        masks = positions[dimen_indices[0]] < Inf
-        for dimen_i in dimen_indices:
+        masks = positions[dimen_indices_select[0]] < Inf  # initialize masks
+        for dimen_i in dimen_indices_select:
             positions[dimen_i] -= center_position[dimen_i]
             positions[dimen_i] *= part.snapshot['scale-factor']
             masks *= (positions[dimen_i] <= distance_max) * (positions[dimen_i] >= -distance_max)
 
-        for dimen_i in dimen_indices:
+        for dimen_i in dimen_indices_plot:
             positions[dimen_i] = positions[dimen_i][masks]
+
         masses = part[species]['mass'][masks]
     else:
         position_dif_max = 0
-        for dimen_i in dimen_indices:
+        for dimen_i in dimen_indices_plot:
             position_dif = np.max(positions[dimen_i]) - np.min(positions[dimen_i])
             if position_dif > position_dif_max:
                 position_dif_max = position_dif
@@ -522,25 +528,27 @@ def plot_positions(
     # plot ----------
     plt.clf()
 
-    if len(dimen_indices) == 2:
+    if len(dimen_indices_plot) == 2:
         plt.minorticks_on()
         fig = plt.figure(1)
         subplot = fig.add_subplot(111)
-        fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03)
+        fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
         subplot.set_xlim(position_lims[0])
         subplot.set_ylim(position_lims[1])
 
-        subplot.set_xlabel('position %s $[\\rm kpc\,physical]$' % dimen_labels[dimen_indices[0]])
-        subplot.set_ylabel('position %s $[\\rm kpc\,physical]$' % dimen_labels[dimen_indices[1]])
+        subplot.set_xlabel('position %s $[\\rm kpc\,physical]$' %
+                           dimen_label[dimen_indices_plot[0]])
+        subplot.set_ylabel('position %s $[\\rm kpc\,physical]$' %
+                           dimen_label[dimen_indices_plot[1]])
 
-        H = subplot.hist2d(positions[dimen_indices[0]], positions[dimen_indices[1]], weights=masses,
-                           range=position_lims, bins=position_bin_num, norm=LogNorm(),
-                           cmap=plt.cm.Greens)  # @UndefinedVariable
+        H = subplot.hist2d(positions[dimen_indices_plot[0]], positions[dimen_indices_plot[1]],
+                           weights=masses, range=position_lims, bins=position_bin_num,
+                           norm=LogNorm(), cmap=plt.cm.YlOrBr)  # @UndefinedVariable
 
         fig.colorbar(H[3])
 
-    elif len(dimen_indices) == 3:
+    elif len(dimen_indices_plot) == 3:
         #position_lims *= 0.99999  # ensure that tick labels do not overlap
         position_lims[0, 0] *= 0.9999
         position_lims[1, 0] *= 0.9999
@@ -549,9 +557,9 @@ def plot_positions(
         fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
 
         plot_dimen_iss = [
-            [dimen_indices[0], dimen_indices[1]],
-            [dimen_indices[0], dimen_indices[2]],
-            [dimen_indices[1], dimen_indices[2]],
+            [dimen_indices_plot[0], dimen_indices_plot[1]],
+            [dimen_indices_plot[0], dimen_indices_plot[2]],
+            [dimen_indices_plot[1], dimen_indices_plot[2]],
         ]
 
         subplot_iss = [
@@ -566,12 +574,12 @@ def plot_positions(
             subplot.set_ylim([position_lims[1, 0] * 0.9, position_lims[1, 1]])
 
             if subplot_is == [0, 0]:
-                subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[1]])
+                subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_label[plot_dimen_is[1]])
             elif subplot_is == [1, 0]:
-                subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[0]])
-                subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[1]])
+                subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_label[plot_dimen_is[0]])
+                subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_label[plot_dimen_is[1]])
             elif subplot_is == [1, 1]:
-                subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_labels[plot_dimen_is[0]])
+                subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_label[plot_dimen_is[0]])
 
             subplot.set_xlim(position_lims[0])
             subplot.set_ylim(position_lims[1])
@@ -579,14 +587,17 @@ def plot_positions(
             H = subplot.hist2d(
                 positions[plot_dimen_is[0]], positions[plot_dimen_is[1]], weights=masses,
                 range=position_lims, bins=position_bin_num, norm=LogNorm(),
-                cmap=plt.cm.Greens)  # @UndefinedVariable
+                cmap=plt.cm.YlOrBr)  # @UndefinedVariable
             #fig.colorbar(H[3])  #, ax=subplot)
 
     #plt.tight_layout(pad=0.02)
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        plot_name = 'test'
+        plot_name = '%s.position' % (species)
+        for dimen_i in dimen_indices_plot:
+            plot_name += '.%s' % dimen_label[dimen_i]
+        plot_name += '_d.%.0f_z.%0.1f.pdf' % (distance_max, part.snapshot['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
     else:
         plt.show(block=False)
@@ -663,8 +674,8 @@ def plot_property_distribution(
     plt.minorticks_on()
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
-    #fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    #fig, subplot = plt.subplots(1, 1, num=1, sharex=True)
+    fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(prop_lim)
     y_vals = [Stat.distr[prop_statistic][part_i] for part_i in xrange(len(parts))]
@@ -844,7 +855,7 @@ def plot_property_v_distance(
     plt.minorticks_on()
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
-    #fig, subplot = plt.subplots(1, 1, sharex=True)
+    #fig, subplot = plt.subplots(1, 1, num=1, sharex=True)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(distance_lim)
@@ -1020,8 +1031,8 @@ def plot_star_form_history(
     plt.minorticks_on()
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
-    #fig, subplot = plt.subplots(1, 1, sharex=True)
-    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03)
+    #fig, subplot = plt.subplots(1, 1, num=1, sharex=True)
+    fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(time_lim)
     subplot.set_ylim(plot.get_axis_limits(sfrs, 'log'))
@@ -1079,7 +1090,17 @@ def get_galaxy_mass_v_redshift(
     directory='.',
     redshifts=[3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0]):
     '''
-    .
+    Read snapshots and store dictionary of galaxy/halo position, velocity, size, mass at input
+    scale-factors.
+
+    Parameters
+    ----------
+    directory : string : directory of snapshot files
+    redshifts : array-like : redshifts at which to get properties
+
+    Returns
+    -------
+    dictionary of galaxy/halo properties at each redshift
     '''
     from . import gizmo_io
 
@@ -1103,12 +1124,13 @@ def get_galaxy_mass_v_redshift(
 
     for redshift in redshifts:
         part = gizmo_io.Gizmo.read_snapshot(
-            species, 'redshift', redshift, directory, property_names, metal_index_max=1,
-            force_float32=True)
+            species, 'redshift', redshift, directory, property_names, force_float32=True)
         part.center_position = ut.particle.get_center_position(part, 'star')
 
-        gal_radius = ut.particle.get_galaxy_radius(part, [], 50, 30)
-        hal_radius = ut.particle.get_halo_radius(part, species, virial_kind='200m')
+        gal_radius = ut.particle.get_galaxy_radius(part, None, 50, 30)
+        #hal_radius = ut.particle.get_halo_radius(part, species, virial_kind='200m')
+        #hal_radius *= 0.5
+        hal_radius = 50  # shortcut for larger runs
 
         for k in ['redshift', 'scale-factor', 'time']:
             gal[k].append(part.snapshot[k])
@@ -1117,10 +1139,10 @@ def get_galaxy_mass_v_redshift(
         gal['star.velocity'].append(
             ut.particle.get_center_velocity(part, 'star', radius_max=gal_radius))
         gal['dark.velocity'].append(
-            ut.particle.get_center_velocity(part, 'dark', radius_max=hal_radius / 2))
+            ut.particle.get_center_velocity(part, 'dark', radius_max=hal_radius))
 
         for mass_percent in mass_percents:
-            gal_radius = ut.particle.get_galaxy_radius(part, [], mass_percent, 30)
+            gal_radius = ut.particle.get_galaxy_radius(part, None, mass_percent, 30)
             gal['radius.%.0f' % mass_percent].append(gal_radius)
 
             for spec in species:
@@ -1139,31 +1161,32 @@ def get_galaxy_mass_v_redshift(
 
 def print_galaxy_mass_v_redshift(gal):
     '''
+    Print galaxy/halo position, velocity, size, mass over time for Shea.
+
     Parameters
     ----------
     gal : dict : dictionary of galaxy properties across snapshots
     '''
-    print('# redshift scale_factor time[Gyr] ', end='')
+    print('# redshift scale-factor time[Gyr] ', end='')
     print('star_position(x,y,z)[kpc comov] ', end='')
     print('star_velocity(x,y,z)[km/s phys] dark_velocity(x,y,z)[km/s phys] ', end='')
     print('r_50[kpc phys] star_mass_50[M_sun] gas_mass_50[M_sun] dark_mass_50[M_sun] ', end='')
-    print('r_90[kpc phys] star_mass_90[M_sun] gas_mass_90[M_sun] dark_mass_90[M_sun]', end='')
-    print()
-    for i in xrange(gal['redshift'].size):
+    print('r_90[kpc phys] star_mass_90[M_sun] gas_mass_90[M_sun] dark_mass_90[M_sun]', end='\n')
+
+    for ti in xrange(gal['redshift'].size):
         print('%.5f %.5f %.5f ' %
-              (gal['redshift'][i], gal['scale-factor'][i], gal['time'][i]), end='')
+              (gal['redshift'][ti], gal['scale-factor'][ti], gal['time'][ti]), end='')
         print('%.3f %.3f %.3f ' %
-              (gal['position'][i][0], gal['position'][i][1], gal['position'][i][2]), end='')
+              (gal['position'][ti][0], gal['position'][ti][1], gal['position'][ti][2]), end='')
         print('%.3f %.3f %.3f ' %
-              (gal['star.velocity'][i][0], gal['star.velocity'][i][1], gal['star.velocity'][i][2]),
-              end='')
+              (gal['star.velocity'][ti][0], gal['star.velocity'][ti][1],
+               gal['star.velocity'][ti][2]), end='')
         print('%.3f %.3f %.3f ' %
-              (gal['dark.velocity'][i][0], gal['dark.velocity'][i][1], gal['dark.velocity'][i][2]),
-              end='')
+              (gal['dark.velocity'][ti][0], gal['dark.velocity'][ti][1],
+               gal['dark.velocity'][ti][2]), end='')
         print('%.3e %.3e %.3e %.3e ' %
-              (gal['radius.50'][i], gal['star.mass.50'][i], gal['gas.mass.50'][i],
-               gal['dark.mass.50'][i]), end='')
+              (gal['radius.50'][ti], gal['star.mass.50'][ti], gal['gas.mass.50'][ti],
+               gal['dark.mass.50'][ti]), end='')
         print('%.3e %.3e %.3e %.3e' %
-              (gal['radius.90'][i], gal['star.mass.90'][i], gal['gas.mass.90'][i],
-               gal['dark.mass.90'][i]), end='')
-        print()
+              (gal['radius.90'][ti], gal['star.mass.90'][ti], gal['gas.mass.90'][ti],
+               gal['dark.mass.90'][ti]), end='\n')
