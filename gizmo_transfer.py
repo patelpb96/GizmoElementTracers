@@ -15,17 +15,18 @@ import sys
 import numpy as np
 # local ----
 from utilities import utility as ut
+from utilities import simulation
 
 
 def sync_snapshots(
-    machine_name='stampede', directory='$STAMPEDE_SCRATCH/m12i_ref12_rad4_wk-area/output',
+    machine_name='stampede', from_directory='$STAMPEDE_SCRATCH/m12i_ref12_rad4_wk-area/output',
     snapshot_kind='file', snapshot_indices=400, to_directory='.'):
     '''
     machine_name : string : name of host machine
-    directory : string : directory of snapshot file on host machine
-    snapshot_kind : string : 'file' or 'directory'
+    from_directory : string : from_directory of snapshot file on host machine
+    snapshot_kind : string : 'file' or 'from_directory'
     snapshot indices : int or list : index[s] of snapshots
-    to_directory : string : local directory to put snapshots
+    to_directory : string : local from_directory to put snapshots
     '''
     if snapshot_kind == 'file':
         snapshot_name_base = 'snapshot_%.3d.hdf5'
@@ -35,13 +36,13 @@ def sync_snapshots(
         raise ValueError('not recognize snapshot_kind = %s' % snapshot_kind)
 
     #if machine_name == 'stampede':
-    #    directory = '$STAMPEDE_SCRATCH/' + directory
+    #    from_directory = '$STAMPEDE_SCRATCH/' + from_directory
     #elif machine_name == 'zwicky':
-    #    directory = '$ZWICKY_SCRATCH/' + directory
+    #    from_directory = '$ZWICKY_SCRATCH/' + from_directory
     #elif machine_name == 'ranch':
-    #    directory = '$RANCH_HOME/stampede/' + directory
+    #    from_directory = '$RANCH_HOME/stampede/' + from_directory
 
-    directory = ut.io.get_path(directory)
+    from_directory = ut.io.get_path(from_directory)
 
     if np.isscalar(snapshot_indices):
         snapshot_indices = [snapshot_indices]
@@ -49,7 +50,7 @@ def sync_snapshots(
     for snapshot_index in snapshot_indices:
         snapshot_name = snapshot_name_base % snapshot_index
         os.system('rsync -ahvPz %s:%s%s %s' %
-                  (machine_name, directory, snapshot_name, to_directory))
+                  (machine_name, from_directory, snapshot_name, to_directory))
 
 
 #===================================================================================================
@@ -58,11 +59,14 @@ def sync_snapshots(
 if __name__ == '__main__':
 
     if len(sys.argv) < 5:
-        raise ValueError('must specify function kind: runtime, contamination, delete')
+        raise ValueError('imports: machine_name, directory, snapshot_kind, snapshot_time_file_name')
 
     machine_name = str(sys.argv[1])
-    directory = str(sys.argv[2])
+    from_directory = str(sys.argv[2])
     snapshot_kind = str(sys.argv[3])
-    snapshot_index = int(sys.argv[4])
+    snapshot_time_file_name = str(sys.argv[4])
 
-    sync_snapshots(machine_name, directory, snapshot_kind, snapshot_index)
+    Snapshot = simulation.SnapshotClass()
+    Snapshot.read_snapshots('../', snapshot_time_file_name)
+
+    sync_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])
