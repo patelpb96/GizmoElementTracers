@@ -603,7 +603,8 @@ class GizmoClass(ut.io.SayClass):
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
-            raise ValueError('cannot find snapshot index = %d in: %s' % path_names)
+            raise ValueError('cannot find snapshot index = %d in: %s' %
+                             (snapshot_index, path_names))
 
         path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
 
