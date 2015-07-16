@@ -176,7 +176,7 @@ class GizmoClass(ut.io.SayClass):
 
             ## star particles ##
             ## 'time' when star particle formed
-            ## for cosmological runs, = scale factor; for non-cosmological runs, = time {Gyr / h}
+            ## for cosmological runs, = scale-factor; for non-cosmological runs, = time {Gyr / h}
             'StellarFormationTime': 'form.time',
 
             ## black hole particles ##
@@ -497,7 +497,7 @@ class GizmoClass(ut.io.SayClass):
                 part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
 
             if 'velocity' in part[spec_name]:
-                # convert to {km / s physical}
+                # convert to {km / sec physical}
                 part[spec_name]['velocity'] *= np.sqrt(header['scale-factor'])
 
             if 'density' in part[spec_name]:

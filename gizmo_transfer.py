@@ -47,10 +47,11 @@ def sync_snapshots(
     if np.isscalar(snapshot_indices):
         snapshot_indices = [snapshot_indices]
 
+    snapshot_path_names = ''
     for snapshot_index in snapshot_indices:
-        snapshot_name = snapshot_name_base % snapshot_index
-        os.system('rsync -ahvPz %s:%s%s %s' %
-                  (machine_name, from_directory, snapshot_name, to_directory))
+        snapshot_path_names += from_directory + snapshot_name_base % snapshot_index + ' '
+
+    os.system('rsync -ahvPz %s:"%s" %s' % (machine_name, snapshot_path_names, to_directory))
 
 
 #===================================================================================================
@@ -59,7 +60,7 @@ def sync_snapshots(
 if __name__ == '__main__':
 
     if len(sys.argv) < 5:
-        raise ValueError('imports: machine_name, directory, snapshot_kind, snapshot_time_file_name')
+        raise ValueError('imports: machine_name directory snapshot_kind snapshot_time_file_name')
 
     machine_name = str(sys.argv[1])
     from_directory = str(sys.argv[2])
