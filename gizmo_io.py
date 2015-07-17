@@ -1,5 +1,5 @@
 '''
-Read Gizmo/Gadget snapshots.
+Read Gizmo snapshots.
 
 Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
 
@@ -21,7 +21,7 @@ from utilities import simulation
 
 class GizmoClass(ut.io.SayClass):
     '''
-    Read in gizmo/gadget snapshots.
+    Read Gizmo snapshots.
     '''
     def __init__(
         self, snapshot_name_base='snap*', file_extension='.hdf5'):
@@ -43,12 +43,11 @@ class GizmoClass(ut.io.SayClass):
         sort_dark_by_id=True, force_float32=False, assign_center=True, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
-        Return as dictionary.
+        Return as dictionary class.
 
         Parameters
         ----------
-        species_types : string or int, or list of these : type[s] of particle species
-            options:
+        species_types : string or int, or list of these : type[s] of particle species - options:
             'all' = all species in file
             0 or gas = gas
             1 or dark = dark matter at highest resolution
@@ -61,8 +60,7 @@ class GizmoClass(ut.io.SayClass):
         snapshot_number_kind : string : input snapshot number kind: index, redshift
         snapshot_number : int or float : index (number) of snapshot file
         directory: string : directory of snapshot file
-        property_names : string or list : name[s] of particle properties to read
-            options:
+        property_names : string or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_name_dict
         property_names_exclude : string or list : name[s] of particle properties not to read
@@ -78,7 +76,7 @@ class GizmoClass(ut.io.SayClass):
 
         Returns
         -------
-        generalized dictionary class, with keys for each species
+        dictionary class, with keys for each species
         '''
         # connects particle species name to id, and determines all possible species types
         species_name_dict = {

@@ -1,5 +1,5 @@
 '''
-Analysis of Gizmo simulations.
+Analyze Gizmo simulations.
 
 Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
 
@@ -1127,7 +1127,7 @@ def get_galaxy_mass_v_redshift(
             species, 'redshift', redshift, directory, property_names, force_float32=True)
         part.center_position = ut.particle.get_center_position(part, 'star')
 
-        gal_radius = ut.particle.get_galaxy_radius(part, None, 50, 30)
+        gal_radius = ut.particle.get_galaxy_radius(part, None, 'mass.percent', 50)
         #hal_radius = ut.particle.get_halo_radius(part, species, virial_kind='200m')
         #hal_radius *= 0.5
         hal_radius = 50  # shortcut for larger runs
@@ -1142,7 +1142,7 @@ def get_galaxy_mass_v_redshift(
             ut.particle.get_center_velocity(part, 'dark', radius_max=hal_radius))
 
         for mass_percent in mass_percents:
-            gal_radius = ut.particle.get_galaxy_radius(part, None, mass_percent, 30)
+            gal_radius = ut.particle.get_galaxy_radius(part, None, 'mass.percent', mass_percent)
             gal['radius.%.0f' % mass_percent].append(gal_radius)
 
             for spec in species:
