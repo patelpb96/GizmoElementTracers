@@ -71,6 +71,7 @@ def get_species_histogram_profiles(
     ----------
     part : dict : catalog of particles
     species : string or list : species to compute total mass of
+    prop_name : string : property to get histogram of
     center_position : list : center position
     DistanceBin : class : distance bin class
     '''
@@ -192,7 +193,7 @@ def get_species_statistics_profiles(
         species = [species]
 
     if species == ['all'] or species == ['total']:
-        species = ['dark', 'gas', 'star', 'dark.2']
+        species = ['dark', 'gas', 'star', 'dark.2', 'dark.3']
         #species = part.keys()
     elif species == ['baryon']:
         species = ['gas', 'star']
@@ -1190,113 +1191,3 @@ def print_galaxy_mass_v_redshift(gal):
         print('%.3e %.3e %.3e %.3e' %
               (gal['radius.90'][ti], gal['star.mass.90'][ti], gal['gas.mass.90'][ti],
                gal['dark.mass.90'][ti]), end='\n')
-
-
-#===================================================================================================
-# code performance for XSEDE application
-#===================================================================================================
-def plot_scaling(
-    plot_kind='mfm_ref14', time_kind='cpu', axis_x_scaling='log', axis_y_scaling='lin',
-    write_plot=False, plot_directory='.'):
-    '''
-    .
-    '''
-    Say = ut.io.SayClass(plot_scaling)
-
-    dark = {
-        'ref12': {'particle.num': 8.82e6, 'cpu.num': 128, 'cpu.time': 3078, 'wall.time': 24.0},
-        'ref13': {'particle.num': 7.05e7, 'cpu.num': 512, 'cpu.time': 7135, 'wall.time': 13.9},
-        'ref14': {'particle.num': 5.64e8, 'cpu.num': 2048, 'cpu.time': 154355, 'wall.time': 75.4},
-    }
-
-    mfm = {
-        'ref12': {'particle.num': 8.82e6 * 2, 'cpu.num': 512, 'cpu.time': 116482, 'wall.time': 228},
-        'ref13': {'particle.num': 7.05e7 * 2, 'cpu.num': 2048, 'cpu.time': 1322781,
-                  'wall.time': 646},
-        #'ref14': {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'cpu.time': 568228,
-        #          'wall.time': 69.4},
-        # projected
-        'ref14': {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'cpu.time': 1.95e7,
-                  'wall.time': 2380},
-    }
-
-    mfm_ref14 = {
-        2048: {'particle.num': 5.64e8 * 2, 'cpu.num': 2048, 'wall.time': 15.55, 'cpu.time': 31850},
-        4096: {'particle.num': 5.64e8 * 2, 'cpu.num': 4096, 'wall.time': 8.64, 'cpu.time': 35389},
-        8192: {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'wall.time': 4.96, 'cpu.time': 40632},
-        16384: {'particle.num': 5.64e8 * 2, 'cpu.num': 16384, 'wall.time': 4.57, 'cpu.time': 74875},
-    }
-
-    # plot ----------
-    plt.clf()
-    plt.minorticks_on()
-    fig = plt.figure(1)
-    subplot = fig.add_subplot(111)
-    fig.subplots_adjust(left=0.21, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
-
-    plot_func = plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
-
-    if plot_kind == 'mfm_ref14':
-        cpu_nums = [k for k in mfm_ref14]
-        # 2x == convert from a = 0.068 to a = 0.1
-        if time_kind == 'cpu':
-            times = [mfm_ref14[k]['cpu.time'] * 2 for k in mfm_ref14]
-        elif time_kind == 'wall':
-            times = [mfm_ref14[k]['wall.time'] * 2 for k in mfm_ref14]
-
-        subplot.set_xlim([1e3, 2e4])
-        subplot.set_xlabel('core number')
-
-        if time_kind == 'cpu':
-            subplot.set_ylim([0, 2e5])
-            subplot.set_ylabel('CPU time to $z = 9$ [hr]')
-        elif time_kind == 'wall':
-            subplot.set_ylim([0, 35])
-            subplot.set_ylabel('wall time to $z = 9$ [hr]')
-
-        plot_func(cpu_nums, times, '*-', linewidth=2.0, color='blue')
-
-        subplot.text(0.05, 0.1, 'mfm_ref14 scaling:\nparticle number = 1.1e9', color='black',
-                     transform=subplot.transAxes)
-
-    elif plot_kind == 'weak':
-        dm_particle_nums = np.array([dark[k]['particle.num'] for k in sorted(dark.keys())])
-        mfm_particle_nums = np.array([mfm[k]['particle.num'] for k in sorted(mfm.keys())])
-
-        if time_kind == 'cpu':
-            dm_times = np.array([dark[k]['cpu.time'] for k in sorted(dark.keys())])
-            mfm_times = np.array([mfm[k]['cpu.time'] for k in sorted(mfm.keys())])
-        elif time_kind == 'wall':
-            ratio_ref = mfm['ref14']['particle.num'] / mfm['ref14']['cpu.num']
-            dm_times = np.array([dark[k]['wall.time'] *
-                                 ratio_ref / (dark[k]['particle.num'] / dark[k]['cpu.num'])
-                                 for k in sorted(dark.keys())])
-            mfm_times = np.array([mfm[k]['wall.time'] *
-                                  ratio_ref / (mfm[k]['particle.num'] / mfm[k]['cpu.num'])
-                                  for k in sorted(mfm.keys())])
-
-        subplot.set_xlim([6e6, 1.5e9])
-        subplot.set_xlabel('particle number')
-
-        if time_kind == 'cpu':
-            subplot.set_ylim([1e3, 4e7])
-            subplot.set_ylabel('CPU time to $z = 0$ [hr]')
-        elif time_kind == 'wall':
-            subplot.set_ylim([10, 4000])
-            subplot.set_ylabel('wall time to $z = 0$ [hr]')
-            subplot.text(0.05, 0.5,
-                         'weak scaling:\nfixed particle number / core = %.1e' % ratio_ref,
-                         color='black', transform=subplot.transAxes)
-
-        plot_func(dm_particle_nums, dm_times, 'x-', linewidth=2.0, color='red')
-        plot_func(mfm_particle_nums[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
-        plot_func(mfm_particle_nums[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
-                  alpha=0.7)
-
-    if write_plot:
-        plot_directory = ut.io.get_path(plot_directory)
-        plot_name = 'test.pdf'
-        plt.savefig(plot_directory + plot_name, format='pdf')
-        Say.say('wrote %s' % plot_directory + plot_name)
-    else:
-        plt.show(block=False)

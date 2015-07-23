@@ -15,8 +15,14 @@ import sys
 import glob
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
+import matplotlib.pyplot as plt
 # local ----
 from utilities import utility as ut
+from utilities import constants as const
+from utilities import plot
+from utilities import simulation
+from . import gizmo_io
+from . import gizmo_analysis
 
 
 #===================================================================================================
@@ -164,9 +170,6 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
     directory : string : directory of simulation (one level above directory of snapshot file)
     snapshot_redshift : float : redshift of snapshot file
     '''
-    from . import gizmo_io
-    from . import gizmo_analysis
-
     position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
     radius_bin_wid = 0.02
     radius_lim_phys = [1, 4000]  # {kpc physical}
@@ -206,6 +209,75 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
         scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
 
 
+def print_property_statitics_across_snapshots(
+    simulation_directory='.', species_property_dict={'gas': ['smooth.length', 'density']}):
+    '''
+    .
+    '''
+    Say = ut.io.SayClass(print_property_statitics_across_snapshots)
+
+    property_statistic = {
+        'smooth.length': {'function.name': 'min', 'function': np.min},
+        'density': {'function.name': 'max', 'function': np.max},
+    }
+
+    simulation_directory = ut.io.get_path(simulation_directory)
+
+    Snapshot = simulation.SnapshotClass()
+    Snapshot.read_snapshots(simulation_directory)
+
+    Snapshot['index'] = [114, 184, 400]
+
+    species_read = species_property_dict.keys()
+
+    properties_read = []
+    for spec_name in species_property_dict:
+        prop_names = species_property_dict[spec_name]
+        if np.isscalar(prop_names):
+            prop_names = [prop_names]
+
+        prop_dict = {}
+        for prop_name in species_property_dict[spec_name]:
+            prop_dict[prop_name] = []
+
+            if prop_name not in properties_read:
+                properties_read.append(prop_name)
+
+        # re-assign property list as dictionary so can store list of values
+        species_property_dict[spec_name] = prop_dict
+
+    for snapshot_i in Snapshot['index']:
+        part = gizmo_io.Gizmo.read_snapshot(
+            species_read, 'index', snapshot_i, simulation_directory + 'output', properties_read,
+            sort_dark_by_id=False, force_float32=True, assign_center=False)
+
+        for spec_name in species_property_dict:
+            for prop_name in species_property_dict[spec_name]:
+                if prop_name in part[spec_name]:
+                    prop_ext = property_statistic[prop_name]['function'](part[spec_name][prop_name])
+                    species_property_dict[spec_name][prop_name].append(prop_ext)
+                else:
+                    Say.say('! %s %s not in particle dictionary!' % (spec_name, prop_name))
+
+    Statistic = ut.math.StatisticClass()
+
+    for spec_name in species_property_dict:
+        for prop_name in species_property_dict[spec_name]:
+            prop_func_name = property_statistic[prop_name]['function.name']
+            prop_values = np.array(species_property_dict[spec_name][prop_name])
+
+            if 'gas' in spec_name and 'density' in prop_name:
+                prop_values *= const.proton_per_sun * const.kpc_per_cm ** 3  # convert to {cm ^ -3}
+
+            Statistic.stat = Statistic.get_statistic_dict(prop_values)
+
+            Say.say('\n%s %s %s:' % (spec_name, prop_name, prop_func_name))
+            for stat_name in ['min', 'median.16', 'median', 'max', 'median.84', 'max']:
+                Say.say('%10s = %.3f' % (stat_name, Statistic.stat[stat_name]))
+
+            #Statistic.print_statistics()
+
+
 #===================================================================================================
 # simulation utility
 #===================================================================================================
@@ -235,6 +307,116 @@ def delete_snapshots(directory='.'):
 
             if not keep:
                 os.system('rm -rf %s' % snapshot_name)
+
+
+#===================================================================================================
+# code performance and scaling
+#===================================================================================================
+def plot_scaling(
+    plot_kind='strong', time_kind='cpu', axis_x_scaling='log', axis_y_scaling='lin',
+    write_plot=False, plot_directory='.'):
+    '''
+    .
+    '''
+    Say = ut.io.SayClass(plot_scaling)
+
+    dark = {
+        'ref12': {'particle.num': 8.82e6, 'cpu.num': 64, 'cpu.time': 385, 'wall.time': 6.0},
+        'ref13': {'particle.num': 7.05e7, 'cpu.num': 512, 'cpu.time': 7135, 'wall.time': 13.9},
+        'ref14': {'particle.num': 5.64e8, 'cpu.num': 2048, 'cpu.time': 154355, 'wall.time': 75.4},
+    }
+
+    mfm = {
+        'ref12': {'particle.num': 8.82e6 * 2, 'cpu.num': 512, 'cpu.time': 116482, 'wall.time': 228},
+        'ref13': {'particle.num': 7.05e7 * 2, 'cpu.num': 2048, 'cpu.time': 1322781,
+                  'wall.time': 646},
+        #'ref14': {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'cpu.time': 568228,
+        #          'wall.time': 69.4},
+        # projected
+        'ref14': {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'cpu.time': 1.95e7,
+                  'wall.time': 2380},
+    }
+
+    mfm_ref14 = {
+        2048: {'particle.num': 5.64e8 * 2, 'cpu.num': 2048, 'wall.time': 15.55, 'cpu.time': 31850},
+        4096: {'particle.num': 5.64e8 * 2, 'cpu.num': 4096, 'wall.time': 8.64, 'cpu.time': 35389},
+        8192: {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'wall.time': 4.96, 'cpu.time': 40632},
+        16384: {'particle.num': 5.64e8 * 2, 'cpu.num': 16384, 'wall.time': 4.57, 'cpu.time': 74875},
+    }
+
+    # plot ----------
+    plt.clf()
+    plt.minorticks_on()
+    fig = plt.figure(1)
+    subplot = fig.add_subplot(111)
+    fig.subplots_adjust(left=0.21, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
+
+    plot_func = plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
+
+    if plot_kind == 'strong':
+        cpu_nums = [k for k in mfm_ref14]
+        # 2x == convert from a = 0.068 to a = 0.1
+        if time_kind == 'cpu':
+            times = [mfm_ref14[k]['cpu.time'] * 2 for k in mfm_ref14]
+        elif time_kind == 'wall':
+            times = [mfm_ref14[k]['wall.time'] * 2 for k in mfm_ref14]
+
+        subplot.set_xlim([1e3, 2e4])
+        subplot.set_xlabel('core number')
+
+        if time_kind == 'cpu':
+            subplot.set_ylim([0, 2e5])
+            subplot.set_ylabel('CPU time to $z = 9$ [hr]')
+        elif time_kind == 'wall':
+            subplot.set_ylim([0, 35])
+            subplot.set_ylabel('wall time to $z = 9$ [hr]')
+
+        plot_func(cpu_nums, times, '*-', linewidth=2.0, color='blue')
+
+        subplot.text(0.05, 0.1, 'mfm_ref14 scaling:\nparticle number = 1.1e9', color='black',
+                     transform=subplot.transAxes)
+
+    elif plot_kind == 'weak':
+        dm_particle_nums = np.array([dark[k]['particle.num'] for k in sorted(dark.keys())])
+        mfm_particle_nums = np.array([mfm[k]['particle.num'] for k in sorted(mfm.keys())])
+
+        if time_kind == 'cpu':
+            dm_times = np.array([dark[k]['cpu.time'] for k in sorted(dark.keys())])
+            mfm_times = np.array([mfm[k]['cpu.time'] for k in sorted(mfm.keys())])
+        elif time_kind == 'wall':
+            ratio_ref = mfm['ref14']['particle.num'] / mfm['ref14']['cpu.num']
+            dm_times = np.array([dark[k]['wall.time'] *
+                                 ratio_ref / (dark[k]['particle.num'] / dark[k]['cpu.num'])
+                                 for k in sorted(dark.keys())])
+            mfm_times = np.array([mfm[k]['wall.time'] *
+                                  ratio_ref / (mfm[k]['particle.num'] / mfm[k]['cpu.num'])
+                                  for k in sorted(mfm.keys())])
+
+        subplot.set_xlim([6e6, 1.5e9])
+        subplot.set_xlabel('particle number')
+
+        if time_kind == 'cpu':
+            subplot.set_ylim([2e2, 4e7])
+            subplot.set_ylabel('CPU time to $z = 0$ [hr]')
+        elif time_kind == 'wall':
+            subplot.set_ylim([4, 4000])
+            subplot.set_ylabel('wall time to $z = 0$ [hr]')
+            subplot.text(0.05, 0.5,
+                         'weak scaling:\nfixed particle number / core = %.1e' % ratio_ref,
+                         color='black', transform=subplot.transAxes)
+
+        plot_func(dm_particle_nums, dm_times, '.-', linewidth=2.0, color='red')
+        plot_func(mfm_particle_nums[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
+        plot_func(mfm_particle_nums[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
+                  alpha=0.7)
+
+    if write_plot:
+        plot_directory = ut.io.get_path(plot_directory)
+        plot_name = 'test.pdf'
+        plt.savefig(plot_directory + plot_name, format='pdf')
+        Say.say('wrote %s' % plot_directory + plot_name)
+    else:
+        plt.show(block=False)
 
 
 #===================================================================================================
