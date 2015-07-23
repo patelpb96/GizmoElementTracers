@@ -226,8 +226,6 @@ def print_property_statitics_across_snapshots(
     Snapshot = simulation.SnapshotClass()
     Snapshot.read_snapshots(simulation_directory)
 
-    Snapshot['index'] = [114, 184, 400]
-
     species_read = species_property_dict.keys()
 
     properties_read = []
