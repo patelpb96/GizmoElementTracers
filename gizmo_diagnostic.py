@@ -185,16 +185,18 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
     center_position_dark_cm = ut.particle.get_center_position(part, 'dark')
     center_pos_dark_pot = part['dark']['position'][np.argmin(part['dark']['potential'])]
 
-    print('# dark center position {kpc comoving}')
+    print('# dark center position [kpc comoving]')
     print('  center-of-mass: ', end='')
     ut.io.print_array(center_position_dark_cm, '%.3f')
-    print('  potential min:  ', end='')
-    ut.io.print_array(center_pos_dark_pot, '%.3f')
 
-    for dimen_i in xrange(center_position_dark_cm.size):
-        position_dif = np.abs(center_position_dark_cm[dimen_i] - center_pos_dark_pot[dimen_i])
-        if position_dif > position_dif_max:
-            print('! position-%d offset = %.3f' % (dimen_i, position_dif))
+    if 'potential' in part['dark']:
+        print('  potential min:  ', end='')
+        ut.io.print_array(center_pos_dark_pot, '%.3f')
+
+        for dimen_i in xrange(center_position_dark_cm.size):
+            position_dif = np.abs(center_position_dark_cm[dimen_i] - center_pos_dark_pot[dimen_i])
+            if position_dif > position_dif_max:
+                print('! position-%d offset = %.3f' % (dimen_i, position_dif))
 
     part.center_position = center_position_dark_cm
 
@@ -210,9 +212,13 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
 
 
 def print_property_statitics_across_snapshots(
-    simulation_directory='.', species_property_dict={'gas': ['smooth.length', 'density']}):
+    directory='.', species_property_dict={'gas': ['smooth.length', 'density']}):
     '''
-    .
+    Read every snapshot.
+    For each input properties, print statistics of its extrema across all snapshots.
+
+    directory : string : directory of simulation (one level above directory of snapshot file)
+    species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
     Say = ut.io.SayClass(print_property_statitics_across_snapshots)
 
@@ -221,10 +227,10 @@ def print_property_statitics_across_snapshots(
         'density': {'function.name': 'max', 'function': np.max},
     }
 
-    simulation_directory = ut.io.get_path(simulation_directory)
+    directory = ut.io.get_path(directory)
 
     Snapshot = simulation.SnapshotClass()
-    Snapshot.read_snapshots(simulation_directory)
+    Snapshot.read_snapshots(directory)
 
     species_read = species_property_dict.keys()
 
@@ -246,7 +252,7 @@ def print_property_statitics_across_snapshots(
 
     for snapshot_i in Snapshot['index']:
         part = gizmo_io.Gizmo.read_snapshot(
-            species_read, 'index', snapshot_i, simulation_directory + 'output', properties_read,
+            species_read, 'index', snapshot_i, directory + 'output', properties_read,
             sort_dark_by_id=False, force_float32=True, assign_center=False)
 
         for spec_name in species_property_dict:
