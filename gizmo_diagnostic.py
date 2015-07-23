@@ -183,13 +183,13 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
         ['position', 'mass', 'potential'], force_float32=True, assign_center=False)
 
     center_position_dark_cm = ut.particle.get_center_position(part, 'dark')
-    center_pos_dark_pot = part['dark']['position'][np.argmin(part['dark']['potential'])]
 
     print('# dark center position [kpc comoving]')
     print('  center-of-mass: ', end='')
     ut.io.print_array(center_position_dark_cm, '%.3f')
 
     if 'potential' in part['dark']:
+        center_pos_dark_pot = part['dark']['position'][np.argmin(part['dark']['potential'])]
         print('  potential min:  ', end='')
         ut.io.print_array(center_pos_dark_pot, '%.3f')
 
