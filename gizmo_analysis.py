@@ -572,7 +572,7 @@ def plot_positions(
         for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
             subplot_is = subplot_iss[plot_i]
             subplot = subplots[subplot_is[0], subplot_is[1]]
-            subplot.set_ylim([position_lims[1, 0] * 0.9, position_lims[1, 1]])
+            subplot.set_ylim([position_lims[1, 0], position_lims[1, 1]])
 
             if subplot_is == [0, 0]:
                 subplot.set_ylabel('%s $[\\rm kpc\,phys]$' % dimen_label[plot_dimen_is[1]])
@@ -716,8 +716,8 @@ def plot_property_distribution(
 
 def plot_property_v_property(
     part, species='gas',
-    prop_x_name='density', prop_x_scaling='log', prop_x_lim=[],
-    prop_y_name='temperature', prop_y_scaling='log', prop_y_lim=[],
+    x_prop_name='density', x_prop_scaling='log', x_prop_lim=[],
+    y_prop_name='temperature', y_prop_scaling='log', y_prop_lim=[],
     prop_bin_num=200, center_position=[], distance_lim=[20, 300],
     write_plot=False, plot_directory='.'):
     '''
@@ -727,10 +727,10 @@ def plot_property_v_property(
     ----------
     part : dict : catalog of particles at snapshot
     species : string : particle species
-    prop_x_name : string : property name for x-axis
-    prop_x_scaling : string : lin or log
-    prop_y_name : string : property name for y-axis
-    prop_y_scaling : string : lin or log
+    x_prop_name : string : property name for x-axis
+    x_prop_scaling : string : lin or log
+    y_prop_name : string : property name for y-axis
+    y_prop_scaling : string : lin or log
     center_position : array : position of galaxy center
     distance_lim : list : min and max limits for distance from galaxy
     write_plot : boolean : whether to write plot to file
@@ -744,26 +744,26 @@ def plot_property_v_property(
         distances *= part.snapshot['scale-factor']
         masks = ut.array.elements(distances, distance_lim)
     else:
-        masks = np.arange(part[species][prop_x_name].size, dtype=np.int32)
+        masks = np.arange(part[species][x_prop_name].size, dtype=np.int32)
 
-    prop_x_vals = part[species][prop_x_name][masks]
-    prop_y_vals = part[species][prop_y_name][masks]
+    x_prop_vals = part[species][x_prop_name][masks]
+    y_prop_vals = part[species][y_prop_name][masks]
 
-    if prop_x_lim:
-        indices = ut.array.elements(prop_x_vals, prop_x_lim)
-        prop_x_vals = prop_x_vals[indices]
-        prop_y_vals = prop_y_vals[indices]
+    if x_prop_lim:
+        indices = ut.array.elements(x_prop_vals, x_prop_lim)
+        x_prop_vals = x_prop_vals[indices]
+        y_prop_vals = y_prop_vals[indices]
 
-    if prop_y_lim:
-        indices = ut.array.elements(prop_y_vals, prop_y_lim)
-        prop_x_vals = prop_x_vals[indices]
-        prop_y_vals = prop_y_vals[indices]
+    if y_prop_lim:
+        indices = ut.array.elements(y_prop_vals, y_prop_lim)
+        x_prop_vals = x_prop_vals[indices]
+        y_prop_vals = y_prop_vals[indices]
 
-    if 'log' in prop_x_scaling:
-        prop_x_vals = ut.math.get_log(prop_x_vals)
+    if 'log' in x_prop_scaling:
+        x_prop_vals = ut.math.get_log(x_prop_vals)
 
-    if 'log' in prop_y_scaling:
-        prop_y_vals = ut.math.get_log(prop_y_vals)
+    if 'log' in y_prop_scaling:
+        y_prop_vals = ut.math.get_log(y_prop_vals)
 
     # plot ----------
     plt.clf()
@@ -771,13 +771,13 @@ def plot_property_v_property(
     fig = plt.figure(1)
     subplot = fig.add_subplot(111)
 
-    subplot.set_xlabel(plot.get_label(prop_x_name, species=species, get_units=True, get_symbol=True,
-                                      draw_log=prop_x_scaling))
+    subplot.set_xlabel(plot.get_label(x_prop_name, species=species, get_units=True, get_symbol=True,
+                                      draw_log=x_prop_scaling))
 
-    subplot.set_ylabel(plot.get_label(prop_y_name, species=species, get_units=True, get_symbol=True,
-                                      draw_log=prop_y_scaling))
+    subplot.set_ylabel(plot.get_label(y_prop_name, species=species, get_units=True, get_symbol=True,
+                                      draw_log=y_prop_scaling))
 
-    plt.hist2d(prop_x_vals, prop_y_vals, bins=prop_bin_num, norm=LogNorm(),
+    plt.hist2d(x_prop_vals, y_prop_vals, bins=prop_bin_num, norm=LogNorm(),
                cmap=plt.cm.Greens)  # @UndefinedVariable
     plt.colorbar()
 
@@ -785,7 +785,7 @@ def plot_property_v_property(
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        plot_name = (species + '.' + prop_y_name + '_v_' + prop_x_name + '_z.%.1f.pdf' %
+        plot_name = (species + '.' + y_prop_name + '_v_' + x_prop_name + '_z.%.1f.pdf' %
                      part.info['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
     else:
@@ -916,31 +916,33 @@ def get_star_form_history(
     Parameters
     ----------
     part : dict : dictionary of particles
-    part_indices : array : star particle indices
+    part_indices : array : indices of star particles
     time_kind : string : time kind to use: time, time.lookback, redshift
     time_scaling : string : scaling of time_kind: lin, log
-    time_lim : list : min and max limits of time_kind to get
-    time_wid : float : width of time_kind bin
+    time_lim : list : min and max limits of time_kind to impose
+    time_wid : float : width of time_kind bin (in units set by time_scaling)
 
     Returns
     -------
-    time_mids : array : times {Gyr}
-    dm_dts : array : total star-formation rate at each time {M_sun / yr}
+    time_mids : array : times at midpoint of bin {Gyr or redshift, according to time_kind}
+    dm_dt_in_bins : array : star-formation rate at each time bin mid {M_sun / yr}
+    masses_cum_in_bins : array : cumulative mass at each time bin mid {M_sun}
     '''
     species = 'star'
 
     if part_indices is None:
-        part_indices = np.arange(part[species]['mass'].size, dtype=np.int32)
+        part_indices = ut.array.initialize_array(part[species]['mass'].size)
 
     part_is_sort = part_indices[np.argsort(part[species]['form.time'][part_indices])]
-    star_form_times = part[species]['form.time'][part_is_sort]
-    star_masses = part[species]['mass'][part_is_sort]
-    star_masses_cum = np.cumsum(star_masses)
+    form_times = part[species]['form.time'][part_is_sort]
+    masses = part[species]['mass'][part_is_sort]
+    masses_cum = np.cumsum(masses)
 
     time_lim = np.array(time_lim)
 
     if 'lookback' in time_kind:
-        time_lim = np.sort(part.Cosmo.time_from_redshift(0) - time_lim)  # convert to age
+        # convert from look-back time wrt z = 0 to age for the computation
+        time_lim = np.sort(part.Cosmo.time_from_redshift(0) - time_lim)
 
     if time_scaling == 'lin':
         time_bins = np.arange(time_lim.min(), time_lim.max() + time_wid, time_wid)
@@ -951,41 +953,51 @@ def get_star_form_history(
                                     time_wid)
         if time_kind == 'redshift':
             time_bins -= 1
+    else:
+        raise ValueError('not recognzie time_scaling = %s' % time_scaling)
+
     if time_kind == 'redshift':
         # input redshift limits and bins, need to convert to time
         redshift_bins = time_bins
         time_bins = np.sort(part.Cosmo.time_from_redshift(time_bins))
 
-    star_mass_cum_bins = np.interp(time_bins, star_form_times, star_masses_cum)
-    # convert to {M_sun / yr} and crudely account for stellar mass loss
-    dm_dts = np.diff(star_mass_cum_bins) / (np.diff(time_bins) * 1e9) / 0.7
+    masses_cum_in_bins = np.interp(time_bins, form_times, masses_cum)
+    # convert to {M_sun / yr}
+    dm_dt_in_bins = np.diff(masses_cum_in_bins) / np.diff(time_bins) / const.giga
+    dm_dt_in_bins /= 0.7  # crudely account for stellar mass loss, assume instantaneous recycling
 
-    #time_bins[1e9]
+    if time_kind == 'redshift':
+        time_bins = redshift_bins
 
     # convert to midpoints of bins
-    if 'time' in time_kind:
-        time_bins = time_bins[: time_bins.size - 1] + 0.5 * np.diff(time_bins)
-        if 'lookback' in time_kind:
-            time_bins = part.Cosmo.time_from_redshift(0) - time_bins  # convert to lookback time
+    time_bins = time_bins[: time_bins.size - 1] + 0.5 * np.diff(time_bins)
+    masses_cum_in_bins = (masses_cum_in_bins[: masses_cum_in_bins.size - 1] +
+                          0.5 * np.diff(masses_cum_in_bins))
+
+    if 'lookback' in time_kind:
+        # convert back to lookback time wrt z = 0
+        time_bins = part.Cosmo.time_from_redshift(0) - time_bins
     elif time_kind == 'redshift':
-        time_bins = redshift_bins[: redshift_bins.size - 1] + 0.5 * np.diff(redshift_bins)
-        time_bins = np.sort(time_bins)[::-1]
+        time_bin_is = np.argsort(time_bins)[::-1]
+        time_bins = time_bin_is[time_bin_is]
+        masses_cum_in_bins = masses_cum_in_bins[time_bin_is]
 
-    print(time_bins)
-
-    return time_bins, dm_dts
+    return time_bins, dm_dt_in_bins, masses_cum_in_bins
 
 
 def plot_star_form_history(
-    parts, time_kind='redshift', time_scaling='lin', time_lim=[0, 1], time_wid=0.01,
+    parts, sf_kind='rate',
+    time_kind='redshift', time_scaling='lin', time_lim=[0, 1], time_wid=0.01,
     distance_lim=[0, 10], center_positions=[],
     write_plot=False, plot_directory='.'):
     '''
     Plot star-formation rate history v time_kind.
+    Note: assumes instantaneous recycling of 30% of mass, should fix this for mass lass v time.
 
     Parameters
     ----------
     parts : dict or list : catalog[s] of particles
+    sf_kind : string : star formation kind to plot: rate, rate.specific, cumulative
     time_kind : string : time kind to use: time, time.lookback, redshift
     time_scaling : string : scaling of time_kind: lin, log
     time_lim : list : min and max limits of time_kind to get
@@ -1006,8 +1018,7 @@ def plot_star_form_history(
     if time_lim[1] is None:
         time_lim[1] = parts[0].snapshot[time_kind]
 
-    sfrs = []
-    times = []
+    sf = {'time': [], 'form.rate': [], 'form.rate.specific': [], 'mass': []}
     for part_i, part in enumerate(parts):
         if len(center_positions[part_i]) and len(distance_lim):
             distances = ut.coord.distance(
@@ -1018,11 +1029,13 @@ def plot_star_form_history(
         else:
             part_is = np.arange(part['star']['form.time'].size, dtype=np.int32)
 
-        times_p, sfrs_p = get_star_form_history(
+        times, sfrs, masses = get_star_form_history(
             part, part_is, time_kind, time_scaling, time_lim, time_wid)
 
-        times.append(times_p)
-        sfrs.append(sfrs_p)
+        sf['time'].append(times)
+        sf['form.rate'].append(sfrs)
+        sf['mass'].append(masses)
+        sf['form.rate.specific'].append(sfrs / masses)
 
     if time_kind == 'redshift' and time_scaling == 'log':
         time_lim += 1  # convert to z + 1 so log is well-defined
@@ -1036,7 +1049,7 @@ def plot_star_form_history(
     fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(time_lim)
-    subplot.set_ylim(plot.get_axis_limits(sfrs, 'log'))
+    subplot.set_ylim(plot.get_axis_limits(sf[sf_kind], 'log'))
 
     if 'time' in time_kind:
         label = 'time $[{\\rm Gyr}]$'
@@ -1058,7 +1071,8 @@ def plot_star_form_history(
         plot_func = subplot.loglog
 
     for part_i, part in enumerate(parts):
-        plot_func(times[part_i], sfrs[part_i], linewidth=2.0, color=colors[part_i], alpha=0.5,
+        plot_func(sf['time'][part_i], sf[sf_kind][part_i],
+                  linewidth=2.0, color=colors[part_i], alpha=0.5,
                   label=part.info['simulation.name'])
 
     # redshift legend
@@ -1077,7 +1091,8 @@ def plot_star_form_history(
 
     if write_plot:
         plot_directory = ut.io.get_path(plot_directory)
-        plot_name = 'star.form_v_%s_z.%.1f.pdf' % (time_kind, part.info['redshift'])
+        sf_name = 'star' + '.' + sf_kind
+        plot_name = '%s_v_%s_z.%.1f.pdf' % (sf_name, time_kind, part.info['redshift'])
         plt.savefig(plot_directory + plot_name, format='pdf')
         Say.say('wrote %s' % plot_directory + plot_name)
     else:

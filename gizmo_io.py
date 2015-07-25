@@ -19,6 +19,69 @@ from utilities import cosmology
 from utilities import simulation
 
 
+class ParticleDictionaryClass(dict):
+    '''
+    Dictionary class to store particle data.
+    Allows greater flexibility for producing derived quantities.
+    '''
+    def prop(self, property_name=''):
+        '''
+        Get property, either from self dictionary or derive.
+        If several properties, need to provide mathematical relationship.
+
+        Parameters
+        ----------
+        property_name : string : name of property
+        '''
+        property_name = property_name.strip()  # strip white space
+
+        if property_name in self:
+            return self[property_name]
+
+        prop_values = None
+
+        if ('/' in property_name or '*' in property_name or '+' in property_name or
+                '-' in property_name):
+            prop_names = property_name
+
+            for delimiter in ['/', '*', '+', '-']:
+                if delimiter in property_name:
+                    prop_names = prop_names.split(delimiter)
+                    break
+
+            for prop_name in prop_names:
+                if prop_name not in self:
+                    raise ValueError('property = %s is not in halo catalog' % prop_name)
+
+            if len(prop_names) == 1:
+                raise ValueError('property = %s is not a valid input to halo catalog' %
+                                 property_name)
+
+            prop_values = np.array(self.prop(prop_names[0]))
+            for prop_name in prop_names[1:]:
+                if '/' in property_name:
+                    prop_values /= self.prop(prop_name)
+                if '*' in property_name:
+                    prop_values *= self.prop(prop_name)
+                if '+' in property_name:
+                    prop_values += self.prop(prop_name)
+                if '-' in property_name:
+                    prop_values -= self.prop(prop_name)
+
+        if 'log' in property_name:
+            prop_values = self.prop(property_name.replace('log', ''))
+
+        if property_name == 'number.density' or property_name == 'density.number':
+            # number density of hyrogen {cm ^ -3}
+            prop_values = (self['density'] * (1 - self['metallicity'][:, 0]) *
+                           const.proton_per_sun * const.kpc_per_cm ** 3)
+
+        if prop_values is None:
+            raise ValueError('property = %s is not a valid input to halo catalog' % property_name)
+
+        return prop_values
+
+
 class GizmoClass(ut.io.SayClass):
     '''
     Read Gizmo snapshots.
@@ -182,8 +245,11 @@ class GizmoClass(ut.io.SayClass):
             'BH_Mdot': 'dm/dt'
         }
 
-        header = {}  # custom dictionary to store header information
-        part = {}  # custom dictionary to store properties for all particle species
+        header = {}  # dictionary to store header information
+
+        # dictionary class to store properties for all particle species
+        #part = {}
+        part = ut.array.DictClass()
 
         ## parse input species list ##
         # if input 'all' for species, read all species in snapshot
@@ -253,9 +319,9 @@ class GizmoClass(ut.io.SayClass):
 
         try:
             try:
-                Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_times.txt')
+                Snapshot.read_snapshots('snapshot_times.txt', snapshot_time_file_directory)
             except:
-                Snapshot.read_snapshots(snapshot_time_file_directory, 'snapshot_scale-factors.txt')
+                Snapshot.read_snapshots('snapshot_scale-factors.txt', snapshot_time_file_directory)
         except:
             if snapshot_number_kind == 'redshift':
                 raise ValueError(
@@ -351,9 +417,14 @@ class GizmoClass(ut.io.SayClass):
         ## initialize arrays to store each property for each species ##
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
+
             part_in = file_in['PartType' + str(spec_id)]
-            part[spec_name] = {}  # add species to particle dictionary
+
             part_num_tot = header['particle.numbers.total'][spec_id]
+
+            # add species to particle dictionary
+            #part[spec_name] = {}
+            part[spec_name] = ParticleDictionaryClass()
 
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
@@ -452,7 +523,10 @@ class GizmoClass(ut.io.SayClass):
                 for dark_i, dark_mass in enumerate(dark_lowres_masses):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
                     spec_name = 'dark.%d' % (dark_i + 2)
-                    part[spec_name] = {}
+
+                    #part[spec_name] = {}
+                    part[spec_name] = ParticleDictionaryClass()
+
                     for prop_name in dark_lowres:
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
                     self.say('  %s: %d particles' % (spec_name, spec_indices.size))
@@ -520,7 +594,7 @@ class GizmoClass(ut.io.SayClass):
 
             if 'temperature' in part[spec_name]:
                 # convert from {(km / s) ^ 2} to {Kelvin}
-                # ignore small corrections from metals
+                # ignore small corrections from metals (beyond He)
                 helium_mass_fracs = part[spec_name]['metallicity'][:, 1]
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
@@ -542,20 +616,16 @@ class GizmoClass(ut.io.SayClass):
         ## end adjusting properties for each species ##
 
         ## assign auxilliary information ##
-        # convert particle dictionary to generalized dictionary class to increase flexibility
-        part_return = ut.array.DictClass()
-        for spec_name in part:
-            part_return[spec_name] = part[spec_name]
 
         # store cosmology class
-        part_return.Cosmo = Cosmo
+        part.Cosmo = Cosmo
 
         # store header dictionary
-        part_return.info = header
+        part.info = header
 
         # store information on snapshot time
         time = Cosmo.time_from_redshift(header['redshift'])
-        part_return.snapshot = {
+        part.snapshot = {
             'redshift': header['redshift'],
             'scale-factor': header['scale-factor'],
             'time': time,
@@ -564,16 +634,16 @@ class GizmoClass(ut.io.SayClass):
         }
 
         # store information on all snapshot times - may or may not be initialized
-        part_return.Snapshot = Snapshot
+        part.Snapshot = Snapshot
 
         # arrays to store center position and velocity
-        part_return.center_position = []
-        part_return.center_velocity = []
+        part.center_position = []
+        part.center_velocity = []
         if assign_center:
             # assign center now
-            self.assign_center(part_return)
+            self.assign_center(part)
 
-        return part_return
+        return part
 
     def get_file_name(self, directory, snapshot_index):
         '''
@@ -632,7 +702,7 @@ class GizmoClass(ut.io.SayClass):
         -------
         class dictionary of snapshot information
         '''
-        return simulation.Snapshot.read_snapshots(directory, file_name)
+        return simulation.Snapshot.read_snapshots(file_name, directory)
 
     def assign_center(self, part, method='center-of-mass'):
         '''

@@ -211,16 +211,16 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
         scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
 
 
-def print_property_statitics_across_snapshots(
+def print_properties_extrema_all_snapshots(
     directory='.', species_property_dict={'gas': ['smooth.length', 'density']}):
     '''
-    Read every snapshot.
-    For each input properties, print statistics of its extrema across all snapshots.
+    Read every snapshot, for each input properties, get its extremum at each snapshot.
+    Print statistics of this across all snapshots.
 
     directory : string : directory of simulation (one level above directory of snapshot file)
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
-    Say = ut.io.SayClass(print_property_statitics_across_snapshots)
+    Say = ut.io.SayClass(print_properties_extrema_all_snapshots)
 
     property_statistic = {
         'smooth.length': {'function.name': 'min', 'function': np.min},
@@ -230,7 +230,7 @@ def print_property_statitics_across_snapshots(
     directory = ut.io.get_path(directory)
 
     Snapshot = simulation.SnapshotClass()
-    Snapshot.read_snapshots(directory)
+    Snapshot.read_snapshots(directory=directory)
 
     species_read = species_property_dict.keys()
 
@@ -276,7 +276,7 @@ def print_property_statitics_across_snapshots(
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
             Say.say('\n%s %s %s:' % (spec_name, prop_name, prop_func_name))
-            for stat_name in ['min', 'median.16', 'median', 'max', 'median.84', 'max']:
+            for stat_name in ['min', 'percent.16', 'median', 'percent.84', 'max']:
                 Say.say('%10s = %.3f' % (stat_name, Statistic.stat[stat_name]))
 
             #Statistic.print_statistics()
@@ -429,11 +429,11 @@ def plot_scaling(
 if __name__ == '__main__':
 
     if len(sys.argv) <= 1:
-        raise ValueError('must specify function kind: runtime, contamination, delete')
+        raise ValueError('must specify function kind: runtime, contamination, extreme, delete')
 
     function_kind = str(sys.argv[1])
     assert ('runtime' in function_kind or 'contamination' in function_kind or
-            'delete' in function_kind)
+            'extreme' in function_kind or 'delete' in function_kind)
 
     directory = '.'
 
@@ -456,6 +456,12 @@ if __name__ == '__main__':
             snapshot_redshift = float(sys.argv[2])
 
         plot_halo_contamination(directory, snapshot_redshift)
+
+    elif 'extreme' in function_kind:
+        if len(sys.argv) > 2:
+            directory = str(sys.argv[2])
+
+        print_properties_extrema_all_snapshots(directory)
 
     elif 'delete' in function_kind:
         if len(sys.argv) > 2:

@@ -68,6 +68,6 @@ if __name__ == '__main__':
     snapshot_time_file_name = str(sys.argv[4])
 
     Snapshot = simulation.SnapshotClass()
-    Snapshot.read_snapshots('.', snapshot_time_file_name)
+    Snapshot.read_snapshots(snapshot_time_file_name)
 
     sync_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])
