@@ -251,17 +251,21 @@ def print_properties_extrema_all_snapshots(
         species_property_dict[spec_name] = prop_dict
 
     for snapshot_i in Snapshot['index']:
-        part = gizmo_io.Gizmo.read_snapshot(
-            species_read, 'index', snapshot_i, directory + 'output', properties_read,
-            sort_dark_by_id=False, force_float32=True, assign_center=False)
+        try:
+            part = gizmo_io.Gizmo.read_snapshot(
+                species_read, 'index', snapshot_i, directory + 'output', properties_read,
+                sort_dark_by_id=False, force_float32=True, assign_center=False)
 
-        for spec_name in species_property_dict:
-            for prop_name in species_property_dict[spec_name]:
-                if prop_name in part[spec_name]:
-                    prop_ext = property_statistic[prop_name]['function'](part[spec_name][prop_name])
-                    species_property_dict[spec_name][prop_name].append(prop_ext)
-                else:
-                    Say.say('! %s %s not in particle dictionary!' % (spec_name, prop_name))
+            for spec_name in species_property_dict:
+                for prop_name in species_property_dict[spec_name]:
+                    if prop_name in part[spec_name]:
+                        prop_ext = property_statistic[prop_name]['function'](
+                            part[spec_name][prop_name])
+                        species_property_dict[spec_name][prop_name].append(prop_ext)
+                    else:
+                        Say.say('! %s %s not in particle dictionary' % (spec_name, prop_name))
+        except:
+            Say.say('! cannot read snapshot index %d in %s' % (snapshot_i, directory))
 
     Statistic = ut.math.StatisticClass()
 
