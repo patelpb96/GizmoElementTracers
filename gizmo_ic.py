@@ -2,7 +2,7 @@
 Generate initial condition points by selecting particles at final time and tracing them back
 to initial time.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
+Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
 @author: awetzel
 '''

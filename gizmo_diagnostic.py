@@ -102,8 +102,7 @@ def print_run_times(
 def print_run_time_ratios(
     directories=['.'], cpu_numbers=None,
     scalefactors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                  0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
-    print_lines=False):
+                  0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
     '''
     Print ratios of wall [and CPU] times (average per MPI taks) for input simulations at input
     scale factors from cpu.txt for Gizmo run
@@ -113,7 +112,6 @@ def print_run_time_ratios(
     directories : string or list : directory[s] of cpu.txt file for each simulation
     cpu_numbers : int or list : number[s] of CPUs used for each simulation
     scalefactors : array-like : list of scale factors at which to print run times
-    print_lines : boolean : whether to print full lines from cpu.txt as get them
     '''
     run_timess = []
 
@@ -131,7 +129,7 @@ def print_run_time_ratios(
 
     for d_i, directory in enumerate(directories):
         scalefactors, redshifts, run_times = print_run_times(
-            directory, cpu_numbers[d_i], scalefactors, print_lines, get_values=True)
+            directory, cpu_numbers[d_i], scalefactors, get_values=True)
         run_timess.append(run_times)
 
     run_time_num_min = Inf
@@ -326,8 +324,6 @@ def plot_scaling(
     '''
     .
     '''
-    Say = ut.io.SayClass(plot_scaling)
-
     dark = {
         'ref12': {'particle.num': 8.82e6, 'cpu.num': 64, 'cpu.time': 385, 'wall.time': 6.0},
         'ref13': {'particle.num': 7.05e7, 'cpu.num': 512, 'cpu.time': 7135, 'wall.time': 13.9},
@@ -418,13 +414,8 @@ def plot_scaling(
         plot_func(mfm_particle_nums[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
                   alpha=0.7)
 
-    if write_plot:
-        plot_directory = ut.io.get_path(plot_directory)
-        plot_name = 'test.pdf'
-        plt.savefig(plot_directory + plot_name, format='pdf')
-        Say.say('wrote %s' % plot_directory + plot_name)
-    else:
-        plt.show(block=False)
+    plot_name = 'test'
+    plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 #===================================================================================================

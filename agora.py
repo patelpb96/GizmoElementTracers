@@ -95,13 +95,13 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.hal['position'] = np.zeros((len(self.hal_yt), 3), dtype=np.float32)
         self.hal['mass'] = np.zeros(len(self.hal_yt), dtype=np.float32)
         self.hal['radius'] = np.zeros(len(self.hal_yt), dtype=np.float32)
-        self.hal['particle.num'] = np.zeros(len(self.hal_yt), dtype=np.int32)
+        self.hal['particle.number'] = np.zeros(len(self.hal_yt), dtype=np.int32)
 
         for hi in xrange(len(self.hal_yt)):
             self.hal['mass'][hi] = self.hal_yt[hi].total_mass()
             self.hal['radius'][hi] = self.hal_yt[hi].maximum_radius()
             self.hal['position'][hi] = self.hal_yt[hi].center_of_mass()
-            self.hal['particle.num'][hi] = self.hal_yt[hi].get_size()
+            self.hal['particle.number'][hi] = self.hal_yt[hi].get_size()
         self.hal['mass'] = log10(self.hal['mass'])  # {log M_sun}
         self.hal['radius'] *= self.hal.info['box.length']  # {kpc comoving}
         self.hal['position'] *= self.hal.info['box.length']  # {kpc comoving}
@@ -320,8 +320,8 @@ def print_contamination_around_halo(
         Say.say('yay! no contaminating particles out to distance_max = %.3f' % distance_max)
         return
 
-    for di in xrange(DistanceBin.num):
-        dist_bin_lim = DistanceBin.get_bin_limit(distance_scaling, di)
+    for di in xrange(DistanceBin.number):
+        dist_bin_lim = DistanceBin.get_bin_limits(distance_scaling, di)
         pis_d = pis[ut.array.elements(distances, dist_bin_lim)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
         num_frac = Fraction.get_fraction(pis_contam_d.size, pis_d.size)
@@ -334,7 +334,7 @@ def print_contamination_around_halo(
 
 
 def print_contamination_in_box(
-    part, center_pos=None, distance_lim=None, distance_bin_num=20, scaling='lin',
+    part, center_position=None, distance_limits=None, distance_bin_num=20, scaling='lin',
     geometry='cube'):
     '''
     Test lower resolution particle contamination around center.
@@ -351,16 +351,16 @@ def print_contamination_in_box(
 
     Neighbor = ut.neighbor.NeighborClass()
 
-    if distance_lim is None:
-        distance_lim = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
+    if distance_limits is None:
+        distance_limits = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
 
-    if center_pos is None:
-        center_pos = np.zeros(part['position'].shape[1])
+    if center_position is None:
+        center_position = np.zeros(part['position'].shape[1])
         for dimension_i in xrange(part['position'].shape[1]):
-            center_pos[dimension_i] = 0.5 * part.info['box.length']
-    print('center position = %s' % center_pos)
+            center_position[dimension_i] = 0.5 * part.info['box.length']
+    print('center position = %s' % center_position)
 
-    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_lim, number=distance_bin_num)
+    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_limits, number=distance_bin_num)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])
@@ -368,16 +368,16 @@ def print_contamination_in_box(
 
     if geometry == 'sphere':
         distances, neig_pis = Neighbor.get_neighbors(
-            center_pos, part['position'], part['mass'].size,
-            distance_lim, part.info['box.length'], neig_ids=pis_all)
+            center_position, part['position'], part['mass'].size,
+            distance_limits, part.info['box.length'], neig_ids=pis_all)
         distances = distances[0]
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
         distance_vector = np.abs(ut.coord.distance(
-            'vector', part['position'], center_pos, part.info['box.length']))
+            'vector', part['position'], center_position, part.info['box.length']))
 
-    for di in xrange(DistanceBin.num):
-        dist_bin_lim = DistanceBin.get_bin_limit(scaling, di)
+    for di in xrange(DistanceBin.number):
+        dist_bin_lim = DistanceBin.get_bin_limits(scaling, di)
 
         if geometry == 'sphere':
             pis_all_d = neig_pis[ut.array.elements(distances, dist_bin_lim)]

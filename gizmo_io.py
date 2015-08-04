@@ -1,7 +1,7 @@
 '''
-Read Gizmo snapshots.
+Read Gizmo snapshot files.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances and radii in {kpc physical}.
+Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
 @author: Andrew Wetzel
 '''
@@ -68,8 +68,11 @@ class ParticleDictionaryClass(dict):
                 if '-' in property_name:
                     prop_values -= self.prop(prop_name)
 
-        if 'log' in property_name:
-            prop_values = self.prop(property_name.replace('log', ''))
+        if property_name[:3] == 'log':
+            prop_values = ut.math.get_log(self.prop(property_name.replace('log', '')))
+
+        if property_name[:3] == 'abs':
+            prop_values = np.abs(self.prop(property_name.replace('abs', '')))
 
         if property_name == 'number.density' or property_name == 'density.number':
             # number density of hyrogen {cm ^ -3}
@@ -102,8 +105,8 @@ class GizmoClass(ut.io.SayClass):
         self, species_types='all', snapshot_number_kind='index', snapshot_number=400, directory='.',
         property_names='all', property_names_exclude=[],
         simulation_name='',
-        metal_index_max=1, particle_subsample_factor=1,
-        sort_dark_by_id=True, force_float32=False, assign_center=True, get_header_only=False):
+        metal_index_max=1, particle_subsample_factor=0,
+        sort_dark_by_id=False, force_float32=False, assign_center=True, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary class.
@@ -139,7 +142,7 @@ class GizmoClass(ut.io.SayClass):
 
         Returns
         -------
-        dictionary class, with keys for each species
+        dictionary class, with keys for each particle species
         '''
         # connects particle species name to id, and determines all possible species types
         species_name_dict = {
@@ -602,6 +605,15 @@ class GizmoClass(ut.io.SayClass):
                 part[spec_name]['temperature'] *= \
                     const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights / const.boltzmann
 
+        if 'potential' in part[species_names[0]]:
+            # renormalize so potential max = 0
+            potential_max = 0
+            for spec_name in species_names:
+                if part[spec_name]['potential'].max() > potential_max:
+                    potential_max = part[spec_name]['potential'].max()
+            for spec_name in species_names:
+                part[spec_name]['potential'] -= potential_max
+
         # sub-sample highest-resolution particles for smaller memory
         if particle_subsample_factor > 1:
             spec_names = ['dark', 'gas', 'star']
@@ -729,19 +741,20 @@ class GizmoClass(ut.io.SayClass):
         part.center_velocity = ut.particle.get_center_velocity(
             part, species, velocity_radius_max, part.center_position)
 
-        self.say('assigning center position and velocity')
+        self.say('assigning center:')
         print('    position: ', end='')
         ut.io.print_array(part.center_position, '%.3f', end='')
         print(' kpc comoving')
         print('    velocity: ', end='')
         ut.io.print_array(part.center_velocity, '%.1f', end='')
         print(' km / sec')
+        print()
 
 Gizmo = GizmoClass()
 
 
 def assign_orbit(
-    part, species=['star'], center_position=[], center_velocity=[], include_hubble_flow=True):
+    part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True):
     '''
     Assign derived orbital properties to species.
 
@@ -774,4 +787,4 @@ def assign_orbit(
         orb = ut.orbit.get_orbit_dictionary(distance_vecs, velocity_vecs, get_integrals=False)
 
         for k in orb:
-            part[spec_name][k] = orb[k]
+            part[spec_name]['host.' + k] = orb[k]
