@@ -24,7 +24,7 @@ class ParticleDictionaryClass(dict):
     Dictionary class to store particle data.
     Allows greater flexibility for producing derived quantities.
     '''
-    def prop(self, property_name=''):
+    def prop(self, property_name='', indices=None):
         '''
         Get property, either from self dictionary or derive.
         If several properties, need to provide mathematical relationship.
@@ -32,14 +32,34 @@ class ParticleDictionaryClass(dict):
         Parameters
         ----------
         property_name : string : name of property
+        indices : array : list of indices to select on
         '''
+        metal_dict = {
+            # translate between metal name and index in metallicity table
+            'total': 0,
+            'he': 1,
+            'c': 2,
+            'n': 3,
+            'o': 4,
+            'ne': 5,
+            'mg': 6,
+            'si': 7,
+            's': 8,
+            'ca': 9,
+            'fe': 10,
+            'feh': 0,  # use to get [Fe/H]
+        }
+
         property_name = property_name.strip()  # strip white space
 
+        # check if input is in self dictionary, return as is
         if property_name in self:
-            return self[property_name]
+            if indices is not None:
+                return self[property_name][indices]
+            else:
+                return self[property_name]
 
-        prop_values = None
-
+        # check for relational property (involves combining more than one property)
         if ('/' in property_name or '*' in property_name or '+' in property_name or
                 '-' in property_name):
             prop_names = property_name
@@ -49,40 +69,65 @@ class ParticleDictionaryClass(dict):
                     prop_names = prop_names.split(delimiter)
                     break
 
-            for prop_name in prop_names:
-                if prop_name not in self:
-                    raise ValueError('property = %s is not in halo catalog' % prop_name)
-
             if len(prop_names) == 1:
                 raise ValueError('property = %s is not a valid input to halo catalog' %
                                  property_name)
 
-            prop_values = np.array(self.prop(prop_names[0]))
+            prop_values = np.array(self.prop(prop_names[0], indices))
             for prop_name in prop_names[1:]:
                 if '/' in property_name:
-                    prop_values /= self.prop(prop_name)
+                    masks = self.prop(prop_name, indices) != 0
+                    prop_values[masks] /= self.prop(prop_name, indices)[masks]
+                    masks = self.prop(prop_name, indices) == 0
+                    prop_values[masks] = 0
                 if '*' in property_name:
-                    prop_values *= self.prop(prop_name)
+                    prop_values *= self.prop(prop_name, indices)
                 if '+' in property_name:
-                    prop_values += self.prop(prop_name)
+                    prop_values += self.prop(prop_name, indices)
                 if '-' in property_name:
-                    prop_values -= self.prop(prop_name)
+                    prop_values -= self.prop(prop_name, indices)
 
+            return prop_values
+
+        # check for math transformation of single property
         if property_name[:3] == 'log':
-            prop_values = ut.math.get_log(self.prop(property_name.replace('log', '')))
+            return ut.math.get_log(
+                self.prop(property_name.replace('log', ''), indices))
 
         if property_name[:3] == 'abs':
-            prop_values = np.abs(self.prop(property_name.replace('abs', '')))
+            return np.abs(self.prop(property_name.replace('abs', ''), indices))
+
+        if property_name == 'mass.neutral':
+            # mass of neutral hydrogen
+            return (self.prop('mass', indices) * (1 - self.prop('metallicity', indices)[:, 0]) *
+                    self.prop('neutral.hydrogen.fraction', indices))
 
         if property_name == 'number.density' or property_name == 'density.number':
             # number density of hyrogen {cm ^ -3}
-            prop_values = (self['density'] * (1 - self['metallicity'][:, 0]) *
-                           const.proton_per_sun * const.kpc_per_cm ** 3)
+            return (self.prop('density', indices) * (1 - self.prop('metallicity', indices)[:, 0]) *
+                    const.proton_per_sun * const.kpc_per_cm ** 3)
 
-        if prop_values is None:
-            raise ValueError('property = %s is not a valid input to halo catalog' % property_name)
+        if 'star.form.time' in property_name and 'lookback' in property_name:
+            prop_name = property_name.replace('.lookback', '')
+            return (self.snapshot['time'] - self.prop(prop_name, indices))
 
-        return prop_values
+        # check for metallicity string -> index conversion
+        if 'metallicity.' in property_name:
+            metal_index = None
+            for prop_name in property_name.split('.'):
+                if prop_name in metal_dict:
+                    metal_index = metal_dict[prop_name]
+            if metal_index is None:
+                ValueError('property = %s is not a valid input to halo catalog' % property_name)
+
+            values = self['metallicity'][indices, metal_index]
+            if '.feh' in property_name:
+                values /= 10 ** 0.2  # conversion from Ma et al 2015
+            if '.solar' in property_name:
+                values /= const.sun_metallicity
+            return values
+
+        raise ValueError('property = %s is not a valid input to halo catalog' % property_name)
 
 
 class GizmoClass(ut.io.SayClass):
@@ -631,9 +676,13 @@ class GizmoClass(ut.io.SayClass):
 
         # store cosmology class
         part.Cosmo = Cosmo
+        for spec_name in species_names:
+            part[spec_name].Cosmo = part.Cosmo
 
         # store header dictionary
         part.info = header
+        for spec_name in species_names:
+            part[spec_name].info = part.info
 
         # store information on snapshot time
         time = Cosmo.time_from_redshift(header['redshift'])
@@ -644,6 +693,8 @@ class GizmoClass(ut.io.SayClass):
             'time.lookback': Cosmo.time_from_redshift(0) - time,
             'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
         }
+        for spec_name in species_names:
+            part[spec_name].snapshot = part.snapshot
 
         # store information on all snapshot times - may or may not be initialized
         part.Snapshot = Snapshot
