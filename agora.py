@@ -244,9 +244,8 @@ def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig
     ----------
     hal : dict : catalog of halos
     halo_index : int : index of halo to select
-    distance_max : float : maximum distance {kpc physical or R_vir}
-    distance_kind : string : kind for maximum distance
-        options: physical, virial
+    distance_max : float : maximum distance {kpc physical or R_halo}
+    distance_kind : string : kind for maximum distance: 'physical', 'virial'
     neig_mass_frac_min : float : minimum fraction of input mass to select neighboring halos
     '''
     Neighbor = ut.neighbor.NeighborClass()
@@ -270,12 +269,14 @@ def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial=T
 
     Parameters
     ----------
-    halo index: int
-    maximum distance {kpc comoving or in units of virial radius}: float
-    whether to scale distance by virial radius: boolean
+    Agora : class : Agora data class
+    halo_index: int : index of halo
+    distance_max : float : maximum distance {kpc comoving or in units of R_halo}
+    scale_virial : boolean : whether to scale distance by virial radius
     '''
     if scale_virial:
         distance_max *= Agora.hal['radius'][halo_index]
+
     # convert distance_max to simulation units [0, 1)
     distance_max /= Agora['box.length']
     sp = Agora.snapshot[0].h.sphere(Agora.hal_yt[halo_index].center_of_mass(), distance_max)
@@ -284,7 +285,7 @@ def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial=T
 
 
 def print_contamination_around_halo(
-    Agora, halo_index, distance_max, distance_bin_wid=0.5, scale_virial=True):
+    Agora, halo_index, distance_max, distance_bin_width=0.5, scale_virial=True):
     '''
     Test lower resolution particle contamination around halo as a function of distance.
 
@@ -293,7 +294,7 @@ def print_contamination_around_halo(
     Agora : class : Agora data class
     halo_index: int : index of halo
     distance_max : float : maximum distance from halo center to check
-    distance_bin_wid : float : width of distance bin for printing
+    distance_bin_width : float : width of distance bin for printing
     scale_virial : boolean : whether to scale distances by virial radius
     '''
     distance_scaling = 'lin'
@@ -302,7 +303,7 @@ def print_contamination_around_halo(
     Say = ut.io.SayClass(print_contamination_around_halo)
 
     DistanceBin = ut.bin.DistanceBinClass(
-        distance_scaling, [0, distance_max], width=distance_bin_wid)
+        distance_scaling, [0, distance_max], width=distance_bin_width)
 
     pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial)
     Say.say('read %d particles around halo' % pids.size)
@@ -334,18 +335,19 @@ def print_contamination_around_halo(
 
 
 def print_contamination_in_box(
-    part, center_position=None, distance_limits=None, distance_bin_num=20, scaling='lin',
+    part, center_position=None, distance_limits=None, distance_bin_number=20, scaling='lin',
     geometry='cube'):
     '''
     Test lower resolution particle contamination around center.
 
     Parameters
     ----------
-    particle catalog: dict
-    3-d position of center: array
-    maximum distance from center to check: float
-    region geometry: string
-        options: cube, sphere
+    part : dict : catalog of particles
+    center_position : array : 3-d position of center
+    distance_limits : float : maximum distance from center to check
+    distance_bin_number : int : number of distance bins
+    scaling : string : 'log', 'lin'
+    geometry : string : geometry of region: 'cube', 'sphere'
     '''
     Say = ut.io.SayClass(print_contamination_in_box)
 
@@ -360,7 +362,7 @@ def print_contamination_in_box(
             center_position[dimension_i] = 0.5 * part.info['box.length']
     print('center position = %s' % center_position)
 
-    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_limits, number=distance_bin_num)
+    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_limits, number=distance_bin_number)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])
@@ -396,43 +398,43 @@ def print_contamination_in_box(
 
 
 def print_ic_zoom_region_for_halo(
-    Agora, halo_index, refinement_num=1, distance_max=None, geometry='cube'):
+    Agora, halo_index, refinement_number=1, distance_max=None, geometry='cube'):
     '''
     Print extent of lagrangian region at z_initial around given halo at z = 0.
     Use rules of thumb from Onorbe et al.
 
     Parameters
     ----------
-    halo index: int
-    number of refinement levels beyond current level for zoom-in region: int
-    maximum distance want to be uncontaminated {kpc comoving}: float
+    halo_index : int : index of halo
+    refinement_number : int : number of refinement levels beyond current level for zoom-in region
+    distance_max : float : maximum distance want to be uncontaminated {kpc comoving}
         if None, use R_vir
-    geometry of zoom-in lagrangian regon in initial conditions: string
-        options: cube, ellipsoid
+    geometry : string : geometry of zoom-in lagrangian regon in initial conditions:
+        'cube', 'ellipsoid'
     '''
     if not distance_max:
         distance_max = Agora.hal['radius'][halo_index] * 1.2
 
     if geometry == 'cube':
-        distance_max = (1.5 * refinement_num + 1) * distance_max
+        distance_max = (1.5 * refinement_number + 1) * distance_max
     elif geometry == 'ellipsoid':
-        distance_max = (1.5 * refinement_num + 7) * distance_max
+        distance_max = (1.5 * refinement_number + 7) * distance_max
 
     pids = Agora.get_particle_ids_around_halo(halo_index, distance_max, scale_vir=False)
 
     pis = Agora.part[1]['id-to-index'][pids]
-    poss = Agora.part[1]['position'][pis]
-    lims = np.zeros((poss.shape[1], 2))
-    wids = np.zeros(poss.shape[1])
-    for dimen_i in xrange(poss.shape[1]):
-        lims[dimen_i] = np.array(ut.array.get_limits(poss[:, dimen_i]))
-        wids[dimen_i] = lims[[dimen_i]].max() - lims[[dimen_i]].min()
+    positions = Agora.part[1]['position'][pis]
+    limits = np.zeros((positions.shape[1], 2))
+    widths = np.zeros(positions.shape[1])
+    for dimen_i in xrange(positions.shape[1]):
+        limits[dimen_i] = np.array(ut.array.get_limits(positions[:, dimen_i]))
+        widths[dimen_i] = limits[[dimen_i]].max() - limits[[dimen_i]].min()
         Agora.say('dimension-%d: %s (%.3f) kpc, %s (%.8f) box length' %
-                  (dimen_i, ut.array.get_limits(lims[[dimen_i]], digit_num=3), wids[dimen_i],
-                   ut.array.get_limits(lims[[dimen_i]] / Agora['box.length'], digit_num=8),
-                   wids[dimen_i] / Agora['box.length']))
-    lims /= Agora['box.length']
-    wids /= Agora['box.length']
+                  (dimen_i, ut.array.get_limits(limits[[dimen_i]], digit_num=3), widths[dimen_i],
+                   ut.array.get_limits(limits[[dimen_i]] / Agora['box.length'], digit_num=8),
+                   widths[dimen_i] / Agora['box.length']))
+    limits /= Agora['box.length']
+    widths /= Agora['box.length']
     Agora.say('for MUSIC config file:')
-    Agora.say('  ref_offset = %.8f, %.8f, %.8f' % (lims[0, 0], lims[1, 0], lims[2, 0]))
-    Agora.say('  ref_extent = %.8f, %.8f, %.8f' % (wids[0], wids[1], wids[2]))
+    Agora.say('  ref_offset = %.8f, %.8f, %.8f' % (limits[0, 0], limits[1, 0], limits[2, 0]))
+    Agora.say('  ref_extent = %.8f, %.8f, %.8f' % (widths[0], widths[1], widths[2]))

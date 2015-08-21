@@ -801,41 +801,28 @@ class GizmoClass(ut.io.SayClass):
         print(' km / sec')
         print()
 
+    def assign_orbit(
+        self, part, species=['star'], center_position=None, center_velocity=None,
+        include_hubble_flow=True):
+        '''
+        Assign derived orbital properties to species.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles at snapshot
+        species : string or list : particle species to compute
+        center_position : array : center position to use
+        center_velocity : array : center velocity to use
+        include_hubble_flow : boolean : whether to include hubble flow
+        '''
+        from . import gizmo_analysis
+
+        orb = gizmo_analysis.get_orbit_dictionary(
+            part, species, center_position, center_velocity, include_hubble_flow)
+
+        for spec_name in species:
+            for prop in orb:
+                part[spec_name]['host.' + prop] = orb[spec_name][prop]
+
+
 Gizmo = GizmoClass()
-
-
-def assign_orbit(
-    part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True):
-    '''
-    Assign derived orbital properties to species.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    species : string or list : particle species to compute
-    center_position : array : center position to use
-    include_hubble_flow : boolean : whether to include hubble flow
-    '''
-    if np.isscalar(species):
-        species = [species]
-
-    if (center_position is None or not len(center_position)) and len(part.center_position):
-        center_position = part.center_position
-
-    if (center_velocity is None or not len(center_velocity)) and len(part.center_velocity):
-        center_velocity = part.center_velocity
-
-    for spec_name in species:
-        distance_vecs = ut.coord.distance(
-            'vector', part[spec_name]['position'], center_position, part.info['box.length'])
-        distance_vecs *= part.snapshot['scale-factor']  # convert to {kpc physical}
-
-        velocity_vecs = ut.coord.velocity_difference(
-            'vector', center_velocity, part[spec_name]['velocity'], include_hubble_flow,
-            center_position, part[spec_name]['position'], part.snapshot['scale-factor'],
-            part.snapshot['time.hubble'], part.info['box.length'])
-
-        orb = ut.orbit.get_orbit_dictionary(distance_vecs, velocity_vecs, get_integrals=False)
-
-        for k in orb:
-            part[spec_name]['host.' + k] = orb[k]

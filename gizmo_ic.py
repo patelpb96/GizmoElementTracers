@@ -80,26 +80,27 @@ def write_initial_condition_points(
             distance_max = (1.5 * refinement_num + 7) * distance_pure
 
     mass_select = 0
-    poss_ini = []
-    spec_select_num = []
+    positions_ini = []
+    spec_select_number = []
     for spec_name in spec_names:
-        poss_fin = part_fin[spec_name]['position']
+        positions_fin = part_fin[spec_name]['position']
 
-        dists = ut.coord.distance('scalar', poss_fin, center_position, part_fin.info['box.length'])
-        dists *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
+        distances = ut.coord.distance(
+            'scalar', positions_fin, center_position, part_fin.info['box.length'])
+        distances *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
-        select_indices = ut.array.elements(dists, [0, distance_max])
+        select_indices = ut.array.elements(distances, [0, distance_max])
 
-        poss_ini.extend(part_ini[spec_name]['position'][select_indices])
+        positions_ini.extend(part_ini[spec_name]['position'][select_indices])
 
         mass_select += part_ini[spec_name]['mass'][select_indices].sum()
-        spec_select_num.append(select_indices.size)
+        spec_select_number.append(select_indices.size)
 
-    poss_ini = np.array(poss_ini)
-    poss_ini_limits = [[poss_ini[:, dimen_i].min(), poss_ini[:, dimen_i].max()] for dimen_i in
-                       xrange(poss_ini.shape[1])]
+    positions_ini = np.array(positions_ini)
+    poss_ini_limits = [[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
+                       for dimen_i in xrange(positions_ini.shape[1])]
 
-    volume_ini = ut.coord.volume_convex_hull(poss_ini)
+    volume_ini = ut.coord.volume_convex_hull(positions_ini)
     density_ini = part_ini.Cosmo.density_matter(part_ini.snapshot['redshift'])
     if part_ini.info['has.baryons']:
         # subtract baryonic mass
@@ -117,10 +118,11 @@ def write_initial_condition_points(
     if use_onorbe_method:
         Say.say('radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc physical' %
                 distance_pure)
-    Say.say('number of particles in selection volume at final time = %d' % np.sum(spec_select_num))
+    Say.say('number of particles in selection volume at final time = %d' %
+            np.sum(spec_select_number))
     for spec_i in xrange(len(spec_names)):
         spec_name = spec_names[spec_i]
-        Say.say('  species %s: number = %d' % (spec_name, spec_select_num[spec_i]))
+        Say.say('  species %s: number = %d' % (spec_name, spec_select_number[spec_i]))
     Say.say('mass of all dark-matter particles:')
     Say.say('  at highest-resolution in input catalog = %.2e M_sun' %
             part_ini['dark']['mass'].sum())
@@ -146,10 +148,10 @@ def write_initial_condition_points(
             '# radius of uncontaminated volume (Onorbe et al) at final time = %.3f kpc physical\n' %
             distance_pure)
     file_io.write('# number of particles in selection volume at final time = %d\n' %
-                  poss_ini.shape[0])
+                  positions_ini.shape[0])
     for spec_i in xrange(len(spec_names)):
         file_io.write('#   species %s: number = %d\n' %
-                      (spec_names[spec_i], spec_select_num[spec_i]))
+                      (spec_names[spec_i], spec_select_number[spec_i]))
     file_io.write('# mass of all dark-matter particles:\n')
     file_io.write('#   at highest-resolution in input catalog = %.2e M_sun\n' %
                   part_ini['dark']['mass'].sum())
@@ -157,26 +159,27 @@ def write_initial_condition_points(
     file_io.write('#   in convex hull at initial time = %.2e M_sun\n' % mass_ini)
     file_io.write('# volume of convex hull at initial time = %.1f Mpc ^ 3 comoving\n' %
                   (volume_ini * const.mega_per_kilo ** 3))
-    for dimen_i in xrange(poss_ini.shape[1]):
+    for dimen_i in xrange(positions_ini.shape[1]):
         file_io.write('# initial position-%s [min, max] = %s kpc comoving, %s box units\n' %
                       (dimen_i, ut.array.get_limits(poss_ini_limits[dimen_i], digit_num=3),
                        ut.array.get_limits(poss_ini_limits[dimen_i] / part_ini.info['box.length'],
                                            digit_num=8)))
 
-    poss_ini /= part_ini.info['box.length']  # renormalize to box units
+    positions_ini /= part_ini.info['box.length']  # renormalize to box units
 
     if method == 'convex-hull':
         # use convex hull to define initial region to reduce memory
-        ConvexHull = spatial.ConvexHull(poss_ini)
-        poss_ini = poss_ini[ConvexHull.vertices]
+        ConvexHull = spatial.ConvexHull(positions_ini)
+        positions_ini = positions_ini[ConvexHull.vertices]
         file_io.write('# using convex hull with %d vertices to define initial volume\n' %
-                      poss_ini.shape[0])
+                      positions_ini.shape[0])
 
     file_io.close()
 
     file_io = open(file_name, 'w')
-    for pi in xrange(poss_ini.shape[0]):
-        file_io.write('%.8f %.8f %.8f\n' % (poss_ini[pi, 0], poss_ini[pi, 1], poss_ini[pi, 2]))
+    for pi in xrange(positions_ini.shape[0]):
+        file_io.write('%.8f %.8f %.8f\n' %
+                      (positions_ini[pi, 0], positions_ini[pi, 1], positions_ini[pi, 2]))
     file_io.close()
 
 
