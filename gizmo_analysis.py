@@ -36,47 +36,41 @@ def parse_property(parts_or_species, property_kind, prop_values=None):
     property_kind : string : options: 'position', 'velocity', 'indices'
     prop_values : float/array or list thereof : property values to assign
     '''
+    def parse_property_single(part_or_spec, property_kind, prop_values):
+        if property_kind in ['position', 'velocity']:
+            if prop_values is None or not len(prop_values):
+                if property_kind == 'position':
+                    part_value = part_or_spec.center_position
+                elif property_kind == 'velocity':
+                    part_value = part_or_spec.center_velocity
+
+                if part_value is not None and len(part_value):
+                    prop_values = part_value
+                else:
+                    raise ValueError('no input %s and no %s in input catalog' %
+                                     (property_kind, property_kind))
+
+        if isinstance(prop_values, list):
+            raise ValueError('input list of %ss but only input single catalog' % property_kind)
+
+        return prop_values
+
     assert property_kind in ['position', 'velocity', 'indices']
 
     if isinstance(parts_or_species, list):
         # input list of particle catalogs
         if prop_values is None or not len(prop_values):
-            prop_values = [[] for _ in parts_or_species]
+            prop_values = [prop_values for _ in parts_or_species]
 
         if len(prop_values) != len(parts_or_species):
             raise ValueError('number of input %ss not match number of input catalogs' %
                              property_kind)
 
-        for part_i, part in enumerate(parts_or_species):
-            if prop_values[part_i] is None or not len(prop_values[part_i]):
-                # check if particle catalog stores a default value
-                if property_kind == 'position':
-                    part_value = part.center_position
-                elif property_kind == 'velocity':
-                    part_value = part.center_velocity
-
-                if len(part_value):
-                    prop_values[part_i] = part_value
-                else:
-                    raise ValueError('no input %s and no %s in input catalog' %
-                                     (property_kind, property_kind))
+        for i, part_or_spec in enumerate(parts_or_species):
+            prop_values[i] = parse_property_single(part_or_spec, property_kind, prop_values[i])
     else:
         # input single particle catalog
-        if prop_values is None or not len(prop_values):
-            if property_kind == 'position':
-                part_value = parts_or_species.center_position
-            elif property_kind == 'velocity':
-                part_value = parts_or_species.center_velocity
-
-            if len(part_value):
-                prop_values = part_value
-            else:
-                raise ValueError('no input %s and no %s in input catalog' %
-                                 (property_kind, property_kind))
-        elif isinstance(prop_values, list):
-            raise ValueError('input list of %ss but only input single catalog' % property_kind)
-        else:
-            prop_values = np.asarray(prop_values)
+        prop_values = parse_property_single(parts_or_species, property_kind, prop_values)
 
     return prop_values
 
