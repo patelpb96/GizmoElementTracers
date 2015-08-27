@@ -24,63 +24,66 @@ from utilities import plot
 #===================================================================================================
 # analysis utility
 #===================================================================================================
-def parse_center(center_kind, parts, centers=None):
+def parse_property(parts_or_species, property_kind, prop_values=None):
     '''
-    Get center position, either from particle catalog or input.
+    Get property, either input or from particle catalog, and list-ify as necessary to match
+    input particle catalog.
 
     Parameters
     ----------
-    center_kind : string : options: 'position', 'velocity'
-    parts : dict or list : catalog[s] of particles
-    centers : list or list of lists : position[s] or velocity[s] of center[s]
+    parts_or_species : dict or string or list thereof :
+        catalog[s] of particles or string[s] of species
+    property_kind : string : options: 'position', 'velocity', 'indices'
+    prop_values : float/array or list thereof : property values to assign
     '''
-    assert center_kind in ['position', 'velocity']
+    assert property_kind in ['position', 'velocity', 'indices']
 
-    if isinstance(parts, list):
-        # list of particle catalogs
-        if centers is None or not len(centers):
-            centers = [[] for part in parts]
+    if isinstance(parts_or_species, list):
+        # input list of particle catalogs
+        if prop_values is None or not len(prop_values):
+            prop_values = [[] for _ in parts_or_species]
 
-        if np.ndim(centers) != 2 or len(centers) != len(parts):
-            raise ValueError('shape of input center %ss does not match that of input catalogs' %
-                             center_kind)
+        if len(prop_values) != len(parts_or_species):
+            raise ValueError('number of input %ss not match number of input catalogs' %
+                             property_kind)
 
-        for part_i, part in enumerate(parts):
-            if center_kind == 'position':
-                part_center = part.center_position
-            elif center_kind == 'velocity':
-                part_center = part.center_velocity
+        for part_i, part in enumerate(parts_or_species):
+            if prop_values[part_i] is None or not len(prop_values[part_i]):
+                # check if particle catalog stores a default value
+                if property_kind == 'position':
+                    part_value = part.center_position
+                elif property_kind == 'velocity':
+                    part_value = part.center_velocity
 
-            if centers[part_i] is None or not len(centers[part_i]):
-                if len(part_center):
-                    centers[part_i] = part_center
+                if len(part_value):
+                    prop_values[part_i] = part_value
                 else:
-                    raise ValueError('no input center %s and no center %s in input catalog' %
-                                     (center_kind, center_kind))
+                    raise ValueError('no input %s and no %s in input catalog' %
+                                     (property_kind, property_kind))
     else:
-        # single particle catalog
-        if center_kind == 'position':
-            part_center = parts.center_position
-        elif center_kind == 'velocity':
-            part_center = parts.center_velocity
+        # input single particle catalog
+        if prop_values is None or not len(prop_values):
+            if property_kind == 'position':
+                part_value = parts_or_species.center_position
+            elif property_kind == 'velocity':
+                part_value = parts_or_species.center_velocity
 
-        if centers is None or not len(centers):
-            if len(part_center):
-                centers = part_center
+            if len(part_value):
+                prop_values = part_value
             else:
-                raise ValueError('no input center %s and no center %s in input catalog' %
-                                 (center_kind, center_kind))
-        elif np.ndim(centers) > 1:
-            raise ValueError('input multiple center %ss but only single catalog' % center_kind)
+                raise ValueError('no input %s and no %s in input catalog' %
+                                 (property_kind, property_kind))
+        elif isinstance(prop_values, list):
+            raise ValueError('input list of %ss but only input single catalog' % property_kind)
         else:
-            centers = np.array(centers)
+            prop_values = np.asarray(prop_values)
 
-    return centers
+    return prop_values
 
 
 def get_orbit_dictionary(
     part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True,
-    part_indicess=None):
+    part_indicess=None, scalarize=False):
     '''
     Get dictionary of orbital parameters.
 
@@ -95,14 +98,9 @@ def get_orbit_dictionary(
     if np.isscalar(species):
         species = [species]
 
-    if (center_position is None or not len(center_position)) and len(part.center_position):
-        center_position = part.center_position
-
-    if (center_velocity is None or not len(center_velocity)) and len(part.center_velocity):
-        center_velocity = part.center_velocity
-
-    if not isinstance(part_indicess, list):
-        part_indicess = [part_indicess]
+    center_position = parse_property(part, 'position', center_position)
+    center_velocity = parse_property(part, 'velocity', center_velocity)
+    part_indicess = parse_property(species, 'indices', part_indicess)
 
     orb = {}
     for spec_i, spec_name in enumerate(species):
@@ -125,8 +123,8 @@ def get_orbit_dictionary(
         orb[spec_name] = ut.orbit.get_orbit_dictionary(
             distance_vectors, velocity_vectors, get_integrals=False)
 
-    #if len(species) == 1:
-    #    orb = orb[species[0]]
+    if scalarize and len(species) == 1:
+        orb = orb[species[0]]
 
     return orb
 
@@ -178,7 +176,8 @@ def get_species_histogram_profiles(
         if 'dark.2' in part:
             species.append('dark.2')
 
-    center_position = parse_center('position', part, center_position)
+    center_position = parse_property(part, 'position', center_position)
+    part_indicess = parse_property(species, 'indices', part_indicess)
 
     assert 0 < DistanceBin.dimension_number <= 3
 
@@ -313,14 +312,11 @@ def get_species_statistics_profiles(
     elif species == ['baryon']:
         species = ['gas', 'star']
 
-    center_position = parse_center('position', part, center_position)
-    if 'velocity' in prop_name:
-        center_velocity = parse_center('velocity', part, center_velocity)
+    center_position = parse_property(part, 'position', center_position)
+    center_velocity = parse_property(part, 'velocity', center_velocity)
+    part_indicess = parse_property(species, 'indices', part_indicess)
 
     assert 0 < DistanceBin.dimension_number <= 3
-
-    if not isinstance(part_indicess, list):
-        part_indicess = [part_indicess]
 
     for spec_i, spec_name in enumerate(species):
         part_indices = part_indicess[spec_i]
@@ -419,7 +415,7 @@ def plot_mass_contamination(
             Say.say('! no %s in particle dictionary' % spec_test)
     species_test = species_test_t
 
-    center_position = parse_center('position', part, center_position)
+    center_position = parse_property(part, 'position', center_position)
 
     distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
@@ -542,7 +538,7 @@ def plot_metal_v_distance(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to put plot
     '''
-    center_position = parse_center('position', part, center_position)
+    center_position = parse_property(part, 'position', center_position)
 
     distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
@@ -668,7 +664,7 @@ def plot_image(
     positions = positions[:, dimen_indices_select]
     weights = part[spec_name].prop(weight_prop_name, part_indices)
 
-    center_position = parse_center('position', part, center_position)
+    center_position = parse_property(part, 'position', center_position)
 
     if center_position is not None and len(center_position):
         # re-orient to input center
@@ -831,16 +827,10 @@ def plot_property_distribution(
 
     if isinstance(parts, dict):
         parts = [parts]
-        if not isinstance(center_positions, list):
-            center_positions = [center_positions]
-        if not isinstance(center_velocities, list):
-            center_velocities = [center_velocities]
-        if not isinstance(part_indicess, list):
-            part_indicess = [part_indicess]
 
-    center_positions = parse_center('position', parts, center_positions)
-    if 'velocity' in prop_name:
-        center_velocities = parse_center('velocity', parts, center_velocities)
+    center_positions = parse_property(parts, 'position', center_positions)
+    center_velocities = parse_property(parts, 'velocity', center_velocities)
+    part_indicess = parse_property(parts, 'velocity', part_indicess)
 
     Stat = ut.math.StatisticClass()
 
@@ -947,7 +937,7 @@ def plot_property_v_property(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to put plot
     '''
-    center_position = parse_center('position', part, center_position)
+    center_position = parse_property(part, 'position', center_position)
 
     if part_indices is None or not len(part_indices):
         part_indices = ut.array.arange_length(part[spec_name].prop(x_prop_name))
@@ -1095,16 +1085,10 @@ def plot_property_v_distance(
     '''
     if isinstance(parts, dict):
         parts = [parts]
-    if not isinstance(center_positions, list):
-        center_positions = [center_positions]
-    if not isinstance(center_velocities, list):
-        center_velocities = [center_velocities]
-    if not isinstance(part_indicess, list):
-        part_indicess = [part_indicess]
 
-    center_positions = parse_center('position', parts, center_positions)
-    if 'velocity' in prop_name:
-        center_velocities = parse_center('velocity', parts, center_velocities)
+    center_positions = parse_property(parts, 'position', center_positions)
+    center_velocities = parse_property(parts, 'velocity', center_velocities)
+    part_indicess = parse_property(parts, 'indices', part_indicess)
 
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
@@ -1215,9 +1199,9 @@ def get_star_form_history(
     if part_indices is None:
         part_indices = ut.array.get_null_array(part[species]['mass'].size)
 
-    part_is_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
-    form_times = part[species].prop('form.time', part_is_sort)
-    masses = part[species]['mass'][part_is_sort]
+    part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
+    form_times = part[species].prop('form.time', part_indices_sort)
+    masses = part[species]['mass'][part_indices_sort]
     masses_cum = np.cumsum(masses)
 
     time_limits = np.array(time_limits)
@@ -1268,7 +1252,7 @@ def get_star_form_history(
 def plot_star_form_history(
     parts, sf_kind='rate',
     time_kind='redshift', time_limits=[0, 1], time_width=0.01, time_scaling='lin',
-    distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indices=None,
+    distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indicess=None,
     axis_y_scaling='log', axix_y_limits=[], write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot star-formation rate history v time_kind.
@@ -1285,7 +1269,7 @@ def plot_star_form_history(
     distance_limits : list : min and max limits of distance to select star particles
     center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indices : array : indices of particles from which to select
+    part_indicess : array : part_indices of particles from which to select
     axis_y_scaling : string : log or lin
     write_plot : boolean : whether to write plot
     plot_directory : string
@@ -1294,10 +1278,9 @@ def plot_star_form_history(
 
     if isinstance(parts, dict):
         parts = [parts]
-        if center_positions is not None and not isinstance(center_positions, list):
-            center_positions = [center_positions]
 
-    center_positions = parse_center('position', parts, center_positions)
+    center_positions = parse_property(parts, 'position', center_positions)
+    part_indicess = parse_property(parts, 'part_indices', part_indicess)
 
     time_limits = np.array(time_limits)
     if time_limits[1] is None:
@@ -1306,23 +1289,23 @@ def plot_star_form_history(
     sf = {'time': [], 'form.rate': [], 'form.rate.specific': [], 'mass': [], 'mass.normalized': []}
 
     for part_i, part in enumerate(parts):
-        if part_indices is not None and len(part_indices):
-            indices = part_indices
+        if part_indicess[part_i] is not None and len(part_indicess[part_i]):
+            part_indices = part_indicess
         else:
-            indices = ut.array.arange_length(part['star'].prop('form.time'))
+            part_indices = ut.array.arange_length(part['star'].prop('form.time'))
 
         if other_prop_limits:
-            indices = ut.catalog.get_indices(part['star'], other_prop_limits, indices)
+            part_indices = ut.catalog.get_indices(part['star'], other_prop_limits, part_indices)
 
         if (center_positions[part_i] is not None and len(center_positions[part_i]) and
                 distance_limits is not None and len(distance_limits)):
             distances = ut.coord.get_distance(
-                'scalar', part['star']['position'][indices], center_positions[part_i],
+                'scalar', part['star']['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            indices = indices[ut.array.elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.elements(distances, distance_limits)]
 
         times, sfrs, masses = get_star_form_history(
-            part, time_kind, time_limits, time_width, time_scaling, indices)
+            part, time_kind, time_limits, time_width, time_scaling, part_indices)
 
         sf['time'].append(times)
         sf['form.rate'].append(sfrs)
