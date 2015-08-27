@@ -107,7 +107,7 @@ class ParticleDictionaryClass(dict):
             return (self.prop('density', indices) * (1 - self.prop('metallicity', indices)[:, 0]) *
                     const.proton_per_sun * const.kpc_per_cm ** 3)
 
-        if 'star.form.time' in property_name and 'lookback' in property_name:
+        if 'form.time' in property_name and 'lookback' in property_name:
             prop_name = property_name.replace('.lookback', '')
             return (self.snapshot['time'] - self.prop(prop_name, indices))
 

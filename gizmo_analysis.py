@@ -175,9 +175,6 @@ def get_species_histogram_profiles(
 
     assert 0 < DistanceBin.dimension_number <= 3
 
-    if not isinstance(part_indicess, list):
-        part_indicess = [part_indicess]
-
     for spec_i, spec_name in enumerate(species):
         part_indices = part_indicess[spec_i]
         if part_indices is None or not len(part_indices):
@@ -1082,7 +1079,6 @@ def plot_property_v_distance(
 
     center_positions = parse_property(parts, 'position', center_positions)
     center_velocities = parse_property(parts, 'velocity', center_velocities)
-    part_indicess = parse_property(parts, 'indices', part_indicess)
 
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
@@ -1153,7 +1149,7 @@ def plot_property_v_distance(
 
     plot_name = (species + '.' + prop_name + '.' + prop_statistic + '_v_dist_z.%.1f' %
                  part.info['redshift'])
-    plot_name = plot_name.replace('.hist', '')
+    plot_name = plot_name.replace('.histogram', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
     plot.parse_output(write_plot, plot_directory, plot_name)
