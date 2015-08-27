@@ -39,7 +39,7 @@ def write_initial_condition_points(
     distance_max : float : distance from center to select particles at final time
         {kpc physical, or units of R_halo}
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
-    halo_radius : float : radius of halo
+    halo_radius : float : radius of halo {kpc physical}
     virial_kind : string : virial kind for halo radius (if not input halo_radius)
     use_onorbe_method : boolean : whether to use method of Onorbe et al to get uncontaminated region
     refinement_num : int : if above is true, number of refinement levels beyond current for region
@@ -85,7 +85,7 @@ def write_initial_condition_points(
     for spec_name in spec_names:
         positions_fin = part_fin[spec_name]['position']
 
-        distances = ut.coord.distance(
+        distances = ut.coord.get_distance(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
         distances *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
@@ -100,11 +100,12 @@ def write_initial_condition_points(
     poss_ini_limits = [[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
                        for dimen_i in xrange(positions_ini.shape[1])]
 
-    volume_ini = ut.coord.volume_convex_hull(positions_ini)
-    density_ini = part_ini.Cosmo.density_matter(part_ini.snapshot['redshift'])
+    volume_ini = ut.coord.get_volume_of_convex_hull(positions_ini)
+    density_ini = part_ini.Cosmology.density(
+        'matter', part_ini.snapshot['redshift'], 'kpc comoving')
     if part_ini.info['has.baryons']:
         # subtract baryonic mass
-        density_ini *= part_ini.Cosmo['omega_dark'] / part_ini.Cosmo['omega_matter']
+        density_ini *= part_ini.Cosmology['omega_dark'] / part_ini.Cosmology['omega_matter']
     mass_ini = volume_ini * density_ini  # assume cosmic density within volume
 
     Say.say('final redshift = %.3f, initial redshift = %.3f' %

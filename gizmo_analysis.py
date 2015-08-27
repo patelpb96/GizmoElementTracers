@@ -30,30 +30,13 @@ def parse_center(center_kind, parts, centers=None):
 
     Parameters
     ----------
-    center_kind : string : 'position', 'velocity'
+    center_kind : string : options: 'position', 'velocity'
     parts : dict or list : catalog[s] of particles
     centers : list or list of lists : position[s] or velocity[s] of center[s]
     '''
     assert center_kind in ['position', 'velocity']
 
-    if isinstance(parts, dict):
-        # single particle catalog
-        if center_kind == 'position':
-            part_center = parts.center_position
-        elif center_kind == 'velocity':
-            part_center = parts.center_velocity
-
-        if centers is None or not len(centers):
-            if len(part_center):
-                centers = part_center
-            else:
-                raise ValueError('no input center %s and no center %s in input catalog' %
-                                 (center_kind, center_kind))
-        elif np.ndim(centers) > 1:
-            raise ValueError('input multiple center %ss but only single catalog' % center_kind)
-        else:
-            centers = np.array(centers)
-    else:
+    if isinstance(parts, list):
         # list of particle catalogs
         if centers is None or not len(centers):
             centers = [[] for part in parts]
@@ -74,6 +57,23 @@ def parse_center(center_kind, parts, centers=None):
                 else:
                     raise ValueError('no input center %s and no center %s in input catalog' %
                                      (center_kind, center_kind))
+    else:
+        # single particle catalog
+        if center_kind == 'position':
+            part_center = parts.center_position
+        elif center_kind == 'velocity':
+            part_center = parts.center_velocity
+
+        if centers is None or not len(centers):
+            if len(part_center):
+                centers = part_center
+            else:
+                raise ValueError('no input center %s and no center %s in input catalog' %
+                                 (center_kind, center_kind))
+        elif np.ndim(centers) > 1:
+            raise ValueError('input multiple center %ss but only single catalog' % center_kind)
+        else:
+            centers = np.array(centers)
 
     return centers
 
@@ -94,13 +94,15 @@ def get_orbit_dictionary(
     '''
     if np.isscalar(species):
         species = [species]
-        part_indicess = [part_indicess]
 
     if (center_position is None or not len(center_position)) and len(part.center_position):
         center_position = part.center_position
 
     if (center_velocity is None or not len(center_velocity)) and len(part.center_velocity):
         center_velocity = part.center_velocity
+
+    if not isinstance(part_indicess, list):
+        part_indicess = [part_indicess]
 
     orb = {}
     for spec_i, spec_name in enumerate(species):
@@ -112,11 +114,11 @@ def get_orbit_dictionary(
             positions = positions[part_indices]
             velocities = velocities[part_indices]
 
-        distance_vectors = ut.coord.distance(
+        distance_vectors = ut.coord.get_distance(
             'vector', positions, center_position, part.info['box.length'])
         distance_vectors *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
-        velocity_vectors = ut.coord.velocity_difference(
+        velocity_vectors = ut.coord.get_velocity_difference(
             'vector', velocities, center_velocity, include_hubble_flow, positions, center_position,
             part.snapshot['scale-factor'], part.snapshot['time.hubble'], part.info['box.length'])
 
@@ -131,7 +133,7 @@ def get_orbit_dictionary(
 
 def get_species_histogram_profiles(
     part, species=['all'], prop_name='mass', center_position=None, DistanceBin=None,
-    other_prop_limits={}, part_indicess=None):
+    axis_distance_max=Inf, other_axis_distance_max=None, other_prop_limits={}, part_indicess=None):
     '''
     Get dictionary of profiles of mass/density (or any summed quantity) for each particle species.
 
@@ -142,9 +144,24 @@ def get_species_histogram_profiles(
     prop_name : string : property to get histogram of
     center_position : list : center position
     DistanceBin : class : distance bin class
+    axis_distance_max : float : maximum distance to use in defining principal axes {kpc physical}
+    other_axis_distance_max : float :
+        maximum distance along other axis[s] to keep particles {kpc physical}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indicess : array or list: indices of particles from which to select
+    part_indicess : array : indices of particles from which to select
     '''
+    if 'gas' in species and 'consume.time' in prop_name:
+        pros_mass = get_species_histogram_profiles(
+            part, species, 'mass', center_position, DistanceBin, other_prop_limits, part_indicess)
+        pros_sfr = get_species_histogram_profiles(
+            part, species, 'sfr', center_position, DistanceBin, other_prop_limits, part_indicess)
+
+        pros = pros_sfr
+        for k in pros_sfr['gas']:
+            if 'distance' not in k:
+                pros['gas'][k] = pros_mass['gas'][k] / pros_sfr['gas'][k] / 1e9
+        return pros
+
     pros = {}
 
     Fraction = ut.math.FractionClass()
@@ -152,36 +169,52 @@ def get_species_histogram_profiles(
     # ensure is list even if just one species
     if np.isscalar(species):
         species = [species]
-        part_indicess = [part_indicess]
     else:
         species = copy.copy(species)
 
     if species == ['all'] or species == ['total'] or species == ['baryon']:
-        species = ['dark', 'gas', 'star']
         #species = part.keys()
+        species = ['dark', 'gas', 'star']
         if 'dark.2' in part:
             species.append('dark.2')
 
     center_position = parse_center('position', part, center_position)
 
+    assert 0 < DistanceBin.dimension_number <= 3
+
+    if not isinstance(part_indicess, list):
+        part_indicess = [part_indicess]
+
     for spec_i, spec_name in enumerate(species):
-        positions = part[spec_name]['position']
-        prop_values = part[spec_name].prop(prop_name)
-
         part_indices = part_indicess[spec_i]
-        if (part_indices is not None and len(part_indices)) or other_prop_limits:
-            if part_indices is None or not len(part_indices):
-                part_indices = ut.array.arange_length(prop_values)
+        if part_indices is None or not len(part_indices):
+            part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
 
-            if other_prop_limits:
-                part_indices = ut.catalog.get_indices(
-                    part[spec_name], other_prop_limits, part_indices)
+        if other_prop_limits:
+            part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
 
-            positions = positions[part_indices]
-            prop_values = prop_values[part_indices]
+        prop_values = part[spec_name].prop(prop_name, part_indices)
 
-        distances = ut.coord.distance('scalar', positions, center_position, part.info['box.length'])
-        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+        if DistanceBin.dimension_number == 3:
+            distances = ut.coord.get_distance(
+                'scalar', part[spec_name]['position'][part_indices], center_position,
+                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+        elif DistanceBin.dimension_number in [1, 2]:
+            distancess = ut.particle.get_distances_along_principal_axes(
+                part, spec_name, '2d', axis_distance_max, center_position,
+                part_indicess=part_indices, scalarize=True)
+
+            if DistanceBin.dimension_number == 1:
+                distances = distancess[0]
+                other_distances = distancess[1]
+            elif DistanceBin.dimension_number == 2:
+                distances = distancess[1]
+                other_distances = distancess[0]
+
+            if 0 < other_axis_distance_max < Inf:
+                masks = other_distances < other_axis_distance_max
+                distances = distances[masks]
+                prop_values = prop_values[masks]
 
         pros[spec_name] = DistanceBin.get_histogram_profile(distances, prop_values)
 
@@ -234,7 +267,7 @@ def get_species_histogram_profiles(
                     if spec_name == 'baryon':
                         # units of cosmic baryon fraction
                         pros[spec_name][pro_prop + '.fraction'] /= (
-                            part.Cosmo['omega_baryon'] / part.Cosmo['omega_matter'])
+                            part.Cosmology['omega_baryon'] / part.Cosmology['omega_matter'])
 
         # create circular velocity = sqrt (G m(< r) / r)
         for spec_name in species:
@@ -249,7 +282,8 @@ def get_species_histogram_profiles(
 
 def get_species_statistics_profiles(
     part, species=['all'], prop_name='', center_position=None, DistanceBin=None,
-    center_velocity=None, weight_by_mass=True, other_prop_limits={}, part_indicess=None):
+    center_velocity=None, weight_by_mass=True, axis_distance_max=Inf, other_axis_distance_max=None,
+    other_prop_limits={}, part_indicess=None):
     '''
     Get dictionary of profiles of statistics (such as median, average) for given property for each
     particle species.
@@ -263,15 +297,17 @@ def get_species_statistics_profiles(
     DistanceBin : class : distance bin class
     center_velocity : array : velocity of center
     weight_by_mass : boolean : whether to weight property by species mass
+    axis_distance_max : float : maximum distance to use in defining principal axes {kpc physical}
+    other_axis_distance_max : float :
+        maximum distance along other axis[s] to keep particles {kpc physical}
+    other_axis_distance_max : float :
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array or list : indices of particles from which to select
     '''
     pros = {}
 
-    # ensure is list even if just one species
     if np.isscalar(species):
-        species = [species]
-
+        species = [species]  # ensure is list
     if species == ['all'] or species == ['total']:
         species = ['dark', 'gas', 'star', 'dark.2', 'dark.3']
     elif species == ['baryon']:
@@ -280,6 +316,11 @@ def get_species_statistics_profiles(
     center_position = parse_center('position', part, center_position)
     if 'velocity' in prop_name:
         center_velocity = parse_center('velocity', part, center_velocity)
+
+    assert 0 < DistanceBin.dimension_number <= 3
+
+    if not isinstance(part_indicess, list):
+        part_indicess = [part_indicess]
 
     for spec_i, spec_name in enumerate(species):
         part_indices = part_indicess[spec_i]
@@ -294,32 +335,48 @@ def get_species_statistics_profiles(
             masses = part[spec_name].prop('mass', part_indices)
 
         if 'velocity' in prop_name:
-            # {kpc comoving}
-            distances = ut.coord.distance(
+            distances = ut.coord.get_distance(
                 'vector', part[spec_name]['position'][part_indices], center_position,
-                part.info['box.length'])
-            distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
 
-            velocity_vectors = ut.coord.velocity_difference(
+            velocity_vectors = ut.coord.get_velocity_difference(
                 'vector', part[spec_name]['velocity'][part_indices], center_velocity, True,
                 part[spec_name]['position'][part_indices], center_position,
                 part.snapshot['scale-factor'], part.snapshot['time.hubble'],
                 part.info['box.length'])
 
             pro = DistanceBin.get_velocity_profile(distances, velocity_vectors, masses)
+
             pros[spec_name] = pro[prop_name]
             for prop in pro:
                 if 'velocity' not in prop:
                     pros[spec_name][prop] = pro[prop]
         else:
-            # {kpc comoving}
-            distances = ut.coord.distance(
-                'scalar', part[spec_name]['position'][part_indices], center_position,
-                part.info['box.length'])
-            distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+            prop_values = part[spec_name].prop(prop_name, part_indices)
 
-            pros[spec_name] = DistanceBin.get_statistics_profile(
-                distances, part[spec_name].prop(prop_name, part_indices), masses)
+            if DistanceBin.dimension_number == 3:
+                distances = ut.coord.get_distance(
+                    'scalar', part[spec_name]['position'][part_indices], center_position,
+                    part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+            elif DistanceBin.dimension_number in [1, 2]:
+                distancess = ut.particle.get_distances_along_principal_axes(
+                    part, spec_name, '2d', axis_distance_max, center_position,
+                    part_indicess=part_indices, scalarize=True)
+
+                if DistanceBin.dimension_number == 1:
+                    distances = distancess[0]
+                    other_distances = distancess[1]
+                elif DistanceBin.dimension_number == 2:
+                    distances = distancess[1]
+                    other_distances = distancess[0]
+
+                if 0 < other_axis_distance_max < Inf:
+                    masks = other_distances < other_axis_distance_max
+                    distances = distances[masks]
+                    masses = masses[masks]
+                    prop_values = prop_values[masks]
+
+            pros[spec_name] = DistanceBin.get_statistics_profile(distances, prop_values, masses)
 
     return pros
 
@@ -378,7 +435,7 @@ def plot_mass_contamination(
     ratios = {}
 
     for spec_name in pros:
-        distances = ut.coord.distance(
+        distances = ut.coord.get_distance(
             'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
         distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
         pros[spec_name] = DistanceBin.get_histogram_profile(distances, part[spec_name]['mass'])
@@ -487,14 +544,14 @@ def plot_metal_v_distance(
     '''
     center_position = parse_center('position', part, center_position)
 
-    distance_lim_use = np.array(distance_limits)
+    distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
-        distance_lim_use *= halo_radius
+        distance_limits_use *= halo_radius
 
     DistanceBin = ut.bin.DistanceBinClass(
-        distance_scaling, distance_lim_use, distance_bin_width, distance_bin_number)
+        distance_scaling, distance_limits_use, distance_bin_width, distance_bin_number)
 
-    distances = ut.coord.distance(
+    distances = ut.coord.get_distance(
         'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
     distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
@@ -568,7 +625,7 @@ def plot_image(
     part, spec_name='dark', dimen_indices_plot=[0, 1], dimen_indices_select=[0, 1, 2],
     distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
-    write_plot=False, plot_directory='.', figure_index=1):
+    align_principal_axes=False, write_plot=False, plot_directory='.', figure_index=1):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
     3 panels for all axes.
@@ -587,6 +644,7 @@ def plot_image(
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indices : array : input selection indices for particles
     subsample_factor : int : factor by which periodically to sub-sample particles
+    align_principal_axes : boolean : whether to align positions with principal axes
     write_plot : boolean : whether to write plot to file
     plot_directory : string : where to put plot file
     '''
@@ -624,6 +682,10 @@ def plot_image(
 
         positions = positions[masks]
         weights = weights[masks]
+
+        if align_principal_axes:
+            eigen_vectors = ut.coord.get_principal_axes(positions, weights)[0]
+            positions = ut.coord.get_position_rotated(positions, eigen_vectors)
     else:
         distance_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
 
@@ -792,10 +854,9 @@ def plot_property_distribution(
             part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
 
         if distance_limits:
-            distances = ut.coord.distance(
+            distances = ut.coord.get_distance(
                 'scalar', part[spec_name]['position'][part_indices], center_positions[part_i],
-                part.info['box.length'])
-            distances *= part.snapshot['scale-factor']  # {kpc physical}
+                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
             part_indices = part_indices[ut.array.elements(distances, distance_limits)]
 
         if 'velocity' in prop_name:
@@ -895,10 +956,9 @@ def plot_property_v_property(
         part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
 
     if len(center_position) and len(host_distance_limits):
-        distances = ut.coord.distance(
+        distances = ut.coord.get_distance(
             'scalar', center_position, part[spec_name]['position'][part_indices],
-            part.info['box.length'])
-        distances *= part.snapshot['scale-factor']
+            part.info['box.length']) * part.snapshot['scale-factor']
         part_indices = part_indices[ut.array.elements(distances, host_distance_limits)]
 
     x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
@@ -999,40 +1059,48 @@ def plot_property_v_distance(
     parts, species='dark', prop_name='mass', prop_statistic='histogram', prop_scaling='log',
     weight_by_mass=False,
     distance_limits=[0.1, 300], distance_bin_width=0.02, distance_bin_number=None,
-    distance_scaling='log', center_positions=None, center_velocities=None,
+    distance_scaling='log',
+    dimension_number=3, axis_distance_max=Inf, other_axis_distance_max=None,
+    center_positions=None, center_velocities=None,
     other_prop_limits={}, part_indicess=None,
     axis_y_limits=[], distance_reference=None,
-    write_plot=False, plot_directory='.', figure_index=1):
+    get_values=False, write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
     species : string or list : species to compute total mass of
         options: dark, star, gas, baryon, total
     prop_name : string : property to get profile of
-    prop_statistic : string : statistic/type to plot
-        options: hist, hist.cum, density, density.cum, vel.circ, hist.fraction, hist.cum.fraction,
-            med, ave
+    prop_statistic : string : statistic/type to plot:
+        histogram, histogram.cum, density, density.cum, vel.circ,
+        histogram.fraction, histogram.cum.fraction, med, ave
     prop_scaling : string : scaling for property (y-axis): lin, log
     weight_by_mass : boolean : whether to weight property by particle mass
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
     distance_bin_number : int : number of bins between limits
     distance_scaling : string : lin or log
+    dimension_number : int : number of spatial dimensions for profile
+        note : if 1, get profile along minor axis, if 2, get profile along 2 major axes
+    axis_distance_max : float : maximum distance to use in defining principal axes {kpc physical}
+    other_axis_distance_max : float :
+        maximum distance along other axis[s] to keep particles {kpc physical}
     center_positions : array or list of arrays : position of center for each particle catalog
     center_velocities : array or list of arrays : velocity of center for each particle catalog
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : limits to impose on y-axis
+    write_values : boolean : whether to write values
     write_plot : boolean : whether to write plot to file
     plot_directory : string
     '''
     if isinstance(parts, dict):
         parts = [parts]
-        if not isinstance(center_positions, list):
-            center_positions = [center_positions]
-        if not isinstance(center_velocities, list):
-            center_velocities = [center_velocities]
-        if not isinstance(part_indicess, list):
-            part_indicess = [part_indicess]
+    if not isinstance(center_positions, list):
+        center_positions = [center_positions]
+    if not isinstance(center_velocities, list):
+        center_velocities = [center_velocities]
+    if not isinstance(part_indicess, list):
+        part_indicess = [part_indicess]
 
     center_positions = parse_center('position', parts, center_positions)
     if 'velocity' in prop_name:
@@ -1040,30 +1108,19 @@ def plot_property_v_distance(
 
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
-        dimension_number=3)
+        dimension_number=dimension_number)
 
     pros = []
     for part_i, part in enumerate(parts):
-        if prop_name in ['mass', 'sfr']:
+        if prop_name in ['mass', 'sfr', 'consume.time']:
             pros_part = get_species_histogram_profiles(
-                part, species, prop_name, center_positions[part_i], DistanceBin, other_prop_limits,
-                part_indicess)
-        elif 'gas' in species and 'consume.time' in prop_name:
-            pros_part_mass = get_species_histogram_profiles(
-                part, species, 'mass', center_positions[part_i], DistanceBin, other_prop_limits,
-                part_indicess)
-            pros_part_sfr = get_species_histogram_profiles(
-                part, species, 'sfr', center_positions[part_i], DistanceBin, other_prop_limits,
-                part_indicess)
-
-            pros_part = pros_part_sfr
-            for k in pros_part_sfr['gas']:
-                if 'distance' not in k:
-                    pros_part['gas'][k] = pros_part_mass['gas'][k] / pros_part_sfr['gas'][k] / 1e9
+                part, species, prop_name, center_positions[part_i], DistanceBin,
+                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
         else:
             pros_part = get_species_statistics_profiles(
                 part, species, prop_name, center_positions[part_i], DistanceBin,
-                center_velocities[part_i], weight_by_mass, other_prop_limits, part_indicess)
+                center_velocities[part_i], weight_by_mass, axis_distance_max,
+                other_axis_distance_max, other_prop_limits, part_indicess)
 
         pros.append(pros_part)
 
@@ -1083,7 +1140,8 @@ def plot_property_v_distance(
     subplot.set_ylim(plot.parse_axis_limits(axis_y_limits, y_vals, prop_scaling))
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
-    label_y = plot.get_label(prop_name, prop_statistic, species, get_symbol=True, get_units=True)
+    label_y = plot.get_label(prop_name, prop_statistic, species, dimension_number=dimension_number,
+                             get_symbol=True, get_units=True)
     subplot.set_ylabel(label_y)
 
     plot_func = plot.get_plot_function(subplot, distance_scaling, prop_scaling)
@@ -1121,6 +1179,11 @@ def plot_property_v_distance(
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
     plot.parse_output(write_plot, plot_directory, plot_name)
+
+    if get_values:
+        if len(parts) == 1:
+            pros = pros[0]
+        return pros
 
 
 #===================================================================================================
@@ -1161,7 +1224,7 @@ def get_star_form_history(
 
     if 'lookback' in time_kind:
         # convert from look-back time wrt z = 0 to age for the computation
-        time_limits = np.sort(part.Cosmo.time_from_redshift(0) - time_limits)
+        time_limits = np.sort(part.Cosmology.time_from_redshift(0) - time_limits)
 
     if 'log' in time_scaling:
         if time_kind == 'redshift':
@@ -1176,7 +1239,7 @@ def get_star_form_history(
     if time_kind == 'redshift':
         # input redshift limits and bins, need to convert to time
         redshift_bins = time_bins
-        time_bins = np.sort(part.Cosmo.time_from_redshift(time_bins))
+        time_bins = np.sort(part.Cosmology.time_from_redshift(time_bins))
 
     masses_cum_in_bins = np.interp(time_bins, form_times, masses_cum)
     # convert to {M_sun / yr}
@@ -1193,7 +1256,7 @@ def get_star_form_history(
 
     if 'lookback' in time_kind:
         # convert back to lookback time wrt z = 0
-        time_bins = part.Cosmo.time_from_redshift(0) - time_bins
+        time_bins = part.Cosmology.time_from_redshift(0) - time_bins
     elif time_kind == 'redshift':
         time_bin_is = np.argsort(time_bins)[::-1]
         time_bins = time_bin_is[time_bin_is]
@@ -1253,10 +1316,9 @@ def plot_star_form_history(
 
         if (center_positions[part_i] is not None and len(center_positions[part_i]) and
                 distance_limits is not None and len(distance_limits)):
-            distances = ut.coord.distance(
+            distances = ut.coord.get_distance(
                 'scalar', part['star']['position'][indices], center_positions[part_i],
-                part.info['box.length'])
-            distances *= part.snapshot['scale-factor']  # {kpc physical}
+                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
             indices = indices[ut.array.elements(distances, distance_limits)]
 
         times, sfrs, masses = get_star_form_history(
@@ -1392,7 +1454,81 @@ def get_galaxy_mass_v_redshift(
             gal['radius.%.0f' % mass_percent].append(gal_radius)
 
             for spec in species:
-                distances = ut.coord.distance(
+                distances = ut.coord.get_distance(
+                    'scalar', part[spec]['position'], part.center_position, part.info['box.length'])
+                distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+
+                gal[spec + '.mass.%.0f' % mass_percent].append(
+                    np.sum(part[spec]['mass'][distances < gal_radius]))
+
+    for prop in gal:
+        gal[prop] = np.array(gal[prop])
+
+    return gal
+
+
+def get_galaxy_mass_profiles_v_redshift(
+    directory='.',
+    redshifts=[3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0]):
+    '''
+    Read snapshots and store dictionary of galaxy/halo position, velocity, size, mass at input
+    scale-factors.
+
+    Parameters
+    ----------
+    directory : string : directory of snapshot files
+    redshifts : array-like : redshifts at which to get properties
+
+    Returns
+    -------
+    dictionary of galaxy/halo properties at each redshift
+    '''
+    from . import gizmo_io
+
+    property_names = ['mass', 'position', 'velocity']
+
+    species = ['star', 'gas', 'dark']
+    mass_percents = [50, 90]
+
+    gal = {
+        'redshift': [],
+        'scale-factor': [],
+        'time': [],
+        'position': [],
+        'star.velocity': [],
+        'dark.velocity': [],
+    }
+    for mass_percent in mass_percents:
+        gal['radius.%.0f' % mass_percent] = []
+        for spec in species:
+            gal[spec + '.mass.%.0f' % mass_percent] = []
+
+    for redshift in redshifts:
+        part = gizmo_io.Gizmo.read_snapshot(
+            species, 'redshift', redshift, directory, property_names, force_float32=True)
+        part.center_position = ut.particle.get_center_position(part, 'star')
+
+        gal_radius = ut.particle.get_galaxy_radius(part, 'star', 'mass.percent', 50)
+        #hal_radius = ut.particle.get_halo_radius(part, species, virial_kind='200m')
+        #hal_radius *= 0.5
+        hal_radius = 50  # shortcut for larger runs
+
+        for k in ['redshift', 'scale-factor', 'time']:
+            gal[k].append(part.snapshot[k])
+
+        gal['position'].append(part.center_position)
+        gal['star.velocity'].append(
+            ut.particle.get_center_velocity(part, 'star', radius_max=gal_radius))
+        gal['dark.velocity'].append(
+            ut.particle.get_center_velocity(part, 'dark', radius_max=hal_radius))
+
+        for mass_percent in mass_percents:
+            gal_radius = ut.particle.get_galaxy_radius(
+                part, 'star', 'mass.percent', mass_percent)
+            gal['radius.%.0f' % mass_percent].append(gal_radius)
+
+            for spec in species:
+                distances = ut.coord.get_distance(
                     'scalar', part[spec]['position'], part.center_position, part.info['box.length'])
                 distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 

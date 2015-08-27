@@ -458,7 +458,7 @@ class GizmoClass(ut.io.SayClass):
             sigma_8 = 0.807
             n_s = 0.961
             w = -1.0
-            Cosmo = cosmology.CosmologyClass(
+            Cosmology = cosmology.CosmologyClass(
                 header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
                 sigma_8, n_s, w)
 
@@ -633,7 +633,7 @@ class GizmoClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale factor to {Gyr}
-                    part[spec_name]['form.time'] = Cosmo.time_from_redshift(
+                    part[spec_name]['form.time'] = Cosmology.time_from_redshift(
                         1 / part[spec_name]['form.time'] - 1).astype(
                             part[spec_name]['form.time'].dtype)
                 else:
@@ -675,9 +675,9 @@ class GizmoClass(ut.io.SayClass):
         ## assign auxilliary information ##
 
         # store cosmology class
-        part.Cosmo = Cosmo
+        part.Cosmology = Cosmology
         for spec_name in species_names:
-            part[spec_name].Cosmo = part.Cosmo
+            part[spec_name].Cosmology = part.Cosmology
 
         # store header dictionary
         part.info = header
@@ -685,13 +685,13 @@ class GizmoClass(ut.io.SayClass):
             part[spec_name].info = part.info
 
         # store information on snapshot time
-        time = Cosmo.time_from_redshift(header['redshift'])
+        time = Cosmology.time_from_redshift(header['redshift'])
         part.snapshot = {
             'redshift': header['redshift'],
             'scale-factor': header['scale-factor'],
             'time': time,
-            'time.lookback': Cosmo.time_from_redshift(0) - time,
-            'time.hubble': const.Gyr_per_sec / Cosmo.hubble_parameter(0),
+            'time.lookback': Cosmology.time_from_redshift(0) - time,
+            'time.hubble': const.Gyr_per_sec / Cosmology.hubble_parameter(0),
         }
         for spec_name in species_names:
             part[spec_name].snapshot = part.snapshot

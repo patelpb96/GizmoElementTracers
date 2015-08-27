@@ -1,7 +1,7 @@
 '''
 Generate initial conditions for MUSIC using AGORA.
 
-Halo masses in {log M_sun}, particle masses in {M_sun}, positions in {kpc comoving}.
+Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
 @author: Andrew Wetzel
 '''
@@ -10,7 +10,7 @@ Halo masses in {log M_sun}, particle masses in {M_sun}, positions in {kpc comovi
 # system ----
 from __future__ import absolute_import, division, print_function
 import numpy as np
-from numpy import log10, Inf
+from numpy import Inf
 # local ----
 import yt
 import yt.analysis_modules.halo_finding.api as halo_io
@@ -65,7 +65,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.data.append(self.snapshot[0].h.all_data())
         self.data.append(self.snapshot[1].h.all_data())
 
-        self.Cosmo = cosmology.CosmologyClass(source='agora')
+        self.Cosmology = cosmology.CosmologyClass(source='agora')
 
         if read_halos:
             self.read_halo_catalog()
@@ -89,8 +89,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.hal.info['box.length'] = self['box.length']
         self.hal.snapshot = {}
         self.hal.snapshot['redshift'] = self['redshifts'][0]
-        self.hal.snapshot['scale-factor'] = 1 / (1 + self['redshifts'][0])
-        self.hal.Cosmo = self.Cosmo
+        self.hal.snapshot['scale-factor'] /= (1 + self['redshifts'][0])
+        self.hal.Cosmology = self.Cosmology
 
         self.hal['position'] = np.zeros((len(self.hal_yt), 3), dtype=np.float32)
         self.hal['mass'] = np.zeros(len(self.hal_yt), dtype=np.float32)
@@ -102,8 +102,9 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.hal['radius'][hi] = self.hal_yt[hi].maximum_radius()
             self.hal['position'][hi] = self.hal_yt[hi].center_of_mass()
             self.hal['particle.number'][hi] = self.hal_yt[hi].get_size()
-        self.hal['mass'] = log10(self.hal['mass'])  # {log M_sun}
-        self.hal['radius'] *= self.hal.info['box.length']  # {kpc comoving}
+        self.hal['mass'] = self.hal['mass']  # {M_sun}
+        # {kpc physical}
+        self.hal['radius'] *= self.hal.info['box.length'] * self.hal.snapshot['scale-factor']
         self.hal['position'] *= self.hal.info['box.length']  # {kpc comoving}
 
         NearestNeig = ut.catalog.NearestNeighborClass()
@@ -138,13 +139,13 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.part[ti].info['has.baryons'] = False
             self.part[ti].snapshot = {}
             self.part[ti].snapshot['redshift'] = self['redshifts'][ti]
-            self.part[ti].snapshot['scale-factor'] = 1 / (1 + self['redshifts'][ti])
-            self.part[ti].Cosmo = self.Cosmo
+            self.part[ti].snapshot['scale-factor'] /= (1 + self['redshifts'][ti])
+            self.part[ti].Cosmology = self.Cosmology
 
         self.part.info = {}
         self.part.info['box.length'] = self['box.length']
         self.part.info['has.baryons'] = False
-        self.part.Cosmo = self.Cosmo
+        self.part.Cosmology = self.Cosmology
 
         for ti in tis:
             # in yt, particle_index = id
@@ -238,7 +239,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 #===================================================================================================
 def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig_mass_frac_min=0.5):
     '''
-    Get distances & indices of halos that are within distance_max of center of given halo.
+    Get distances {kpc physical} and indices of halos that are within distance_max of center of
+    given halo.
 
     Parameters
     ----------
@@ -252,11 +254,14 @@ def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig
 
     if scale_virial:
         distance_max *= hal['radius'][halo_index]
-    mass_min = hal['mass'][halo_index] + log10(neig_mass_frac_min)
+
+    mass_min = neig_mass_frac_min * hal['mass'][halo_index]
     his_m = ut.array.elements(hal['mass'], [mass_min, Inf])
+
     neig_distances, neig_indices = Neighbor.get_neighbors(
         hal['position'][[halo_index]], hal['position'][his_m], 200, [1e-6, distance_max],
-        hal.info['box.length'], neig_ids=his_m)
+        hal.info['box.length'], hal.snapshot['scale-factor'], neig_ids=his_m)
+
     if scale_virial:
         neig_distances /= hal['radius'][halo_index]
 
@@ -309,7 +314,7 @@ def print_contamination_around_halo(
     Say.say('read %d particles around halo' % pids.size)
 
     pis = Agora.part[ti]['id-to-index'][pids]
-    distances = ut.coord.distance(
+    distances = ut.coord.get_distance(
         'scalar', Agora.part[ti]['position'][pis], Agora.hal['position'][halo_index],
         Agora['box.length'])
     if scale_virial:
@@ -343,8 +348,8 @@ def print_contamination_in_box(
     Parameters
     ----------
     part : dict : catalog of particles
-    center_position : array : 3-d position of center
-    distance_limits : float : maximum distance from center to check
+    center_position : array : 3-d position of center {kpc comoving}
+    distance_limits : float : maximum distance from center to check {kpc physical}
     distance_bin_number : int : number of distance bins
     scaling : string : 'log', 'lin'
     geometry : string : geometry of region: 'cube', 'sphere'
@@ -375,7 +380,7 @@ def print_contamination_in_box(
         distances = distances[0]
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
-        distance_vector = np.abs(ut.coord.distance(
+        distance_vector = np.abs(ut.coord.get_distance(
             'vector', part['position'], center_position, part.info['box.length']))
 
     for di in xrange(DistanceBin.number):
