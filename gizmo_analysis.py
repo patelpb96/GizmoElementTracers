@@ -830,7 +830,7 @@ def plot_property_distribution(
 
     center_positions = parse_property(parts, 'position', center_positions)
     center_velocities = parse_property(parts, 'velocity', center_velocities)
-    part_indicess = parse_property(parts, 'velocity', part_indicess)
+    part_indicess = parse_property(parts, 'indices', part_indicess)
 
     Stat = ut.math.StatisticClass()
 
@@ -1280,7 +1280,7 @@ def plot_star_form_history(
         parts = [parts]
 
     center_positions = parse_property(parts, 'position', center_positions)
-    part_indicess = parse_property(parts, 'part_indices', part_indicess)
+    part_indicess = parse_property(parts, 'indices', part_indicess)
 
     time_limits = np.array(time_limits)
     if time_limits[1] is None:
