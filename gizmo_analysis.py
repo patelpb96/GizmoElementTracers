@@ -1358,11 +1358,22 @@ def get_galaxy_mass_profiles_v_redshift(
         'dark.velocity': [],
         'rotation.tensor': [],
         'axis.ratio': [],
+
+        'profile.3d.distance': [],
+        'profile.3d.density': [],
+
+        'profile.minor.distance': [],
+        'profile.minor.density': [],
+
+        'profile.major.distance': [],
+        'profile.major.density': [],
+
     }
 
     for mass_percent in mass_percents:
         gal['radius.3d.%.0f' % mass_percent] = []
         gal['mass.3d.%.0f' % mass_percent] = []
+        gal['profile.3d.distance'] = []
 
         gal['radius.major.%.0f' % mass_percent] = []
         gal['mass.major.%.0f' % mass_percent] = []
@@ -1420,22 +1431,22 @@ def get_galaxy_mass_profiles_v_redshift(
             part, spec_name, 'mass', 'density', 'log', False, [0.1, 20], 0.1, None, 'log', 3,
             rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
 
-        gal['profile.3d.distance'] = pro[spec_name]['distance']
-        gal['profile.3d.density'] = pro[spec_name]['density']
+        for k in ['distance', 'density']:
+            gal['profile.3d.' + k].append(pro[spec_name][k])
 
         pro = plot_property_v_distance(
             part, spec_name, 'mass', 'density', 'log', False, [0.1, 20], 0.1, None, 'log', 1,
             rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
 
-        gal['profile.minor.distance'] = pro[spec_name]['distance']
-        gal['profile.minor.density'] = pro[spec_name]['density']
+        for k in ['distance', 'density']:
+            gal['profile.minor.' + k].append(pro[spec_name][k])
 
         pro = plot_property_v_distance(
             part, spec_name, 'mass', 'density', 'log', False, [0.1, 20], 0.1, None, 'log', 2,
             rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
 
-        gal['profile.major.distance'] = pro[spec_name]['distance']
-        gal['profile.major.density'] = pro[spec_name]['density']
+        for k in ['distance', 'density']:
+            gal['profile.major.' + k].append(pro[spec_name][k])
 
     for prop in gal:
         gal[prop] = np.array(gal[prop])
