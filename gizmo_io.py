@@ -767,7 +767,7 @@ class GizmoClass(ut.io.SayClass):
         '''
         return simulation.Snapshot.read_snapshots(file_name, directory)
 
-    def assign_center(self, part, method='center-of-mass'):
+    def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''
         Assign center position and velocity to galaxy/halo, using stars for hydro simulation or
         dark matter for dark matter simulation.
@@ -775,7 +775,8 @@ class GizmoClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        method : string : method of centering: center-of-mass, potential
+        method : string : method of centering: 'center-of-mass', 'potential'
+        compare_centers : boolean : whether to compare centers via c-o-m zoom v potential
         '''
         if 'star' in part and len(part['star']['position']):
             species = 'star'
@@ -787,7 +788,8 @@ class GizmoClass(ut.io.SayClass):
             self.say('! catalog not contain star or dark particles, skipping center finding')
             return
 
-        part.center_position = ut.particle.get_center_position(part, species, method)
+        part.center_position = ut.particle.get_center_position(
+            part, species, method, compare_centers=compare_centers)
 
         part.center_velocity = ut.particle.get_center_velocity(
             part, species, velocity_radius_max, part.center_position)

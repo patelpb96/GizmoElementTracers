@@ -24,7 +24,7 @@ from . import gizmo_io
 # initial conditions
 #===================================================================================================
 def write_initial_condition_points(
-    part_fin, part_ini, center_position=[], distance_max=None, scale_to_halo_radius=True,
+    part_fin, part_ini, center_position=None, distance_max=None, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m',
     use_onorbe_method=False, refinement_num=1, method='convex-hull'):
     '''
@@ -61,10 +61,10 @@ def write_initial_condition_points(
                 Say.say('! species = %s: ids in final and initial catalogs not match' % spec_name)
                 if spec_name in ['dark', 'dark.2']:
                     return
+
     Say.say('using species: %s' % spec_names)
 
-    if not len(center_position) and len(part_fin.center_position):
-        center_position = part_fin.center_position
+    center_position = ut.particle.parse_property(part_fin, 'position', center_position)
 
     if scale_to_halo_radius:
         if not halo_radius:
@@ -204,7 +204,8 @@ if __name__ == '__main__':
         ['dark', 'dark.2'], 'index', 0, 'output', ['position', 'id', 'mass'],
         sort_dark_by_id=True, force_float32=False, assign_center=False)
 
-    center_position = ut.particle.get_center_position(part_fin, 'dark')
+    center_position = ut.particle.get_center_position(
+        part_fin, 'dark', 'center-of-mass', compare_centers=True)
 
     write_initial_condition_points(
         part_fin, part_ini, center_position, distance_max, scale_to_halo_radius=True,

@@ -178,25 +178,10 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
 
     part = gizmo_io.Gizmo.read_snapshot(
         ['dark', 'dark.2'], 'redshift', snapshot_redshift, 'output',
-        ['position', 'mass', 'potential'], force_float32=True, assign_center=False)
+        ['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 
-    center_position_dark_cm = ut.particle.get_center_position(part, 'dark')
-
-    print('# dark center position [kpc comoving]')
-    print('  center-of-mass: ', end='')
-    ut.io.print_array(center_position_dark_cm, '%.3f')
-
-    if 'potential' in part['dark']:
-        center_pos_dark_pot = part['dark']['position'][np.argmin(part['dark']['potential'])]
-        print('  potential min:  ', end='')
-        ut.io.print_array(center_pos_dark_pot, '%.3f')
-
-        for dimen_i in xrange(center_position_dark_cm.size):
-            position_dif = np.abs(center_position_dark_cm[dimen_i] - center_pos_dark_pot[dimen_i])
-            if position_dif > position_dif_max:
-                print('! position-%d offset = %.3f' % (dimen_i, position_dif))
-
-    part.center_position = center_position_dark_cm
+    #part.center_position = ut.particle.get_center_position(
+    #    part, 'dark', 'center-of-mass', compare_centers=True)
 
     halo_radius, _halo_mass = ut.particle.get_halo_radius(part, 'all', virial_kind=virial_kind)
 
