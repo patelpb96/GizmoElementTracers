@@ -68,7 +68,8 @@ def write_initial_condition_points(
 
     if scale_to_halo_radius:
         if not halo_radius:
-            halo_radius = ut.particle.get_halo_radius(part_fin, 'all', center_position, virial_kind)
+            halo_radius, _halo_mass = ut.particle.get_halo_radius(
+                part_fin, 'all', center_position, virial_kind)
         distance_max *= halo_radius
 
     if use_onorbe_method:
@@ -85,7 +86,7 @@ def write_initial_condition_points(
     for spec_name in spec_names:
         positions_fin = part_fin[spec_name]['position']
 
-        distances = ut.coord.get_distance(
+        distances = ut.coord.get_distances(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
         distances *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 

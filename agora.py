@@ -247,7 +247,6 @@ def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig
     hal : dict : catalog of halos
     halo_index : int : index of halo to select
     distance_max : float : maximum distance {kpc physical or R_halo}
-    distance_kind : string : kind for maximum distance: 'physical', 'virial'
     neig_mass_frac_min : float : minimum fraction of input mass to select neighboring halos
     '''
     Neighbor = ut.neighbor.NeighborClass()
@@ -314,7 +313,7 @@ def print_contamination_around_halo(
     Say.say('read %d particles around halo' % pids.size)
 
     pis = Agora.part[ti]['id-to-index'][pids]
-    distances = ut.coord.get_distance(
+    distances = ut.coord.get_distances(
         'scalar', Agora.part[ti]['position'][pis], Agora.hal['position'][halo_index],
         Agora['box.length'])
     if scale_virial:
@@ -380,7 +379,7 @@ def print_contamination_in_box(
         distances = distances[0]
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
-        distance_vector = np.abs(ut.coord.get_distance(
+        distance_vector = np.abs(ut.coord.get_distances(
             'vector', part['position'], center_position, part.info['box.length']))
 
     for di in xrange(DistanceBin.number):

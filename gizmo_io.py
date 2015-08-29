@@ -151,7 +151,7 @@ class GizmoClass(ut.io.SayClass):
         property_names='all', property_names_exclude=[],
         simulation_name='',
         metal_index_max=1, particle_subsample_factor=0,
-        sort_dark_by_id=False, force_float32=False, assign_center=True, get_header_only=False):
+        assign_center=True, sort_dark_by_id=False, force_float32=False, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary class.
@@ -180,9 +180,9 @@ class GizmoClass(ut.io.SayClass):
         metal_index_max : int : maximum metal index to keep
             options: 0 = total, 1 = total + helium, 10 = iron (no r-process)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
+        assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
-        assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         get_header_only : boolean : whether to read only header
 
         Returns
