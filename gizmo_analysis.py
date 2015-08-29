@@ -1322,8 +1322,9 @@ def plot_star_form_history(
 # galaxy disk mass and radius over time, with james and shea
 #===================================================================================================
 def get_galaxy_mass_profiles_v_redshift(
-    part=None, directory='.',
-    redshifts=[3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0]):
+    directory='.',
+    redshifts=[3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0],
+    parts=None):
     '''
     Read snapshots and store dictionary of galaxy/halo position, velocity, size, mass at input
     scale-factors.
@@ -1339,7 +1340,7 @@ def get_galaxy_mass_profiles_v_redshift(
     '''
     from . import gizmo_io
 
-    property_names = ['mass', 'position', 'velocity']
+    property_names = ['mass', 'position', 'velocity', 'potential']
 
     species_read = ['star', 'dark']
     spec_name = 'star'
@@ -1381,8 +1382,10 @@ def get_galaxy_mass_profiles_v_redshift(
         gal['radius.minor.%.0f' % mass_percent] = []
         gal['mass.minor.%.0f' % mass_percent] = []
 
-    for redshift in redshifts:
-        if part is None:
+    for zi, redshift in enumerate(redshifts):
+        if parts is not None and len(parts):
+            part = parts[zi]
+        else:
             part = gizmo_io.Gizmo.read_snapshot(
                 species_read, 'redshift', redshift, directory, property_names, force_float32=True)
 
