@@ -1235,7 +1235,7 @@ def plot_star_form_history(
 
     for part_i, part in enumerate(parts):
         if part_indicess[part_i] is not None and len(part_indicess[part_i]):
-            part_indices = part_indicess
+            part_indices = part_indicess[part_i]
         else:
             part_indices = ut.array.arange_length(part['star'].prop('form.time'))
 
@@ -1401,7 +1401,7 @@ def get_galaxy_mass_profiles_v_redshift(
             ut.particle.get_center_velocity(part, 'dark', distance_max=dark_distance_max))
 
         # get radius_90 as fiducial
-        gal_radius_90, _gal_mass_90 = ut.particle.get_galaxy_radius(
+        gal_radius_90, _gal_mass_90 = ut.particle.get_galaxy_radius_mass(
             part, spec_name, 'mass.percent', mass_percent, star_distance_max)
 
         rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
@@ -1411,19 +1411,19 @@ def get_galaxy_mass_profiles_v_redshift(
         gal['axis.ratio'].append(axis_ratios)
 
         for mass_percent in mass_percents:
-            gal_radius, gal_mass = ut.particle.get_galaxy_radius(
+            gal_radius, gal_mass = ut.particle.get_galaxy_radius_mass(
                 part, spec_name, 'mass.percent', mass_percent, star_distance_max)
             gal['radius.3d.%.0f' % mass_percent].append(gal_radius)
             gal['mass.3d.%.0f' % mass_percent].append(gal_mass)
 
-            gal_radius_minor, gal_mass_minor = ut.particle.get_galaxy_radius(
+            gal_radius_minor, gal_mass_minor = ut.particle.get_galaxy_radius_mass(
                 part, spec_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='minor', rotation_vectors=rotation_vectors,
                 other_axis_distance_max=gal_radius_90)
             gal['radius.minor.%.0f' % mass_percent].append(gal_radius_minor)
             gal['mass.minor.%.0f' % mass_percent].append(gal_mass_minor)
 
-            gal_radius_major, gal_mass_major = ut.particle.get_galaxy_radius(
+            gal_radius_major, gal_mass_major = ut.particle.get_galaxy_radius_mass(
                 part, spec_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='major', rotation_vectors=rotation_vectors,
                 other_axis_distance_max=gal_radius_minor)

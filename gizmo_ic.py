@@ -68,7 +68,7 @@ def write_initial_condition_points(
 
     if scale_to_halo_radius:
         if not halo_radius:
-            halo_radius, _halo_mass = ut.particle.get_halo_radius(
+            halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(
                 part_fin, 'all', center_position, virial_kind)
         distance_max *= halo_radius
 

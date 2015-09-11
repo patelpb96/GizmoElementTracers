@@ -183,7 +183,7 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
     #part.center_position = ut.particle.get_center_position(
     #    part, 'dark', 'center-of-mass', compare_centers=True)
 
-    halo_radius, _halo_mass = ut.particle.get_halo_radius(part, 'all', virial_kind=virial_kind)
+    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(part, 'all', virial_kind=virial_kind)
 
     gizmo_analysis.plot_mass_contamination(
         part, radius_lim_phys, radius_bin_wid, halo_radius=halo_radius, scale_to_halo_radius=False,

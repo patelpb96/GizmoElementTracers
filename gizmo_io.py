@@ -379,8 +379,8 @@ class GizmoClass(ut.io.SayClass):
         if snapshot_number_kind == 'redshift':
             snapshot_redshift = snapshot_number
             snapshot_number = Snapshot.get_index(snapshot_number)
-            self.say('input snapshot redshift = %.3f -> snapshot index = %d\n' %
-                     (snapshot_redshift, snapshot_number))
+            self.say('input redshift = %.3f -> snapshot index = %d, redshift = %.3f\n' %
+                     (snapshot_redshift, snapshot_number, Snapshot['redshift'][snapshot_number]))
 
         ## read and assign header ##
         # get file name
