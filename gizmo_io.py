@@ -769,14 +769,14 @@ class GizmoClass(ut.io.SayClass):
 
     def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''
-        Assign center position and velocity to galaxy/halo, using stars for hydro simulation or
-        dark matter for dark matter simulation.
+        Assign center position {kpc comoving} and velocity {km / sec physical} to galaxy/halo,
+        using stars for hydro simulation or dark matter for dark matter simulation.
 
         Parameters
         ----------
         part : dict : catalog of particles
         method : string : method of centering: 'center-of-mass', 'potential'
-        compare_centers : boolean : whether to compare centers via c-o-m zoom v potential
+        compare_centers : boolean : whether to compare centers via center-of-mass v potential
         '''
         if 'star' in part and len(part['star']['position']):
             species = 'star'
