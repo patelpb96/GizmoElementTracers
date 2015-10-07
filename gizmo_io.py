@@ -117,10 +117,15 @@ class ParticleDictionaryClass(dict):
             for prop_name in property_name.split('.'):
                 if prop_name in metal_dict:
                     metal_index = metal_dict[prop_name]
+
             if metal_index is None:
                 ValueError('property = %s is not a valid input to halo catalog' % property_name)
 
-            values = self['metallicity'][indices, metal_index]
+            if indices is None:
+                values = self['metallicity'][:, metal_index]
+            else:
+                values = self['metallicity'][indices, metal_index]
+
             if '.feh' in property_name:
                 values /= 10 ** 0.2  # conversion from Ma et al 2015
             if '.solar' in property_name:
