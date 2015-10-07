@@ -147,8 +147,8 @@ class GizmoClass(ut.io.SayClass):
         self.eos = 5 / 3  # gas equation of state
 
     def read_snapshot(
-        self, species_types='all', snapshot_number_kind='index', snapshot_number=400, directory='.',
-        property_names='all', property_names_exclude=[],
+        self, species_types='all', snapshot_number_kind='index', snapshot_number=400,
+        directory='output', property_names='all', property_names_exclude=[],
         simulation_name='',
         metal_index_max=1, particle_subsample_factor=0,
         assign_center=True, sort_dark_by_id=False, force_float32=False, get_header_only=False):
@@ -178,7 +178,7 @@ class GizmoClass(ut.io.SayClass):
             note: can use this instead of property_names if just want to exclude a few properties
         simulation_name : string : name to store for future identification
         metal_index_max : int : maximum metal index to keep
-            options: 0 = total, 1 = total + helium, 10 = iron (no r-process)
+            options: None = keep all, 0 = total, 1 = total + helium, 10 = iron (no r-process)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
@@ -819,11 +819,14 @@ class GizmoClass(ut.io.SayClass):
         '''
         from . import gizmo_analysis
 
+        if np.isscalar(species):
+            species = [species]  # ensure is list
+
         orb = gizmo_analysis.get_orbit_dictionary(
-            part, species, center_position, center_velocity, include_hubble_flow)
+            part, species, center_position, center_velocity, include_hubble_flow, scalarize=False)
 
         for spec_name in species:
-            for prop in orb:
+            for prop in orb[spec_name]:
                 part[spec_name]['host.' + prop] = orb[spec_name][prop]
 
 

@@ -109,7 +109,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 
         NearestNeig = ut.catalog.NearestNeighborClass()
         NearestNeig.assign_to_self(
-            self.hal, 'mass', [1, Inf], [1, Inf], 200, 8000, 'comoving', 'virial')
+            self.hal, 'mass', [1, Inf], [1, Inf], 200, 8000, 'comoving', 'halo')
         NearestNeig.assign_to_catalog(self.hal)
 
     def read_particles(self, tis=[0, 1], divvy_by_mass=False):
