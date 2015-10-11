@@ -97,6 +97,7 @@ def get_species_histogram_profiles(
         pros_mass = get_species_histogram_profiles(
             part, species, 'mass', DistanceBin, center_position, rotation_vectors,
             axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+
         pros_sfr = get_species_histogram_profiles(
             part, species, 'sfr', DistanceBin, center_position, rotation_vectors,
             axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)

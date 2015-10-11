@@ -168,7 +168,7 @@ def plot_halo_contamination(directory='.', snapshot_redshift=0):
     directory : string : directory of simulation (one level above directory of snapshot file)
     snapshot_redshift : float : redshift of snapshot file
     '''
-    position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
+    #position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
     radius_bin_wid = 0.02
     radius_lim_phys = [1, 4000]  # {kpc physical}
     radius_lim_vir = [0.01, 10]  # {units of R_halo}
@@ -350,11 +350,11 @@ def plot_scaling(
         elif time_kind == 'wall':
             times = [mfm_ref14[k]['wall.time'] * 2 for k in mfm_ref14]
 
-        subplot.set_xlim([1e3, 2e4])
+        subplot.set_xlim([1e3, 2.5e4])
         subplot.set_xlabel('core number')
 
         if time_kind == 'cpu':
-            subplot.set_ylim([0, 2e5])
+            subplot.set_ylim([0, 1.6e5])
             subplot.set_ylabel('CPU time to $z = 9$ [hr]')
         elif time_kind == 'wall':
             subplot.set_ylim([0, 35])
@@ -362,7 +362,7 @@ def plot_scaling(
 
         plot_func(cpu_nums, times, '*-', linewidth=2.0, color='blue')
 
-        subplot.text(0.05, 0.1, 'mfm_ref14 scaling:\nparticle number = 1.1e9', color='black',
+        subplot.text(0.05, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                      transform=subplot.transAxes)
 
     elif plot_kind == 'weak':

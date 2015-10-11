@@ -130,6 +130,7 @@ class ParticleDictionaryClass(dict):
                 values /= 10 ** 0.2  # conversion from Ma et al 2015
             if '.solar' in property_name:
                 values /= const.sun_metallicity
+
             return values
 
         raise ValueError('property = %s is not a valid input to halo catalog' % property_name)
@@ -137,7 +138,7 @@ class ParticleDictionaryClass(dict):
 
 class GizmoClass(ut.io.SayClass):
     '''
-    Read Gizmo snapshots.
+    Read Gizmo snapshot.
     '''
     def __init__(
         self, snapshot_name_base='snap*', file_extension='.hdf5'):
