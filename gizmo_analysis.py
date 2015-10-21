@@ -632,7 +632,7 @@ def plot_image(
 
         if align_principal_axes:
             eigen_vectors = ut.coord.get_principal_axes(positions, weights)[0]
-            positions = ut.coord.get_positions_rotated(positions, eigen_vectors)
+            positions = ut.coord.get_coordinates_rotated(positions, eigen_vectors)
     else:
         distance_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
 
