@@ -22,11 +22,15 @@ def sync_snapshots(
     machine_name='stampede', from_directory='$STAMPEDE_SCRATCH/m12i_ref12_rad4_wk-area/output',
     snapshot_kind='file', snapshot_indices=400, to_directory='.'):
     '''
+    Transfer snapshot file[s] or directory[s] from remote machine to local.
+
+    Parameters
+    ----------
     machine_name : string : name of host machine
-    from_directory : string : from_directory of snapshot file on host machine
-    snapshot_kind : string : 'file' or 'from_directory'
+    from_directory : string : directory of snapshot file on host machine
+    snapshot_kind : string : 'file' or 'directory'
     snapshot indices : int or list : index[s] of snapshots
-    to_directory : string : local from_directory to put snapshots
+    to_directory : string : local directory to put snapshots
     '''
     if snapshot_kind == 'file':
         snapshot_name_base = 'snapshot_%.3d.hdf5'

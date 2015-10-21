@@ -37,17 +37,17 @@ class ParticleDictionaryClass(dict):
         metal_dict = {
             # translate between metal name and index in metallicity table
             'total': 0,
-            'he': 1,
-            'c': 2,
-            'n': 3,
-            'o': 4,
-            'ne': 5,
-            'mg': 6,
-            'si': 7,
-            's': 8,
-            'ca': 9,
-            'fe': 10,
-            'feh': 0,  # use to get [Fe/H]
+            'helium': 1,
+            'carbon': 2,
+            'nitrogen': 3,
+            'oxygen': 4,
+            'neon': 5,
+            'magnesium': 6,
+            'silicon': 7,
+            'sulphur': 8,
+            'calcium': 9,
+            'iron': 10,
+            'ironderived': 0,  # use to get [Fe/H]
         }
 
         property_name = property_name.strip()  # strip white space
@@ -97,10 +97,17 @@ class ParticleDictionaryClass(dict):
         if property_name[:3] == 'abs':
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
-        if property_name == 'mass.neutral':
-            # mass of neutral hydrogen
-            return (self.prop('mass', indices) * (1 - self.prop('metallicity', indices)[:, 0]) *
-                    self.prop('neutral.hydrogen.fraction', indices))
+        if 'mass.hydrogen' in property_name:
+            # mass of hydrogen (excluding helium)
+            values = (self.prop('mass', indices) *
+                      (1 - self.prop('metallicity', indices)[:, 0] -
+                       self.prop('metallicity', indices)[:, 1]))
+
+            if property_name == 'mass.hydrogen.neutral':
+                # mass of neutral hydrogen (excluding helium)
+                values = np.array(values) * self.prop('neutral.hydrogen.fraction', indices)
+
+            return values
 
         if property_name == 'number.density' or property_name == 'density.number':
             # number density of hyrogen {cm ^ -3}
@@ -109,7 +116,7 @@ class ParticleDictionaryClass(dict):
 
         if 'form.time' in property_name and 'lookback' in property_name:
             prop_name = property_name.replace('.lookback', '')
-            return (self.snapshot['time'] - self.prop(prop_name, indices))
+            return self.snapshot['time'] - self.prop(prop_name, indices)
 
         # check for metallicity string -> index conversion
         if 'metallicity.' in property_name:
@@ -117,6 +124,8 @@ class ParticleDictionaryClass(dict):
             for prop_name in property_name.split('.'):
                 if prop_name in metal_dict:
                     metal_index = metal_dict[prop_name]
+                    metal_name = prop_name
+                    break
 
             if metal_index is None:
                 ValueError('property = %s is not a valid input to halo catalog' % property_name)
@@ -126,10 +135,12 @@ class ParticleDictionaryClass(dict):
             else:
                 values = self['metallicity'][indices, metal_index]
 
-            if '.feh' in property_name:
-                values /= 10 ** 0.2  # conversion from Ma et al 2015
+            if '.ironderived' in property_name:
+                # conversion to [Fe/H] solar from Ma et al 2015
+                values = np.array(values) / 10 ** 0.2 * 0.02
+
             if '.solar' in property_name:
-                values /= const.sun_metallicity
+                values = np.array(values) / const.sun_metal[metal_name + '.mass.fraction']
 
             return values
 
@@ -638,7 +649,7 @@ class GizmoClass(ut.io.SayClass):
 
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
-                    # convert from units of scale factor to {Gyr}
+                    # convert from units of scale-factor to {Gyr}
                     part[spec_name]['form.time'] = Cosmology.time_from_redshift(
                         1 / part[spec_name]['form.time'] - 1).astype(
                             part[spec_name]['form.time'].dtype)
