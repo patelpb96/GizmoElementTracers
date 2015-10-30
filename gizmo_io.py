@@ -24,19 +24,19 @@ from utilities import simulation
 # utility
 #===================================================================================================
 # use to translate between element name and index in element table
-metal_dict = collections.OrderedDict()
-metal_dict['metal'] = 0
-metal_dict['helium'] = 1
-metal_dict['carbon'] = 2
-metal_dict['nitrogen'] = 3
-metal_dict['oxygen'] = 4
-metal_dict['neon'] = 5
-metal_dict['magnesium'] = 6
-metal_dict['silicon'] = 7,
-metal_dict['sulphur'] = 8,
-metal_dict['calcium'] = 9
-metal_dict['iron'] = 10
-metal_dict['ironderived'] = 0
+element_dict = collections.OrderedDict()
+element_dict['metal'] = 0
+element_dict['helium'] = 1
+element_dict['carbon'] = 2
+element_dict['nitrogen'] = 3
+element_dict['oxygen'] = 4
+element_dict['neon'] = 5
+element_dict['magnesium'] = 6
+element_dict['silicon'] = 7,
+element_dict['sulphur'] = 8,
+element_dict['calcium'] = 9
+element_dict['iron'] = 10
+element_dict['ironderived'] = 0
 
 
 class ParticleDictionaryClass(dict):
@@ -126,8 +126,8 @@ class ParticleDictionaryClass(dict):
         if 'metallicity.' in property_name:
             metal_index = None
             for prop_name in property_name.split('.'):
-                if prop_name in metal_dict:
-                    metal_index = metal_dict[prop_name]
+                if prop_name in element_dict:
+                    metal_index = element_dict[prop_name]
                     metal_name = prop_name
                     break
 

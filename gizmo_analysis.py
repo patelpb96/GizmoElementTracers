@@ -25,10 +25,10 @@ from utilities import plot
 #===================================================================================================
 # utility
 #===================================================================================================
-def get_metal_yields(
+def get_nucleosynthetic_yields(
     event_kind='supernova.ii', star_metallicity=1.0, normalize=True):
     '''
-    Get ordered dictionary of nucleosynthetic yields, according to input event_kind.
+    Get nucleosynthetic element yields, according to input event_kind.
     Note: this only returns the *additional* nucleosynthetic yields that Gizmo adds to the
     star's existing metallicity, so these are not the actual yields that get deposited to gas.
 
@@ -36,7 +36,7 @@ def get_metal_yields(
     ----------
     event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float :
-        total metallicity of star prior to event, relative to sun_metal_mass_fraction
+        total metallicity of star prior to event, relative to solar (sun_metal_mass_fraction)
     normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
 
     Returns
@@ -46,23 +46,23 @@ def get_metal_yields(
     '''
     sun_metal_mass_fraction = 0.02  # total metal mass fraction that Gizmo assumes
 
-    assert event_kind in ('wind', 'supernova.ii', 'supernova.ia')
+    assert event_kind in ['wind', 'supernova.ii', 'supernova.ia']
 
-    metal_dict = collections.OrderedDict()
-    metal_dict['metal'] = 0
-    metal_dict['helium'] = 1
-    metal_dict['carbon'] = 2
-    metal_dict['nitrogen'] = 3
-    metal_dict['oxygen'] = 4
-    metal_dict['neon'] = 5
-    metal_dict['magnesium'] = 6
-    metal_dict['silicon'] = 7
-    metal_dict['sulphur'] = 8
-    metal_dict['calcium'] = 9
-    metal_dict['iron'] = 10
+    element_dict = collections.OrderedDict()
+    element_dict['metal'] = 0
+    element_dict['helium'] = 1
+    element_dict['carbon'] = 2
+    element_dict['nitrogen'] = 3
+    element_dict['oxygen'] = 4
+    element_dict['neon'] = 5
+    element_dict['magnesium'] = 6
+    element_dict['silicon'] = 7
+    element_dict['sulphur'] = 8
+    element_dict['calcium'] = 9
+    element_dict['iron'] = 10
 
     yield_dict = collections.OrderedDict()
-    for k in metal_dict:
+    for k in element_dict:
         yield_dict[k] = 0.0
 
     star_metal_mass_fraction = star_metallicity * sun_metal_mass_fraction
@@ -88,7 +88,9 @@ def get_metal_yields(
                 yield_dict['metal'] += yield_dict[k]
 
     elif event_kind == 'supernova.ii':
-        # in Gizmo, occurs up to 37.53 Myr after formation
+        # in Gizmo, occurs from 3.4 to 37.53 Myr after formation
+        # from 3.4 to 10.37 Myr, rate / M_sun is 5.408e-10 yr ^ -1
+        # from 10.37 37.53 Myr, rate / M_sun is 2.516e-10 yr ^ -1
         # from Nomoto et al 2006, IMF averaged
         ejecta_mass = 10.5  # {M_sun}
 
@@ -116,7 +118,9 @@ def get_metal_yields(
         yield_dict['metal'] += yield_dict['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
-        # in Gizmo, occurs starting 37.53 Myr after formation
+        # in Gizmo, occurs after 37.53 Myr after formation, rate / M_sun is
+        # 5.3e-14 + 1.6e-5 * exp(-0.5 * ((star_age - 0.05) / 0.01) *
+        #                        ((star_age - 0.05) / 0.01)) yr ^ -1
         # from Iwamoto et al 1999, W7 model
         ejecta_mass = 1.4  # {M_sun}
 
@@ -139,19 +143,23 @@ def get_metal_yields(
     return yield_dict
 
 
-def plot_metal_yields(
+def plot_nucleosynthetic_yields(
     event_kind='wind', star_metallicity=0.1, normalize=False,
     axis_y_scaling='lin', axis_y_limits=[1e-3, None],
     write_plot=False, plot_directory='.', figure_index=1):
     '''
-    Plot nucleosynthetic yields, according to input event_kind.
+    Plot nucleosynthetic element yields, according to input event_kind.
 
     Parameters
     ----------
     event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
-    star_metallicity : float :
-        total metallicity of star prior to event, relative to sun_metal_mass_fraction
+    star_metallicity : float : total metallicity of star prior to event, relative to solar
     normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
+    axis_y_scaling : string : scaling along y-axis: 'log', 'lin'
+    axis_y_limits : list : min and max limits of y-axis
+    write_plot : boolean : whether to write plot to file
+    plot_directory : string : where to write file
+    figure_index : int : index of figure for matplotlib
     '''
     title_dict = {
         'wind': 'Stellar Wind',
@@ -159,15 +167,13 @@ def plot_metal_yields(
         'supernova.ia': 'Supernova: Ia',
     }
 
-    yield_dict = get_metal_yields(event_kind, star_metallicity, normalize)
+    yield_dict = get_nucleosynthetic_yields(event_kind, star_metallicity, normalize)
 
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
     yield_names = np.array(yield_dict.keys())[yield_indices]
     yield_labels = [plot.element_name_dict[k] for k in yield_names]
     yield_indices = np.arange(yield_indices.size)
-
-    #import ipdb; ipdb.set_trace()
 
     # plot ----------
     colors = plot.get_colors(yield_indices.size, use_black=False)
@@ -200,7 +206,6 @@ def plot_metal_yields(
         for yi in yield_indices:
             if yield_values[yi] > 0:
                 plot_func(yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi])
-                #import ipdb; ipdb.set_trace()
                 subplots[si].text(yield_indices[yi] * 0.98, yield_values[yi] * 0.6,
                                   yield_labels[yi])
 
@@ -216,7 +221,7 @@ def plot_metal_yields(
 
     #plt.tight_layout(pad=0.02)
 
-    plot_name = 'metal.yields_%s_z.%.1f' % (event_kind, star_metallicity)
+    plot_name = 'element.yields_%s_z.%.1f' % (event_kind, star_metallicity)
     plot.parse_output(write_plot, plot_directory, plot_name)
 
 
