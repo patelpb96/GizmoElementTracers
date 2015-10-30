@@ -10,6 +10,7 @@ Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 # system ----
 from __future__ import absolute_import, division, print_function
 import copy
+import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import matplotlib.pyplot as plt
@@ -22,8 +23,203 @@ from utilities import plot
 
 
 #===================================================================================================
-# analysis utility
+# utility
 #===================================================================================================
+def get_metal_yields(
+    event_kind='supernova.ii', star_metallicity=1.0, normalize=True):
+    '''
+    Get ordered dictionary of nucleosynthetic yields, according to input event_kind.
+    Note: this only returns the *additional* nucleosynthetic yields that Gizmo adds to the
+    star's existing metallicity, so these are not the actual yields that get deposited to gas.
+
+    Parameters
+    ----------
+    event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+    star_metallicity : float :
+        total metallicity of star prior to event, relative to sun_metal_mass_fraction
+    normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
+
+    Returns
+    -------
+    yields : ordered dictionary : yield mass {M_sun} or mass fraction for each element
+        can covert to regular dictionary via dict(yields) or list of values via yields.values()
+    '''
+    sun_metal_mass_fraction = 0.02  # total metal mass fraction that Gizmo assumes
+
+    assert event_kind in ('wind', 'supernova.ii', 'supernova.ia')
+
+    metal_dict = collections.OrderedDict()
+    metal_dict['metal'] = 0
+    metal_dict['helium'] = 1
+    metal_dict['carbon'] = 2
+    metal_dict['nitrogen'] = 3
+    metal_dict['oxygen'] = 4
+    metal_dict['neon'] = 5
+    metal_dict['magnesium'] = 6
+    metal_dict['silicon'] = 7
+    metal_dict['sulphur'] = 8
+    metal_dict['calcium'] = 9
+    metal_dict['iron'] = 10
+
+    yield_dict = collections.OrderedDict()
+    for k in metal_dict:
+        yield_dict[k] = 0.0
+
+    star_metal_mass_fraction = star_metallicity * sun_metal_mass_fraction
+
+    if event_kind == 'wind':
+        # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
+        # treat AGB and O-star yields in more detail for light elements
+        ejecta_mass = 1.0  # these yields already are mass fractions
+
+        yield_dict['helium'] = 0.36
+        yield_dict['carbon'] = 0.016
+        yield_dict['nitrogen'] = 0.0041
+        yield_dict['oxygen'] = 0.0118
+
+        # oxygen yield strongly depends on initial metallicity of star
+        if star_metal_mass_fraction < 0.033:
+            yield_dict['oxygen'] *= star_metal_mass_fraction / sun_metal_mass_fraction
+        else:
+            yield_dict['oxygen'] *= 1.65
+
+        for k in yield_dict:
+            if k is not 'helium':
+                yield_dict['metal'] += yield_dict[k]
+
+    elif event_kind == 'supernova.ii':
+        # in Gizmo, occurs up to 37.53 Myr after formation
+        # from Nomoto et al 2006, IMF averaged
+        ejecta_mass = 10.5  # {M_sun}
+
+        yield_dict['metal'] = 2.0
+        yield_dict['helium'] = 3.87
+        yield_dict['carbon'] = 0.133
+        yield_dict['nitrogen'] = 0.0479
+        yield_dict['oxygen'] = 1.17
+        yield_dict['neon'] = 0.30
+        yield_dict['magnesium'] = 0.0987
+        yield_dict['silicon'] = 0.0933
+        yield_dict['sulphur'] = 0.0397
+        yield_dict['calcium'] = 0.00458
+        yield_dict['iron'] = 0.0741
+
+        yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
+
+        # nitrogen yield strongly depends on initial metallicity of star
+        if star_metal_mass_fraction < 0.033:
+            yield_dict['nitrogen'] *= star_metal_mass_fraction / sun_metal_mass_fraction
+        else:
+            yield_dict['nitrogen'] *= 1.65
+
+        # correct total metal mass for nitrogen correction
+        yield_dict['metal'] += yield_dict['nitrogen'] - yield_nitrogen_orig
+
+    elif event_kind == 'supernova.ia':
+        # in Gizmo, occurs starting 37.53 Myr after formation
+        # from Iwamoto et al 1999, W7 model
+        ejecta_mass = 1.4  # {M_sun}
+
+        yield_dict['metal'] = 1.4
+        yield_dict['helium'] = 0.0
+        yield_dict['carbon'] = 0.049
+        yield_dict['nitrogen'] = 1.2e-6
+        yield_dict['oxygen'] = 0.143
+        yield_dict['neon'] = 0.0045
+        yield_dict['magnesium'] = 0.0086
+        yield_dict['silicon'] = 0.156
+        yield_dict['sulphur'] = 0.087
+        yield_dict['calcium'] = 0.012
+        yield_dict['iron'] = 0.743
+
+    if normalize:
+        for k in yield_dict:
+            yield_dict[k] /= ejecta_mass
+
+    return yield_dict
+
+
+def plot_metal_yields(
+    event_kind='wind', star_metallicity=0.1, normalize=False,
+    axis_y_scaling='lin', axis_y_limits=[1e-3, None],
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    Plot nucleosynthetic yields, according to input event_kind.
+
+    Parameters
+    ----------
+    event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+    star_metallicity : float :
+        total metallicity of star prior to event, relative to sun_metal_mass_fraction
+    normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
+    '''
+    title_dict = {
+        'wind': 'Stellar Wind',
+        'supernova.ii': 'Supernova: Core Collapse',
+        'supernova.ia': 'Supernova: Ia',
+    }
+
+    yield_dict = get_metal_yields(event_kind, star_metallicity, normalize)
+
+    yield_indices = np.arange(1, len(yield_dict))
+    yield_values = np.array(yield_dict.values())[yield_indices]
+    yield_names = np.array(yield_dict.keys())[yield_indices]
+    yield_labels = [plot.element_name_dict[k] for k in yield_names]
+    yield_indices = np.arange(yield_indices.size)
+
+    #import ipdb; ipdb.set_trace()
+
+    # plot ----------
+    colors = plot.get_colors(yield_indices.size, use_black=False)
+
+    fig = plt.figure(figure_index)
+    fig.clf()
+    subplot = fig.add_subplot(111)
+    subplots = [subplot]
+    #fig, subplots = plt.subplots(3, 1, num=figure_index, sharex=True)
+    fig.subplots_adjust(left=0.17, right=0.96, top=0.94, bottom=0.14, hspace=0.03, wspace=0.03)
+
+    for si in xrange(1):
+        subplots[si].set_xlim([yield_indices.min() - 0.5, yield_indices.max() + 0.5])
+        subplots[si].set_ylim(plot.parse_axis_limits(axis_y_limits, yield_values, axis_y_scaling))
+
+        subplots[si].set_xticks(yield_indices)
+        subplots[si].set_xticklabels(yield_labels)
+
+        if normalize:
+            y_label = 'yield (mass fraction)'
+        else:
+            y_label = 'yield $[M_\odot]$'
+        subplots[si].set_ylabel(y_label, fontsize=26)
+        subplots[si].set_xlabel('element', fontsize=26)
+        #fig.set_ylabel(y_label, fontsize=26)
+        #fig.set_xlabel('element', fontsize=26)
+
+        plot_func = plot.get_plot_function(subplots[si], 'lin', axis_y_scaling)
+
+        for yi in yield_indices:
+            if yield_values[yi] > 0:
+                plot_func(yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi])
+                #import ipdb; ipdb.set_trace()
+                subplots[si].text(yield_indices[yi] * 0.98, yield_values[yi] * 0.6,
+                                  yield_labels[yi])
+
+        subplots[si].set_title(title_dict[event_kind])
+
+        # metallicity legend
+        legend_z = subplots[si].legend(
+            [plt.Line2D((0, 0), (0, 0), linestyle='.')],
+            ['$Z/Z_\odot=%.3f$' % (star_metallicity)],
+            loc='best', prop=FontProperties(size=16)
+        )
+        legend_z.get_frame().set_alpha(0.7)
+
+    #plt.tight_layout(pad=0.02)
+
+    plot_name = 'metal.yields_%s_z.%.1f' % (event_kind, star_metallicity)
+    plot.parse_output(write_plot, plot_directory, plot_name)
+
+
 def get_orbit_dictionary(
     part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True,
     part_indicess=None, scalarize=False):

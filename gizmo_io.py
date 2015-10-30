@@ -9,6 +9,7 @@ Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
 # system ----
 from __future__ import absolute_import, division, print_function
+import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import h5py as h5py
@@ -17,6 +18,25 @@ from utilities import utility as ut
 from utilities import constants as const
 from utilities import cosmology
 from utilities import simulation
+
+
+#===================================================================================================
+# utility
+#===================================================================================================
+# use to translate between element name and index in element table
+metal_dict = collections.OrderedDict()
+metal_dict['metal'] = 0
+metal_dict['helium'] = 1
+metal_dict['carbon'] = 2
+metal_dict['nitrogen'] = 3
+metal_dict['oxygen'] = 4
+metal_dict['neon'] = 5
+metal_dict['magnesium'] = 6
+metal_dict['silicon'] = 7,
+metal_dict['sulphur'] = 8,
+metal_dict['calcium'] = 9
+metal_dict['iron'] = 10
+metal_dict['ironderived'] = 0
 
 
 class ParticleDictionaryClass(dict):
@@ -34,22 +54,6 @@ class ParticleDictionaryClass(dict):
         property_name : string : name of property
         indices : array : list of indices to select on
         '''
-        metal_dict = {
-            # translate between metal name and index in metallicity table
-            'total': 0,
-            'helium': 1,
-            'carbon': 2,
-            'nitrogen': 3,
-            'oxygen': 4,
-            'neon': 5,
-            'magnesium': 6,
-            'silicon': 7,
-            'sulphur': 8,
-            'calcium': 9,
-            'iron': 10,
-            'ironderived': 0,  # use to get [Fe/H]
-        }
-
         property_name = property_name.strip()  # strip white space
 
         # check if input is in self dictionary, return as is
@@ -140,13 +144,16 @@ class ParticleDictionaryClass(dict):
                 values = np.array(values) / 10 ** 0.2 * 0.02
 
             if '.solar' in property_name:
-                values = np.array(values) / const.sun_metal[metal_name + '.mass.fraction']
+                values = np.array(values) / const.sun_composition[metal_name + '.mass.fraction']
 
             return values
 
         raise ValueError('property = %s is not a valid input to halo catalog' % property_name)
 
 
+#===================================================================================================
+# read class
+#===================================================================================================
 class GizmoClass(ut.io.SayClass):
     '''
     Read Gizmo snapshot.
@@ -285,9 +292,8 @@ class GizmoClass(ut.io.SayClass):
             'NeutralHydrogenAbundance': 'neutral.hydrogen.fraction',  # neutral hydrogen fraction
             'StarFormationRate': 'sfr',  # {M_sun / yr}
 
-            ## star/gas metallicity {mass fraction} ('solar' is ~0.02 in total metallicity) ##
-            ## stars inherit metallicity from gas particle
-            ## 0 = 'total' metal mass (everything not H, He)
+            ## star/gas metallicity {mass fraction} ##
+            ## 0 = total metal mass fraction (everything not H, He)
             ## 1 = He
             ## 2 = C
             ## 3 = N
