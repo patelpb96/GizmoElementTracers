@@ -319,7 +319,6 @@ class GizmoClass(ut.io.SayClass):
         header = {}  # dictionary to store header information
 
         # dictionary class to store properties for all particle species
-        #part = {}
         part = ut.array.DictClass()
 
         ## parse input species list ##
@@ -631,7 +630,7 @@ class GizmoClass(ut.io.SayClass):
             if 'mass' in part[spec_name]:
                 # convert to {M_sun}
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
-                if np.min(part[spec_name]['mass']) < 10 or np.max(part[spec_name]['mass']) > 2e10:
+                if np.min(part[spec_name]['mass']) < 1 or np.max(part[spec_name]['mass']) > 2e10:
                     self.say('! unsure about masses: read [min, max] = [%.3e, %.3e] M_sun' %
                              (np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
 
@@ -802,28 +801,31 @@ class GizmoClass(ut.io.SayClass):
         compare_centers : boolean : whether to compare centers via center-of-mass v potential
         '''
         if 'star' in part and len(part['star']['position']):
-            species = 'star'
+            spec_name = 'star'
             velocity_radius_max = 15
         elif 'dark' in part and len(part['dark']['position']):
-            species = 'dark'
+            spec_name = 'dark'
             velocity_radius_max = 30
         else:
             self.say('! catalog not contain star or dark particles, skipping center finding')
             return
 
-        part.center_position = ut.particle.get_center_position(
-            part, species, method, compare_centers=compare_centers)
-
-        part.center_velocity = ut.particle.get_center_velocity(
-            part, species, velocity_radius_max, part.center_position)
-
         self.say('assigning center:')
-        print('    position: ', end='')
-        ut.io.print_array(part.center_position, '%.3f', end='')
-        print(' kpc comoving')
-        print('    velocity: ', end='')
-        ut.io.print_array(part.center_velocity, '%.1f', end='')
-        print(' km / sec')
+
+        if 'position' in part[spec_name]:
+            part.center_position = ut.particle.get_center_position(
+                part, spec_name, method, compare_centers=compare_centers)
+            print('    position: ', end='')
+            ut.io.print_array(part.center_position, '%.3f', end='')
+            print(' kpc comoving')
+
+        if 'velocity' in part[spec_name]:
+            part.center_velocity = ut.particle.get_center_velocity(
+                part, spec_name, velocity_radius_max, part.center_position)
+            print('    velocity: ', end='')
+            ut.io.print_array(part.center_velocity, '%.1f', end='')
+            print(' km / sec')
+
         print()
 
     def assign_orbit(

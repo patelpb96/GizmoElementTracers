@@ -13,6 +13,7 @@ from __future__ import absolute_import, division, print_function
 import os
 import sys
 import glob
+import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import matplotlib.pyplot as plt
@@ -267,6 +268,52 @@ def print_properties_extrema_all_snapshots(
                 Say.say('%10s = %.3f' % (stat_name, Statistic.stat[stat_name]))
 
             #Statistic.print_statistics()
+
+
+#===================================================================================================
+# compare simulations
+#===================================================================================================
+def plot_simulations_compare(
+    simulation_dict=collections.OrderedDict({
+        'm12_ref13_rad4_fb-angle-max': 'r13 angle-max',
+        'm12_ref13_rad4_fb-angle-eff': 'r13 angle-eff',
+        'm12_ref13_rad4_oct23': 'r13 test',
+    }),
+    redshifts=[5, 4, 3, 2, 1.5, 1, 0.5, 0],
+    species='all'):
+    '''
+    .
+    '''
+    property_names = ['mass', 'position', 'form.time']
+    force_float32 = True
+
+    for redshift in redshifts:
+        parts = []
+        for simulation_dir in simulation_dict:
+            parts.append(gizmo_io.Gizmo.read_snapshot(
+                species, 'redshift', redshift, '%s/output' % simulation_dir, property_names,
+                simulation_name=simulation_dict[simulation_dir], force_float32=force_float32)
+            )
+
+        gizmo_analysis.plot_property_v_distance(
+            parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [0.1, 3000], 0.1,
+            axis_y_limits=[0, 3], write_plot=True)
+
+        gizmo_analysis.plot_property_v_distance(
+            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 200], 0.05,
+            axis_y_limits=[0, None], write_plot=True)
+
+        gizmo_analysis.plot_property_v_distance(
+            parts, 'gas', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            axis_y_limits=[None, None], write_plot=True)
+
+        gizmo_analysis.plot_property_v_distance(
+            parts, 'star', 'mass', 'histogram.cum', 'log', False, [0.1, 30], 0.05,
+            axis_y_limits=[None, None], write_plot=True)
+
+        gizmo_analysis.plot_star_form_history(
+            parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
+            write_plot=True)
 
 
 #===================================================================================================

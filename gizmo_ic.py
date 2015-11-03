@@ -26,7 +26,7 @@ from . import gizmo_io
 def write_initial_condition_points(
     part_fin, part_ini, center_position=None, distance_max=None, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m',
-    use_onorbe_method=False, refinement_num=1, method='convex-hull'):
+    use_onorbe_method=False, refinement_number=1, method='convex-hull'):
     '''
     Print positions dark-matter particles at initial snapshot as selected at final snapshot.
     Can use rules of thumb from Onorbe et al.
@@ -42,7 +42,7 @@ def write_initial_condition_points(
     halo_radius : float : radius of halo {kpc physical}
     virial_kind : string : virial kind for halo radius (if not input halo_radius)
     use_onorbe_method : boolean : whether to use method of Onorbe et al to get uncontaminated region
-    refinement_num : int : if above is true, number of refinement levels beyond current for region
+    refinement_number : int : if above true, number of refinement levels beyond current for region
     method : string : method to identify initial zoom-in regon
         options: particles, convex-hull, cube
     '''
@@ -76,9 +76,9 @@ def write_initial_condition_points(
         # convert distance_max according to Onorbe et al
         distance_pure = distance_max
         if method == 'cube':
-            distance_max = (1.5 * refinement_num + 1) * distance_pure
+            distance_max = (1.5 * refinement_number + 1) * distance_pure
         elif method in ['particles', 'convex-hull']:
-            distance_max = (1.5 * refinement_num + 7) * distance_pure
+            distance_max = (1.5 * refinement_number + 7) * distance_pure
 
     mass_select = 0
     positions_ini = []
@@ -90,7 +90,7 @@ def write_initial_condition_points(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
         distances *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
-        select_indices = ut.array.elements(distances, [0, distance_max])
+        select_indices = ut.array.get_elements(distances, [0, distance_max])
 
         positions_ini.extend(part_ini[spec_name]['position'][select_indices])
 
@@ -163,9 +163,9 @@ def write_initial_condition_points(
                   (volume_ini * const.mega_per_kilo ** 3))
     for dimen_i in xrange(positions_ini.shape[1]):
         file_io.write('# initial position-%s [min, max] = %s kpc comoving, %s box units\n' %
-                      (dimen_i, ut.array.get_limits(poss_ini_limits[dimen_i], digit_num=3),
+                      (dimen_i, ut.array.get_limits(poss_ini_limits[dimen_i], digit_number=3),
                        ut.array.get_limits(poss_ini_limits[dimen_i] / part_ini.info['box.length'],
-                                           digit_num=8)))
+                                           digit_number=8)))
 
     positions_ini /= part_ini.info['box.length']  # renormalize to box units
 

@@ -69,7 +69,7 @@ def get_nucleosynthetic_yields(
 
     if event_kind == 'wind':
         # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
-        # treat AGB and O-star yields in more detail for light elements
+        # treat AGB and O-star yields in more detail for light get_elements
         ejecta_mass = 1.0  # these yields already are mass fractions
 
         yield_dict['helium'] = 0.36
@@ -88,10 +88,10 @@ def get_nucleosynthetic_yields(
                 yield_dict['metal'] += yield_dict[k]
 
     elif event_kind == 'supernova.ii':
-        # in Gizmo, occurs from 3.4 to 37.53 Myr after formation
-        # from 3.4 to 10.37 Myr, rate / M_sun is 5.408e-10 yr ^ -1
-        # from 10.37 37.53 Myr, rate / M_sun is 2.516e-10 yr ^ -1
-        # from Nomoto et al 2006, IMF averaged
+        # yields from Nomoto et al 2006, IMF averaged
+        # in Gizmo, these occur from 3.4 to 37.53 Myr after formation
+        # from 3.4 to 10.37 Myr, rate / M_sun = 5.408e-10 yr ^ -1
+        # from 10.37 to 37.53 Myr, rate / M_sun = 2.516e-10 yr ^ -1
         ejecta_mass = 10.5  # {M_sun}
 
         yield_dict['metal'] = 2.0
@@ -118,10 +118,11 @@ def get_nucleosynthetic_yields(
         yield_dict['metal'] += yield_dict['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
-        # in Gizmo, occurs after 37.53 Myr after formation, rate / M_sun is
-        # 5.3e-14 + 1.6e-5 * exp(-0.5 * ((star_age - 0.05) / 0.01) *
-        #                        ((star_age - 0.05) / 0.01)) yr ^ -1
-        # from Iwamoto et al 1999, W7 model
+        # yields from Iwamoto et al 1999, W7 model, IMF averaged
+        # in Gizmo, these occur starting 37.53 Myr after formation, with rate / M_sun =
+        # 5.3e-14 + 1.6e-11 * exp(-0.5 * ((star_age - 0.05) / 0.01) *
+        #                         ((star_age - 0.05) / 0.01)) yr ^ -1
+        # rates from Mannucci, Della Valle & Panagia 2006
         ejecta_mass = 1.4  # {M_sun}
 
         yield_dict['metal'] = 1.4
@@ -999,7 +1000,7 @@ def plot_property_distribution(
             distances = ut.coord.get_distances(
                 'scalar', part[spec_name]['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            part_indices = part_indices[ut.array.elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.get_elements(distances, distance_limits)]
 
         if 'velocity' in prop_name:
             orb = get_orbit_dictionary(
@@ -1101,7 +1102,7 @@ def plot_property_v_property(
         distances = ut.coord.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scale-factor']
-        part_indices = part_indices[ut.array.elements(distances, host_distance_limits)]
+        part_indices = part_indices[ut.array.get_elements(distances, host_distance_limits)]
 
     x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
     y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
@@ -1112,16 +1113,16 @@ def plot_property_v_property(
     part_indices = ut.array.arange_length(part_indices)
 
     if x_prop_limits:
-        part_indices = ut.array.elements(x_prop_values, x_prop_limits, part_indices)
+        part_indices = ut.array.get_elements(x_prop_values, x_prop_limits, part_indices)
 
     if y_prop_limits:
-        part_indices = ut.array.elements(y_prop_values, y_prop_limits, part_indices)
+        part_indices = ut.array.get_elements(y_prop_values, y_prop_limits, part_indices)
 
     if cut_percent > 0:
         x_limits = ut.array.get_limits(x_prop_values[part_indices], cut_percent=cut_percent)
         y_limits = ut.array.get_limits(y_prop_values[part_indices], cut_percent=cut_percent)
-        part_indices = ut.array.elements(x_prop_values, x_limits, part_indices)
-        part_indices = ut.array.elements(y_prop_values, y_limits, part_indices)
+        part_indices = ut.array.get_elements(x_prop_values, x_limits, part_indices)
+        part_indices = ut.array.get_elements(y_prop_values, y_limits, part_indices)
 
     x_prop_values = x_prop_values[part_indices]
     y_prop_values = y_prop_values[part_indices]
@@ -1462,7 +1463,7 @@ def plot_star_form_history(
             distances = ut.coord.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            part_indices = part_indices[ut.array.elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.get_elements(distances, distance_limits)]
 
         times, sfrs, masses = get_star_form_history(
             part, time_kind, time_limits, time_width, time_scaling, part_indices)
@@ -1568,10 +1569,10 @@ def plot_star_form_histories_galaxies(
     if hal_indices is not None and len(hal_indices):
         hal_indices = hal_indices
     else:
-        hal_indices = ut.array.elements(hal.prop('star.number'), [2, Inf])
+        hal_indices = ut.array.get_elements(hal.prop('star.number'), [2, Inf])
 
     if mass_limits is not None and len(mass_limits):
-        hal_indices = ut.array.elements(hal.prop(mass_kind), mass_limits, hal_indices)
+        hal_indices = ut.array.get_elements(hal.prop(mass_kind), mass_limits, hal_indices)
 
     print('galaxy number = %d' % hal_indices.size)
 
@@ -1587,7 +1588,7 @@ def plot_star_form_histories_galaxies(
             distances = ut.coord.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[hal_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            part_indices = part_indices[ut.array.elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.get_elements(distances, distance_limits)]
         """
         times, sfrs, masses = get_star_form_history(
             part, time_kind, time_limits, time_width, time_scaling, part_indices)
