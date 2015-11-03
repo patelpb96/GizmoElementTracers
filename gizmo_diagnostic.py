@@ -280,27 +280,25 @@ def plot_simulations_compare(
         'm12_ref13_rad4_oct23': 'r13 test',
     }),
     redshifts=[5, 4, 3, 2, 1.5, 1, 0.5, 0],
-    species='all'):
+    species='all', property_names=['mass', 'position', 'velocity', 'form.time'],
+    force_float32=True):
     '''
     .
     '''
-    property_names = ['mass', 'position', 'form.time']
-    force_float32 = True
-
     for redshift in redshifts:
         parts = []
         for simulation_dir in simulation_dict:
-            parts.append(gizmo_io.Gizmo.read_snapshot(
+            part = gizmo_io.Gizmo.read_snapshot(
                 species, 'redshift', redshift, '%s/output' % simulation_dir, property_names,
                 simulation_name=simulation_dict[simulation_dir], force_float32=force_float32)
-            )
+            parts.append(part)
 
         gizmo_analysis.plot_property_v_distance(
             parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [0.1, 3000], 0.1,
             axis_y_limits=[0, 3], write_plot=True)
 
         gizmo_analysis.plot_property_v_distance(
-            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 200], 0.05,
+            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 200], 0.1,
             axis_y_limits=[0, None], write_plot=True)
 
         gizmo_analysis.plot_property_v_distance(
