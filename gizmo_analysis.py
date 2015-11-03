@@ -466,8 +466,9 @@ def get_species_statistics_profiles(
         species = ['gas', 'star']
 
     center_position = ut.particle.parse_property(part, 'position', center_position)
-    center_velocity = ut.particle.parse_property(part, 'velocity', center_velocity)
     part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
+    if 'velocity' in prop_name:
+        center_velocity = ut.particle.parse_property(part, 'velocity', center_velocity)
 
     assert 0 < DistanceBin.dimension_number <= 3
 
@@ -982,8 +983,9 @@ def plot_property_distribution(
         parts = [parts]
 
     center_positions = ut.particle.parse_property(parts, 'position', center_positions)
-    center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
+    if 'velocity' in prop_name:
+        center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
 
     Stat = ut.math.StatisticClass()
 
@@ -1241,7 +1243,8 @@ def plot_property_v_distance(
         parts = [parts]
 
     center_positions = ut.particle.parse_property(parts, 'position', center_positions)
-    center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+    if 'velocity' in prop_name:
+        center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
 
     DistanceBin = ut.bin.DistanceBinClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
@@ -1514,7 +1517,7 @@ def plot_star_form_history(
         plot_func(sf['time'][part_i], sf[sf_kind][part_i],
                   linewidth=2.0, color=colors[part_i], alpha=0.5,
                   label=part.info['simulation.name'])
-    """
+
     # redshift legend
     legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
@@ -1526,7 +1529,7 @@ def plot_star_form_history(
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
         subplot.add_artist(legend_z)
-    """
+
     #plt.tight_layout(pad=0.02)
 
     sf_name = 'star' + '.' + sf_kind
@@ -1667,6 +1670,60 @@ def plot_star_form_histories_galaxies(
     sf_name = 'star' + '.' + sf_kind
     plot_name = '%s_v_%s_z.%.1f' % (sf_name, time_kind, part.info['redshift'])
     plot.parse_output(write_plot, plot_directory, plot_name)
+
+
+#===================================================================================================
+# compare simulations
+#===================================================================================================
+simulation_dict = collections.OrderedDict()
+simulation_dict['m12_ref13_rad4_fb-angle-max'] = 'r13 angle-max'
+simulation_dict['m12_ref13_rad4_fb-angle-eff'] = 'r13 angle-eff'
+simulation_dict['m12_ref13_rad4_oct23'] = 'r13 test'
+
+
+def plot_simulations_compare(
+    simulation_dict=simulation_dict, redshifts=[4, 3, 2, 1.5, 1, 0.5, 0],
+    species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+    '''
+    .
+    '''
+    from . import gizmo_io
+
+    for redshift in redshifts:
+        parts = []
+        for simulation_dir in simulation_dict:
+            part = gizmo_io.Gizmo.read_snapshot(
+                species, 'redshift', redshift, '%s/output' % simulation_dir, property_names,
+                simulation_name=simulation_dict[simulation_dir], force_float32=force_float32)
+            parts.append(part)
+
+        plot_property_v_distance(
+            parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [0.1, 3000], 0.1,
+            axis_y_limits=[0, 3], write_plot=True)
+
+        plot_property_v_distance(
+            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 200], 0.1,
+            axis_y_limits=[0, None], write_plot=True)
+
+        plot_property_v_distance(
+            parts, 'total', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            axis_y_limits=[None, None], write_plot=True)
+
+        plot_property_v_distance(
+            parts, 'gas', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            axis_y_limits=[None, None], write_plot=True)
+
+        plot_property_v_distance(
+            parts, 'dark', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            axis_y_limits=[None, None], write_plot=True)
+
+        plot_property_v_distance(
+            parts, 'star', 'mass', 'histogram.cum', 'log', False, [0.1, 30], 0.05,
+            axis_y_limits=[None, None], write_plot=True)
+
+        plot_star_form_history(
+            parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
+            write_plot=True)
 
 
 #===================================================================================================
