@@ -69,7 +69,7 @@ def get_nucleosynthetic_yields(
 
     if event_kind == 'wind':
         # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
-        # treat AGB and O-star yields in more detail for light get_elements
+        # treat AGB and O-star yields in more detail for light get_indices
         ejecta_mass = 1.0  # these yields already are mass fractions
 
         yield_dict['helium'] = 0.36
@@ -343,7 +343,8 @@ def get_species_histogram_profiles(
             part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
 
         if other_prop_limits:
-            part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
+            part_indices = ut.catalog.get_indices_catalog(
+                part[spec_name], other_prop_limits, part_indices)
 
         prop_values = part[spec_name].prop(prop_name, part_indices)
 
@@ -478,7 +479,8 @@ def get_species_statistics_profiles(
             part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
 
         if other_prop_limits:
-            part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
+            part_indices = ut.catalog.get_indices_catalog(
+                part[spec_name], other_prop_limits, part_indices)
 
         masses = None
         if weight_by_mass:
@@ -809,7 +811,8 @@ def plot_image(
         part_indices = ut.array.arange_length(part[spec_name]['position'].shape[0])
 
     if other_prop_limits:
-        part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
+        part_indices = ut.catalog.get_indices_catalog(
+            part[spec_name], other_prop_limits, part_indices)
 
     if subsample_factor > 1:
         part_indices = part_indices[::subsample_factor]
@@ -996,13 +999,14 @@ def plot_property_distribution(
             part_indices = ut.array.arange_length(part[spec_name]['position'].shape[0])
 
         if other_prop_limits:
-            part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
+            part_indices = ut.catalog.get_indices_catalog(
+                part[spec_name], other_prop_limits, part_indices)
 
         if distance_limits:
             distances = ut.coord.get_distances(
                 'scalar', part[spec_name]['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            part_indices = part_indices[ut.array.get_elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         if 'velocity' in prop_name:
             orb = get_orbit_dictionary(
@@ -1098,13 +1102,14 @@ def plot_property_v_property(
         part_indices = ut.array.arange_length(part[spec_name].prop(x_prop_name))
 
     if other_prop_limits:
-        part_indices = ut.catalog.get_indices(part[spec_name], other_prop_limits, part_indices)
+        part_indices = ut.catalog.get_indices_catalog(
+            part[spec_name], other_prop_limits, part_indices)
 
     if len(center_position) and len(host_distance_limits):
         distances = ut.coord.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scale-factor']
-        part_indices = part_indices[ut.array.get_elements(distances, host_distance_limits)]
+        part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
 
     x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
     y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
@@ -1115,16 +1120,16 @@ def plot_property_v_property(
     part_indices = ut.array.arange_length(part_indices)
 
     if x_prop_limits:
-        part_indices = ut.array.get_elements(x_prop_values, x_prop_limits, part_indices)
+        part_indices = ut.array.get_indices(x_prop_values, x_prop_limits, part_indices)
 
     if y_prop_limits:
-        part_indices = ut.array.get_elements(y_prop_values, y_prop_limits, part_indices)
+        part_indices = ut.array.get_indices(y_prop_values, y_prop_limits, part_indices)
 
     if cut_percent > 0:
         x_limits = ut.array.get_limits(x_prop_values[part_indices], cut_percent=cut_percent)
         y_limits = ut.array.get_limits(y_prop_values[part_indices], cut_percent=cut_percent)
-        part_indices = ut.array.get_elements(x_prop_values, x_limits, part_indices)
-        part_indices = ut.array.get_elements(y_prop_values, y_limits, part_indices)
+        part_indices = ut.array.get_indices(x_prop_values, x_limits, part_indices)
+        part_indices = ut.array.get_indices(y_prop_values, y_limits, part_indices)
 
     x_prop_values = x_prop_values[part_indices]
     y_prop_values = y_prop_values[part_indices]
@@ -1267,6 +1272,8 @@ def plot_property_v_distance(
         #if part_i > 0:
         #    print(pros[part_i][prop_name] / pros[0][prop_name])
 
+        print(pros_part[species][prop_statistic])
+
     # plot ----------
     fig = plt.figure(figure_index)
     fig.clf()
@@ -1291,10 +1298,12 @@ def plot_property_v_distance(
     plot_func = plot.get_plot_function(subplot, distance_scaling, prop_scaling)
     colors = plot.get_colors(len(parts))
 
-    if 'fraction' in prop_statistic or 'beta' in prop_name:
+    if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
         if 'fraction' in prop_statistic:
             y_values = [1, 1]
         elif 'beta' in prop_name:
+            y_values = [0, 0]
+        elif 'velocity.rad' in prop_name:
             y_values = [0, 0]
         plot_func(distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
 
@@ -1459,14 +1468,15 @@ def plot_star_form_history(
             part_indices = ut.array.arange_length(part['star'].prop('form.time'))
 
         if other_prop_limits:
-            part_indices = ut.catalog.get_indices(part['star'], other_prop_limits, part_indices)
+            part_indices = ut.catalog.get_indices_catalog(
+                part['star'], other_prop_limits, part_indices)
 
         if (center_positions[part_i] is not None and len(center_positions[part_i]) and
                 distance_limits is not None and len(distance_limits)):
             distances = ut.coord.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            part_indices = part_indices[ut.array.get_elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         times, sfrs, masses = get_star_form_history(
             part, time_kind, time_limits, time_width, time_scaling, part_indices)
@@ -1572,10 +1582,10 @@ def plot_star_form_histories_galaxies(
     if hal_indices is not None and len(hal_indices):
         hal_indices = hal_indices
     else:
-        hal_indices = ut.array.get_elements(hal.prop('star.number'), [2, Inf])
+        hal_indices = ut.array.get_indices(hal.prop('star.number'), [2, Inf])
 
     if mass_limits is not None and len(mass_limits):
-        hal_indices = ut.array.get_elements(hal.prop(mass_kind), mass_limits, hal_indices)
+        hal_indices = ut.array.get_indices(hal.prop(mass_kind), mass_limits, hal_indices)
 
     print('galaxy number = %d' % hal_indices.size)
 
@@ -1583,7 +1593,8 @@ def plot_star_form_histories_galaxies(
         part_indices = hal.prop('star.indices', hal_i)
 
         if other_prop_limits:
-            part_indices = ut.catalog.get_indices(part['star'], other_prop_limits, part_indices)
+            part_indices = ut.catalog.get_indices_catalog(
+                part['star'], other_prop_limits, part_indices)
 
         """
         if (center_positions[hal_i] is not None and len(center_positions[hal_i]) and
@@ -1591,7 +1602,7 @@ def plot_star_form_histories_galaxies(
             distances = ut.coord.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[hal_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-            part_indices = part_indices[ut.array.get_elements(distances, distance_limits)]
+            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
         """
         times, sfrs, masses = get_star_form_history(
             part, time_kind, time_limits, time_width, time_scaling, part_indices)
@@ -1687,14 +1698,21 @@ simulations = [
 
 
 def plot_simulations_compare(
-    simulations=simulations, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-    species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+    simulations=simulations, redshifts=[8, 7, 6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+    species='all', property_names=['mass', 'position', 'form.time'],
+    plot_velocity=False, force_float32=True):
     '''
     .
     '''
     from . import gizmo_io
 
     simulations = collections.OrderedDict(simulations)
+
+    if np.isscalar(redshifts):
+        redshifts = [redshifts]
+
+    if plot_velocity and 'velocity' not in property_names:
+        property_names.append('velocity')
 
     for redshift in redshifts:
         parts = []
@@ -1705,32 +1723,37 @@ def plot_simulations_compare(
             parts.append(part)
 
         plot_property_v_distance(
-            parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [0.1, 3000], 0.1,
+            parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
             axis_y_limits=[0, 3], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 200], 0.1,
+            parts, 'total', 'mass', 'vel.circ', 'lin', False, [1, 300], 0.1,
             axis_y_limits=[0, None], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'total', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            parts, 'total', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'gas', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'dark', 'mass', 'histogram.cum', 'log', False, [0.1, 300], 0.1,
+            parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'star', 'mass', 'histogram.cum', 'log', False, [0.1, 30], 0.05,
+            parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 30], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
         plot_star_form_history(
             parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
             write_plot=True)
+
+        if plot_velocity:
+            plot_property_v_distance(
+                parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.2,
+                axis_y_limits=[None, None], write_plot=True)
 
 
 #===================================================================================================

@@ -90,7 +90,7 @@ def write_initial_condition_points(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
         distances *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
-        select_indices = ut.array.get_elements(distances, [0, distance_max])
+        select_indices = ut.array.get_indices(distances, [0, distance_max])
 
         positions_ini.extend(part_ini[spec_name]['position'][select_indices])
 

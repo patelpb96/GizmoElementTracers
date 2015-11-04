@@ -255,7 +255,7 @@ def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig
         distance_max *= hal['radius'][halo_index]
 
     mass_min = neig_mass_frac_min * hal['mass'][halo_index]
-    his_m = ut.array.get_elements(hal['mass'], [mass_min, Inf])
+    his_m = ut.array.get_indices(hal['mass'], [mass_min, Inf])
 
     neig_distances, neig_indices = Neighbor.get_neighbors(
         hal['position'][[halo_index]], hal['position'][his_m], 200, [1e-6, distance_max],
@@ -327,7 +327,7 @@ def print_contamination_around_halo(
 
     for di in xrange(DistanceBin.number):
         dist_bin_lim = DistanceBin.get_bin_limits(distance_scaling, di)
-        pis_d = pis[ut.array.get_elements(distances, dist_bin_lim)]
+        pis_d = pis[ut.array.get_indices(distances, dist_bin_lim)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
         num_frac = Fraction.get_fraction(pis_contam_d.size, pis_d.size)
         mass_frac = Fraction.get_fraction(
@@ -386,11 +386,11 @@ def print_contamination_in_box(
         dist_bin_lim = DistanceBin.get_bin_limits(scaling, di)
 
         if geometry == 'sphere':
-            pis_all_d = neig_pis[ut.array.get_elements(distances, dist_bin_lim)]
+            pis_all_d = neig_pis[ut.array.get_indices(distances, dist_bin_lim)]
         elif geometry == 'cube':
             pis_all_d = np.array(pis_all)
             for dimension_i in xrange(part['position'].shape[1]):
-                pis_all_d = ut.array.get_elements(
+                pis_all_d = ut.array.get_indices(
                     distance_vector[:, dimension_i], dist_bin_lim, pis_all_d)
 
         pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
