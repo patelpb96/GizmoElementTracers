@@ -1751,14 +1751,15 @@ def plot_simulations_compare(
             parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 30], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
-        plot_star_form_history(
-            parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
-            write_plot=True)
-
         if plot_velocity:
             plot_property_v_distance(
                 parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
                 axis_y_limits=[None, None], write_plot=True)
+
+        if redshift <= 3:
+            plot_star_form_history(
+                parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
+                write_plot=True)
 
 
 #===================================================================================================
