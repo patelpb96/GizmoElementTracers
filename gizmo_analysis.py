@@ -1272,7 +1272,7 @@ def plot_property_v_distance(
         #if part_i > 0:
         #    print(pros[part_i][prop_name] / pros[0][prop_name])
 
-        print(pros_part[species][prop_statistic])
+        #print(pros_part[species][prop_statistic])
 
     # plot ----------
     fig = plt.figure(figure_index)
@@ -1688,8 +1688,9 @@ def plot_star_form_histories_galaxies(
 #===================================================================================================
 
 simulations = [
-    ['m12_ref12_rad4_orig', 'r12 orig'],
+    #['m12_ref12_rad4_orig', 'r12 orig'],
     ['m12_ref12_rad4_oct23', 'r12 test'],
+    ['m12_ref12_rad4_oct23_sfn100', 'r12 test n100'],
 
     ['m12_ref13_rad4_fb-angle-max', 'r13 angle-max'],
     ['m12_ref13_rad4_fb-angle-eff', 'r13 angle-eff'],
@@ -1756,7 +1757,7 @@ def plot_simulations_compare(
 
         if plot_velocity:
             plot_property_v_distance(
-                parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.2,
+                parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
                 axis_y_limits=[None, None], write_plot=True)
 
 
