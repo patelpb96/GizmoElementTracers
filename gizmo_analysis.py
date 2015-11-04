@@ -1675,26 +1675,33 @@ def plot_star_form_histories_galaxies(
 #===================================================================================================
 # compare simulations
 #===================================================================================================
-simulation_dict = collections.OrderedDict()
-simulation_dict['m12_ref13_rad4_fb-angle-max'] = 'r13 angle-max'
-simulation_dict['m12_ref13_rad4_fb-angle-eff'] = 'r13 angle-eff'
-simulation_dict['m12_ref13_rad4_oct23'] = 'r13 test'
+
+simulations = [
+    ['m12_ref12_rad4_orig', 'r12 orig'],
+    ['m12_ref12_rad4_oct23', 'r12 test'],
+
+    ['m12_ref13_rad4_fb-angle-max', 'r13 angle-max'],
+    ['m12_ref13_rad4_fb-angle-eff', 'r13 angle-eff'],
+    ['m12_ref13_rad4_oct23', 'r13 test'],
+]
 
 
 def plot_simulations_compare(
-    simulation_dict=simulation_dict, redshifts=[4, 3, 2, 1.5, 1, 0.5, 0],
+    simulations=simulations, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
     species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
     '''
     .
     '''
     from . import gizmo_io
 
+    simulations = collections.OrderedDict(simulations)
+
     for redshift in redshifts:
         parts = []
-        for simulation_dir in simulation_dict:
+        for directory in simulations:
             part = gizmo_io.Gizmo.read_snapshot(
-                species, 'redshift', redshift, '%s/output' % simulation_dir, property_names,
-                simulation_name=simulation_dict[simulation_dir], force_float32=force_float32)
+                species, 'redshift', redshift, '%s/output' % directory, property_names,
+                simulation_name=simulations[directory], force_float32=force_float32)
             parts.append(part)
 
         plot_property_v_distance(

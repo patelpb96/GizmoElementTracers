@@ -12,7 +12,7 @@ from __future__ import absolute_import, division, print_function
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
-import h5py as h5py
+import h5py
 # local ----
 from utilities import utility as ut
 from utilities import constants as const
