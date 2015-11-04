@@ -1720,6 +1720,10 @@ def plot_simulations_compare(
             part = gizmo_io.Gizmo.read_snapshot(
                 species, 'redshift', redshift, '%s/output' % directory, property_names,
                 simulation_name=simulations[directory], force_float32=force_float32)
+
+            if plot_velocity:
+                gizmo_io.Gizmo.assign_orbit(part, 'gas')
+
             parts.append(part)
 
         plot_property_v_distance(
