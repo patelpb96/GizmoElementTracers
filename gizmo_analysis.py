@@ -46,8 +46,6 @@ def get_nucleosynthetic_yields(
     '''
     sun_metal_mass_fraction = 0.02  # total metal mass fraction that Gizmo assumes
 
-    assert event_kind in ['wind', 'supernova.ii', 'supernova.ia']
-
     element_dict = collections.OrderedDict()
     element_dict['metal'] = 0
     element_dict['helium'] = 1
@@ -64,6 +62,8 @@ def get_nucleosynthetic_yields(
     yield_dict = collections.OrderedDict()
     for k in element_dict:
         yield_dict[k] = 0.0
+
+    assert event_kind in ['wind', 'supernova.ii', 'supernova.ia']
 
     star_metal_mass_fraction = star_metallicity * sun_metal_mass_fraction
 
@@ -239,6 +239,12 @@ def get_orbit_dictionary(
     center_position : array : center position to use
     include_hubble_flow : boolean : whether to include hubble flow
     part_indicess : array or list : indices of particles from which to select
+    scalarize : boolean :
+        whether to return single dictionary instead of dictionary of dictionaries, if single species
+
+    Returns
+    -------
+    orb : dict : dictionary of orbital properties, one for each species (unless scalarize)
     '''
     if np.isscalar(species):
         species = [species]
@@ -274,236 +280,126 @@ def get_orbit_dictionary(
     return orb
 
 
-def get_species_histogram_profiles(
-    part, species=['all'], prop_name='mass', DistanceBin=None, center_position=None,
-    rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_max=None,
-    other_prop_limits={}, part_indicess=None):
+class SpeciesProfileClass(ut.io.SayClass):
     '''
-    Get dictionary of profiles of mass/density (or any summed quantity) for each particle species.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    species : string or list : species to compute total mass of
-    prop_name : string : property to get histogram of
-    DistanceBin : class : distance bin class
-    center_position : list : center position
-    rotation_vectors : array : eigen-vectors to define rotation
-    axis_distance_max : float : maximum distance to use in defining principal axes {kpc physical}
-    other_axis_distance_max : float :
-        maximum distance along other axis[s] to keep particles {kpc physical}
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indicess : array : indices of particles from which to select
+    Get profiles of either histograms or stastitics (such as average, median) for particle species.
     '''
-    if 'gas' in species and 'consume.time' in prop_name:
-        pros_mass = get_species_histogram_profiles(
-            part, species, 'mass', DistanceBin, center_position, rotation_vectors,
-            axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+    def get_profiles(
+        self, part, species=['all'], prop_name='', prop_statistic='histogram', weight_by_mass=False,
+        DistanceBin=None, center_position=None, center_velocity=None, rotation_vectors=None,
+        axis_distance_max=Inf, other_axis_distance_max=None, other_prop_limits={},
+        part_indicess=None):
+        '''
+        center_positions
 
-        pros_sfr = get_species_histogram_profiles(
-            part, species, 'sfr', DistanceBin, center_position, rotation_vectors,
-            axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        species : string or list : species to compute total mass of
+        prop_name : string : name of property to get statistics of
+        prop_statistic : string : statistic to get profile of - if 'histogram', get histogram
+        weight_by_mass : boolean : whether to weight property by species mass
+        DistanceBin : class : distance bin class
+        center_position : array : position of center
+        center_velocity : array : velocity of center
+        axis_distance_max : float : maximum distance to use to define principal axes {kpc physical}
+        rotation_vectors : array : eigen-vectors to define rotation
+        other_axis_distance_max : float :
+            maximum distance along other axis[s] to keep particles {kpc physical}
+        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        part_indicess : array or list : indices of particles from which to select
 
-        pros = pros_sfr
-        for k in pros_sfr['gas']:
-            if 'distance' not in k:
-                pros['gas'][k] = pros_mass['gas'][k] / pros_sfr['gas'][k] / 1e9
-
-        return pros
-
-    pros = {}
-
-    Fraction = ut.math.FractionClass()
-
-    # ensure is list even if just one species
-    if np.isscalar(species):
-        species = [species]
-    else:
-        species = copy.copy(species)
-
-    if species == ['all'] or species == ['total'] or species == ['baryon']:
-        #species = part.keys()
-        species = ['dark', 'star', 'gas']
-        if 'dark.2' in part:
-            species.append('dark.2')
-
-        for spec_name in species:
-            if spec_name not in part:
-                species.remove(spec_name)
-                print('! %s not in particle catalog' % spec_name)
-
-    center_position = ut.particle.parse_property(part, 'position', center_position)
-    part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
-
-    assert 0 < DistanceBin.dimension_number <= 3
-
-    for spec_i, spec_name in enumerate(species):
-        part_indices = part_indicess[spec_i]
-        if part_indices is None or not len(part_indices):
-            part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
-
-        if other_prop_limits:
-            part_indices = ut.catalog.get_indices_catalog(
-                part[spec_name], other_prop_limits, part_indices)
-
-        prop_values = part[spec_name].prop(prop_name, part_indices)
-
-        if DistanceBin.dimension_number == 3:
-            distances = ut.coord.get_distances(
-                'scalar', part[spec_name]['position'][part_indices], center_position,
-                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-        elif DistanceBin.dimension_number in [1, 2]:
-            distancess = ut.particle.get_distances_along_principal_axes(
-                part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
-                part_indices, scalarize=True)
-
-            if DistanceBin.dimension_number == 1:
-                distances = distancess[0]
-                other_distances = distancess[1]
-            elif DistanceBin.dimension_number == 2:
-                distances = distancess[1]
-                other_distances = distancess[0]
-
-            if 0 < other_axis_distance_max < Inf:
-                masks = other_distances < other_axis_distance_max
-                distances = distances[masks]
-                prop_values = prop_values[masks]
-
-        pros[spec_name] = DistanceBin.get_histogram_profile(distances, prop_values)
-
-    props = [pro_prop for pro_prop in pros[species[0]] if 'distance' not in pro_prop]
-    props_dist = [pro_prop for pro_prop in pros[species[0]] if 'distance' in pro_prop]
-
-    if prop_name == 'mass':
-        # create dictionary for baryonic mass
-        if 'star' in species or 'gas' in species:
-            spec_name_new = 'baryon'
-            pros[spec_name_new] = {}
-            for spec_name in np.intersect1d(species, ['star', 'gas']):
-                for pro_prop in props:
-                    if pro_prop not in pros[spec_name_new]:
-                        pros[spec_name_new][pro_prop] = np.array(pros[spec_name][pro_prop])
-                    elif 'log' in pro_prop:
-                        pros[spec_name_new][pro_prop] = ut.math.get_log(
-                            10 ** pros[spec_name_new][pro_prop] + 10 ** pros[spec_name][pro_prop])
-                    else:
-                        pros[spec_name_new][pro_prop] += pros[spec_name][pro_prop]
-
-            for pro_prop in props_dist:
-                pros[spec_name_new][pro_prop] = pros[species[0]][pro_prop]
-            species.append(spec_name_new)
-
-        if len(species) > 1:
-            # create dictionary for total mass
-            spec_name_new = 'total'
-            pros[spec_name_new] = {}
-            for spec_name in np.setdiff1d(species, ['baryon', 'total']):
-                for pro_prop in props:
-                    if pro_prop not in pros[spec_name_new]:
-                        pros[spec_name_new][pro_prop] = np.array(pros[spec_name][pro_prop])
-                    elif 'log' in pro_prop:
-                        pros[spec_name_new][pro_prop] = ut.math.get_log(
-                            10 ** pros[spec_name_new][pro_prop] + 10 ** pros[spec_name][pro_prop])
-                    else:
-                        pros[spec_name_new][pro_prop] += pros[spec_name][pro_prop]
-
-            for pro_prop in props_dist:
-                pros[spec_name_new][pro_prop] = pros[species[0]][pro_prop]
-            species.append(spec_name_new)
-
-            # create mass fraction wrt total mass
-            for spec_name in np.setdiff1d(species, ['total']):
-                for pro_prop in ['histogram', 'histogram.cum']:
-                    pros[spec_name][pro_prop + '.fraction'] = Fraction.get_fraction(
-                        pros[spec_name][pro_prop], pros['total'][pro_prop])
-
-                    if spec_name == 'baryon':
-                        # units of cosmic baryon fraction
-                        pros[spec_name][pro_prop + '.fraction'] /= (
-                            part.Cosmology['omega_baryon'] / part.Cosmology['omega_matter'])
-
-        # create circular velocity = sqrt (G m(< r) / r)
-        for spec_name in species:
-            pros[spec_name]['vel.circ'] = (
-                pros[spec_name]['histogram.cum'] / pros[spec_name]['distance.cum'] *
-                const.grav_kpc_msun_yr)
-            pros[spec_name]['vel.circ'] = np.sqrt(pros[spec_name]['vel.circ'])
-            pros[spec_name]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
-
-    return pros
-
-
-def get_species_statistics_profiles(
-    part, species=['all'], prop_name='', weight_by_mass=True, DistanceBin=None,
-    center_position=None, center_velocity=None, rotation_vectors=None, axis_distance_max=Inf,
-    other_axis_distance_max=None, other_prop_limits={}, part_indicess=None):
-    '''
-    Get dictionary of profiles of statistics (such as median, average) for given property for each
-    particle species.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    species : string or list : species to compute total mass of
-    prop_name : string : name of property to get statistics of
-    weight_by_mass : boolean : whether to weight property by species mass
-    DistanceBin : class : distance bin class
-    center_position : array : position of center
-    center_velocity : array : velocity of center
-    axis_distance_max : float : maximum distance to use in defining principal axes {kpc physical}
-    rotation_vectors : array : eigen-vectors to define rotation
-    other_axis_distance_max : float :
-        maximum distance along other axis[s] to keep particles {kpc physical}
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indicess : array or list : indices of particles from which to select
-    '''
-    pros = {}
-
-    if np.isscalar(species):
-        species = [species]  # ensure is list
-    if species == ['all'] or species == ['total']:
-        species = ['dark', 'gas', 'star', 'dark.2', 'dark.3']
-    elif species == ['baryon']:
-        species = ['gas', 'star']
-
-    center_position = ut.particle.parse_property(part, 'position', center_position)
-    part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
-    if 'velocity' in prop_name:
-        center_velocity = ut.particle.parse_property(part, 'velocity', center_velocity)
-
-    assert 0 < DistanceBin.dimension_number <= 3
-
-    for spec_i, spec_name in enumerate(species):
-        part_indices = part_indicess[spec_i]
-        if part_indices is None or not len(part_indices):
-            part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
-
-        if other_prop_limits:
-            part_indices = ut.catalog.get_indices_catalog(
-                part[spec_name], other_prop_limits, part_indices)
-
-        masses = None
-        if weight_by_mass:
-            masses = part[spec_name].prop('mass', part_indices)
-
-        if 'velocity' in prop_name:
-            distances = ut.coord.get_distances(
-                'vector', part[spec_name]['position'][part_indices], center_position,
-                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
-
-            velocity_vectors = ut.coord.get_velocity_differences(
-                'vector', part[spec_name]['velocity'][part_indices], center_velocity, True,
-                part[spec_name]['position'][part_indices], center_position,
-                part.snapshot['scale-factor'], part.snapshot['time.hubble'],
-                part.info['box.length'])
-
-            pro = DistanceBin.get_velocity_profile(distances, velocity_vectors, masses)
-
-            pros[spec_name] = pro[prop_name.replace('host.', '')]
-            for prop in pro:
-                if 'velocity' not in prop:
-                    pros[spec_name][prop] = pro[prop]
+        Returns
+        -------
+        pros : dict : dictionary of profiles for each particle species
+        '''
+        if prop_statistic == 'histogram':
+            return self.get_histogram_profiles(
+                part, species, prop_name, DistanceBin, center_position, rotation_vectors,
+                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
         else:
+            return self.get_statistics_profiles(
+                part, species, prop_name, weight_by_mass, DistanceBin, center_position,
+                center_velocity, rotation_vectors, axis_distance_max, other_axis_distance_max,
+                other_prop_limits, part_indicess)
+
+    def get_histogram_profiles(
+        self, part, species=['all'], prop_name='mass', DistanceBin=None, center_position=None,
+        rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_max=None,
+        other_prop_limits={}, part_indicess=None):
+        '''
+        Get profiles of mass/density (or any summed quantity) for given property for each
+        particle species.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        species : string or list : species to compute total mass of
+        prop_name : string : property to get histogram of
+        DistanceBin : class : distance bin class
+        center_position : list : center position
+        rotation_vectors : array : eigen-vectors to define rotation
+        axis_distance_max : float : maximum distance to use to define principal axes {kpc physical}
+        other_axis_distance_max : float :
+            maximum distance along other axis[s] to keep particles {kpc physical}
+        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        part_indicess : array : indices of particles from which to select
+
+        Returns
+        -------
+        pros : dict : dictionary of profiles for each particle species
+        '''
+        if 'gas' in species and 'consume.time' in prop_name:
+            pros_mass = self.get_histogram_profiles(
+                part, species, 'mass', DistanceBin, center_position, rotation_vectors,
+                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+
+            pros_sfr = self.get_histogram_profiles(
+                part, species, 'sfr', DistanceBin, center_position, rotation_vectors,
+                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+
+            pros = pros_sfr
+            for k in pros_sfr['gas']:
+                if 'distance' not in k:
+                    pros['gas'][k] = pros_mass['gas'][k] / pros_sfr['gas'][k] / 1e9
+
+            return pros
+
+        pros = {}
+
+        Fraction = ut.math.FractionClass()
+
+        # ensure is list even if just one species
+        if np.isscalar(species):
+            species = [species]
+        else:
+            species = copy.copy(species)
+
+        if species == ['all'] or species == ['total'] or species == ['baryon']:
+            #species = part.keys()
+            species = ['dark', 'star', 'gas']
+            if 'dark.2' in part:
+                species.append('dark.2')
+
+            for spec_name in species:
+                if spec_name not in part:
+                    species.remove(spec_name)
+                    self.say('! %s not in particle catalog' % spec_name)
+
+        center_position = ut.particle.parse_property(part, 'position', center_position)
+        part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
+
+        assert 0 < DistanceBin.dimension_number <= 3
+
+        for spec_i, spec_name in enumerate(species):
+            part_indices = part_indicess[spec_i]
+            if part_indices is None or not len(part_indices):
+                part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
+
+            if other_prop_limits:
+                part_indices = ut.catalog.get_indices_catalog(
+                    part[spec_name], other_prop_limits, part_indices)
+
             prop_values = part[spec_name].prop(prop_name, part_indices)
 
             if DistanceBin.dimension_number == 3:
@@ -525,12 +421,175 @@ def get_species_statistics_profiles(
                 if 0 < other_axis_distance_max < Inf:
                     masks = other_distances < other_axis_distance_max
                     distances = distances[masks]
-                    masses = masses[masks]
                     prop_values = prop_values[masks]
 
-            pros[spec_name] = DistanceBin.get_statistics_profile(distances, prop_values, masses)
+            pros[spec_name] = DistanceBin.get_histogram_profile(distances, prop_values)
 
-    return pros
+        props = [pro_prop for pro_prop in pros[species[0]] if 'distance' not in pro_prop]
+        props_dist = [pro_prop for pro_prop in pros[species[0]] if 'distance' in pro_prop]
+
+        if prop_name == 'mass':
+            # create dictionary for baryonic mass
+            if 'star' in species or 'gas' in species:
+                spec_name_new = 'baryon'
+                pros[spec_name_new] = {}
+                for spec_name in np.intersect1d(species, ['star', 'gas']):
+                    for pro_prop in props:
+                        if pro_prop not in pros[spec_name_new]:
+                            pros[spec_name_new][pro_prop] = np.array(pros[spec_name][pro_prop])
+                        elif 'log' in pro_prop:
+                            pros[spec_name_new][pro_prop] = ut.math.get_log(
+                                10 ** pros[spec_name_new][pro_prop] +
+                                10 ** pros[spec_name][pro_prop])
+                        else:
+                            pros[spec_name_new][pro_prop] += pros[spec_name][pro_prop]
+
+                for pro_prop in props_dist:
+                    pros[spec_name_new][pro_prop] = pros[species[0]][pro_prop]
+                species.append(spec_name_new)
+
+            if len(species) > 1:
+                # create dictionary for total mass
+                spec_name_new = 'total'
+                pros[spec_name_new] = {}
+                for spec_name in np.setdiff1d(species, ['baryon', 'total']):
+                    for pro_prop in props:
+                        if pro_prop not in pros[spec_name_new]:
+                            pros[spec_name_new][pro_prop] = np.array(pros[spec_name][pro_prop])
+                        elif 'log' in pro_prop:
+                            pros[spec_name_new][pro_prop] = ut.math.get_log(
+                                10 ** pros[spec_name_new][pro_prop] +
+                                10 ** pros[spec_name][pro_prop])
+                        else:
+                            pros[spec_name_new][pro_prop] += pros[spec_name][pro_prop]
+
+                for pro_prop in props_dist:
+                    pros[spec_name_new][pro_prop] = pros[species[0]][pro_prop]
+                species.append(spec_name_new)
+
+                # create mass fraction wrt total mass
+                for spec_name in np.setdiff1d(species, ['total']):
+                    for pro_prop in ['histogram', 'histogram.cum']:
+                        pros[spec_name][pro_prop + '.fraction'] = Fraction.get_fraction(
+                            pros[spec_name][pro_prop], pros['total'][pro_prop])
+
+                        if spec_name == 'baryon':
+                            # units of cosmic baryon fraction
+                            pros[spec_name][pro_prop + '.fraction'] /= (
+                                part.Cosmology['omega_baryon'] / part.Cosmology['omega_matter'])
+
+            # create circular velocity = sqrt (G m(< r) / r)
+            for spec_name in species:
+                pros[spec_name]['vel.circ'] = (
+                    pros[spec_name]['histogram.cum'] / pros[spec_name]['distance.cum'] *
+                    const.grav_kpc_msun_yr)
+                pros[spec_name]['vel.circ'] = np.sqrt(pros[spec_name]['vel.circ'])
+                pros[spec_name]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+
+        return pros
+
+    def get_statistics_profiles(
+        self, part, species=['all'], prop_name='', weight_by_mass=True, DistanceBin=None,
+        center_position=None, center_velocity=None, rotation_vectors=None, axis_distance_max=Inf,
+        other_axis_distance_max=None, other_prop_limits={}, part_indicess=None):
+        '''
+        Get profiles of statistics (such as median, average) for given property for each
+        particle species.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        species : string or list : species to compute total mass of
+        prop_name : string : name of property to get statistics of
+        weight_by_mass : boolean : whether to weight property by species mass
+        DistanceBin : class : distance bin class
+        center_position : array : position of center
+        center_velocity : array : velocity of center
+        axis_distance_max : float : maximum distance to use to define principal axes {kpc physical}
+        rotation_vectors : array : eigen-vectors to define rotation
+        other_axis_distance_max : float :
+            maximum distance along other axis[s] to keep particles {kpc physical}
+        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        part_indicess : array or list : indices of particles from which to select
+
+        Returns
+        -------
+        pros : dict : dictionary of profiles for each particle species
+        '''
+        pros = {}
+
+        if np.isscalar(species):
+            species = [species]  # ensure is list
+        if species == ['all'] or species == ['total']:
+            species = ['dark', 'gas', 'star', 'dark.2', 'dark.3']
+        elif species == ['baryon']:
+            species = ['gas', 'star']
+
+        center_position = ut.particle.parse_property(part, 'position', center_position)
+        part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
+        if 'velocity' in prop_name:
+            center_velocity = ut.particle.parse_property(part, 'velocity', center_velocity)
+
+        assert 0 < DistanceBin.dimension_number <= 3
+
+        for spec_i, spec_name in enumerate(species):
+            part_indices = part_indicess[spec_i]
+            if part_indices is None or not len(part_indices):
+                part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
+
+            if other_prop_limits:
+                part_indices = ut.catalog.get_indices_catalog(
+                    part[spec_name], other_prop_limits, part_indices)
+
+            masses = None
+            if weight_by_mass:
+                masses = part[spec_name].prop('mass', part_indices)
+
+            if 'velocity' in prop_name:
+                distances = ut.coord.get_distances(
+                    'vector', part[spec_name]['position'][part_indices], center_position,
+                    part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+
+                velocity_vectors = ut.coord.get_velocity_differences(
+                    'vector', part[spec_name]['velocity'][part_indices], center_velocity, True,
+                    part[spec_name]['position'][part_indices], center_position,
+                    part.snapshot['scale-factor'], part.snapshot['time.hubble'],
+                    part.info['box.length'])
+
+                pro = DistanceBin.get_velocity_profile(distances, velocity_vectors, masses)
+
+                pros[spec_name] = pro[prop_name.replace('host.', '')]
+                for prop in pro:
+                    if 'velocity' not in prop:
+                        pros[spec_name][prop] = pro[prop]
+            else:
+                prop_values = part[spec_name].prop(prop_name, part_indices)
+
+                if DistanceBin.dimension_number == 3:
+                    distances = ut.coord.get_distances(
+                        'scalar', part[spec_name]['position'][part_indices], center_position,
+                        part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                elif DistanceBin.dimension_number in [1, 2]:
+                    distancess = ut.particle.get_distances_along_principal_axes(
+                        part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
+                        part_indices, scalarize=True)
+
+                    if DistanceBin.dimension_number == 1:
+                        distances = distancess[0]
+                        other_distances = distancess[1]
+                    elif DistanceBin.dimension_number == 2:
+                        distances = distancess[1]
+                        other_distances = distancess[0]
+
+                    if 0 < other_axis_distance_max < Inf:
+                        masks = other_distances < other_axis_distance_max
+                        distances = distances[masks]
+                        masses = masses[masks]
+                        prop_values = prop_values[masks]
+
+                pros[spec_name] = DistanceBin.get_statistics_profile(distances, prop_values, masses)
+
+        return pros
 
 
 #===================================================================================================
@@ -1255,17 +1314,14 @@ def plot_property_v_distance(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
         dimension_number=dimension_number)
 
+    SpeciesProfile = SpeciesProfileClass()
     pros = []
+
     for part_i, part in enumerate(parts):
-        if prop_name in ['mass', 'sfr', 'consume.time']:
-            pros_part = get_species_histogram_profiles(
-                part, species, prop_name, DistanceBin, center_positions[part_i], rotation_vectors,
-                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
-        else:
-            pros_part = get_species_statistics_profiles(
-                part, species, prop_name, weight_by_mass, DistanceBin, center_positions[part_i],
-                center_velocities[part_i], rotation_vectors, axis_distance_max,
-                other_axis_distance_max, other_prop_limits, part_indicess)
+        pros_part = SpeciesProfile.get_profiles(
+            part, species, prop_name, prop_statistic, weight_by_mass, DistanceBin,
+            center_positions[part_i], center_velocities[part_i], rotation_vectors,
+            axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
 
         pros.append(pros_part)
 
@@ -1766,8 +1822,7 @@ def plot_simulations_compare(
 # galaxy disk mass and radius over time, with james and shea
 #===================================================================================================
 def get_galaxy_mass_profiles_v_redshift(
-    directory='.',
-    redshifts=[3.0, 2.75, 2.5, 2.25, 2.0, 1.75, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.0],
+    directory='.', redshifts=[3, 2.75, 2.5, 2.25, 2, 1.75, 1.5, 1.25, 1, 0.75, 0.5, 0.25, 0],
     parts=None):
     '''
     Read snapshots and store dictionary of galaxy/halo position, velocity, size, mass at input
