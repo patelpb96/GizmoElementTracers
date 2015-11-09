@@ -17,10 +17,7 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import matplotlib.pyplot as plt
 # local ----
-from utilities import utility as ut
-from utilities import constants as const
-from utilities import plot
-from utilities import simulation
+import utilities as ut
 from . import gizmo_io
 from . import gizmo_analysis
 
@@ -45,20 +42,21 @@ def print_run_times(
     print_lines : boolean : whether to print full lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale factors, redshifts, run times
     '''
-    scale_factors = np.array(scale_factors)
-
-    run_times = []
-
     file_name = 'cpu.txt'
 
     file_path_name = ut.io.get_path(directory) + file_name
-
     file_in = open(file_path_name, 'r')
+
+    scale_factors = np.array(scale_factors)
+    run_times = []
 
     t_i = 0
     print_next_line = False
     for line in file_in:
-        if 'Time: %.3f' % scale_factors[t_i] in line or 'Time: 1,' in line:
+        if ('Time: %.0f,' % scale_factors[t_i] in line or
+                'Time: %.1f,' % scale_factors[t_i] in line or
+                'Time: %.2f,' % scale_factors[t_i] in line or
+                'Time: %.3f' % scale_factors[t_i] in line):
             if print_lines:
                 print(line, end='')
             print_next_line = True
@@ -83,7 +81,7 @@ def print_run_times(
     if cpu_number:
         print(' cpu-time[hr]', end='')
     print()
-    for t_i in xrange(len(run_times)):
+    for t_i in range(len(run_times)):
         print('%.3f %5.2f   %5.1f%% %7.2f %5.2f' %
               (scale_factors[t_i], redshifts[t_i], 100 * run_times[t_i] / run_times.max(),
                run_times[t_i], run_times[t_i] / 24), end='')
@@ -144,15 +142,15 @@ def print_run_time_ratios(
     redshifts = redshifts[: run_time_num_min]
 
     print('# scale-factor redshift', end='')
-    for _ in xrange(1, len(run_timess)):
+    for _ in range(1, len(run_timess)):
         print(' wall-time-ratio', end='')
         if print_cpu:
             print(' cpu-time-ratio', end='')
     print()
 
-    for a_i in xrange(run_time_num_min):
+    for a_i in range(run_time_num_min):
         print('%.3f %5.2f  ' % (scalefactors[a_i], redshifts[a_i]), end='')
-        for d_i in xrange(1, len(run_timess)):
+        for d_i in range(1, len(run_timess)):
             print(' %7.3f' % (run_timess[d_i][a_i] / run_timess[0][a_i]), end='')
             if print_cpu:
                 print(' %7.3f' % (cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
@@ -212,7 +210,7 @@ def print_properties_extrema_all_snapshots(
 
     directory = ut.io.get_path(directory)
 
-    Snapshot = simulation.SnapshotClass()
+    Snapshot = ut.simulation.SnapshotClass()
     Snapshot.read_snapshots(directory=directory)
 
     species_read = species_property_dict.keys()
@@ -250,7 +248,7 @@ def print_properties_extrema_all_snapshots(
         except:
             Say.say('! cannot read snapshot index %d in %s' % (snapshot_i, directory))
 
-    Statistic = ut.math.StatisticClass()
+    Statistic = ut.statistic.StatisticClass()
 
     for spec_name in species_property_dict:
         for prop_name in species_property_dict[spec_name]:
@@ -258,7 +256,8 @@ def print_properties_extrema_all_snapshots(
             prop_values = np.array(species_property_dict[spec_name][prop_name])
 
             if 'gas' in spec_name and 'density' in prop_name:
-                prop_values *= const.proton_per_sun * const.kpc_per_cm ** 3  # convert to {cm ^ -3}
+                # convert to {cm ^ -3}
+                prop_values *= ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
@@ -340,7 +339,7 @@ def plot_scaling(
     subplot = fig.add_subplot(111)
     fig.subplots_adjust(left=0.21, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    plot_func = plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
 
     if plot_kind == 'strong':
         cpu_nums = [k for k in mfm_ref14]
@@ -400,7 +399,7 @@ def plot_scaling(
                   alpha=0.7)
 
     plot_name = 'test'
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 #===================================================================================================

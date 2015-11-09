@@ -14,8 +14,7 @@ import os
 import sys
 import numpy as np
 # local ----
-from utilities import utility as ut
-from utilities import simulation
+import utilities as ut
 
 
 def sync_snapshots(
@@ -71,7 +70,7 @@ if __name__ == '__main__':
     snapshot_kind = str(sys.argv[3])
     snapshot_time_file_name = str(sys.argv[4])
 
-    Snapshot = simulation.SnapshotClass()
+    Snapshot = ut.simulation.SnapshotClass()
     Snapshot.read_snapshots(snapshot_time_file_name)
 
     sync_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])

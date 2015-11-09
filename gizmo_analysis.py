@@ -17,9 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib.colors import LogNorm
 # local ----
-from utilities import utility as ut
-from utilities import constants as const
-from utilities import plot
+import utilities as ut
 
 
 #===================================================================================================
@@ -173,11 +171,11 @@ def plot_nucleosynthetic_yields(
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
     yield_names = np.array(yield_dict.keys())[yield_indices]
-    yield_labels = [plot.element_name_dict[k] for k in yield_names]
+    yield_labels = [ut.plot.element_name_dict[k] for k in yield_names]
     yield_indices = np.arange(yield_indices.size)
 
     # plot ----------
-    colors = plot.get_colors(yield_indices.size, use_black=False)
+    colors = ut.plot.get_colors(yield_indices.size, use_black=False)
 
     fig = plt.figure(figure_index)
     fig.clf()
@@ -186,9 +184,10 @@ def plot_nucleosynthetic_yields(
     #fig, subplots = plt.subplots(3, 1, num=figure_index, sharex=True)
     fig.subplots_adjust(left=0.17, right=0.96, top=0.94, bottom=0.14, hspace=0.03, wspace=0.03)
 
-    for si in xrange(1):
+    for si in range(1):
         subplots[si].set_xlim([yield_indices.min() - 0.5, yield_indices.max() + 0.5])
-        subplots[si].set_ylim(plot.parse_axis_limits(axis_y_limits, yield_values, axis_y_scaling))
+        subplots[si].set_ylim(
+            ut.plot.parse_axis_limits(axis_y_limits, yield_values, axis_y_scaling))
 
         subplots[si].set_xticks(yield_indices)
         subplots[si].set_xticklabels(yield_labels)
@@ -202,7 +201,7 @@ def plot_nucleosynthetic_yields(
         #fig.set_ylabel(y_label, fontsize=26)
         #fig.set_xlabel('element', fontsize=26)
 
-        plot_func = plot.get_plot_function(subplots[si], 'lin', axis_y_scaling)
+        plot_func = ut.plot.get_plot_function(subplots[si], 'lin', axis_y_scaling)
 
         for yi in yield_indices:
             if yield_values[yi] > 0:
@@ -223,7 +222,7 @@ def plot_nucleosynthetic_yields(
     #plt.tight_layout(pad=0.02)
 
     plot_name = 'element.yields_%s_z.%.1f' % (event_kind, star_metallicity)
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 def get_orbit_dictionary(
@@ -263,11 +262,11 @@ def get_orbit_dictionary(
             positions = positions[part_indices]
             velocities = velocities[part_indices]
 
-        distance_vectors = ut.coord.get_distances(
+        distance_vectors = ut.coordinate.get_distances(
             'vector', positions, center_position, part.info['box.length'])
         distance_vectors *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
-        velocity_vectors = ut.coord.get_velocity_differences(
+        velocity_vectors = ut.coordinate.get_velocity_differences(
             'vector', velocities, center_velocity, include_hubble_flow, positions, center_position,
             part.snapshot['scale-factor'], part.snapshot['time.hubble'], part.info['box.length'])
 
@@ -403,7 +402,7 @@ class SpeciesProfileClass(ut.io.SayClass):
             prop_values = part[spec_name].prop(prop_name, part_indices)
 
             if DistanceBin.dimension_number == 3:
-                distances = ut.coord.get_distances(
+                distances = ut.coordinate.get_distances(
                     'scalar', part[spec_name]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
             elif DistanceBin.dimension_number in [1, 2]:
@@ -482,9 +481,9 @@ class SpeciesProfileClass(ut.io.SayClass):
             for spec_name in species:
                 pros[spec_name]['vel.circ'] = (
                     pros[spec_name]['histogram.cum'] / pros[spec_name]['distance.cum'] *
-                    const.grav_kpc_msun_yr)
+                    ut.const.grav_kpc_msun_yr)
                 pros[spec_name]['vel.circ'] = np.sqrt(pros[spec_name]['vel.circ'])
-                pros[spec_name]['vel.circ'] *= const.km_per_kpc * const.yr_per_sec
+                pros[spec_name]['vel.circ'] *= ut.const.km_per_kpc * ut.const.yr_per_sec
 
         return pros
 
@@ -546,11 +545,11 @@ class SpeciesProfileClass(ut.io.SayClass):
                 masses = part[spec_name].prop('mass', part_indices)
 
             if 'velocity' in prop_name:
-                distances = ut.coord.get_distances(
+                distances = ut.coordinate.get_distances(
                     'vector', part[spec_name]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
 
-                velocity_vectors = ut.coord.get_velocity_differences(
+                velocity_vectors = ut.coordinate.get_velocity_differences(
                     'vector', part[spec_name]['velocity'][part_indices], center_velocity, True,
                     part[spec_name]['position'][part_indices], center_position,
                     part.snapshot['scale-factor'], part.snapshot['time.hubble'],
@@ -566,7 +565,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                 prop_values = part[spec_name].prop(prop_name, part_indices)
 
                 if DistanceBin.dimension_number == 3:
-                    distances = ut.coord.get_distances(
+                    distances = ut.coordinate.get_distances(
                         'scalar', part[spec_name]['position'][part_indices], center_position,
                         part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
                 elif DistanceBin.dimension_number in [1, 2]:
@@ -636,7 +635,7 @@ def plot_mass_contamination(
     if halo_radius and scale_to_halo_radius:
         distance_limits_use *= halo_radius
 
-    DistanceBin = ut.bin.DistanceBinClass(
+    DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits_use, distance_bin_width, distance_bin_number)
 
     pros = {species_reference: {}}
@@ -646,7 +645,7 @@ def plot_mass_contamination(
     ratios = {}
 
     for spec_name in pros:
-        distances = ut.coord.get_distances(
+        distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
         distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
         pros[spec_name] = DistanceBin.get_histogram_profile(distances, part[spec_name]['mass'])
@@ -656,7 +655,7 @@ def plot_mass_contamination(
         mass_ratio_cum = pros[spec_name]['histogram.cum'] / pros[species_reference]['histogram.cum']
         ratios[spec_name] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
         """
-        for dist_bin_i in xrange(DistanceBin.number):
+        for dist_bin_i in range(DistanceBin.number):
             dist_bin_lim = DistanceBin.get_bin_limit('lin', dist_bin_i)
             Say.say('dist = [%.3f, %.3f]: mass ratio (bin, cum) = (%.5f, %.5f)' %
                     (dist_bin_lim[0], dist_bin_lim[1],
@@ -673,14 +672,14 @@ def plot_mass_contamination(
     if scale_to_halo_radius:
         distances /= halo_radius
         print_string = '  d/R_halo < %.3f: mass = %.2e, number = %d'
-    for dist_i in xrange(pros[spec_name]['histogram.cum'].size):
+    for dist_i in range(pros[spec_name]['histogram.cum'].size):
         if pros[spec_name]['histogram.cum'][dist_i] > 0:
             Say.say(print_string %
                     (distances[dist_i], pros[spec_name]['histogram.cum'][dist_i],
                      pros[spec_name]['histogram.cum'][dist_i] / part[spec_name]['mass'][0]))
 
     # plot ----------
-    colors = plot.get_colors(len(species_test), use_black=False)
+    colors = ut.plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
     if halo_radius and scale_to_halo_radius:
         xs /= halo_radius
@@ -703,7 +702,7 @@ def plot_mass_contamination(
         x_label = 'distance [$\\rm kpc\,comoving$]'
     subplot.set_xlabel(x_label, fontsize=20)
 
-    plot_func = plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
 
     if halo_radius:
         if scale_to_halo_radius:
@@ -724,7 +723,7 @@ def plot_mass_contamination(
     if halo_radius and scale_to_halo_radius:
         dist_name += '.200m'
     plot_name = 'mass.ratio_v_%s_z.%.1f' % (dist_name, part.snapshot['redshift'])
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 def plot_metal_v_distance(
@@ -759,10 +758,10 @@ def plot_metal_v_distance(
     if halo_radius and scale_to_halo_radius:
         distance_limits_use *= halo_radius
 
-    DistanceBin = ut.bin.DistanceBinClass(
+    DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits_use, distance_bin_width, distance_bin_number)
 
-    distances = ut.coord.get_distances(
+    distances = ut.coordinate.get_distances(
         'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
     distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
 
@@ -772,13 +771,13 @@ def plot_metal_v_distance(
     if 'metallicity' in plot_kind:
         pro_mass = DistanceBin.get_histogram_profile(distances, part[spec_name]['mass'])
         ys = pro_metal['histogram'] / pro_mass['histogram']
-        axis_y_limits = np.clip(plot.get_axis_limits(ys), 0.0001, 10)
+        axis_y_limits = np.clip(ut.plot.get_axis_limits(ys), 0.0001, 10)
     elif 'metal.mass.cum' in plot_kind:
         ys = pro_metal['fraction.cum']
         axis_y_limits = [0.001, 1]
 
     # plot ----------
-    # colors = plot.get_colors(len(species_test), use_black=False)
+    # colors = ut.plot.get_colors(len(species_test), use_black=False)
     xs = DistanceBin.mids
     if halo_radius and scale_to_halo_radius:
         xs /= halo_radius
@@ -806,7 +805,7 @@ def plot_metal_v_distance(
 
     subplot.set_xlabel(x_label, fontsize=20)
 
-    plot_func = plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
 
     if halo_radius:
         if scale_to_halo_radius:
@@ -826,7 +825,7 @@ def plot_metal_v_distance(
     if halo_radius and scale_to_halo_radius:
         dist_name += '.200m'
     plot_name = plot_kind + '_v_' + dist_name + '_z.%.1f' % part.info['redshift']
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 #===================================================================================================
@@ -896,8 +895,8 @@ def plot_image(
         weights = weights[masks]
 
         if align_principal_axes:
-            eigen_vectors = ut.coord.get_principal_axes(positions, weights)[0]
-            positions = ut.coord.get_coordinates_rotated(positions, eigen_vectors)
+            eigen_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
+            positions = ut.coordinate.get_coordinates_rotated(positions, eigen_vectors)
     else:
         distance_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
 
@@ -912,11 +911,11 @@ def plot_image(
 
     # plot ----------
     plt.minorticks_on()
-    fig = plt.figure(figure_index)
+    fig = plt.figure(figure_index, facecolor='black')
     fig.clf()
 
     if len(dimen_indices_plot) == 2:
-        subplot = fig.add_subplot(111)
+        subplot = fig.add_subplot(111, axisbg='black')
         fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
         subplot.set_xlim(position_limits[0])
@@ -1003,7 +1002,7 @@ def plot_image(
     for dimen_i in dimen_indices_plot:
         plot_name += '.%s' % dimen_label[dimen_i]
     plot_name += '_d.%.0f_z.%0.1f' % (distance_max, part.snapshot['redshift'])
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 #===================================================================================================
@@ -1049,7 +1048,7 @@ def plot_property_distribution(
     if 'velocity' in prop_name:
         center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
 
-    Stat = ut.math.StatisticClass()
+    Stat = ut.statistic.StatisticClass()
 
     for part_i, part in enumerate(parts):
         if part_indicess[part_i] is not None and len(part_indicess[part_i]):
@@ -1062,7 +1061,7 @@ def plot_property_distribution(
                 part[spec_name], other_prop_limits, part_indices)
 
         if distance_limits:
-            distances = ut.coord.get_distances(
+            distances = ut.coordinate.get_distances(
                 'scalar', part[spec_name]['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
@@ -1083,7 +1082,7 @@ def plot_property_distribution(
         Stat.print_statistics(-1)
         print()
 
-    colors = plot.get_colors(len(parts))
+    colors = ut.plot.get_colors(len(parts))
 
     # plot ----------
     plt.minorticks_on()
@@ -1093,16 +1092,18 @@ def plot_property_distribution(
     #fig, subplot = plt.subplots(1, 1, num=figure_index, sharex=True)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(plot.parse_axis_limits(prop_limits, prop_values, prop_scaling))
+    subplot.set_xlim(ut.plot.parse_axis_limits(prop_limits, prop_values, prop_scaling))
 
-    y_vals = [Stat.distr[prop_statistic][part_i] for part_i in xrange(len(parts))]
-    subplot.set_ylim(plot.parse_axis_limits(axis_y_limits, y_vals, axis_y_scaling))
+    y_vals = [Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))]
+    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, y_vals, axis_y_scaling))
 
-    subplot.set_xlabel(plot.get_label(prop_name, species=spec_name, get_units=True))
-    subplot.set_ylabel(plot.get_label(prop_name, prop_statistic, spec_name, get_symbol=True,
-                                      get_units=False, get_log=prop_scaling))
+    subplot.set_xlabel(ut.plot.get_label(prop_name, species=spec_name, get_units=True))
+    subplot.set_ylabel(
+        ut.plot.get_label(
+            prop_name, prop_statistic, spec_name, get_symbol=True, get_units=False,
+            get_log=prop_scaling))
 
-    plot_func = plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i, part in enumerate(parts):
         plot_func(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
                   color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['simulation.name'])
@@ -1122,7 +1123,7 @@ def plot_property_distribution(
     #plt.tight_layout(pad=0.02)
 
     plot_name = spec_name + '.' + prop_name + '_distr_z.%.1f' % part.info['redshift']
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 def plot_property_v_property(
@@ -1165,7 +1166,7 @@ def plot_property_v_property(
             part[spec_name], other_prop_limits, part_indices)
 
     if len(center_position) and len(host_distance_limits):
-        distances = ut.coord.get_distances(
+        distances = ut.coordinate.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scale-factor']
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
@@ -1210,16 +1211,18 @@ def plot_property_v_property(
     subplot = fig.add_subplot(111)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    axis_x_limits = plot.parse_axis_limits(log10(x_prop_limits), x_prop_values)
-    axis_y_limits = plot.parse_axis_limits(log10(y_prop_limits), y_prop_values)
+    axis_x_limits = ut.plot.parse_axis_limits(log10(x_prop_limits), x_prop_values)
+    axis_y_limits = ut.plot.parse_axis_limits(log10(y_prop_limits), y_prop_values)
 
     subplot.set_xlabel(
-        plot.get_label(x_prop_name, species=spec_name, get_units=True, get_symbol=True,
-                       get_log=x_prop_scaling))
+        ut.plot.get_label(
+            x_prop_name, species=spec_name, get_units=True, get_symbol=True,
+            get_log=x_prop_scaling))
 
     subplot.set_ylabel(
-        plot.get_label(y_prop_name, species=spec_name, get_units=True, get_symbol=True,
-                       get_log=y_prop_scaling))
+        ut.plot.get_label(
+            y_prop_name, species=spec_name, get_units=True, get_symbol=True,
+            get_log=y_prop_scaling))
 
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
@@ -1248,7 +1251,7 @@ def plot_property_v_property(
     plt.colorbar()
 
     if host_distance_limits is not None and len(host_distance_limits):
-        label = plot.get_label_distance('host.distance', host_distance_limits)
+        label = ut.plot.get_label_distance('host.distance', host_distance_limits)
 
         # distance legend
         legend = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')], [label],
@@ -1261,7 +1264,7 @@ def plot_property_v_property(
                  part.info['redshift'])
     if host_distance_limits is not None and len(host_distance_limits):
         plot_name += '_d.%.0f-%.0f' % (host_distance_limits[0], host_distance_limits[1])
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 def plot_property_v_distance(
@@ -1309,8 +1312,10 @@ def plot_property_v_distance(
     center_positions = ut.particle.parse_property(parts, 'position', center_positions)
     if 'velocity' in prop_name:
         center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+    else:
+        center_velocities = [center_velocities for _ in center_positions]
 
-    DistanceBin = ut.bin.DistanceBinClass(
+    DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
         dimension_number=dimension_number)
 
@@ -1340,19 +1345,20 @@ def plot_property_v_distance(
 
     subplot.set_xlim(distance_limits)
     y_vals = [pro[species][prop_statistic] for pro in pros]
-    subplot.set_ylim(plot.parse_axis_limits(axis_y_limits, y_vals, prop_scaling))
+    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, y_vals, prop_scaling))
 
     subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
     if prop_statistic == 'vel.circ':
         label_prop_name = 'vel.circ'
     else:
         label_prop_name = prop_name
-    label_y = plot.get_label(label_prop_name, prop_statistic, species,
-                             dimension_number=dimension_number, get_symbol=True, get_units=True)
+    label_y = ut.plot.get_label(
+        label_prop_name, prop_statistic, species, dimension_number=dimension_number,
+        get_symbol=True, get_units=True)
     subplot.set_ylabel(label_y)
 
-    plot_func = plot.get_plot_function(subplot, distance_scaling, prop_scaling)
-    colors = plot.get_colors(len(parts))
+    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, prop_scaling)
+    colors = ut.plot.get_colors(len(parts))
 
     if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
         if 'fraction' in prop_statistic:
@@ -1391,7 +1397,7 @@ def plot_property_v_distance(
     plot_name = plot_name.replace('.histogram', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
     if get_values:
         if len(parts) == 1:
@@ -1456,7 +1462,7 @@ def get_star_form_history(
 
     masses_cum_in_bins = np.interp(time_bins, form_times, masses_cum)
     # convert to {M_sun / yr}
-    dm_dt_in_bins = np.diff(masses_cum_in_bins) / np.diff(time_bins) / const.giga
+    dm_dt_in_bins = np.diff(masses_cum_in_bins) / np.diff(time_bins) / ut.const.giga
     dm_dt_in_bins /= 0.7  # crudely account for stellar mass loss, assume instantaneous recycling
 
     if time_kind == 'redshift':
@@ -1529,7 +1535,7 @@ def plot_star_form_history(
 
         if (center_positions[part_i] is not None and len(center_positions[part_i]) and
                 distance_limits is not None and len(distance_limits)):
-            distances = ut.coord.get_distances(
+            distances = ut.coordinate.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
@@ -1556,7 +1562,7 @@ def plot_star_form_history(
     fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(time_limits)
-    subplot.set_ylim(plot.parse_axis_limits(axix_y_limits, sf[sf_kind], axis_y_scaling))
+    subplot.set_ylim(ut.plot.parse_axis_limits(axix_y_limits, sf[sf_kind], axis_y_scaling))
 
     if 'time' in time_kind:
         label = 'time $[{\\rm Gyr}]$'
@@ -1570,14 +1576,14 @@ def plot_star_form_history(
             subplot.set_xlabel('redshift')
 
     if 'mass' in sf_kind:
-        axis_y_label = plot.get_label('star.mass', get_symbol=True, get_units=True)
+        axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
     else:
-        axis_y_label = plot.get_label('sfr', get_symbol=True, get_units=True)
+        axis_y_label = ut.plot.get_label('sfr', get_symbol=True, get_units=True)
     subplot.set_ylabel(axis_y_label)
 
-    colors = plot.get_colors(len(parts))
+    colors = ut.plot.get_colors(len(parts))
 
-    plot_func = plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
 
     for part_i, part in enumerate(parts):
         plot_func(sf['time'][part_i], sf[sf_kind][part_i],
@@ -1600,7 +1606,7 @@ def plot_star_form_history(
 
     sf_name = 'star' + '.' + sf_kind
     plot_name = '%s_v_%s_z.%.1f' % (sf_name, time_kind, part.info['redshift'])
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 def plot_star_form_histories_galaxies(
@@ -1655,7 +1661,7 @@ def plot_star_form_histories_galaxies(
         """
         if (center_positions[hal_i] is not None and len(center_positions[hal_i]) and
                 distance_limits is not None and len(distance_limits)):
-            distances = ut.coord.get_distances(
+            distances = ut.coordinate.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[hal_i],
                 part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
@@ -1688,7 +1694,7 @@ def plot_star_form_histories_galaxies(
     fig.subplots_adjust(left=0.17, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(time_limits)
-    subplot.set_ylim(plot.parse_axis_limits(axix_y_limits, sf[sf_kind], axis_y_scaling))
+    subplot.set_ylim(ut.plot.parse_axis_limits(axix_y_limits, sf[sf_kind], axis_y_scaling))
 
     if 'time' in time_kind:
         label = 'time $[{\\rm Gyr}]$'
@@ -1702,14 +1708,14 @@ def plot_star_form_histories_galaxies(
             subplot.set_xlabel('redshift')
 
     if 'mass' in sf_kind:
-        axis_y_label = plot.get_label('star.mass', get_symbol=True, get_units=True)
+        axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
     else:
-        axis_y_label = plot.get_label('sfr', get_symbol=True, get_units=True)
+        axis_y_label = ut.plot.get_label('sfr', get_symbol=True, get_units=True)
     subplot.set_ylabel(axis_y_label)
 
-    colors = plot.get_colors(len(hal_indices))
+    colors = ut.plot.get_colors(len(hal_indices))
 
-    plot_func = plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
 
     for hal_ii, hal_i in enumerate(hal_indices):
         plot_func(sf['time'][hal_ii], sf[sf_kind][hal_ii],
@@ -1736,28 +1742,33 @@ def plot_star_form_histories_galaxies(
 
     sf_name = 'star' + '.' + sf_kind
     plot_name = '%s_v_%s_z.%.1f' % (sf_name, time_kind, part.info['redshift'])
-    plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 #===================================================================================================
 # compare simulations
 #===================================================================================================
-
 simulations = [
     #['m12_ref12_rad4_orig', 'r12 orig'],
-    ['m12_ref12_rad4_oct23', 'r12 test'],
-    ['m12_ref12_rad4_oct23_sfn100', 'r12 test n100'],
+    #['m12_ref12_rad4_oct23', 'r12 test'],
+    #['m12_ref12_rad4_oct23_sfn100', 'r12 test n100'],
 
-    ['m12_ref13_rad4_fb-angle-max', 'r13 angle-max'],
-    ['m12_ref13_rad4_fb-angle-eff', 'r13 angle-eff'],
-    ['m12_ref13_rad4_oct23', 'r13 test'],
+    ['../m12_ref13_rad4_fb-angle-max', 'r13 angle-max'],
+    #['m12_ref13_rad4_fb-angle-eff', 'r13 angle-eff'],
+    #['m12_ref13_rad4_oct23', 'r13 test'],
+
+    ['m12_ref12_rad4_orig', 'r12 orig'],
+    ['m12_ref13_rad4_orig', 'r13 orig'],
+    ['m12_ref12_rad4_rmax1kpc', 'r12 r.max=1kpc'],
+    ['m12_ref13_rad4_rmax1kpc', 'r13 r.max=1kpc'],
+    ['m12_ref12_rad4_rmax10hsml', 'r12 r.max=10h'],
+    ['m12_ref13_rad4_rmax10hsml', 'r13 r.max=10h'],
 ]
 
 
 def plot_simulations_compare(
-    simulations=simulations, redshifts=[8, 7, 6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-    species='all', property_names=['mass', 'position', 'form.time'],
-    plot_velocity=False, force_float32=True):
+    simulations=simulations, redshifts=[7, 6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+    species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
     '''
     .
     '''
@@ -1768,9 +1779,6 @@ def plot_simulations_compare(
     if np.isscalar(redshifts):
         redshifts = [redshifts]
 
-    if plot_velocity and 'velocity' not in property_names:
-        property_names.append('velocity')
-
     for redshift in redshifts:
         parts = []
         for directory in simulations:
@@ -1778,7 +1786,7 @@ def plot_simulations_compare(
                 species, 'redshift', redshift, '%s/output' % directory, property_names,
                 simulation_name=simulations[directory], force_float32=force_float32)
 
-            if plot_velocity:
+            if 'velocity' in property_names:
                 gizmo_io.Gizmo.assign_orbit(part, 'gas')
 
             parts.append(part)
@@ -1804,15 +1812,15 @@ def plot_simulations_compare(
             axis_y_limits=[None, None], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 30], 0.1,
+            parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
-        if plot_velocity:
+        if 'velocity' in property_names:
             plot_property_v_distance(
                 parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
                 axis_y_limits=[None, None], write_plot=True)
 
-        if redshift <= 3:
+        if 'form.time' in property_names and redshift <= 3:
             plot_star_form_history(
                 parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
                 write_plot=True)
@@ -1970,7 +1978,7 @@ def print_galaxy_mass_v_redshift(gal):
     print('r_50[kpc phys] star_mass_50[M_sun] gas_mass_50[M_sun] dark_mass_50[M_sun] ', end='')
     print('r_90[kpc phys] star_mass_90[M_sun] gas_mass_90[M_sun] dark_mass_90[M_sun]', end='\n')
 
-    for ti in xrange(gal['redshift'].size):
+    for ti in range(gal['redshift'].size):
         print('%.5f %.5f %.5f ' %
               (gal['redshift'][ti], gal['scale-factor'][ti], gal['time'][ti]), end='')
         print('%.3f %.3f %.3f ' %

@@ -16,8 +16,7 @@ import yt
 import yt.analysis_modules.halo_finding.api as halo_io
 #import yt.analysis_modules.halo_analysis.api as halo_analysis
 #import yt.analysis_modules.halo_merger_tree.api as tree_io
-from utilities import utility as ut
-from utilities import cosmology
+import utilities as ut
 
 
 Fraction = ut.math.FractionClass()
@@ -65,7 +64,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.data.append(self.snapshot[0].h.all_data())
         self.data.append(self.snapshot[1].h.all_data())
 
-        self.Cosmology = cosmology.CosmologyClass(source='agora')
+        self.Cosmology = ut.cosmology.CosmologyClass(source='agora')
 
         if read_halos:
             self.read_halo_catalog()
@@ -97,7 +96,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.hal['radius'] = np.zeros(len(self.hal_yt), dtype=np.float32)
         self.hal['particle.number'] = np.zeros(len(self.hal_yt), dtype=np.int32)
 
-        for hi in xrange(len(self.hal_yt)):
+        for hi in range(len(self.hal_yt)):
             self.hal['mass'][hi] = self.hal_yt[hi].total_mass()
             self.hal['radius'][hi] = self.hal_yt[hi].maximum_radius()
             self.hal['position'][hi] = self.hal_yt[hi].center_of_mass()
@@ -306,14 +305,14 @@ def print_contamination_around_halo(
 
     Say = ut.io.SayClass(print_contamination_around_halo)
 
-    DistanceBin = ut.bin.DistanceBinClass(
+    DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, [0, distance_max], width=distance_bin_width)
 
     pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial)
     Say.say('read %d particles around halo' % pids.size)
 
     pis = Agora.part[ti]['id-to-index'][pids]
-    distances = ut.coord.get_distances(
+    distances = ut.coordinate.get_distances(
         'scalar', Agora.part[ti]['position'][pis], Agora.hal['position'][halo_index],
         Agora['box.length'])
     if scale_virial:
@@ -325,7 +324,7 @@ def print_contamination_around_halo(
         Say.say('yay! no contaminating particles out to distance_max = %.3f' % distance_max)
         return
 
-    for di in xrange(DistanceBin.number):
+    for di in range(DistanceBin.number):
         dist_bin_lim = DistanceBin.get_bin_limits(distance_scaling, di)
         pis_d = pis[ut.array.get_indices(distances, dist_bin_lim)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
@@ -362,11 +361,11 @@ def print_contamination_in_box(
 
     if center_position is None:
         center_position = np.zeros(part['position'].shape[1])
-        for dimension_i in xrange(part['position'].shape[1]):
+        for dimension_i in range(part['position'].shape[1]):
             center_position[dimension_i] = 0.5 * part.info['box.length']
     print('center position = %s' % center_position)
 
-    DistanceBin = ut.bin.DistanceBinClass(scaling, distance_limits, number=distance_bin_number)
+    DistanceBin = ut.binning.DistanceBinClass(scaling, distance_limits, number=distance_bin_number)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])
@@ -379,17 +378,17 @@ def print_contamination_in_box(
         distances = distances[0]
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
-        distance_vector = np.abs(ut.coord.get_distances(
+        distance_vector = np.abs(ut.coordinate.get_distances(
             'vector', part['position'], center_position, part.info['box.length']))
 
-    for di in xrange(DistanceBin.number):
+    for di in range(DistanceBin.number):
         dist_bin_lim = DistanceBin.get_bin_limits(scaling, di)
 
         if geometry == 'sphere':
             pis_all_d = neig_pis[ut.array.get_indices(distances, dist_bin_lim)]
         elif geometry == 'cube':
             pis_all_d = np.array(pis_all)
-            for dimension_i in xrange(part['position'].shape[1]):
+            for dimension_i in range(part['position'].shape[1]):
                 pis_all_d = ut.array.get_indices(
                     distance_vector[:, dimension_i], dist_bin_lim, pis_all_d)
 
@@ -430,7 +429,7 @@ def print_ic_zoom_region_for_halo(
     positions = Agora.part[1]['position'][pis]
     limits = np.zeros((positions.shape[1], 2))
     widths = np.zeros(positions.shape[1])
-    for dimen_i in xrange(positions.shape[1]):
+    for dimen_i in range(positions.shape[1]):
         limits[dimen_i] = np.array(ut.array.get_limits(positions[:, dimen_i]))
         widths[dimen_i] = limits[[dimen_i]].max() - limits[[dimen_i]].min()
         Agora.say('dimension-%d: %s (%.3f) kpc, %s (%.8f) box length' %

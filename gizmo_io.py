@@ -14,10 +14,7 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import h5py
 # local ----
-from utilities import utility as ut
-from utilities import constants as const
-from utilities import cosmology
-from utilities import simulation
+import utilities as ut
 
 
 #===================================================================================================
@@ -116,7 +113,7 @@ class ParticleDictionaryClass(dict):
         if property_name == 'number.density' or property_name == 'density.number':
             # number density of hyrogen {cm ^ -3}
             return (self.prop('density', indices) * (1 - self.prop('metallicity', indices)[:, 0]) *
-                    const.proton_per_sun * const.kpc_per_cm ** 3)
+                    ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3)
 
         if 'form.time' in property_name and 'lookback' in property_name:
             prop_name = property_name.replace('.lookback', '')
@@ -144,7 +141,7 @@ class ParticleDictionaryClass(dict):
                 values = np.array(values) / 10 ** 0.2 * 0.02
 
             if '.solar' in property_name:
-                values = np.array(values) / const.sun_composition[metal_name + '.mass.fraction']
+                values = np.array(values) / ut.const.sun_composition[metal_name + '.mass.fraction']
 
             return values
 
@@ -385,7 +382,7 @@ class GizmoClass(ut.io.SayClass):
         ## try to read snapshot time file ##
         directory = ut.io.get_path(directory)
         snapshot_time_file_directory = directory + '../'
-        Snapshot = simulation.SnapshotClass()
+        Snapshot = ut.simulation.SnapshotClass()
 
         try:
             try:
@@ -480,7 +477,7 @@ class GizmoClass(ut.io.SayClass):
             sigma_8 = 0.807
             n_s = 0.961
             w = -1.0
-            Cosmology = cosmology.CosmologyClass(
+            Cosmology = ut.cosmology.CosmologyClass(
                 header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
                 sigma_8, n_s, w)
 
@@ -532,7 +529,7 @@ class GizmoClass(ut.io.SayClass):
 
         ## start reading properties for each species ##
         # loop over all files at given snapshot
-        for file_i in xrange(header['file.number.per.snapshot']):
+        for file_i in range(header['file.number.per.snapshot']):
             if file_i == 0:
                 file_name_i = file_name
             else:
@@ -668,9 +665,10 @@ class GizmoClass(ut.io.SayClass):
                 helium_mass_fracs = part[spec_name]['metallicity'][:, 1]
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
-                molecular_weights = mus * const.proton_mass
-                part[spec_name]['temperature'] *= \
-                    const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights / const.boltzmann
+                molecular_weights = mus * ut.const.proton_mass
+                part[spec_name]['temperature'] *= (
+                    ut.const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights /
+                    ut.const.boltzmann)
 
         if 'potential' in part[species_names[0]]:
             # renormalize so potential max = 0
@@ -713,7 +711,7 @@ class GizmoClass(ut.io.SayClass):
             'scale-factor': header['scale-factor'],
             'time': time,
             'time.lookback': Cosmology.time_from_redshift(0) - time,
-            'time.hubble': const.Gyr_per_sec / Cosmology.hubble_parameter(0),
+            'time.hubble': ut.const.Gyr_per_sec / Cosmology.hubble_parameter(0),
         }
         for spec_name in species_names:
             part[spec_name].snapshot = part.snapshot
@@ -787,7 +785,7 @@ class GizmoClass(ut.io.SayClass):
         -------
         class dictionary of snapshot information
         '''
-        return simulation.Snapshot.read_snapshots(file_name, directory)
+        return ut.simulation.Snapshot.read_snapshots(file_name, directory)
 
     def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''

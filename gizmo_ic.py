@@ -15,8 +15,7 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 from scipy import spatial
 # local ----
-from utilities import utility as ut
-from utilities import constants as const
+import utilities as ut
 from . import gizmo_io
 
 
@@ -86,7 +85,7 @@ def write_initial_condition_points(
     for spec_name in spec_names:
         positions_fin = part_fin[spec_name]['position']
 
-        distances = ut.coord.get_distances(
+        distances = ut.coordinate.get_distances(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
         distances *= part_fin.snapshot['scale-factor']  # convert to {kpc physical}
 
@@ -99,9 +98,9 @@ def write_initial_condition_points(
 
     positions_ini = np.array(positions_ini)
     poss_ini_limits = [[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
-                       for dimen_i in xrange(positions_ini.shape[1])]
+                       for dimen_i in range(positions_ini.shape[1])]
 
-    volume_ini = ut.coord.get_volume_of_convex_hull(positions_ini)
+    volume_ini = ut.coordinate.get_volume_of_convex_hull(positions_ini)
     density_ini = part_ini.Cosmology.density(
         'matter', part_ini.snapshot['redshift'], 'kpc comoving')
     if part_ini.info['has.baryons']:
@@ -122,7 +121,7 @@ def write_initial_condition_points(
                 distance_pure)
     Say.say('number of particles in selection volume at final time = %d' %
             np.sum(spec_select_number))
-    for spec_i in xrange(len(spec_names)):
+    for spec_i in range(len(spec_names)):
         spec_name = spec_names[spec_i]
         Say.say('  species %s: number = %d' % (spec_name, spec_select_number[spec_i]))
     Say.say('mass of all dark-matter particles:')
@@ -131,7 +130,7 @@ def write_initial_condition_points(
     Say.say('  in selection volume at final time = %.2e M_sun' % mass_select)
     Say.say('  in convex hull at initial time = %.2e M_sun' % mass_ini)
     Say.say('volume of convex hull at initial time = %.1f Mpc ^ 3 comoving' %
-            (volume_ini * const.mega_per_kilo ** 3))
+            (volume_ini * ut.const.mega_per_kilo ** 3))
 
     # MUSIC does not support header information in points file, so put in separate log file
     log_file_name = file_name.replace('.txt', '_log.txt')
@@ -151,7 +150,7 @@ def write_initial_condition_points(
             distance_pure)
     file_io.write('# number of particles in selection volume at final time = %d\n' %
                   positions_ini.shape[0])
-    for spec_i in xrange(len(spec_names)):
+    for spec_i in range(len(spec_names)):
         file_io.write('#   species %s: number = %d\n' %
                       (spec_names[spec_i], spec_select_number[spec_i]))
     file_io.write('# mass of all dark-matter particles:\n')
@@ -160,8 +159,8 @@ def write_initial_condition_points(
     file_io.write('#   in selection volume at final time = %.2e M_sun\n' % mass_select)
     file_io.write('#   in convex hull at initial time = %.2e M_sun\n' % mass_ini)
     file_io.write('# volume of convex hull at initial time = %.1f Mpc ^ 3 comoving\n' %
-                  (volume_ini * const.mega_per_kilo ** 3))
-    for dimen_i in xrange(positions_ini.shape[1]):
+                  (volume_ini * ut.const.mega_per_kilo ** 3))
+    for dimen_i in range(positions_ini.shape[1]):
         file_io.write('# initial position-%s [min, max] = %s kpc comoving, %s box units\n' %
                       (dimen_i, ut.array.get_limits(poss_ini_limits[dimen_i], digit_number=3),
                        ut.array.get_limits(poss_ini_limits[dimen_i] / part_ini.info['box.length'],
@@ -179,7 +178,7 @@ def write_initial_condition_points(
     file_io.close()
 
     file_io = open(file_name, 'w')
-    for pi in xrange(positions_ini.shape[0]):
+    for pi in range(positions_ini.shape[0]):
         file_io.write('%.8f %.8f %.8f\n' %
                       (positions_ini[pi, 0], positions_ini[pi, 1], positions_ini[pi, 2]))
     file_io.close()
