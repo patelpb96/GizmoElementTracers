@@ -42,6 +42,10 @@ def print_run_times(
     print_lines : boolean : whether to print full lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale factors, redshifts, run times
     '''
+    def get_mod(x1, x2):
+        # for some reason, python's mod function is funky with fractional values, so do by hand
+        return x1 - np.floor(x1 / x2) * x2
+
     file_name = 'cpu.txt'
 
     file_path_name = ut.io.get_path(directory) + file_name
@@ -51,12 +55,13 @@ def print_run_times(
     run_times = []
 
     t_i = 0
+    a_i = scale_factors[t_i]
     print_next_line = False
     for line in file_in:
-        if ('Time: 1,' % scale_factors[t_i] in line or
-                'Time: %.1f,' % scale_factors[t_i] in line or
-                'Time: %.2f,' % scale_factors[t_i] in line or
-                'Time: %.3f' % scale_factors[t_i] in line):
+        if ('Time: 1,' in line or
+                ('Time: %.1f,' % a_i in line and get_mod(a_i, 0.1) == 0) or
+                ('Time: %.2f,' % a_i in line and get_mod(a_i, 0.01) == 0) or
+                ('Time: %.3f' % a_i in line)):
             if print_lines:
                 print(line, end='')
             print_next_line = True
@@ -68,6 +73,8 @@ def print_run_times(
             t_i += 1
             if t_i >= len(scale_factors):
                 break
+            else:
+                a_i = scale_factors[t_i]
 
     run_times = np.array(run_times) / 3600  # convert to {hr}
     if cpu_number:
