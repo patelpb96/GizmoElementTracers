@@ -53,7 +53,7 @@ def print_run_times(
     t_i = 0
     print_next_line = False
     for line in file_in:
-        if ('Time: %.0f,' % scale_factors[t_i] in line or
+        if ('Time: 1,' % scale_factors[t_i] in line or
                 'Time: %.1f,' % scale_factors[t_i] in line or
                 'Time: %.2f,' % scale_factors[t_i] in line or
                 'Time: %.3f' % scale_factors[t_i] in line):

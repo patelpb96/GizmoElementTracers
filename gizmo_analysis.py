@@ -960,7 +960,8 @@ def plot_image(
         position_limits[0, 0] *= 0.994
         position_limits[1, 0] *= 0.994
 
-        fig, subplots = plt.subplots(2, 2, num=figure_index, sharex=True, sharey=True)
+        fig, subplots = plt.subplots(2, 2, num=figure_index, sharex=True, sharey=True,
+                                     axisbg='black')
         fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
 
         plot_dimen_iss = [
