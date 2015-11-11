@@ -312,7 +312,7 @@ class SpeciesProfileClass(ut.io.SayClass):
         -------
         pros : dict : dictionary of profiles for each particle species
         '''
-        if 'histogram' in prop_statistic:
+        if 'histogram' in prop_statistic or 'vel.circ' in prop_statistic:
             return self.get_histogram_profiles(
                 part, species, prop_name, DistanceBin, center_position, rotation_vectors,
                 axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
