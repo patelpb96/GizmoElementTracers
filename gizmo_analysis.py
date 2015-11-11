@@ -1750,20 +1750,14 @@ def plot_star_form_histories_galaxies(
 # compare simulations
 #===================================================================================================
 simulations = [
-    #['m12_ref12_rad4_orig', 'r12 orig'],
-    #['m12_ref12_rad4_oct23', 'r12 test'],
-    #['m12_ref12_rad4_oct23_sfn100', 'r12 test n100'],
+    ['../m12_ref13_fb-angle-max', 'r13 angle-max'],
 
-    ['../m12_ref13_rad4_fb-angle-max', 'r13 angle-max'],
-    #['m12_ref13_rad4_fb-angle-eff', 'r13 angle-eff'],
-    #['m12_ref13_rad4_oct23', 'r13 test'],
-
-    ['m12_ref12_rad4_orig', 'r12 r.max=2kpc'],
-    ['m12_ref13_rad4_orig', 'r13 r.max=2kpc'],
-    ['m12_ref12_rad4_rmax1kpc', 'r12 r.max=1kpc'],
-    ['m12_ref13_rad4_rmax1kpc', 'r13 r.max=1kpc'],
-    ['m12_ref12_rad4_rmax10hsml', 'r12 r.max=10h'],
-    ['m12_ref13_rad4_rmax10hsml', 'r13 r.max=10h'],
+    ['m12_ref12_orig', 'r12 r.max=2kpc'],
+    ['m12_ref13_orig', 'r13 r.max=2kpc'],
+    ['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
+    ['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
+    ['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
+    ['m12_ref13_rmax10hsml', 'r13 r.max=10h'],
 ]
 
 
@@ -1794,7 +1788,7 @@ def plot_simulations_compare(
 
         if 'mass' in property_names:
             for di, directory in enumerate(simulations):
-                print('%d: star.mass = %.3e' % (directory, parts[di]['star']['mass'].sum()))
+                print('%s star.mass = %.3e' % (directory, parts[di]['star']['mass'].sum()))
 
         plot_property_v_distance(
             parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
