@@ -41,6 +41,10 @@ def print_run_times(
     scale_factors : array-like : list of scale factors at which to print run times
     print_lines : boolean : whether to print full lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale factors, redshifts, run times
+
+    Returns
+    -------
+    scale_factors, redshifts, run_times : arrays : return these if get_values is True
     '''
     def get_mod(x1, x2):
         # for some reason, python's mod function is funky with fractional values, so do by hand
@@ -164,41 +168,6 @@ def print_run_time_ratios(
         print()
 
 
-def plot_halo_contamination(directory='.', snapshot_redshift=0):
-    '''
-    Plot contamination from lower-resolution particles in/near halo as a function of radius.
-
-    Parameters
-    ----------
-    directory : string : directory of simulation (one level above directory of snapshot file)
-    snapshot_redshift : float : redshift of snapshot file
-    '''
-    #position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
-    radius_bin_wid = 0.02
-    radius_lim_phys = [1, 4000]  # {kpc physical}
-    radius_lim_vir = [0.01, 10]  # {units of R_halo}
-    virial_kind = '200m'
-
-    os.chdir(directory)
-
-    part = gizmo_io.Gizmo.read_snapshot(
-        ['dark', 'dark.2'], 'redshift', snapshot_redshift, 'output',
-        ['position', 'mass', 'potential'], force_float32=True, assign_center=True)
-
-    #part.center_position = ut.particle.get_center_position(
-    #    part, 'dark', 'center-of-mass', compare_centers=True)
-
-    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(part, 'all', virial_kind=virial_kind)
-
-    gizmo_analysis.plot_mass_contamination(
-        part, radius_lim_phys, radius_bin_wid, halo_radius=halo_radius, scale_to_halo_radius=False,
-        write_plot=True, plot_directory='plot')
-
-    gizmo_analysis.plot_mass_contamination(
-        part, radius_lim_vir, radius_bin_wid, halo_radius=halo_radius,
-        scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
-
-
 def print_properties_extrema_all_snapshots(
     directory='.', species_property_dict={'gas': ['smooth.length', 'density']}):
     '''
@@ -275,6 +244,41 @@ def print_properties_extrema_all_snapshots(
             #Statistic.print_statistics()
 
 
+def plot_halo_contamination(directory='.', snapshot_redshift=0):
+    '''
+    Plot contamination from lower-resolution particles in/near halo as a function of radius.
+
+    Parameters
+    ----------
+    directory : string : directory of simulation (one level above directory of snapshot file)
+    snapshot_redshift : float : redshift of snapshot file
+    '''
+    #position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
+    radius_bin_wid = 0.02
+    radius_lim_phys = [1, 4000]  # {kpc physical}
+    radius_lim_vir = [0.01, 10]  # {units of R_halo}
+    virial_kind = '200m'
+
+    os.chdir(directory)
+
+    part = gizmo_io.Gizmo.read_snapshot(
+        ['dark', 'dark.2'], 'redshift', snapshot_redshift, 'output',
+        ['position', 'mass', 'potential'], force_float32=True, assign_center=True)
+
+    #part.center_position = ut.particle.get_center_position(
+    #    part, 'dark', 'center-of-mass', compare_centers=True)
+
+    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(part, 'all', virial_kind=virial_kind)
+
+    gizmo_analysis.plot_mass_contamination(
+        part, radius_lim_phys, radius_bin_wid, halo_radius=halo_radius, scale_to_halo_radius=False,
+        write_plot=True, plot_directory='plot')
+
+    gizmo_analysis.plot_mass_contamination(
+        part, radius_lim_vir, radius_bin_wid, halo_radius=halo_radius,
+        scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
+
+
 #===================================================================================================
 # simulation utility
 #===================================================================================================
@@ -307,13 +311,22 @@ def delete_snapshots(directory='.'):
 
 
 #===================================================================================================
-# code performance and scaling
+# simulation performance and scaling
 #===================================================================================================
 def plot_scaling(
-    plot_kind='strong', time_kind='cpu', axis_x_scaling='log', axis_y_scaling='lin',
+    scaling_kind='strong', time_kind='cpu', axis_x_scaling='log', axis_y_scaling='lin',
     write_plot=False, plot_directory='.'):
     '''
-    .
+    Print simulation run times (all or CPU).
+
+    Parameters
+    ----------
+    scaling_kind : string : 'strong', 'weak'
+    time_kind : string : 'cpu', 'wall'
+    axis_x_scaling : string : scaling along x-axis: 'log', 'lin'
+    axis_y_scaling : string : scaling along y-axis: 'log', 'lin'
+    write_plot : boolean : whether to write plot to file
+    plot_directory : string : directory to write plot file
     '''
     dark = {
         'ref12': {'particle.num': 8.82e6, 'cpu.num': 64, 'cpu.time': 385, 'wall.time': 6.0},
@@ -348,7 +361,7 @@ def plot_scaling(
 
     plot_func = ut.plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
 
-    if plot_kind == 'strong':
+    if scaling_kind == 'strong':
         cpu_nums = [k for k in mfm_ref14]
         # 2x == convert from a = 0.068 to a = 0.1
         if time_kind == 'cpu':
@@ -371,7 +384,7 @@ def plot_scaling(
         subplot.text(0.05, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                      transform=subplot.transAxes)
 
-    elif plot_kind == 'weak':
+    elif scaling_kind == 'weak':
         dm_particle_nums = np.array([dark[k]['particle.num'] for k in sorted(dark.keys())])
         mfm_particle_nums = np.array([mfm[k]['particle.num'] for k in sorted(mfm.keys())])
 

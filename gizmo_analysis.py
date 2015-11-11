@@ -1758,8 +1758,8 @@ simulations = [
     #['m12_ref13_rad4_fb-angle-eff', 'r13 angle-eff'],
     #['m12_ref13_rad4_oct23', 'r13 test'],
 
-    ['m12_ref12_rad4_orig', 'r12 orig'],
-    ['m12_ref13_rad4_orig', 'r13 orig'],
+    ['m12_ref12_rad4_orig', 'r12 r.max=2kpc'],
+    ['m12_ref13_rad4_orig', 'r13 r.max=2kpc'],
     ['m12_ref12_rad4_rmax1kpc', 'r12 r.max=1kpc'],
     ['m12_ref13_rad4_rmax1kpc', 'r13 r.max=1kpc'],
     ['m12_ref12_rad4_rmax10hsml', 'r12 r.max=10h'],
@@ -1792,6 +1792,10 @@ def plot_simulations_compare(
 
             parts.append(part)
 
+        if 'mass' in property_names:
+            for di, directory in enumerate(simulations):
+                print('%d: star.mass = %.3e' % (directory, parts[di]['star']['mass'].sum()))
+
         plot_property_v_distance(
             parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
             axis_y_limits=[0, 3], write_plot=True)
@@ -1821,7 +1825,7 @@ def plot_simulations_compare(
                 parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
                 axis_y_limits=[None, None], write_plot=True)
 
-        if 'form.time' in property_names and redshift <= 3:
+        if 'form.time' in property_names and redshift <= 4:
             plot_star_form_history(
                 parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
                 write_plot=True)
