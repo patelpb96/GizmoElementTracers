@@ -49,7 +49,7 @@ class ParticleDictionaryClass(dict):
         Parameters
         ----------
         property_name : string : name of property
-        indices : array : list of indices to select on
+        indices : array : indices to select on
         '''
         property_name = property_name.strip()  # strip white space
 

@@ -607,11 +607,11 @@ def plot_mass_contamination(
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
     distance_bin_number : int : number of distance bins
-    distance_scaling : string : lin or log
+    distance_scaling : string : 'log', 'lin'
     halo_radius : float : radius of halo {kpc physical}
     scale_to_halo_radius : boolean : whether to scale distance to halo_radius
     center_position : array : position of galaxy/halo center
-    axis_y_scaling : string : scaling of y-axis: lin, log
+    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to put plot
     '''
@@ -1375,7 +1375,7 @@ def plot_property_v_distance(
                   linestyle='-', alpha=0.5, linewidth=2,
                   label=parts[part_i].info['simulation.name'])
 
-    if distance_reference > 0:
+    if distance_reference is not None:
         plot_func([distance_reference, distance_reference], [1e-3, 1e20],
                   color='black', linestyle=':', alpha=0.6)
 
