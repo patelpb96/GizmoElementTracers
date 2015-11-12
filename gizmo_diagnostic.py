@@ -36,12 +36,13 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
     '''
     loop_number_max = 1000
 
+    Say = ut.io.SayClass()
     file_path_name = ut.io.get_path(simulation_directory) + runtime_file_name
     file_in = open(file_path_name, 'r')
 
     loop_i = 0
-    mpi_number = 1
-    omp_number = 1
+    mpi_number = None
+    omp_number = None
 
     for line in file_in:
         if 'MPI tasks' in line:
@@ -54,9 +55,18 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
 
         loop_i += 1
         if loop_i > loop_number_max:
-            if not mpi_number:
-                print('! unable to find MPI number')
             break
+
+    if mpi_number:
+        Say.say('MPI tasks = %d' % mpi_number)
+    else:
+        Say.say('! unable to find number of MPI tasks')
+
+    if omp_number:
+        Say.say('OpenMP threads = %d' % omp_number)
+    else:
+        Say.say('did not find any OpenMP threads')
+        omp_number = 1
 
     return mpi_number, omp_number
 
@@ -125,7 +135,10 @@ def print_run_times(
 
     # get cpu number from runtime file
     mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
-    cpu_number = mpi_number * omp_number
+    if mpi_number and omp_number:
+        cpu_number = mpi_number * omp_number
+    else:
+        cpu_number = 1
     cpu_times = run_times * cpu_number
 
     # sanity check - simulation might not have run to all input scale factors
