@@ -28,6 +28,7 @@ from . import gizmo_analysis
 def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
     '''
     Get number of MPI tasks and OpenMP threads from run-time file.
+    If cannot find any, default to 1.
 
     Parameters
     ----------
@@ -36,7 +37,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
     '''
     loop_number_max = 1000
 
-    Say = ut.io.SayClass()
+    Say = ut.io.SayClass(get_cpu_numbers)
     file_path_name = ut.io.get_path(simulation_directory) + runtime_file_name
     file_in = open(file_path_name, 'r')
 
@@ -61,6 +62,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
         Say.say('MPI tasks = %d' % mpi_number)
     else:
         Say.say('! unable to find number of MPI tasks')
+        mpi_number = 1
 
     if omp_number:
         Say.say('OpenMP threads = %d' % omp_number)
@@ -133,12 +135,9 @@ def print_run_times(
 
     run_times = np.array(run_times) / 3600  # convert to {hr}
 
-    # get cpu number from runtime file
+    # get cpu number from run-time file
     mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
-    if mpi_number and omp_number:
-        cpu_number = mpi_number * omp_number
-    else:
-        cpu_number = 1
+    cpu_number = mpi_number * omp_number
     cpu_times = run_times * cpu_number
 
     # sanity check - simulation might not have run to all input scale factors
