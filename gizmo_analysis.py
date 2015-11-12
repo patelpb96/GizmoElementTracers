@@ -872,7 +872,7 @@ def plot_image(
         part_indices = ut.catalog.get_indices_catalog(
             part[spec_name], other_prop_limits, part_indices)
 
-    if subsample_factor > 1:
+    if subsample_factor is not None and subsample_factor > 1:
         part_indices = part_indices[::subsample_factor]
 
     positions = np.array(part[spec_name]['position'][part_indices])
@@ -900,9 +900,9 @@ def plot_image(
     else:
         distance_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
 
-    if distance_bin_width > 0:
+    if distance_bin_width is not None and distance_bin_width > 0:
         position_bin_number = int(np.round(2 * distance_max / distance_bin_width))
-    elif distance_bin_number > 0:
+    elif distance_bin_number is not None and distance_bin_number > 0:
         position_bin_number = 2 * distance_bin_number
     else:
         raise ValueError('need to input either distance bin width or bin number')

@@ -23,12 +23,52 @@ from . import gizmo_analysis
 
 
 #===================================================================================================
+# utility
+#===================================================================================================
+def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
+    '''
+    Get number of MPI tasks and OpenMP threads from run-time file.
+
+    Parameters
+    ----------
+    simulation_directory : string : directory of simulation
+    runtime_file_name : string : name of run-time file name (set in submission script)
+    '''
+    loop_number_max = 1000
+
+    file_path_name = ut.io.get_path(simulation_directory) + runtime_file_name
+    file_in = open(file_path_name, 'r')
+
+    loop_i = 0
+    mpi_number = 1
+    omp_number = 1
+
+    for line in file_in:
+        if 'MPI tasks' in line:
+            mpi_number = int(line.split()[2])
+        elif 'OpenMP threads' in line:
+            omp_number = int(line.split()[1])
+
+        if mpi_number and omp_number:
+            break
+
+        loop_i += 1
+        if loop_i > loop_number_max:
+            if not mpi_number:
+                print('! unable to find MPI number')
+            break
+
+    return mpi_number, omp_number
+
+
+#===================================================================================================
 # simulation diagnostic
 #===================================================================================================
 def print_run_times(
-    directory='.', cpu_number=None,
-    scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
+    simulation_directory='.', output_directory='output/', runtime_file_name='gizmo.out',
+    scale_factors=[
+        0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
+        0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
     print_lines=False, get_values=False):
     '''
     Print wall [and CPU] times (average per MPI task) at input scale factors from cpu.txt for
@@ -36,10 +76,10 @@ def print_run_times(
 
     Parameters
     ----------
-    directory : string : directory of cpu.txt file
-    cpu_number : int : number of CPUs used for simulation (to compute total CPU hours)
+    simulation_directory : string : directory of simulation
+    runtime_file_name : string : name of run-time file name (set in submission script)
     scale_factors : array-like : list of scale factors at which to print run times
-    print_lines : boolean : whether to print full lines from cpu.txt as get them
+    print_lines : boolean : whether to print lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale factors, redshifts, run times
 
     Returns
@@ -52,7 +92,8 @@ def print_run_times(
 
     file_name = 'cpu.txt'
 
-    file_path_name = ut.io.get_path(directory) + file_name
+    file_path_name = (ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) +
+                      file_name)
     file_in = open(file_path_name, 'r')
 
     scale_factors = np.array(scale_factors)
@@ -81,8 +122,11 @@ def print_run_times(
                 a_i = scale_factors[t_i]
 
     run_times = np.array(run_times) / 3600  # convert to {hr}
-    if cpu_number:
-        cpu_times = run_times * cpu_number
+
+    # get cpu number from runtime file
+    mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
+    cpu_number = mpi_number * omp_number
+    cpu_times = run_times * cpu_number
 
     # sanity check - simulation might not have run to all input scale factors
     scale_factors = scale_factors[: run_times.size]
