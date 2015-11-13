@@ -231,17 +231,19 @@ def print_properties_extrema_all_snapshots(
     For each input property, get its extremum at each snapshot.
     Print statistics of this across all snapshots.
 
-    directory : string : directory of simulation
+    simulation_directory : string : directory of simulation
     output_directory : string : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
-    Say = ut.io.SayClass(print_properties_extrema_all_snapshots)
+    metal_index_max = 0
 
     property_statistic = {
         'smooth.length': {'function.name': 'min', 'function': np.min},
-        'density.number': {'function.name': 'max', 'function': np.max},
         'density': {'function.name': 'max', 'function': np.max},
+        'density.number': {'function.name': 'max', 'function': np.max},
     }
+
+    Say = ut.io.SayClass(print_properties_extrema_all_snapshots)
 
     simulation_directory = ut.io.get_path(simulation_directory)
     output_directory = simulation_directory + ut.io.get_path(output_directory)
@@ -261,8 +263,12 @@ def print_properties_extrema_all_snapshots(
         for prop_name in species_property_dict[spec_name]:
             prop_dict[prop_name] = []
 
-            if prop_name not in properties_read:
-                properties_read.append(prop_name)
+            prop_name_read = prop_name.replace('.number', '')
+            if prop_name_read not in properties_read:
+                properties_read.append(prop_name_read)
+
+            if '.number' in prop_name and 'metallicity' not in properties_read:
+                properties_read.append('metallicity')
 
         # re-assign property list as dictionary so can store list of values
         species_property_dict[spec_name] = prop_dict
@@ -271,7 +277,8 @@ def print_properties_extrema_all_snapshots(
         try:
             part = gizmo_io.Gizmo.read_snapshot(
                 species_read, 'index', snapshot_i, output_directory, properties_read,
-                sort_dark_by_id=False, force_float32=True, assign_center=False)
+                metal_index_max=metal_index_max, sort_dark_by_id=False, assign_center=False,
+                force_float32=True)
 
             for spec_name in species_property_dict:
                 for prop_name in species_property_dict[spec_name]:
@@ -282,7 +289,7 @@ def print_properties_extrema_all_snapshots(
                     else:
                         Say.say('! %s %s not in particle dictionary' % (spec_name, prop_name))
         except:
-            Say.say('! cannot read snapshot index %d in %s' % (snapshot_i, directory))
+            Say.say('! cannot read snapshot index %d in %s' % (snapshot_i, output_directory))
 
     Statistic = ut.statistic.StatisticClass()
 
