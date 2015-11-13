@@ -213,7 +213,7 @@ def plot_nucleosynthetic_yields(
 
         # metallicity legend
         legend_z = subplots[si].legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='.')],
+            [plt.Line2D((0, 0), (0, 0), linestyle=':')],
             ['$Z/Z_\odot=%.3f$' % (star_metallicity)],
             loc='best', prop=FontProperties(size=16)
         )
@@ -1116,7 +1116,7 @@ def plot_property_distribution(
                   color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['simulation.name'])
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
@@ -1261,7 +1261,7 @@ def plot_property_v_property(
         label = ut.plot.get_label_distance('host.distance', host_distance_limits)
 
         # distance legend
-        legend = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')], [label],
+        legend = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')], [label],
                                 loc='best', prop=FontProperties(size=18))
         legend.get_frame().set_alpha(0.5)
 
@@ -1386,7 +1386,7 @@ def plot_property_v_distance(
                   color='black', linestyle=':', alpha=0.6)
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
@@ -1598,7 +1598,7 @@ def plot_star_form_history(
                   label=part.info['simulation.name'])
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
@@ -1734,7 +1734,7 @@ def plot_star_form_histories_galaxies(
 
     """
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='.')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
