@@ -235,7 +235,7 @@ def print_properties_extrema_all_snapshots(
     output_directory : string : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
-    metal_index_max = 0
+    metal_index_max = 1
 
     property_statistic = {
         'smooth.length': {'function.name': 'min', 'function': np.min},
@@ -282,11 +282,11 @@ def print_properties_extrema_all_snapshots(
 
             for spec_name in species_property_dict:
                 for prop_name in species_property_dict[spec_name]:
-                    if prop_name in part[spec_name]:
+                    try:
                         prop_ext = property_statistic[prop_name]['function'](
                             part[spec_name].prop(prop_name))
                         species_property_dict[spec_name][prop_name].append(prop_ext)
-                    else:
+                    except:
                         Say.say('! %s %s not in particle dictionary' % (spec_name, prop_name))
         except:
             Say.say('! cannot read snapshot index %d in %s' % (snapshot_i, output_directory))

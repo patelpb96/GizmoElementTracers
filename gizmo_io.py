@@ -98,21 +98,24 @@ class ParticleDictionaryClass(dict):
         if property_name[:3] == 'abs':
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
+        if 'hydrogen.fraction' in property_name:
+            # mass fraction of hydrogen (excluding helium and metals)
+            return(1 - self.prop('metallicity', indices)[:, 0] -
+                   self.prop('metallicity', indices)[:, 1])
+
         if 'mass.hydrogen' in property_name:
-            # mass of hydrogen (excluding helium)
-            values = (self.prop('mass', indices) *
-                      (1 - self.prop('metallicity', indices)[:, 0] -
-                       self.prop('metallicity', indices)[:, 1]))
+            # mass of hydrogen (excluding helium and metals)
+            values = self.prop('mass', indices) * self.prop('hydrogen.fraction', indices)
 
             if property_name == 'mass.hydrogen.neutral':
-                # mass of neutral hydrogen (excluding helium)
-                values = np.array(values) * self.prop('neutral.hydrogen.fraction', indices)
+                # mass of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
+                values = np.array(values) * self.prop('hydrogen.neutral.fraction', indices)
 
             return values
 
-        if property_name == 'number.density' or property_name == 'density.number':
-            # number density of hyrogen {cm ^ -3}
-            return (self.prop('density', indices) * (1 - self.prop('metallicity', indices)[:, 0]) *
+        if property_name in ['number.density', 'density.number']:
+            # number density of hydrogen {cm ^ -3}
+            return (self.prop('density', indices) * self.prop('hydrogen.fraction', indices) *
                     ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3)
 
         if 'form.time' in property_name and 'lookback' in property_name:
@@ -286,7 +289,8 @@ class GizmoClass(ut.io.SayClass):
             #'ArtificialViscosity': 'artificial.viscosity',
             # average free-electron number per proton, averaged over mass of gas particle
             'ElectronAbundance': 'electron.fraction',
-            'NeutralHydrogenAbundance': 'neutral.hydrogen.fraction',  # neutral hydrogen fraction
+            # fraction of hydrogen that is neutral (not ionized)
+            'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
             'StarFormationRate': 'sfr',  # {M_sun / yr}
 
             ## star/gas metallicity {mass fraction} ##
