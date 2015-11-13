@@ -213,7 +213,7 @@ def plot_nucleosynthetic_yields(
 
         # metallicity legend
         legend_z = subplots[si].legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle=':')],
+            [plt.Line2D((0, 0), (0, 0), linestyle='')],
             ['$Z/Z_\odot=%.3f$' % (star_metallicity)],
             loc='best', prop=FontProperties(size=16)
         )
@@ -836,7 +836,8 @@ def plot_image(
     part, spec_name='dark', dimen_indices_plot=[0, 1], dimen_indices_select=[0, 1, 2],
     distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
-    align_principal_axes=False, write_plot=False, plot_directory='.', figure_index=1):
+    align_principal_axes=False, image_limits=[None, None],
+    write_plot=False, plot_directory='.', figure_index=1):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
     3 panels for all axes.
@@ -856,6 +857,7 @@ def plot_image(
     part_indices : array : input selection indices for particles
     subsample_factor : int : factor by which periodically to sub-sample particles
     align_principal_axes : boolean : whether to align positions with principal axes
+    image_limits : list : min and max limits to impose on image dynamic range (exposure)
     write_plot : boolean : whether to write plot to file
     plot_directory : string : where to put plot file
     '''
@@ -932,9 +934,7 @@ def plot_image(
             weights=weights, range=position_limits, bins=position_bin_number,
             norm=LogNorm(),
             cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-            #vmin=1e1, vmax=1e3,
-            vmin=1e5, vmax=1e7,
-            #vmin=None, vmax=None,
+            vmin=image_limits[0], vmax=image_limits[1],
         )
 
         # use this to plot map of average of property
@@ -1116,7 +1116,7 @@ def plot_property_distribution(
                   color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['simulation.name'])
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
@@ -1386,7 +1386,7 @@ def plot_property_v_distance(
                   color='black', linestyle=':', alpha=0.6)
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
@@ -1598,7 +1598,7 @@ def plot_star_form_history(
                   label=part.info['simulation.name'])
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
@@ -1734,7 +1734,7 @@ def plot_star_form_histories_galaxies(
 
     """
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle=':')],
+    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='')],
                               ['$z=%.1f$' % parts[0].snapshot['redshift']],
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
