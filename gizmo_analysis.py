@@ -312,7 +312,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         -------
         pros : dict : dictionary of profiles for each particle species
         '''
-        if 'histogram' in prop_statistic or 'vel.circ' in prop_statistic:
+        if ('histogram' in prop_statistic or 'vel.circ' in prop_statistic or
+                'density' in prop_statistic):
             return self.get_histogram_profiles(
                 part, species, prop_name, DistanceBin, center_position, rotation_vectors,
                 axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
@@ -876,7 +877,6 @@ def plot_image(
         part_indices = part_indices[::subsample_factor]
 
     positions = np.array(part[spec_name]['position'][part_indices])
-    positions = positions[:, dimen_indices_select]
     weights = part[spec_name].prop(weight_prop_name, part_indices)
 
     center_position = ut.particle.parse_property(part, 'position', center_position)
@@ -911,25 +911,31 @@ def plot_image(
 
     # plot ----------
     plt.minorticks_on()
-    fig = plt.figure(figure_index, facecolor='black')
+    fig = plt.figure(figure_index)  # , facecolor='black')
     fig.clf()
 
     if len(dimen_indices_plot) == 2:
-        subplot = fig.add_subplot(111, axisbg='black')
+        subplot = fig.add_subplot(111)  # , axisbg='black')
         fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
         subplot.set_xlim(position_limits[0])
         subplot.set_ylim(position_limits[1])
 
-        subplot.set_xlabel('position %s $[\\rm kpc\,physical]$' %
+        subplot.set_xlabel('%s $[\\rm kpc\,physical]$' %
                            dimen_label[dimen_indices_plot[0]])
-        subplot.set_ylabel('position %s $[\\rm kpc\,physical]$' %
+        subplot.set_ylabel('%s $[\\rm kpc\,physical]$' %
                            dimen_label[dimen_indices_plot[1]])
 
+        #"""
         _histogramss, _xs, _ys, Image = subplot.hist2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             weights=weights, range=position_limits, bins=position_bin_number,
-            norm=LogNorm(), cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+            norm=LogNorm(),
+            cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+            #vmin=1e1, vmax=1e3,
+            vmin=1e5, vmax=1e7,
+            #vmin=None, vmax=None,
+        )
 
         # use this to plot map of average of property
         """
@@ -938,18 +944,18 @@ def plot_image(
             weights=None, range=position_limits, bins=position_bin_number,
             norm=LogNorm(), cmap=plt.cm.YlOrBr)  # @UndefinedVariable
 
-        Fraction = ut.math.FractionClass()
-        values = Fraction.get_fraction(weight_grid, num_grid)
+        #Fraction = ut.math.FractionClass()
+        #histogramss = Fraction.get_fraction(weight_grid, num_grid)
         subplot.imshow(
-            vals.transpose(),
+            histogramss.transpose(),
             #norm=LogNorm(),
             cmap=plt.cm.YlOrBr,  # @UndefinedVariable
             aspect='auto',
             #interpolation='nearest',
             interpolation='none',
             extent=np.concatenate(position_limits),
-            #vmin=np.min(weights), vmax=np.max(weights),
-            vmin=part[spec_name].prop(weight_prop_name).min(), vmax=(173280),
+            vmin=np.min(weights), vmax=np.max(weights),
+            #vmin=part[spec_name].prop(weight_prop_name).min(), vmax=(173280),
         )
         """
 

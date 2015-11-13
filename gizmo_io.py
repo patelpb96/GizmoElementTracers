@@ -774,7 +774,7 @@ class GizmoClass(ut.io.SayClass):
 
     def read_snapshot_times(self, directory, file_name='snapshot_times.txt'):
         '''
-        Reads expansion scale factors, redshifts, ages, time spacings from snapshot file.
+        Reads scale-factors, redshifts, ages, time spacings from snapshot file.
 
         Parameters
         ----------

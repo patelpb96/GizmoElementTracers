@@ -83,16 +83,16 @@ def print_run_times(
         0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
     print_lines=False, get_values=False):
     '''
-    Print wall [and CPU] times (average per MPI task) at input scale factors from cpu.txt for
+    Print wall [and CPU] times (average per MPI task) at input scale-factors from cpu.txt for
     Gizmo simulation.
 
     Parameters
     ----------
     simulation_directory : string : directory of simulation
     runtime_file_name : string : name of run-time file name (set in submission script)
-    scale_factors : array-like : list of scale factors at which to print run times
+    scale_factors : array-like : list of scale-factors at which to print run times
     print_lines : boolean : whether to print lines from cpu.txt as get them
-    get_values : boolean : whether to return arrays of scale factors, redshifts, run times
+    get_values : boolean : whether to return arrays of scale-factors, redshifts, run times
 
     Returns
     -------
@@ -140,7 +140,7 @@ def print_run_times(
     cpu_number = mpi_number * omp_number
     cpu_times = run_times * cpu_number
 
-    # sanity check - simulation might not have run to all input scale factors
+    # sanity check - simulation might not have run to all input scale-factors
     scale_factors = scale_factors[: run_times.size]
     redshifts = 1 / scale_factors - 1
 
@@ -170,13 +170,13 @@ def print_run_time_ratios(
                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
     '''
     Print ratios of wall [and CPU] times (average per MPI taks) for input simulations at input
-    scale factors from cpu.txt for Gizmo run
+    scale-factors from cpu.txt for Gizmo run
 
     Parameters
     ----------
     directories : string or list : directory[s] of cpu.txt file for each simulation
     cpu_numbers : int or list : number[s] of CPUs used for each simulation
-    scalefactors : array-like : list of scale factors at which to print run times
+    scalefactors : array-like : list of scale-factors at which to print run times
     '''
     run_timess = []
 
@@ -204,7 +204,7 @@ def print_run_time_ratios(
         if len(run_times) < run_time_num_min:
             run_time_num_min = len(run_times)
 
-    # sanity check - simulations might not have run to each input scale factor
+    # sanity check - simulations might not have run to each input scale-factor
     scalefactors = scalefactors[: run_time_num_min]
     redshifts = redshifts[: run_time_num_min]
 
@@ -225,25 +225,29 @@ def print_run_time_ratios(
 
 
 def print_properties_extrema_all_snapshots(
-    directory='.', species_property_dict={'gas': ['smooth.length', 'density']}):
+    simulation_directory='.', output_directory='output',
+    species_property_dict={'gas': ['smooth.length', 'density.number']}):
     '''
-    Read every snapshot, for each input properties, get its extremum at each snapshot.
+    For each input property, get its extremum at each snapshot.
     Print statistics of this across all snapshots.
 
-    directory : string : directory of simulation (one level above directory of snapshot file)
+    directory : string : directory of simulation
+    output_directory : string : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
     Say = ut.io.SayClass(print_properties_extrema_all_snapshots)
 
     property_statistic = {
         'smooth.length': {'function.name': 'min', 'function': np.min},
+        'density.number': {'function.name': 'max', 'function': np.max},
         'density': {'function.name': 'max', 'function': np.max},
     }
 
-    directory = ut.io.get_path(directory)
+    simulation_directory = ut.io.get_path(simulation_directory)
+    output_directory = simulation_directory + ut.io.get_path(output_directory)
 
     Snapshot = ut.simulation.SnapshotClass()
-    Snapshot.read_snapshots(directory=directory)
+    Snapshot.read_snapshots(directory=simulation_directory)
 
     species_read = species_property_dict.keys()
 
@@ -266,14 +270,14 @@ def print_properties_extrema_all_snapshots(
     for snapshot_i in Snapshot['index']:
         try:
             part = gizmo_io.Gizmo.read_snapshot(
-                species_read, 'index', snapshot_i, directory + 'output', properties_read,
+                species_read, 'index', snapshot_i, output_directory, properties_read,
                 sort_dark_by_id=False, force_float32=True, assign_center=False)
 
             for spec_name in species_property_dict:
                 for prop_name in species_property_dict[spec_name]:
                     if prop_name in part[spec_name]:
                         prop_ext = property_statistic[prop_name]['function'](
-                            part[spec_name][prop_name])
+                            part[spec_name].prop(prop_name))
                         species_property_dict[spec_name][prop_name].append(prop_ext)
                     else:
                         Say.say('! %s %s not in particle dictionary' % (spec_name, prop_name))
@@ -286,10 +290,6 @@ def print_properties_extrema_all_snapshots(
         for prop_name in species_property_dict[spec_name]:
             prop_func_name = property_statistic[prop_name]['function.name']
             prop_values = np.array(species_property_dict[spec_name][prop_name])
-
-            if 'gas' in spec_name and 'density' in prop_name:
-                # convert to {cm ^ -3}
-                prop_values *= ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
@@ -385,27 +385,35 @@ def plot_scaling(
     plot_directory : string : directory to write plot file
     '''
     dark = {
-        'ref12': {'particle.num': 8.82e6, 'cpu.num': 64, 'cpu.time': 385, 'wall.time': 6.0},
-        'ref13': {'particle.num': 7.05e7, 'cpu.num': 512, 'cpu.time': 7135, 'wall.time': 13.9},
-        'ref14': {'particle.num': 5.64e8, 'cpu.num': 2048, 'cpu.time': 154355, 'wall.time': 75.4},
+        'ref12': {'particle.number': 8.82e6, 'cpu.number': 64,
+                  'cpu.time': 385, 'wall.time': 6.0},
+        'ref13': {'particle.number': 7.05e7, 'cpu.number': 512,
+                  'cpu.time': 7135, 'wall.time': 13.9},
+        'ref14': {'particle.number': 5.64e8, 'cpu.number': 2048,
+                  'cpu.time': 154355, 'wall.time': 75.4},
     }
 
-    mfm = {
-        'ref12': {'particle.num': 8.82e6 * 2, 'cpu.num': 512, 'cpu.time': 116482, 'wall.time': 228},
-        'ref13': {'particle.num': 7.05e7 * 2, 'cpu.num': 2048, 'cpu.time': 1322781,
-                  'wall.time': 646},
-        #'ref14': {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'cpu.time': 568228,
-        #          'wall.time': 69.4},
+    hydro = {
+        'ref12': {'particle.number': 8.82e6 * 2, 'cpu.number': 512,
+                  'cpu.time': 116482, 'wall.time': 228},
+        'ref13': {'particle.number': 7.05e7 * 2, 'cpu.number': 2048,
+                  'cpu.time': 1322781, 'wall.time': 646},
+        #'ref14': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
+        #          'cpu.time': 568228, 'wall.time': 69.4},
         # projected
-        'ref14': {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'cpu.time': 1.95e7,
-                  'wall.time': 2380},
+        'ref14': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
+                  'cpu.time': 1.95e7, 'wall.time': 2380},
     }
 
-    mfm_ref14 = {
-        2048: {'particle.num': 5.64e8 * 2, 'cpu.num': 2048, 'wall.time': 15.55, 'cpu.time': 31850},
-        4096: {'particle.num': 5.64e8 * 2, 'cpu.num': 4096, 'wall.time': 8.64, 'cpu.time': 35389},
-        8192: {'particle.num': 5.64e8 * 2, 'cpu.num': 8192, 'wall.time': 4.96, 'cpu.time': 40632},
-        16384: {'particle.num': 5.64e8 * 2, 'cpu.num': 16384, 'wall.time': 4.57, 'cpu.time': 74875},
+    hydro_ref14 = {
+        2048: {'particle.number': 5.64e8 * 2, 'cpu.number': 2048,
+               'wall.time': 15.55, 'cpu.time': 31850},
+        4096: {'particle.number': 5.64e8 * 2, 'cpu.number': 4096,
+               'wall.time': 8.64, 'cpu.time': 35389},
+        8192: {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
+               'wall.time': 4.96, 'cpu.time': 40632},
+        16384: {'particle.number': 5.64e8 * 2, 'cpu.number': 16384,
+                'wall.time': 4.57, 'cpu.time': 74875},
     }
 
     # plot ----------
@@ -418,12 +426,12 @@ def plot_scaling(
     plot_func = ut.plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
 
     if scaling_kind == 'strong':
-        cpu_nums = [k for k in mfm_ref14]
+        cpu_nums = [k for k in hydro_ref14]
         # 2x == convert from a = 0.068 to a = 0.1
         if time_kind == 'cpu':
-            times = [mfm_ref14[k]['cpu.time'] * 2 for k in mfm_ref14]
+            times = [hydro_ref14[k]['cpu.time'] * 2 for k in hydro_ref14]
         elif time_kind == 'wall':
-            times = [mfm_ref14[k]['wall.time'] * 2 for k in mfm_ref14]
+            times = [hydro_ref14[k]['wall.time'] * 2 for k in hydro_ref14]
 
         subplot.set_xlim([1e3, 2.5e4])
         subplot.set_xlabel('core number')
@@ -441,20 +449,20 @@ def plot_scaling(
                      transform=subplot.transAxes)
 
     elif scaling_kind == 'weak':
-        dm_particle_nums = np.array([dark[k]['particle.num'] for k in sorted(dark.keys())])
-        mfm_particle_nums = np.array([mfm[k]['particle.num'] for k in sorted(mfm.keys())])
+        dm_particle_nums = np.array([dark[k]['particle.number'] for k in sorted(dark.keys())])
+        mfm_particle_nums = np.array([hydro[k]['particle.number'] for k in sorted(hydro.keys())])
 
         if time_kind == 'cpu':
             dm_times = np.array([dark[k]['cpu.time'] for k in sorted(dark.keys())])
-            mfm_times = np.array([mfm[k]['cpu.time'] for k in sorted(mfm.keys())])
+            mfm_times = np.array([hydro[k]['cpu.time'] for k in sorted(hydro.keys())])
         elif time_kind == 'wall':
-            ratio_ref = mfm['ref14']['particle.num'] / mfm['ref14']['cpu.num']
+            ratio_ref = hydro['ref14']['particle.number'] / hydro['ref14']['cpu.number']
             dm_times = np.array([dark[k]['wall.time'] *
-                                 ratio_ref / (dark[k]['particle.num'] / dark[k]['cpu.num'])
+                                 ratio_ref / (dark[k]['particle.number'] / dark[k]['cpu.number'])
                                  for k in sorted(dark.keys())])
-            mfm_times = np.array([mfm[k]['wall.time'] *
-                                  ratio_ref / (mfm[k]['particle.num'] / mfm[k]['cpu.num'])
-                                  for k in sorted(mfm.keys())])
+            mfm_times = np.array([hydro[k]['wall.time'] *
+                                  ratio_ref / (hydro[k]['particle.number'] / hydro[k]['cpu.number'])
+                                  for k in sorted(hydro.keys())])
 
         subplot.set_xlim([6e6, 1.5e9])
         subplot.set_xlabel('particle number')
@@ -484,11 +492,11 @@ def plot_scaling(
 if __name__ == '__main__':
 
     if len(sys.argv) <= 1:
-        raise ValueError('must specify function kind: runtime, contamination, extreme, delete')
+        raise ValueError('must specify function: runtime, extreme, contamination, delete')
 
     function_kind = str(sys.argv[1])
-    assert ('runtime' in function_kind or 'contamination' in function_kind or
-            'extreme' in function_kind or 'delete' in function_kind)
+    assert ('runtime' in function_kind or 'extreme' in function_kind or
+            'contamination' in function_kind or 'delete' in function_kind)
 
     directory = '.'
 
@@ -496,11 +504,13 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        cpu_number = None
-        if len(sys.argv) > 3:
-            cpu_number = int(sys.argv[3])
+        print_run_times(directory)
 
-        print_run_times(directory, cpu_number)
+    elif 'extreme' in function_kind:
+        if len(sys.argv) > 2:
+            directory = str(sys.argv[2])
+
+        print_properties_extrema_all_snapshots(directory)
 
     elif 'contamination' in function_kind:
         if len(sys.argv) > 2:
@@ -512,12 +522,6 @@ if __name__ == '__main__':
 
         plot_halo_contamination(directory, snapshot_redshift)
 
-    elif 'extreme' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
-        print_properties_extrema_all_snapshots(directory)
-
     elif 'delete' in function_kind:
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
@@ -525,4 +529,4 @@ if __name__ == '__main__':
         delete_snapshots(directory)
 
     else:
-        print('! not recognize function kind')
+        print('! not recognize function')
