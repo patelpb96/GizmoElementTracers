@@ -88,7 +88,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.hal.info['box.length'] = self['box.length']
         self.hal.snapshot = {}
         self.hal.snapshot['redshift'] = self['redshifts'][0]
-        self.hal.snapshot['scale-factor'] /= (1 + self['redshifts'][0])
+        self.hal.snapshot['scalefactor'] /= (1 + self['redshifts'][0])
         self.hal.Cosmology = self.Cosmology
 
         self.hal['position'] = np.zeros((len(self.hal_yt), 3), dtype=np.float32)
@@ -103,7 +103,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.hal['particle.number'][hi] = self.hal_yt[hi].get_size()
         self.hal['mass'] = self.hal['mass']  # {M_sun}
         # {kpc physical}
-        self.hal['radius'] *= self.hal.info['box.length'] * self.hal.snapshot['scale-factor']
+        self.hal['radius'] *= self.hal.info['box.length'] * self.hal.snapshot['scalefactor']
         self.hal['position'] *= self.hal.info['box.length']  # {kpc comoving}
 
         NearestNeig = ut.catalog.NearestNeighborClass()
@@ -138,7 +138,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.part[ti].info['has.baryons'] = False
             self.part[ti].snapshot = {}
             self.part[ti].snapshot['redshift'] = self['redshifts'][ti]
-            self.part[ti].snapshot['scale-factor'] /= (1 + self['redshifts'][ti])
+            self.part[ti].snapshot['scalefactor'] /= (1 + self['redshifts'][ti])
             self.part[ti].Cosmology = self.Cosmology
 
         self.part.info = {}
@@ -258,7 +258,7 @@ def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig
 
     neig_distances, neig_indices = Neighbor.get_neighbors(
         hal['position'][[halo_index]], hal['position'][his_m], 200, [1e-6, distance_max],
-        hal.info['box.length'], hal.snapshot['scale-factor'], neig_ids=his_m)
+        hal.info['box.length'], hal.snapshot['scalefactor'], neig_ids=his_m)
 
     if scale_virial:
         neig_distances /= hal['radius'][halo_index]

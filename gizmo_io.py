@@ -392,6 +392,7 @@ class GizmoClass(ut.io.SayClass):
             try:
                 Snapshot.read_snapshots('snapshot_times.txt', snapshot_time_file_directory)
             except:
+                #print('here')
                 Snapshot.read_snapshots('snapshot_scale-factors.txt', snapshot_time_file_directory)
         except:
             if snapshot_number_kind == 'redshift':
@@ -430,7 +431,7 @@ class GizmoClass(ut.io.SayClass):
 
         # convert some header quantities
         if header['is.cosmological']:
-            header['scale-factor'] = float(header['time'])
+            header['scalefactor'] = float(header['time'])
             del(header['time'])
             header['box.length/h'] = float(header['box.length'])
             header['box.length'] /= header['hubble']  # convert to {kpc comoving}
@@ -641,16 +642,16 @@ class GizmoClass(ut.io.SayClass):
 
             if 'velocity' in part[spec_name]:
                 # convert to {km / sec physical}
-                part[spec_name]['velocity'] *= np.sqrt(header['scale-factor'])
+                part[spec_name]['velocity'] *= np.sqrt(header['scalefactor'])
 
             if 'density' in part[spec_name]:
                 # convert to {M_sun / kpc ** 3 physical}
                 part[spec_name]['density'] *= (1e10 / header['hubble'] /
-                                               (header['scale-factor'] / header['hubble']) ** 3)
+                                               (header['scalefactor'] / header['hubble']) ** 3)
 
             if 'smooth.length' in part[spec_name]:
                 # convert to {pc physical}
-                part[spec_name]['smooth.length'] *= 1000 * header['scale-factor'] / header['hubble']
+                part[spec_name]['smooth.length'] *= 1000 * header['scalefactor'] / header['hubble']
                 part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
 
             if 'form.time' in part[spec_name]:
@@ -712,7 +713,7 @@ class GizmoClass(ut.io.SayClass):
         time = Cosmology.time_from_redshift(header['redshift'])
         part.snapshot = {
             'redshift': header['redshift'],
-            'scale-factor': header['scale-factor'],
+            'scalefactor': header['scalefactor'],
             'time': time,
             'time.lookback': Cosmology.time_from_redshift(0) - time,
             'time.hubble': ut.const.Gyr_per_sec / Cosmology.hubble_parameter(0),

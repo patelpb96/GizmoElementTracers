@@ -15,7 +15,7 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
-from matplotlib.colors import LogNorm
+from matplotlib import colors
 # local ----
 import utilities as ut
 
@@ -264,11 +264,11 @@ def get_orbit_dictionary(
 
         distance_vectors = ut.coordinate.get_distances(
             'vector', positions, center_position, part.info['box.length'])
-        distance_vectors *= part.snapshot['scale-factor']  # convert to {kpc physical}
+        distance_vectors *= part.snapshot['scalefactor']  # convert to {kpc physical}
 
         velocity_vectors = ut.coordinate.get_velocity_differences(
             'vector', velocities, center_velocity, include_hubble_flow, positions, center_position,
-            part.snapshot['scale-factor'], part.snapshot['time.hubble'], part.info['box.length'])
+            part.snapshot['scalefactor'], part.snapshot['time.hubble'], part.info['box.length'])
 
         orb[spec_name] = ut.orbit.get_orbit_dictionary(
             distance_vectors, velocity_vectors, get_integrals=False)
@@ -405,7 +405,7 @@ class SpeciesProfileClass(ut.io.SayClass):
             if DistanceBin.dimension_number == 3:
                 distances = ut.coordinate.get_distances(
                     'scalar', part[spec_name]['position'][part_indices], center_position,
-                    part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                    part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
             elif DistanceBin.dimension_number in [1, 2]:
                 distancess = ut.particle.get_distances_along_principal_axes(
                     part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
@@ -548,12 +548,12 @@ class SpeciesProfileClass(ut.io.SayClass):
             if 'velocity' in prop_name:
                 distances = ut.coordinate.get_distances(
                     'vector', part[spec_name]['position'][part_indices], center_position,
-                    part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                    part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
 
                 velocity_vectors = ut.coordinate.get_velocity_differences(
                     'vector', part[spec_name]['velocity'][part_indices], center_velocity, True,
                     part[spec_name]['position'][part_indices], center_position,
-                    part.snapshot['scale-factor'], part.snapshot['time.hubble'],
+                    part.snapshot['scalefactor'], part.snapshot['time.hubble'],
                     part.info['box.length'])
 
                 pro = DistanceBin.get_velocity_profile(distances, velocity_vectors, masses)
@@ -568,7 +568,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                 if DistanceBin.dimension_number == 3:
                     distances = ut.coordinate.get_distances(
                         'scalar', part[spec_name]['position'][part_indices], center_position,
-                        part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                        part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
                 elif DistanceBin.dimension_number in [1, 2]:
                     distancess = ut.particle.get_distances_along_principal_axes(
                         part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
@@ -648,7 +648,7 @@ def plot_mass_contamination(
     for spec_name in pros:
         distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
-        distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+        distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
         pros[spec_name] = DistanceBin.get_histogram_profile(distances, part[spec_name]['mass'])
 
     for spec_name in species_test:
@@ -764,7 +764,7 @@ def plot_metal_v_distance(
 
     distances = ut.coordinate.get_distances(
         'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
-    distances *= part.snapshot['scale-factor']  # convert to {kpc physical}
+    distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
 
     metal_masses = part[spec_name].prop('metallicity.total.solar') * part[spec_name]['mass']
 
@@ -886,7 +886,7 @@ def plot_image(
     if center_position is not None and len(center_position):
         # re-orient to input center
         positions -= center_position
-        positions *= part.snapshot['scale-factor']
+        positions *= part.snapshot['scalefactor']
 
         masks = positions[:, dimen_indices_select[0]] <= distance_max  # initialize masks
         for dimen_i in dimen_indices_select:
@@ -913,11 +913,14 @@ def plot_image(
 
     # plot ----------
     plt.minorticks_on()
-    fig = plt.figure(figure_index)  # , facecolor='black')
+    fig = plt.figure(figure_index)
     fig.clf()
 
+    BYW = colors.LinearSegmentedColormap('test', ut.plot.cmap_dict['BlackYellowWhite'])
+    plt.register_cmap(cmap=BYW)
+
     if len(dimen_indices_plot) == 2:
-        subplot = fig.add_subplot(111)  # , axisbg='black')
+        subplot = fig.add_subplot(111, axisbg='black')
         fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
         subplot.set_xlim(position_limits[0])
@@ -928,38 +931,68 @@ def plot_image(
         subplot.set_ylabel('%s $[\\rm kpc\,physical]$' %
                            dimen_label[dimen_indices_plot[1]])
 
-        #"""
-        _histogramss, _xs, _ys, Image = subplot.hist2d(
+        """
+        _histogramss, _xs, _ys, _Image = subplot.hist2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             weights=weights, range=position_limits, bins=position_bin_number,
-            norm=LogNorm(),
-            cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+            norm=colors.LogNorm(),
+            #cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+            #cmap=plt.cm.inferno,  # @UndefinedVariable
+            #cmap=plt.cm.Greys_r,  # @UndefinedVariable
+            #cmap=plt.cm.Blues_r,  # @UndefinedVariable
+            cmap=plt.get_cmap('test'),
             vmin=image_limits[0], vmax=image_limits[1],
         )
+        """
 
-        # use this to plot map of average of property
+        # to smooth image
+        #"""
+        valuess, _xs, _ys = np.histogram2d(
+            positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+            range=position_limits, bins=position_bin_number, weights=weights,
+            normed=True,
+        )
+
+        print(valuess[valuess > 0].min(), valuess.max())
+
+        subplot.imshow(
+            valuess.transpose(),
+            norm=colors.LogNorm(),
+            #cmap=plt.cm.Blues_r,  # @UndefinedVariable
+            #cmap=plt.cm.Greys_r,  # @UndefinedVariable
+            cmap=plt.get_cmap('test'),
+            aspect='auto',
+            #interpolation='none',
+            #interpolation='bilinear',
+            #interpolation='bicubic',
+            interpolation='gaussian',
+            extent=np.concatenate(position_limits),
+            vmin=image_limits[0], vmax=image_limits[1],
+        )
+        #"""
+
+        # to plot map of average of property
         """
         histogramss, xs, ys, Image = subplot.hist2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             weights=None, range=position_limits, bins=position_bin_number,
-            norm=LogNorm(), cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+            norm=colors.LogNorm(), cmap=plt.cm.YlOrBr)  # @UndefinedVariable
 
         #Fraction = ut.math.FractionClass()
-        #histogramss = Fraction.get_fraction(weight_grid, num_grid)
+        #histogramss = Fraction.get_fraction(weight_grid, grid_number)
         subplot.imshow(
             histogramss.transpose(),
-            #norm=LogNorm(),
+            #norm=colors.LogNorm(),
             cmap=plt.cm.YlOrBr,  # @UndefinedVariable
             aspect='auto',
             #interpolation='nearest',
             interpolation='none',
             extent=np.concatenate(position_limits),
             vmin=np.min(weights), vmax=np.max(weights),
-            #vmin=part[spec_name].prop(weight_prop_name).min(), vmax=(173280),
         )
         """
 
-        fig.colorbar(Image)
+        #fig.colorbar(_Image)
 
     elif len(dimen_indices_plot) == 3:
         #position_limits *= 0.999  # ensure that tick labels do not overlap
@@ -997,11 +1030,12 @@ def plot_image(
             elif subplot_is == [1, 1]:
                 subplot.set_xlabel('%s $[\\rm kpc\,phys]$' % dimen_label[plot_dimen_is[0]])
 
-            _histogramss, _xs, _ys, Image = subplot.hist2d(
+            _histogramss, _xs, _ys, _Image = subplot.hist2d(
                 positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
-                range=position_limits, bins=position_bin_number, norm=LogNorm(),
+                range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
                 cmap=plt.cm.YlOrBr)  # @UndefinedVariable
-            #fig.colorbar(Image)  #, ax=subplot)
+
+            #fig.colorbar(_Image)  # , ax=subplot)
 
     #plt.tight_layout(pad=0.02)
 
@@ -1070,7 +1104,7 @@ def plot_property_distribution(
         if distance_limits:
             distances = ut.coordinate.get_distances(
                 'scalar', part[spec_name]['position'][part_indices], center_positions[part_i],
-                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         if 'velocity' in prop_name:
@@ -1175,7 +1209,7 @@ def plot_property_v_property(
     if len(center_position) and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
-            part.info['box.length']) * part.snapshot['scale-factor']
+            part.info['box.length']) * part.snapshot['scalefactor']
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
 
     x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
@@ -1233,9 +1267,10 @@ def plot_property_v_property(
 
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
-        norm=LogNorm(), weights=masses,
+        norm=colors.LogNorm(), weights=masses,
         cmin=None, cmax=None,
-        cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+        cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+    )
 
     """
     _valuess, xs, ys = np.histogram2d(
@@ -1245,7 +1280,7 @@ def plot_property_v_property(
 
     subplot.imshow(
         _valuess.transpose(),
-        norm=LogNorm(),
+        norm=colors.LogNorm(),
         cmap=plt.cm.YlOrBr,  # @UndefinedVariable
         aspect='auto',
         #interpolation='nearest',
@@ -1544,7 +1579,7 @@ def plot_star_form_history(
                 distance_limits is not None and len(distance_limits)):
             distances = ut.coordinate.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[part_i],
-                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         times, sfrs, masses = get_star_form_history(
@@ -1670,7 +1705,7 @@ def plot_star_form_histories_galaxies(
                 distance_limits is not None and len(distance_limits)):
             distances = ut.coordinate.get_distances(
                 'scalar', part['star']['position'][part_indices], center_positions[hal_i],
-                part.info['box.length']) * part.snapshot['scale-factor']  # {kpc physical}
+                part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
         """
         times, sfrs, masses = get_star_form_history(
@@ -1863,7 +1898,7 @@ def get_galaxy_mass_profiles_v_redshift(
 
     gal = {
         'redshift': [],
-        'scale-factor': [],
+        'scalefactor': [],
         'time': [],
         'position': [],
         'velocity': [],
@@ -1901,7 +1936,7 @@ def get_galaxy_mass_profiles_v_redshift(
             part = gizmo_io.Gizmo.read_snapshot(
                 species_read, 'redshift', redshift, directory, property_names, force_float32=True)
 
-        for k in ['redshift', 'scale-factor', 'time']:
+        for k in ['redshift', 'scalefactor', 'time']:
             gal[k].append(part.snapshot[k])
 
         # get position and velocity
@@ -1985,7 +2020,7 @@ def print_galaxy_mass_v_redshift(gal):
 
     for ti in range(gal['redshift'].size):
         print('%.5f %.5f %.5f ' %
-              (gal['redshift'][ti], gal['scale-factor'][ti], gal['time'][ti]), end='')
+              (gal['redshift'][ti], gal['scalefactor'][ti], gal['time'][ti]), end='')
         print('%.3f %.3f %.3f ' %
               (gal['position'][ti][0], gal['position'][ti][1], gal['position'][ti][2]), end='')
         print('%.3f %.3f %.3f ' %
