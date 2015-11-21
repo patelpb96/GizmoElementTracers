@@ -13,7 +13,7 @@ import copy
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib import colors
 # local ----
@@ -1793,8 +1793,15 @@ def plot_star_form_histories_galaxies(
 simulations = [
     ['../m12_ref13_fb-angle-max', 'r13 angle-max'],
 
-    ['m12_ref12_orig', 'r12 r.max=2kpc'],
-    ['m12_ref13_orig', 'r13 r.max=2kpc'],
+    ['m12_ref12', 'r12'],
+    ['m12_ref13', 'r13'],
+
+    ['m12_ref12_res-adapt', 'r12 res-adapt'],
+    ['m12_ref12_sfn100', 'r12 n=100'],
+
+    ['m12_ref13_res-adapt', 'r13 res-adapt'],
+    ['m12_ref13_res-lo', 'r12 res-lo n=100'],
+
     ['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
     ['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
     ['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
@@ -1803,7 +1810,7 @@ simulations = [
 
 
 def plot_simulations_compare(
-    simulations=simulations, redshifts=[7, 6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+    simulations=simulations, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
     species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
     '''
     .
@@ -1836,7 +1843,7 @@ def plot_simulations_compare(
             axis_y_limits=[0, 3], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'total', 'mass', 'vel.circ', 'lin', False, [1, 300], 0.1,
+            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
             axis_y_limits=[0, None], write_plot=True)
 
         plot_property_v_distance(

@@ -15,7 +15,7 @@ import sys
 import glob
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 # local ----
 import utilities as ut
 from . import gizmo_io
