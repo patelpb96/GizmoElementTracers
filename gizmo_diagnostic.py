@@ -89,6 +89,7 @@ def print_run_times(
     Parameters
     ----------
     simulation_directory : string : directory of simulation
+    output_directory : string : directory of output files within simulation directory
     runtime_file_name : string : name of run-time file name (set in submission script)
     scale_factors : array-like : list of scale-factors at which to print run times
     print_lines : boolean : whether to print lines from cpu.txt as get them
@@ -96,7 +97,7 @@ def print_run_times(
 
     Returns
     -------
-    scale_factors, redshifts, run_times : arrays : return these if get_values is True
+    scale_factors, redshifts, wall_times, cpu_times : arrays : return these if get_values is True
     '''
     def get_mod(x1, x2):
         # for some reason, python's mod function is funky with fractional values, so do by hand
@@ -109,7 +110,7 @@ def print_run_times(
     file_in = open(file_path_name, 'r')
 
     scale_factors = np.array(scale_factors)
-    run_times = []
+    wall_times = []
 
     t_i = 0
     a_i = scale_factors[t_i]
@@ -125,7 +126,7 @@ def print_run_times(
         elif print_next_line:
             if print_lines:
                 print(line)
-            run_times.append(float(line.split()[1]))
+            wall_times.append(float(line.split()[1]))
             print_next_line = False
             t_i += 1
             if t_i >= len(scale_factors):
@@ -133,25 +134,25 @@ def print_run_times(
             else:
                 a_i = scale_factors[t_i]
 
-    run_times = np.array(run_times) / 3600  # convert to {hr}
+    wall_times = np.array(wall_times) / 3600  # convert to {hr}
 
     # get cpu number from run-time file
     mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
     cpu_number = mpi_number * omp_number
-    cpu_times = run_times * cpu_number
+    cpu_times = wall_times * cpu_number
 
     # sanity check - simulation might not have run to all input scale-factors
-    scale_factors = scale_factors[: run_times.size]
+    scale_factors = scale_factors[: wall_times.size]
     redshifts = 1 / scale_factors - 1
 
-    print('# scale-factor redshift run-time-percent run-time[hr, day]', end='')
+    print('# scale-factor redshift wall-time-percent wall-time[hr, day]', end='')
     if cpu_number:
         print(' cpu-time[hr]', end='')
     print()
-    for t_i in range(len(run_times)):
+    for t_i in range(len(wall_times)):
         print('%.3f %5.2f   %5.1f%% %7.2f %5.2f' %
-              (scale_factors[t_i], redshifts[t_i], 100 * run_times[t_i] / run_times.max(),
-               run_times[t_i], run_times[t_i] / 24), end='')
+              (scale_factors[t_i], redshifts[t_i], 100 * wall_times[t_i] / wall_times.max(),
+               wall_times[t_i], wall_times[t_i] / 24), end='')
         if cpu_number:
             print(' %7.0f' % cpu_times[t_i], end='')
         print()
@@ -161,66 +162,57 @@ def print_run_times(
     #              (scale_factor, file_path_name))
 
     if get_values:
-        return scale_factors, redshifts, run_times
+        return scale_factors, redshifts, wall_times, cpu_times
 
 
 def print_run_time_ratios(
-    directories=['.'], cpu_numbers=None,
-    scalefactors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                  0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
+    simulation_directories='.', output_directory='output/', runtime_file_name='gizmo.out',
+    scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
+                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
     '''
-    Print ratios of wall [and CPU] times (average per MPI taks) for input simulations at input
-    scale-factors from cpu.txt for Gizmo run
+    Print ratios of wall times and CPU times (average per MPI taks) for input simulation directories
+    at input scale-factors from cpu.txt for Gizmo run.
 
     Parameters
     ----------
-    directories : string or list : directory[s] of cpu.txt file for each simulation
+    simulation_directories : string or list : directory[s] of cpu.txt file for each simulation
+    output_directory : string : directory of output files within simulation directory
+    runtime_file_name : string : name of run-time file name (set in submission script)
     cpu_numbers : int or list : number[s] of CPUs used for each simulation
-    scalefactors : array-like : list of scale-factors at which to print run times
+    scale_factors : array-like : list of scale-factors at which to print run times
     '''
-    run_timess = []
+    wall_timess = []
+    cpu_timess = []
 
-    if np.isscalar(directories):
-        directories = [directories]
+    if np.isscalar(simulation_directories):
+        simulation_directories = [simulation_directories]
 
-    print_cpu = False
-    if cpu_numbers is not None:
-        if np.isscalar(cpu_numbers):
-            cpu_numbers = [cpu_numbers]
-        if len(cpu_numbers):
-            assert len(cpu_numbers) == len(directories)
-            print_cpu = True
-            cpu_timess = []
+    for d_i, directory in enumerate(simulation_directories):
+        scale_factors, redshifts, wall_times, cpu_times = print_run_times(
+            directory, output_directory, runtime_file_name, scale_factors, get_values=True)
+        wall_timess.append(wall_times)
+        cpu_timess.append(cpu_times)
 
-    for d_i, directory in enumerate(directories):
-        scalefactors, redshifts, run_times = print_run_times(
-            directory, cpu_numbers[d_i], scalefactors, get_values=True)
-        run_timess.append(run_times)
-
-    run_time_num_min = Inf
-    for d_i, run_times in enumerate(run_timess):
-        if print_cpu:
-            cpu_timess.append(run_times * cpu_numbers[d_i])
-        if len(run_times) < run_time_num_min:
-            run_time_num_min = len(run_times)
+    snapshot_number_min = Inf
+    for d_i, wall_times in enumerate(wall_timess):
+        if len(wall_times) < snapshot_number_min:
+            snapshot_number_min = len(wall_times)
 
     # sanity check - simulations might not have run to each input scale-factor
-    scalefactors = scalefactors[: run_time_num_min]
-    redshifts = redshifts[: run_time_num_min]
+    scale_factors = scale_factors[: snapshot_number_min]
+    redshifts = redshifts[: snapshot_number_min]
 
     print('# scale-factor redshift', end='')
-    for _ in range(1, len(run_timess)):
+    for _ in range(1, len(wall_timess)):
         print(' wall-time-ratio', end='')
-        if print_cpu:
-            print(' cpu-time-ratio', end='')
+        print(' cpu-time-ratio', end='')
     print()
 
-    for a_i in range(run_time_num_min):
-        print('%.3f %5.2f  ' % (scalefactors[a_i], redshifts[a_i]), end='')
-        for d_i in range(1, len(run_timess)):
-            print(' %7.3f' % (run_timess[d_i][a_i] / run_timess[0][a_i]), end='')
-            if print_cpu:
-                print(' %7.3f' % (cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
+    for a_i in range(snapshot_number_min):
+        print('%.3f %5.2f  ' % (scale_factors[a_i], redshifts[a_i]), end='')
+        for d_i in range(1, len(wall_timess)):
+            print(' %7.2f' % (wall_timess[d_i][a_i] / wall_timess[0][a_i]), end='')
+            print(' %7.2f' % (cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
         print()
 
 

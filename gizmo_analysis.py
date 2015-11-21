@@ -1800,7 +1800,7 @@ simulations = [
     ['m12_ref12_sfn100', 'r12 n=100'],
 
     ['m12_ref13_res-adapt', 'r13 res-adapt'],
-    ['m12_ref13_res-lo', 'r12 res-lo n=100'],
+    ['m12_ref13_res-lo', 'r13 res-low n=100'],
 
     ['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
     ['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
@@ -1817,6 +1817,8 @@ def plot_simulations_compare(
     '''
     from . import gizmo_io
 
+    Say = ut.io.SayClass(plot_simulations_compare)
+
     simulations = collections.OrderedDict(simulations)
 
     if np.isscalar(redshifts):
@@ -1824,23 +1826,32 @@ def plot_simulations_compare(
 
     for redshift in redshifts:
         parts = []
+        directories = []
         for directory in simulations:
-            part = gizmo_io.Gizmo.read_snapshot(
-                species, 'redshift', redshift, '%s/output' % directory, property_names,
-                simulation_name=simulations[directory], force_float32=force_float32)
+            try:
+                part = gizmo_io.Gizmo.read_snapshot(
+                    species, 'redshift', redshift, '%s/output' % directory, property_names,
+                    simulation_name=simulations[directory], force_float32=force_float32)
 
-            if 'velocity' in property_names:
-                gizmo_io.Gizmo.assign_orbit(part, 'gas')
+                if 'velocity' in property_names:
+                    gizmo_io.Gizmo.assign_orbit(part, 'gas')
 
-            parts.append(part)
+                parts.append(part)
+                directories.append(directory)
+            except:
+                Say.say('! could not read snapshot at z = %.3f in %s' % (redshift, directory))
+
+        if not len(parts):
+            Say.say('! could not read any snapshots at z = %.3f' % (redshift))
+            return
 
         if 'mass' in property_names:
-            for di, directory in enumerate(simulations):
-                print('%s star.mass = %.3e' % (directory, parts[di]['star']['mass'].sum()))
+            for part, directory in zip(parts, directories):
+                print('%s star.mass = %.3e' % (directory, part['star']['mass'].sum()))
 
         plot_property_v_distance(
             parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
-            axis_y_limits=[0, 3], write_plot=True)
+            axis_y_limits=[0, 2], write_plot=True)
 
         plot_property_v_distance(
             parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
