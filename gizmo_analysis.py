@@ -1850,10 +1850,6 @@ def plot_simulations_compare(
                 print('%s star.mass = %.3e' % (directory, part['star']['mass'].sum()))
 
         plot_property_v_distance(
-            parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
-            axis_y_limits=[0, 2], write_plot=True)
-
-        plot_property_v_distance(
             parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
             axis_y_limits=[0, None], write_plot=True)
 
@@ -1862,20 +1858,26 @@ def plot_simulations_compare(
             axis_y_limits=[None, None], write_plot=True)
 
         plot_property_v_distance(
-            parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-            axis_y_limits=[None, None], write_plot=True)
-
-        plot_property_v_distance(
             parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
-        plot_property_v_distance(
-            parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-            axis_y_limits=[None, None], write_plot=True)
+        if 'gas' in parts[0]:
+            plot_property_v_distance(
+                parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
+                axis_y_limits=[0, 2], write_plot=True)
 
-        plot_property_v_distance(
-            parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
-            axis_y_limits=[None, None], write_plot=True)
+            plot_property_v_distance(
+                parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                axis_y_limits=[None, None], write_plot=True)
+
+        if 'star' in parts[0]:
+            plot_property_v_distance(
+                parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                axis_y_limits=[None, None], write_plot=True)
+
+            plot_property_v_distance(
+                parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
+                axis_y_limits=[None, None], write_plot=True)
 
         if 'velocity' in property_names:
             plot_property_v_distance(

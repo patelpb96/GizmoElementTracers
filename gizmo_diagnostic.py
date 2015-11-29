@@ -172,13 +172,13 @@ def print_run_time_ratios(
     '''
     Print ratios of wall times and CPU times (average per MPI taks) for input simulation directories
     at input scale-factors from cpu.txt for Gizmo run.
+    'Reference' simulation is first in list.
 
     Parameters
     ----------
-    simulation_directories : string or list : directory[s] of cpu.txt file for each simulation
+    simulation_directories : string or list : directory[s] of simulation[s]
     output_directory : string : directory of output files within simulation directory
     runtime_file_name : string : name of run-time file name (set in submission script)
-    cpu_numbers : int or list : number[s] of CPUs used for each simulation
     scale_factors : array-like : list of scale-factors at which to print run times
     '''
     wall_timess = []

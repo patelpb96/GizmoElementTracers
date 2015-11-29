@@ -25,9 +25,9 @@ from . import gizmo_io
 def write_initial_condition_points(
     part_fin, part_ini, center_position=None, distance_max=None, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m',
-    use_onorbe_method=False, refinement_number=1, method='convex-hull'):
+    use_onorbe_method=False, refinement_number=1, ic_method='convex-hull'):
     '''
-    Print positions dark-matter particles at initial snapshot as selected at final snapshot.
+    Select dark matter particles at final snapshot and print their positions at initial snapshot.
     Can use rules of thumb from Onorbe et al.
 
     Parameters
@@ -36,20 +36,20 @@ def write_initial_condition_points(
     part_ini : dict : catalog of particles at initial snapshot
     center_position : list : center position at final time
     distance_max : float : distance from center to select particles at final time
-        {kpc physical, or units of R_halo}
+        {kpc physical, or in units of R_halo}
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
     halo_radius : float : radius of halo {kpc physical}
-    virial_kind : string : virial kind for halo radius (if not input halo_radius)
+    virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
     use_onorbe_method : boolean : whether to use method of Onorbe et al to get uncontaminated region
     refinement_number : int : if above true, number of refinement levels beyond current for region
-    method : string : method to identify initial zoom-in regon
-        options: particles, convex-hull, cube
+    ic_method : string : method to identify zoom-in regon at initial time:
+        'particles', 'convex-hull', 'cube'
     '''
     file_name = 'ic_agora_mX_points.txt'
 
     Say = ut.io.SayClass(write_initial_condition_points)
 
-    assert method in ['particles', 'convex-hull', 'cube']
+    assert ic_method in ['particles', 'convex-hull', 'cube']
 
     # sanity check
     spec_names = []
@@ -74,9 +74,9 @@ def write_initial_condition_points(
     if use_onorbe_method:
         # convert distance_max according to Onorbe et al
         distance_pure = distance_max
-        if method == 'cube':
+        if ic_method == 'cube':
             distance_max = (1.5 * refinement_number + 1) * distance_pure
-        elif method in ['particles', 'convex-hull']:
+        elif ic_method in ['particles', 'convex-hull']:
             distance_max = (1.5 * refinement_number + 7) * distance_pure
 
     mass_select = 0
@@ -168,7 +168,7 @@ def write_initial_condition_points(
 
     positions_ini /= part_ini.info['box.length']  # renormalize to box units
 
-    if method == 'convex-hull':
+    if ic_method == 'convex-hull':
         # use convex hull to define initial region to reduce memory
         ConvexHull = spatial.ConvexHull(positions_ini)
         positions_ini = positions_ini[ConvexHull.vertices]
