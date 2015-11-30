@@ -1830,7 +1830,7 @@ def plot_simulations_compare(
         for directory in simulations:
             try:
                 part = gizmo_io.Gizmo.read_snapshot(
-                    species, 'redshift', redshift, '%s/output' % directory, property_names,
+                    species, 'redshift', redshift, directory, property_names=property_names,
                     simulation_name=simulations[directory], force_float32=force_float32)
 
                 if 'velocity' in property_names:
@@ -1962,7 +1962,8 @@ def get_galaxy_mass_profiles_v_redshift(
             part = parts[zi]
         else:
             part = gizmo_io.Gizmo.read_snapshot(
-                species_read, 'redshift', redshift, directory, property_names, force_float32=True)
+                species_read, 'redshift', redshift, directory, property_names=property_names,
+                force_float32=True)
 
         for k in ['redshift', 'scalefactor', 'time']:
             gal[k].append(part.snapshot[k])

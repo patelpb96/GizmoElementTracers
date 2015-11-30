@@ -238,7 +238,6 @@ def print_properties_extrema_all_snapshots(
     Say = ut.io.SayClass(print_properties_extrema_all_snapshots)
 
     simulation_directory = ut.io.get_path(simulation_directory)
-    output_directory = simulation_directory + ut.io.get_path(output_directory)
 
     Snapshot = ut.simulation.SnapshotClass()
     Snapshot.read_snapshots(directory=simulation_directory)
@@ -268,9 +267,9 @@ def print_properties_extrema_all_snapshots(
     for snapshot_i in Snapshot['index']:
         try:
             part = gizmo_io.Gizmo.read_snapshot(
-                species_read, 'index', snapshot_i, output_directory, properties_read,
-                metal_index_max=metal_index_max, sort_dark_by_id=False, assign_center=False,
-                force_float32=True)
+                species_read, 'index', snapshot_i, simulation_directory, output_directory,
+                properties_read, metal_index_max=metal_index_max, sort_dark_by_id=False,
+                assign_center=False, force_float32=True)
 
             for spec_name in species_property_dict:
                 for prop_name in species_property_dict[spec_name]:
@@ -281,7 +280,8 @@ def print_properties_extrema_all_snapshots(
                     except:
                         Say.say('! %s %s not in particle dictionary' % (spec_name, prop_name))
         except:
-            Say.say('! cannot read snapshot index %d in %s' % (snapshot_i, output_directory))
+            Say.say('! cannot read snapshot index {} in {}'.format(
+                    snapshot_i, simulation_directory + output_directory))
 
     Statistic = ut.statistic.StatisticClass()
 

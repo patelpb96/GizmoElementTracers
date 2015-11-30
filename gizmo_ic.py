@@ -196,11 +196,11 @@ if __name__ == '__main__':
         raise ValueError('selection radius = %s seems odd. you shall not pass.' % distance_max)
 
     part_fin = gizmo_io.Gizmo.read_snapshot(
-        ['dark', 'dark.2'], 'redshift', 0, 'output', ['position', 'id', 'mass'],
+        ['dark', 'dark.2'], 'redshift', 0, '.', 'output', ['position', 'id', 'mass'],
         sort_dark_by_id=True, force_float32=False, assign_center=False)
 
     part_ini = gizmo_io.Gizmo.read_snapshot(
-        ['dark', 'dark.2'], 'index', 0, 'output', ['position', 'id', 'mass'],
+        ['dark', 'dark.2'], 'index', 0, '.', 'output', ['position', 'id', 'mass'],
         sort_dark_by_id=True, force_float32=False, assign_center=False)
 
     center_position = ut.particle.get_center_position(

@@ -284,7 +284,7 @@ class GizmoClass(ut.io.SayClass):
             'Potential': 'potential',
 
             ## particles with adaptive smoothing ##
-            'AGS-Softening': 'soften.length',
+            'AGS-Softening': 'smooth.length',  # for gas, this is same as SmoothingLength
 
             ## gas particles ##
             'InternalEnergy': 'temperature',
@@ -417,7 +417,7 @@ class GizmoClass(ut.io.SayClass):
             self.say('read h = %.3f, omega_matter_0 = %.3f, omega_lambda_0 = %>3f' %
                      (header['hubble'], header['omega_matter'], header['omega_lambda']))
 
-        # convert some header quantities
+        # convert header quantities
         if header['is.cosmological']:
             header['scalefactor'] = float(header['time'])
             del(header['time'])
@@ -643,11 +643,6 @@ class GizmoClass(ut.io.SayClass):
                 # convert to {pc physical}
                 part[spec_name]['smooth.length'] *= 1000 * header['scalefactor'] / header['hubble']
                 part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
-
-            if 'soften.length' in part[spec_name]:
-                # convert to {pc physical}
-                part[spec_name]['soften.length'] *= 1000 * header['scalefactor'] / header['hubble']
-                part[spec_name]['soften.length'] /= 2.8  # Plummer softening, valid for most runs
 
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
