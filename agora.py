@@ -38,14 +38,14 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
     '''
     def __init__(
         self, agora_dir='.', snapshot_final_dir='DD0320/', snapshot_initial_dir='DD0000/',
-        read_halos=True):
+        read_catalog=True):
         '''
         Parameters
         ----------
         agora_dir : string : directory of AGORA simulation
         snapshot_final_dir : string : directory of final shapshot
         snapshot_initial_dir : string : directory of initial snapshot
-        read_halos : boolean : whether to read halo catalog
+        read_catalog : boolean : whether to read halo catalog
         '''
         self.agora_directory = ut.io.get_path(agora_dir)
         self.snapshot_final_directory = self.agora_directory + snapshot_final_dir
@@ -66,7 +66,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 
         self.Cosmology = ut.cosmology.CosmologyClass(source='agora')
 
-        if read_halos:
+        if read_catalog:
             self.read_halo_catalog()
 
     def read_halo_catalog(self):

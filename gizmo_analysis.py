@@ -381,7 +381,7 @@ class SpeciesProfileClass(ut.io.SayClass):
             if 'dark.2' in part:
                 species.append('dark.2')
 
-            for spec_name in species:
+            for spec_name in tuple(species):
                 if spec_name not in part:
                     species.remove(spec_name)
                     self.say('! %s not in particle catalog' % spec_name)
@@ -1155,7 +1155,7 @@ def plot_property_distribution(
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
-    if len(parts) > 1:
+    if len(parts) > 1 and parts[0].info['simulation.name']:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
@@ -1426,7 +1426,7 @@ def plot_property_v_distance(
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
-    if len(parts) > 1:
+    if len(parts) > 1 and parts[0].info['simulation.name']:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
@@ -1638,7 +1638,7 @@ def plot_star_form_history(
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
-    if len(parts) > 1:
+    if len(parts) > 1 and parts[0].info['simulation.name']:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
@@ -1774,7 +1774,7 @@ def plot_star_form_histories_galaxies(
                               loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
-    if len(parts) > 1:
+    if len(parts) > 1 and parts[0].info['simulation.name']:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
@@ -1845,7 +1845,7 @@ def plot_simulations_compare(
             Say.say('! could not read any snapshots at z = %.3f' % (redshift))
             return
 
-        if 'mass' in property_names:
+        if 'mass' in property_names and 'star' in part:
             for part, directory in zip(parts, directories):
                 print('%s star.mass = %.3e' % (directory, part['star']['mass'].sum()))
 
@@ -1859,6 +1859,10 @@ def plot_simulations_compare(
 
         plot_property_v_distance(
             parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+            axis_y_limits=[None, None], write_plot=True)
+
+        plot_property_v_distance(
+            parts, 'dark', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
             axis_y_limits=[None, None], write_plot=True)
 
         if 'gas' in parts[0]:

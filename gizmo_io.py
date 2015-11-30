@@ -171,9 +171,9 @@ class GizmoClass(ut.io.SayClass):
         self.eos = 5 / 3  # gas equation of state
 
     def read_snapshot(
-        self, species_types='all', snapshot_number_kind='index', snapshot_number=400,
-        directory='output', property_names='all', property_names_exclude=[],
-        simulation_name='',
+        self, species_types='all', snapshot_number_kind='index', snapshot_number=600,
+        simulation_directory='.', snapshot_directory='output/', simulation_name='',
+        property_names='all', property_names_exclude=[],
         metal_index_max=1, particle_subsample_factor=0,
         assign_center=True, sort_dark_by_id=False, force_float32=False, get_header_only=False):
         '''
@@ -194,13 +194,14 @@ class GizmoClass(ut.io.SayClass):
             2 or bulge, 3 or disk = stars for non-cosmological run
         snapshot_number_kind : string : input snapshot number kind: index, redshift
         snapshot_number : int or float : index (number) of snapshot file
-        directory: string : directory of snapshot file
+        simulation_directory : root directory of simulation
+        snapshot_directory: string : directory of snapshot files within simulation_directory
+        simulation_name : string : name to store for future identification
         property_names : string or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_name_dict
         property_names_exclude : string or list : name[s] of particle properties not to read
             note: can use this instead of property_names if just want to exclude a few properties
-        simulation_name : string : name to store for future identification
         metal_index_max : int : maximum metal index to keep
             options: None = keep all, 0 = total, 1 = total + helium, 10 = iron (no r-process)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
@@ -281,6 +282,9 @@ class GizmoClass(ut.io.SayClass):
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
+
+            ## particles with adaptive smoothing ##
+            'AGS-Softening': 'soften.length',
 
             ## gas particles ##
             'InternalEnergy': 'temperature',
@@ -383,32 +387,16 @@ class GizmoClass(ut.io.SayClass):
                 if prop_name not in property_names:
                     property_names.append(prop_name)
 
-        ## try to read snapshot time file ##
-        directory = ut.io.get_path(directory)
-        snapshot_time_file_directory = directory + '../'
-        Snapshot = ut.simulation.SnapshotClass()
+        ## read information on snapshot times ##
+        simulation_directory = ut.io.get_path(simulation_directory)
+        snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        try:
-            try:
-                Snapshot.read_snapshots('snapshot_times.txt', snapshot_time_file_directory)
-            except:
-                #print('here')
-                Snapshot.read_snapshots('snapshot_scale-factors.txt', snapshot_time_file_directory)
-        except:
-            if snapshot_number_kind == 'redshift':
-                raise ValueError(
-                    'input redshift for snapshot, but cannot find file of snapshot times in %s' %
-                    snapshot_time_file_directory)
-
-        if snapshot_number_kind == 'redshift':
-            snapshot_redshift = snapshot_number
-            snapshot_number = Snapshot.get_index(snapshot_number)
-            self.say('input redshift = %.3f -> snapshot index = %d, redshift = %.3f\n' %
-                     (snapshot_redshift, snapshot_number, Snapshot['redshift'][snapshot_number]))
+        Snapshot, snapshot_index = self.read_snapshot_times(
+            simulation_directory, snapshot_number_kind, snapshot_number)
 
         ## read and assign header ##
         # get file name
-        file_name = self.get_file_name(directory, snapshot_number)
+        file_name = self.get_file_name(snapshot_directory, snapshot_index)
         self.say('reading header from: ' + file_name, end='\n\n')
 
         # open file and parse header
@@ -464,6 +452,8 @@ class GizmoClass(ut.io.SayClass):
             header['has.baryons'] = True
 
         header['catalog.kind'] = 'particle'
+        if not simulation_name and simulation_directory != './':
+            simulation_name = simulation_directory.strip('/')
         header['simulation.name'] = simulation_name
 
         if get_header_only or part_number_min == 0:
@@ -654,6 +644,11 @@ class GizmoClass(ut.io.SayClass):
                 part[spec_name]['smooth.length'] *= 1000 * header['scalefactor'] / header['hubble']
                 part[spec_name]['smooth.length'] /= 2.8  # Plummer softening, valid for most runs
 
+            if 'soften.length' in part[spec_name]:
+                # convert to {pc physical}
+                part[spec_name]['soften.length'] *= 1000 * header['scalefactor'] / header['hubble']
+                part[spec_name]['soften.length'] /= 2.8  # Plummer softening, valid for most runs
+
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale-factor to {Gyr}
@@ -733,6 +728,44 @@ class GizmoClass(ut.io.SayClass):
 
         return part
 
+    def read_snapshot_times(self, directory, snapshot_number_kind, snapshot_number):
+        '''
+        Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
+        Return as dictionary class.
+
+        Parameters
+        ----------
+        directory : string : directory of snaphot file
+        snapshot_number_kind : string : kind of number that am supplying: 'redshift', 'index'
+        snapshot_number : int or float : corresponding number
+
+        Returns
+        -------
+        dictionary class of snapshot information
+        '''
+        directory = ut.io.get_path(directory)
+
+        Snapshot = ut.simulation.SnapshotClass()
+
+        try:
+            try:
+                Snapshot.read_snapshots('snapshot_times.txt', directory)
+            except:
+                Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
+        except:
+            if snapshot_number_kind == 'redshift':
+                raise ValueError(
+                    'input redshift for snapshot, but cannot find file of snapshot times in %s' %
+                    directory)
+
+        if snapshot_number_kind == 'redshift':
+            snapshot_redshift = snapshot_number
+            snapshot_index = Snapshot.get_index(snapshot_number)
+            self.say('input redshift = %.3f -> reading snapshot index = %d, redshift = %.3f\n' %
+                     (snapshot_redshift, snapshot_index, Snapshot['redshift'][snapshot_index]))
+
+        return Snapshot, snapshot_index
+
     def get_file_name(self, directory, snapshot_index):
         '''
         Get name (with relative path) of file to read in.
@@ -776,21 +809,6 @@ class GizmoClass(ut.io.SayClass):
                 raise ValueError('cannot find 0th snapshot file in: %s' % path_file_names)
 
         return path_file_name
-
-    def read_snapshot_times(self, directory, file_name='snapshot_times.txt'):
-        '''
-        Reads scale-factors, redshifts, ages, time spacings from snapshot file.
-
-        Parameters
-        ----------
-        directory : string : directory of snaphot file
-        file_name : string : name of snapshot file
-
-        Returns
-        -------
-        class dictionary of snapshot information
-        '''
-        return ut.simulation.Snapshot.read_snapshots(file_name, directory)
 
     def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''
