@@ -858,12 +858,10 @@ class GizmoClass(ut.io.SayClass):
         center_velocity : array : center velocity to use
         include_hubble_flow : boolean : whether to include hubble flow
         '''
-        from . import gizmo_analysis
-
         if np.isscalar(species):
             species = [species]  # ensure is list
 
-        orb = gizmo_analysis.get_orbit_dictionary(
+        orb = ut.particle.get_orbit_dictionary(
             part, species, center_position, center_velocity, include_hubble_flow, scalarize=False)
 
         for spec_name in species:

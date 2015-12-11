@@ -153,7 +153,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
                 raise ValueError('partice ids are not unique')
             del(self.data[ti]['particle_index'])
 
-            ut.catalog.assign_id_to_index(self.part[ti], 'id', 0)
+            ut.catalog.assign_id_to_index_species(self.part[ti], 'id', 0)
 
             self.part[ti]['mass'] = np.array(
                 self.data[ti]['particle_mass'].in_units('Msun'), dtype=np.float32)  # {M_sun}

@@ -87,6 +87,7 @@ def get_nucleosynthetic_yields(
 
     elif event_kind == 'supernova.ii':
         # yields from Nomoto et al 2006, IMF averaged
+        # rates from Starburst99
         # in Gizmo, these occur from 3.4 to 37.53 Myr after formation
         # from 3.4 to 10.37 Myr, rate / M_sun = 5.408e-10 yr ^ -1
         # from 10.37 to 37.53 Myr, rate / M_sun = 2.516e-10 yr ^ -1
@@ -117,10 +118,10 @@ def get_nucleosynthetic_yields(
 
     elif event_kind == 'supernova.ia':
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
+        # rates from Mannucci, Della Valle & Panagia 2006
         # in Gizmo, these occur starting 37.53 Myr after formation, with rate / M_sun =
         # 5.3e-14 + 1.6e-11 * exp(-0.5 * ((star_age - 0.05) / 0.01) *
         #                         ((star_age - 0.05) / 0.01)) yr ^ -1
-        # rates from Mannucci, Della Valle & Panagia 2006
         ejecta_mass = 1.4  # {M_sun}
 
         yield_dict['metal'] = 1.4
@@ -223,60 +224,6 @@ def plot_nucleosynthetic_yields(
 
     plot_name = 'element.yields_%s_z.%.1f' % (event_kind, star_metallicity)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
-
-
-def get_orbit_dictionary(
-    part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True,
-    part_indicess=None, scalarize=False):
-    '''
-    Get dictionary of orbital parameters.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    species : string or list : particle species to compute
-    center_position : array : center position to use
-    include_hubble_flow : boolean : whether to include hubble flow
-    part_indicess : array or list : indices of particles from which to select
-    scalarize : boolean :
-        whether to return single dictionary instead of dictionary of dictionaries, if single species
-
-    Returns
-    -------
-    orb : dict : dictionary of orbital properties, one for each species (unless scalarize)
-    '''
-    if np.isscalar(species):
-        species = [species]
-
-    center_position = ut.particle.parse_property(part, 'position', center_position)
-    center_velocity = ut.particle.parse_property(part, 'velocity', center_velocity)
-    part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
-
-    orb = {}
-    for spec_i, spec_name in enumerate(species):
-        positions = part[spec_name]['position']
-        velocities = part[spec_name]['velocity']
-
-        part_indices = part_indicess[spec_i]
-        if part_indices is not None and len(part_indices):
-            positions = positions[part_indices]
-            velocities = velocities[part_indices]
-
-        distance_vectors = ut.coordinate.get_distances(
-            'vector', positions, center_position, part.info['box.length'])
-        distance_vectors *= part.snapshot['scalefactor']  # convert to {kpc physical}
-
-        velocity_vectors = ut.coordinate.get_velocity_differences(
-            'vector', velocities, center_velocity, include_hubble_flow, positions, center_position,
-            part.snapshot['scalefactor'], part.snapshot['time.hubble'], part.info['box.length'])
-
-        orb[spec_name] = ut.orbit.get_orbit_dictionary(
-            distance_vectors, velocity_vectors, get_integrals=False)
-
-    if scalarize and len(species) == 1:
-        orb = orb[species[0]]
-
-    return orb
 
 
 class SpeciesProfileClass(ut.io.SayClass):
@@ -1108,7 +1055,7 @@ def plot_property_distribution(
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         if 'velocity' in prop_name:
-            orb = get_orbit_dictionary(
+            orb = ut.particle.get_orbit_dictionary(
                 part, spec_name, center_positions[part_i], center_velocities[part_i], True,
                 part_indices)
             prop_values = orb[spec_name][prop_name]
