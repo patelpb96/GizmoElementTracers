@@ -299,38 +299,36 @@ def print_properties_extrema_all_snapshots(
             #Statistic.print_statistics()
 
 
-def plot_halo_contamination(directory='.', snapshot_redshift=0):
+def plot_halo_contamination(directory='.', redshift=0):
     '''
     Plot contamination from lower-resolution particles in/near halo as a function of radius.
 
     Parameters
     ----------
     directory : string : directory of simulation (one level above directory of snapshot file)
-    snapshot_redshift : float : redshift of snapshot file
+    redshift : float : redshift of snapshot
     '''
     #position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
-    radius_bin_wid = 0.02
-    radius_lim_phys = [1, 4000]  # {kpc physical}
-    radius_lim_vir = [0.01, 10]  # {units of R_halo}
+    distance_bin_width = 0.02
+    distance_limits_phys = [1, 4000]  # {kpc physical}
+    distance_limits_halo = [0.01, 10]  # {units of R_halo}
     virial_kind = '200m'
 
     os.chdir(directory)
 
     part = gizmo_io.Gizmo.read_snapshot(
-        ['dark', 'dark.2'], 'redshift', snapshot_redshift, 'output',
-        ['position', 'mass', 'potential'], force_float32=True, assign_center=True)
+        ['dark', 'dark.2'], 'redshift', redshift, directory,
+        property_names=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 
-    #part.center_position = ut.particle.get_center_position(
-    #    part, 'dark', 'center-of-mass', compare_centers=True)
-
-    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(part, 'all', virial_kind=virial_kind)
+    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(
+        part, 'all', virial_kind=virial_kind)
 
     gizmo_analysis.plot_mass_contamination(
-        part, radius_lim_phys, radius_bin_wid, halo_radius=halo_radius, scale_to_halo_radius=False,
-        write_plot=True, plot_directory='plot')
+        part, distance_limits_phys, distance_bin_width, halo_radius=halo_radius,
+        scale_to_halo_radius=False, write_plot=True, plot_directory='plot')
 
     gizmo_analysis.plot_mass_contamination(
-        part, radius_lim_vir, radius_bin_wid, halo_radius=halo_radius,
+        part, distance_limits_halo, distance_bin_width, halo_radius=halo_radius,
         scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
 
 

@@ -67,7 +67,7 @@ def get_nucleosynthetic_yields(
 
     if event_kind == 'wind':
         # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
-        # treat AGB and O-star yields in more detail for light get_indices
+        # treat AGB and O-star yields in more detail for light elements
         ejecta_mass = 1.0  # these yields already are mass fractions
 
         yield_dict['helium'] = 0.36
@@ -215,14 +215,14 @@ def plot_nucleosynthetic_yields(
         # metallicity legend
         legend_z = subplots[si].legend(
             [plt.Line2D((0, 0), (0, 0), linestyle='')],
-            ['$Z/Z_\odot=%.3f$' % (star_metallicity)],
+            ['$Z/Z_\odot={:.3f}$'.format(star_metallicity)],
             loc='best', prop=FontProperties(size=16)
         )
         legend_z.get_frame().set_alpha(0.7)
 
     #plt.tight_layout(pad=0.02)
 
-    plot_name = 'element.yields_%s_z.%.1f' % (event_kind, star_metallicity)
+    plot_name = 'element.yields_{}_z.{:.1f}'.format(event_kind, star_metallicity)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -236,8 +236,6 @@ class SpeciesProfileClass(ut.io.SayClass):
         axis_distance_max=Inf, other_axis_distance_max=None, other_prop_limits={},
         part_indicess=None):
         '''
-        center_positions
-
         Parameters
         ----------
         part : dict : catalog of particles
@@ -331,7 +329,7 @@ class SpeciesProfileClass(ut.io.SayClass):
             for spec_name in tuple(species):
                 if spec_name not in part:
                     species.remove(spec_name)
-                    self.say('! %s not in particle catalog' % spec_name)
+                    self.say('! {} not in particle catalog'.format(spec_name))
 
         center_position = ut.particle.parse_property(part, 'position', center_position)
         part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
@@ -516,6 +514,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                     distances = ut.coordinate.get_distances(
                         'scalar', part[spec_name]['position'][part_indices], center_position,
                         part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
+
                 elif DistanceBin.dimension_number in [1, 2]:
                     distancess = ut.particle.get_distances_along_principal_axes(
                         part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
@@ -574,7 +573,7 @@ def plot_mass_contamination(
         if spec_test in part:
             species_test_t.append(spec_test)
         else:
-            Say.say('! no %s in particle dictionary' % spec_test)
+            Say.say('! no {} in particle dictionary'.format(spec_test))
     species_test = species_test_t
 
     center_position = ut.particle.parse_property(part, 'position', center_position)
@@ -604,9 +603,9 @@ def plot_mass_contamination(
         ratios[spec_name] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
         """
         for dist_bin_i in range(DistanceBin.number):
-            dist_bin_lim = DistanceBin.get_bin_limit('lin', dist_bin_i)
+            distance_bin_limits = DistanceBin.get_bin_limit('lin', dist_bin_i)
             Say.say('dist = [%.3f, %.3f]: mass ratio (bin, cum) = (%.5f, %.5f)' %
-                    (dist_bin_lim[0], dist_bin_lim[1],
+                    (distance_bin_limits[0], distance_bin_limits[1],
                      mass_ratio_bin[dist_bin_i], mass_ratio_cum[dist_bin_i]))
             if mass_ratio_bin[dist_bin_i] >= 1.0:
                 break
@@ -614,7 +613,7 @@ def plot_mass_contamination(
 
     # print diagnostics
     spec_name = 'dark.2'
-    Say.say('%s cumulative mass/number:' % spec_name)
+    Say.say('{} cumulative mass/number:'.format(spec_name))
     distances = pros[spec_name]['distance.cum']
     print_string = '  d < %.3f kpc: cumulative contamination mass = %.2e, number = %d'
     if scale_to_halo_radius:
@@ -776,6 +775,24 @@ def plot_metal_v_distance(
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
+def test_image(position_limits=[[0., 1.], [0., 1.1]]):
+
+    # plot ----------
+    plt.minorticks_on()
+    fig = plt.figure(1)
+    fig.clf()
+
+    subplot = fig.add_subplot(111)
+    subplot.axis('equal')
+    #fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
+
+    subplot.set_xlim(position_limits[0])
+    subplot.set_ylim(position_limits[1])
+
+    circle1 = plt.Circle((0.5, 0.5), 0.4, color='b', fill=False)
+    fig.gca().add_artist(circle1)
+
+
 #===================================================================================================
 # visualize
 #===================================================================================================
@@ -784,6 +801,7 @@ def plot_image(
     distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
     align_principal_axes=False, image_limits=[None, None],
+    hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
@@ -808,6 +826,8 @@ def plot_image(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : where to put plot file
     '''
+    background_color = 'black'
+
     dimen_label = {0: 'x', 1: 'y', 2: 'z'}
 
     if dimen_indices_select is None or not len(dimen_indices_select):
@@ -858,6 +878,28 @@ def plot_image(
 
     position_limits = np.array([[-distance_max, distance_max], [-distance_max, distance_max]])
 
+    if hal is not None:
+        # compile halos
+        if hal_indices is None or not len(hal_indices):
+            hal_indices = ut.array.arange_length(hal['total.mass'])
+
+        if 0 not in hal_indices:
+            hal_indices = np.concatenate([[0], hal_indices])
+
+        hal_positions = np.array(hal[hal_position_kind][hal_indices])
+        if center_position is not None and len(center_position):
+            hal_positions -= center_position
+        hal_radiuss = hal[hal_radius_kind][hal_indices]
+
+        masks = hal_positions[:, dimen_indices_select[0]] <= distance_max  # initialize masks
+        for dimen_i in dimen_indices_select:
+            masks *= ((hal_positions[:, dimen_i] <= distance_max) *
+                      (hal_positions[:, dimen_i] >= -distance_max))
+
+        hal_radiuss = hal_radiuss[masks]
+        hal_positions = hal_positions[masks]
+        hal_positions = hal_positions
+
     # plot ----------
     plt.minorticks_on()
     fig = plt.figure(figure_index)
@@ -867,7 +909,7 @@ def plot_image(
     plt.register_cmap(cmap=BYW)
 
     if len(dimen_indices_plot) == 2:
-        subplot = fig.add_subplot(111, axisbg='black')
+        subplot = fig.add_subplot(111, axisbg=background_color)
         fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
         subplot.set_xlim(position_limits[0])
@@ -941,14 +983,27 @@ def plot_image(
 
         #fig.colorbar(_Image)
 
+        # plot halos
+        if hal is not None:
+            for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
+                print(hal_position, hal_radius)
+                circle = plt.Circle(
+                    hal_position[dimen_indices_plot], hal_radius, color='w', linewidth=1,
+                    fill=False)
+                subplot.add_artist(circle)
+
+        fig.gca().set_aspect('equal')
+
     elif len(dimen_indices_plot) == 3:
         #position_limits *= 0.999  # ensure that tick labels do not overlap
         position_limits[0, 0] *= 0.994
         position_limits[1, 0] *= 0.994
 
         fig, subplots = plt.subplots(2, 2, num=figure_index, sharex=True, sharey=True,
-                                     axisbg='black')
-        fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
+                                     axisbg=background_color)
+        #fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
+
+        fig.gca().set_aspect('equal')
 
         plot_dimen_iss = [
             [dimen_indices_plot[0], dimen_indices_plot[1]],
@@ -983,6 +1038,18 @@ def plot_image(
                 cmap=plt.cm.YlOrBr)  # @UndefinedVariable
 
             #fig.colorbar(_Image)  # , ax=subplot)
+
+            # plot halos
+            if hal is not None:
+                for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
+                    circle = plt.Circle(
+                        hal_position[plot_dimen_is], hal_radius, color='w', linewidth=1, fill=False)
+                    subplot.add_artist(circle)
+
+            subplot.axis('equal')
+
+            circle = plt.Circle((0, 0), 10, color='w', fill=False)
+            subplot.add_artist(circle)
 
     #plt.tight_layout(pad=0.02)
 
@@ -1056,13 +1123,13 @@ def plot_property_distribution(
 
         if 'velocity' in prop_name:
             orb = ut.particle.get_orbit_dictionary(
-                part, spec_name, center_positions[part_i], center_velocities[part_i], True,
-                part_indices)
-            prop_values = orb[spec_name][prop_name]
+                part, spec_name, center_positions[part_i], center_velocities[part_i], part_indices,
+                include_hubble_flow=True, scalarize=True)
+            prop_values = orb[prop_name]
         else:
             prop_values = part[spec_name].prop(prop_name, part_indices)
 
-        Say.say('keeping %s %s particles' % (prop_values.size, spec_name))
+        Say.say('keeping {} {} particles'.format(prop_values.size, spec_name))
 
         Stat.append_to_dictionary(
             prop_values, prop_limits, prop_bin_width, prop_bin_number, prop_scaling)
@@ -1257,8 +1324,8 @@ def plot_property_v_property(
 
 
 def plot_property_v_distance(
-    parts, species='dark', prop_name='mass', prop_statistic='histogram', prop_scaling='log',
-    weight_by_mass=False,
+    parts, species='dark',
+    prop_name='mass', prop_statistic='histogram', prop_scaling='log', weight_by_mass=False,
     distance_limits=[0.1, 300], distance_bin_width=0.02, distance_bin_number=None,
     distance_scaling='log',
     dimension_number=3, rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_max=None,
@@ -1303,6 +1370,7 @@ def plot_property_v_distance(
         center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
     else:
         center_velocities = [center_velocities for _ in center_positions]
+    part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,

@@ -71,8 +71,8 @@ class ParticleDictionaryClass(dict):
                     break
 
             if len(prop_names) == 1:
-                raise ValueError('property = %s is not a valid input to halo catalog' %
-                                 property_name)
+                raise ValueError(
+                    'property = {} is not a valid input to halo catalog'.format(property_name))
 
             prop_values = np.array(self.prop(prop_names[0], indices))
             for prop_name in prop_names[1:]:
@@ -132,7 +132,8 @@ class ParticleDictionaryClass(dict):
                     break
 
             if metal_index is None:
-                ValueError('property = %s is not a valid input to halo catalog' % property_name)
+                raise ValueError(
+                    'property = {} is not a valid input to halo catalog'.format(property_name))
 
             if indices is None:
                 values = self['metallicity'][:, metal_index]
@@ -148,7 +149,7 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        raise ValueError('property = %s is not a valid input to halo catalog' % property_name)
+        raise ValueError('property = {} is not a valid input to halo catalog'.format(property_name))
 
 
 #===================================================================================================
@@ -341,10 +342,10 @@ class GizmoClass(ut.io.SayClass):
                 species_ids.append(species_name_dict[spec_type])
             elif isinstance(spec_type, int):
                 if spec_type < 0 or spec_type > 9:
-                    raise ValueError('! not recognize species type = %d' % spec_type)
+                    raise ValueError('! not recognize species type = ' + spec_type)
                 species_ids.append(spec_type)
             else:
-                raise ValueError('not recognize species type = %s' % spec_type)
+                raise ValueError('not recognize species type = ' + spec_type)
 
         # assign species name list
         species_names = []
@@ -414,8 +415,8 @@ class GizmoClass(ut.io.SayClass):
         else:
             header['is.cosmological'] = False
             self.say('assuming that simulation is not cosmological')
-            self.say('read h = %.3f, omega_matter_0 = %.3f, omega_lambda_0 = %>3f' %
-                     (header['hubble'], header['omega_matter'], header['omega_lambda']))
+            self.say('read h = {:.3f}, omega_matter_0 = {:.3f}, omega_lambda_0 = {:.3f}'.format(
+                     header['hubble'], header['omega_matter'], header['omega_lambda']))
 
         # convert header quantities
         if header['is.cosmological']:
@@ -432,8 +433,8 @@ class GizmoClass(ut.io.SayClass):
         species_ids_keep = []
         for spec_name in species_names:
             spec_id = species_name_dict[spec_name]
-            self.say('species name = %7s (id = %s): %d particles' %
-                     (spec_name, spec_id, header['particle.numbers.total'][spec_id]))
+            self.say('species name = {:7s} (id = {}): {} particles'.format(
+                     spec_name, spec_id, header['particle.numbers.total'][spec_id]))
             if header['particle.numbers.total'][spec_id] > 0:
                 part_number_min = header['particle.numbers.total'][spec_id]
                 species_ids_keep.append(spec_id)
@@ -482,7 +483,7 @@ class GizmoClass(ut.io.SayClass):
 
             part_in = file_in['PartType' + str(spec_id)]
 
-            part_num_tot = header['particle.numbers.total'][spec_id]
+            part_number_tot = header['particle.numbers.total'][spec_id]
 
             # add species to particle dictionary
             #part[spec_name] = {}
@@ -494,11 +495,11 @@ class GizmoClass(ut.io.SayClass):
 
                     # determine shape of property array
                     if len(part_in[prop_name_in].shape) == 1:
-                        prop_shape = part_num_tot
+                        prop_shape = part_number_tot
                     elif len(part_in[prop_name_in].shape) == 2:
-                        prop_shape = [part_num_tot, part_in[prop_name_in].shape[1]]
+                        prop_shape = [part_number_tot, part_in[prop_name_in].shape[1]]
                         if prop_name_in == 'Metallicity' and metal_index_max:
-                            prop_shape = [part_num_tot, metal_index_max + 1]
+                            prop_shape = [part_number_tot, metal_index_max + 1]
 
                     # determine data type to store
                     prop_in_dtype = part_in[prop_name_in].dtype
@@ -510,14 +511,14 @@ class GizmoClass(ut.io.SayClass):
 
                     if prop_name == 'id':
                         # initialize so calling an un-itialized value leads to error
-                        part[spec_name][prop_name] -= part_num_tot
+                        part[spec_name][prop_name] -= part_number_tot
                 else:
-                    self.say('not reading %s %s' % (spec_name, prop_name_in))
+                    self.say('not reading {} {}'.format(spec_name, prop_name_in))
 
             # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
                 prop_name = property_name_dict['Masses']
-                part[spec_name][prop_name] = np.zeros(part_num_tot, dtype=np.float32)
+                part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
         # initial particle indices[s] to assign to each species from each file
         part_indices_lo = np.zeros(len(species_names))
@@ -530,7 +531,7 @@ class GizmoClass(ut.io.SayClass):
             else:
                 # open i'th of multiple files for snapshot
                 file_in.close()
-                file_name_i = file_name.replace('.0.', '.%d.' % file_i)
+                file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
                 file_in = h5py.File(file_name_i, 'r')
 
             self.say('reading properties from: ' + file_name_i.split('/')[-1])
@@ -584,14 +585,14 @@ class GizmoClass(ut.io.SayClass):
 
                 for dark_i, dark_mass in enumerate(dark_lowres_masses):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
-                    spec_name = 'dark.%d' % (dark_i + 2)
+                    spec_name = 'dark.{}'.format(dark_i + 2)
 
                     #part[spec_name] = {}
                     part[spec_name] = ParticleDictionaryClass()
 
                     for prop_name in dark_lowres:
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
-                    self.say('  %s: %d particles' % (spec_name, spec_indices.size))
+                    self.say('  {}: {} particles'.format(spec_name, spec_indices.size))
                     if spec_name not in species_names:
                         species_names.append(spec_name)
                     if spec_id not in species_ids:
@@ -604,7 +605,7 @@ class GizmoClass(ut.io.SayClass):
         if sort_dark_by_id:
             for spec_name in species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
-                    self.say('sorting %s particles by id' % spec_name)
+                    self.say('sorting {} particles by id'.format(spec_name))
                     indices_sorted_by_id = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = \
@@ -623,8 +624,9 @@ class GizmoClass(ut.io.SayClass):
                 # convert to {M_sun}
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
                 if np.min(part[spec_name]['mass']) < 1 or np.max(part[spec_name]['mass']) > 2e10:
-                    self.say('! unsure about masses: read [min, max] = [%.3e, %.3e] M_sun' %
-                             (np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
+                    self.say(
+                        '! unsure about masses: read [min, max] = [{:.3e}, {:.3e}] M_sun'.format(
+                            np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
 
             if 'bh.mass' in part[spec_name]:
                 # convert to {M_sun}
@@ -677,8 +679,8 @@ class GizmoClass(ut.io.SayClass):
         # sub-sample highest-resolution particles for smaller memory
         if particle_subsample_factor > 1:
             spec_names = ['dark', 'gas', 'star']
-            self.say('subsampling (periodically) %s particles by factor = %d' %
-                     (spec_names, particle_subsample_factor), end='\n\n')
+            self.say('subsampling (periodically) {} particles by factor = {}'.format(
+                     spec_names, particle_subsample_factor), end='\n\n')
             for spec_name in part:
                 if spec_name in spec_names:
                     for prop_name in part[spec_name]:
@@ -750,14 +752,15 @@ class GizmoClass(ut.io.SayClass):
         except:
             if snapshot_number_kind == 'redshift':
                 raise ValueError(
-                    'input redshift for snapshot, but cannot find file of snapshot times in %s' %
+                    'input redshift for snapshot, but cannot find file of snapshot times in ' +
                     directory)
 
         if snapshot_number_kind == 'redshift':
             snapshot_redshift = snapshot_number
             snapshot_index = Snapshot.get_index(snapshot_number)
-            self.say('input redshift = %.3f -> reading snapshot index = %d, redshift = %.3f\n' %
-                     (snapshot_redshift, snapshot_index, Snapshot['redshift'][snapshot_index]))
+            self.say(
+                'input redshift = {:.3f} -> read snapshot index = {}, redshift = {:.3f}\n'.format(
+                    snapshot_redshift, snapshot_index, Snapshot['redshift'][snapshot_index]))
 
         return Snapshot, snapshot_index
 
@@ -787,8 +790,8 @@ class GizmoClass(ut.io.SayClass):
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
-            raise ValueError('cannot find snapshot index = %d in: %s' %
-                             (snapshot_index, path_names))
+            raise ValueError('cannot find snapshot index = {} in: {}'.format(
+                             snapshot_index, path_names))
 
         path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
 
@@ -801,7 +804,7 @@ class GizmoClass(ut.io.SayClass):
             if len(path_file_names) and '.0.' in path_file_names[0]:
                 path_file_name = path_file_names[0]
             else:
-                raise ValueError('cannot find 0th snapshot file in: %s' % path_file_names)
+                raise ValueError('cannot find 0th snapshot file in ' + path_file_names)
 
         return path_file_name
 
@@ -832,14 +835,14 @@ class GizmoClass(ut.io.SayClass):
             part.center_position = ut.particle.get_center_position(
                 part, spec_name, method, compare_centers=compare_centers)
             print('    position: ', end='')
-            ut.io.print_array(part.center_position, '%.3f', end='')
+            ut.io.print_array(part.center_position, '{:.3f}', end='')
             print(' kpc comoving')
 
         if 'velocity' in part[spec_name]:
             part.center_velocity = ut.particle.get_center_velocity(
                 part, spec_name, velocity_radius_max, part.center_position)
             print('    velocity: ', end='')
-            ut.io.print_array(part.center_velocity, '%.1f', end='')
+            ut.io.print_array(part.center_velocity, '{:.1f}', end='')
             print(' km / sec')
 
         print()
@@ -862,7 +865,8 @@ class GizmoClass(ut.io.SayClass):
             species = [species]  # ensure is list
 
         orb = ut.particle.get_orbit_dictionary(
-            part, species, center_position, center_velocity, include_hubble_flow, scalarize=False)
+            part, species, center_position, center_velocity,
+            include_hubble_flow=include_hubble_flow, scalarize=False)
 
         for spec_name in species:
             for prop in orb[spec_name]:

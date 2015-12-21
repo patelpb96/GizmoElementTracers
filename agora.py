@@ -324,15 +324,15 @@ def print_contamination_around_halo(
         Say.say('yay! no contaminating particles out to distance_max = %.3f' % distance_max)
         return
 
-    for di in range(DistanceBin.number):
-        dist_bin_lim = DistanceBin.get_bin_limits(distance_scaling, di)
-        pis_d = pis[ut.array.get_indices(distances, dist_bin_lim)]
+    for dist_i in range(DistanceBin.number):
+        distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
+        pis_d = pis[ut.array.get_indices(distances, distance_bin_limits)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
         num_frac = Fraction.get_fraction(pis_contam_d.size, pis_d.size)
         mass_frac = Fraction.get_fraction(
             np.sum(Agora.part[ti]['mass'][pis_contam_d]), np.sum(Agora.part[ti]['mass'][pis_d]))
         Say.say('distance = [%.3f, %.3f]: fraction by number = %.5f, by mass = %.5f' %
-                (dist_bin_lim[0], dist_bin_lim[1], num_frac, mass_frac))
+                (distance_bin_limits[0], distance_bin_limits[1], num_frac, mass_frac))
         if num_frac >= 1.0:
             break
 
@@ -381,21 +381,21 @@ def print_contamination_in_box(
         distance_vector = np.abs(ut.coordinate.get_distances(
             'vector', part['position'], center_position, part.info['box.length']))
 
-    for di in range(DistanceBin.number):
-        dist_bin_lim = DistanceBin.get_bin_limits(scaling, di)
+    for dist_i in range(DistanceBin.number):
+        distance_bin_limits = DistanceBin.get_bin_limits(scaling, dist_i)
 
         if geometry == 'sphere':
-            pis_all_d = neig_pis[ut.array.get_indices(distances, dist_bin_lim)]
+            pis_all_d = neig_pis[ut.array.get_indices(distances, distance_bin_limits)]
         elif geometry == 'cube':
             pis_all_d = np.array(pis_all)
             for dimension_i in range(part['position'].shape[1]):
                 pis_all_d = ut.array.get_indices(
-                    distance_vector[:, dimension_i], dist_bin_lim, pis_all_d)
+                    distance_vector[:, dimension_i], distance_bin_limits, pis_all_d)
 
         pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
         frac = Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
         Say.say('distance = [%.3f, %.3f], fraction = %.5f' %
-                (dist_bin_lim[0], dist_bin_lim[1], frac))
+                (distance_bin_limits[0], distance_bin_limits[1], frac))
         if frac >= 1.0:
             break
 
