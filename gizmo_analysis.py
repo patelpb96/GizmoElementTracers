@@ -1436,9 +1436,9 @@ def plot_property_v_distance(
                   color='black', linestyle=':', alpha=0.6)
 
     # redshift legend
-    legend_z = subplot.legend([plt.Line2D((0, 0), (0, 0), linestyle='')],
-                              ['$z=%.1f$' % parts[0].snapshot['redshift']],
-                              loc='lower left', prop=FontProperties(size=16))
+    legend_z = subplot.legend(
+        [plt.Line2D((0, 0), (0, 0), linestyle='')], ['$z=%.1f$' % parts[0].snapshot['redshift']],
+        loc='lower left', prop=FontProperties(size=16))
     legend_z.get_frame().set_alpha(0.5)
 
     if len(parts) > 1 and parts[0].info['simulation.name']:
@@ -1862,7 +1862,7 @@ def plot_simulations_compare(
 
         if 'mass' in property_names and 'star' in part:
             for part, directory in zip(parts, directories):
-                print('{} star.mass = {.3e}'.format(directory, part['star']['mass'].sum()))
+                print('{} star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
 
         plot_property_v_distance(
             parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
