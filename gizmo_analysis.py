@@ -1805,48 +1805,55 @@ def plot_star_form_histories_galaxies(
 #===================================================================================================
 # compare simulations
 #===================================================================================================
-simulations = [
-    ['../m12_ref13_fb-angle-max', 'r13 angle-max'],
-
-    ['m12_ref12', 'r12'],
-    ['m12_ref13', 'r13'],
-
-    ['m12_ref12_res-adapt', 'r12 res-adapt'],
-    ['m12_ref12_sfn100', 'r12 n=100'],
-
-    ['m12_ref13_res-adapt', 'r13 res-adapt'],
-    ['m12_ref13_res-lo', 'r13 res-low n=100'],
-
-    ['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
-    ['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
-    ['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
-    ['m12_ref13_rmax10hsml', 'r13 r.max=10h'],
-]
-
-
-def plot_simulations_compare(
-    simulations=simulations, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-    species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+class SimulationCompareClass(ut.io.SayClass):
     '''
     .
     '''
-    from . import gizmo_io
+    def __init__(self):
+        '''
+        .
+        '''
+        self.simulation_names = [
+            ['fb-angle-max/m12_ref13_fb-angle-max', 'r13 angle-max n=100'],
 
-    Say = ut.io.SayClass(plot_simulations_compare)
+            #['m12_ref12', 'r12'],
+            #['m12_ref12_res-adapt', 'r12 res-adapt'],
+            #['m12_ref12_sfn100', 'r12 n=100'],
 
-    simulations = collections.OrderedDict(simulations)
+            ['m12_ref13_sfn100', 'r13 iso n=100'],
+            ['m12_ref13', 'r13 iso n=1000'],
+            ['m12_ref13_pleiades', 'r13 non-iso n=1000'],
 
-    if np.isscalar(redshifts):
-        redshifts = [redshifts]
+            #['m12_ref13_res-adapt', 'r13 res-adapt'],
+            #['m12_ref13_res-lo', 'r13 res-low n=100'],
 
-    for redshift in redshifts:
+            #['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
+            #['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
+            #['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
+            #['m12_ref13_rmax10hsml', 'r13 r.max=10h'],
+        ]
+
+    def read_simulations(
+        self, simulation_names=None, redshift, species='all',
+        property_names=['mass', 'position', 'form.time'], force_float32=True):
+        '''
+        .
+        '''
+        from . import gizmo_io
+
+        if simulation_names is None:
+            simulation_names = self.simulation_names
+
+        if not isinstance(simulation_names, collections.OrderedDict):
+            simulation_names = collections.OrderedDict(simulation_names)
+
         parts = []
         directories = []
-        for directory in simulations:
+        for directory in simulation_names:
             try:
                 part = gizmo_io.Gizmo.read_snapshot(
                     species, 'redshift', redshift, directory, property_names=property_names,
-                    simulation_name=simulations[directory], force_float32=force_float32)
+                    simulation_name=simulation_names[directory], force_float32=force_float32)
 
                 if 'velocity' in property_names:
                     gizmo_io.Gizmo.assign_orbit(part, 'gas')
@@ -1854,59 +1861,76 @@ def plot_simulations_compare(
                 parts.append(part)
                 directories.append(directory)
             except:
-                Say.say('! could not read snapshot at z = {:.3f} in {}'.format(redshift, directory))
+                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
+                         redshift, directory))
 
         if not len(parts):
-            Say.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
+            self.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
             return
 
         if 'mass' in property_names and 'star' in part:
             for part, directory in zip(parts, directories):
                 print('{} star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
 
-        plot_property_v_distance(
-            parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
-            axis_y_limits=[0, None], write_plot=True)
+        return parts
 
-        plot_property_v_distance(
-            parts, 'total', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-            axis_y_limits=[None, None], write_plot=True)
+    def plot_simulations_compare(
+        self, simulation_names=None, parts=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+        '''
+        .
+        '''
+        if np.isscalar(redshifts):
+            redshifts = [redshifts]
 
-        plot_property_v_distance(
-            parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-            axis_y_limits=[None, None], write_plot=True)
-
-        plot_property_v_distance(
-            parts, 'dark', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
-            axis_y_limits=[None, None], write_plot=True)
-
-        if 'gas' in parts[0]:
-            plot_property_v_distance(
-                parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
-                axis_y_limits=[0, 2], write_plot=True)
+        for redshift in redshifts:
+            if parts is None:
+                parts = self.read_simulations(
+                    simulation_names, redshift, species, property_names, force_float32)
 
             plot_property_v_distance(
-                parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-                axis_y_limits=[None, None], write_plot=True)
+                parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
+                axis_y_limits=[0, None], write_plot=True)
 
-        if 'star' in parts[0]:
             plot_property_v_distance(
-                parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                parts, 'total', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
                 axis_y_limits=[None, None], write_plot=True)
 
             plot_property_v_distance(
-                parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
+                parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
                 axis_y_limits=[None, None], write_plot=True)
 
-        if 'velocity' in property_names:
             plot_property_v_distance(
-                parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
+                parts, 'dark', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
                 axis_y_limits=[None, None], write_plot=True)
 
-        if 'form.time' in property_names and redshift <= 4:
-            plot_star_form_history(
-                parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
-                write_plot=True)
+            if 'gas' in parts[0]:
+                plot_property_v_distance(
+                    parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
+                    axis_y_limits=[0, 2], write_plot=True)
+
+                plot_property_v_distance(
+                    parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                    axis_y_limits=[None, None], write_plot=True)
+
+            if 'star' in parts[0]:
+                plot_property_v_distance(
+                    parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                    axis_y_limits=[None, None], write_plot=True)
+
+                plot_property_v_distance(
+                    parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
+                    axis_y_limits=[None, None], write_plot=True)
+
+            if 'velocity' in property_names:
+                plot_property_v_distance(
+                    parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
+                    axis_y_limits=[None, None], write_plot=True)
+
+            if 'form.time' in property_names and redshift <= 4:
+                plot_star_form_history(
+                    parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
+                    write_plot=True)
 
 
 #===================================================================================================
