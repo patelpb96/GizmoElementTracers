@@ -1805,7 +1805,7 @@ def plot_star_form_histories_galaxies(
 #===================================================================================================
 # compare simulations
 #===================================================================================================
-class SimulationCompareClass(ut.io.SayClass):
+class CompareSimulationsClass(ut.io.SayClass):
     '''
     .
     '''
@@ -1834,7 +1834,7 @@ class SimulationCompareClass(ut.io.SayClass):
         ]
 
     def read_simulations(
-        self, simulation_names=None, redshift, species='all',
+        self, simulation_names=None, redshift=0, species='all',
         property_names=['mass', 'position', 'form.time'], force_float32=True):
         '''
         .
@@ -1931,6 +1931,8 @@ class SimulationCompareClass(ut.io.SayClass):
                 plot_star_form_history(
                     parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
                     write_plot=True)
+
+CompareSimulations = CompareSimulationsClass()
 
 
 #===================================================================================================
