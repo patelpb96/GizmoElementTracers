@@ -644,10 +644,10 @@ def plot_mass_contamination(
 
     subplot.set_ylabel('$M_{\\rm spec_name} / M_{\\rm %s}$' % species_reference, fontsize=20)
     if scale_to_halo_radius:
-        x_label = '$d \, / \, R_{\\rm 200m}$'
+        axis_x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
-        x_label = 'distance [$\\rm kpc\,comoving$]'
-    subplot.set_xlabel(x_label, fontsize=20)
+        axis_x_label = 'distance [$\\rm kpc\,comoving$]'
+    subplot.set_xlabel(axis_x_label, fontsize=20)
 
     plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
 
@@ -1383,7 +1383,7 @@ def plot_property_v_distance(
         pros_part = SpeciesProfile.get_profiles(
             part, species, prop_name, prop_statistic, weight_by_mass, DistanceBin,
             center_positions[part_i], center_velocities[part_i], rotation_vectors,
-            axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+            axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess[part_i])
 
         pros.append(pros_part)
 
@@ -1854,15 +1854,15 @@ def plot_simulations_compare(
                 parts.append(part)
                 directories.append(directory)
             except:
-                Say.say('! could not read snapshot at z = %.3f in %s' % (redshift, directory))
+                Say.say('! could not read snapshot at z = {:.3f} in {}'.format(redshift, directory))
 
         if not len(parts):
-            Say.say('! could not read any snapshots at z = %.3f' % (redshift))
+            Say.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
             return
 
         if 'mass' in property_names and 'star' in part:
             for part, directory in zip(parts, directories):
-                print('%s star.mass = %.3e' % (directory, part['star']['mass'].sum()))
+                print('{} star.mass = {.3e}'.format(directory, part['star']['mass'].sum()))
 
         plot_property_v_distance(
             parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
