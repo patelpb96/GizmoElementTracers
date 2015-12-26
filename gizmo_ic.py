@@ -101,7 +101,7 @@ def write_initial_condition_points(
                        for dimen_i in range(positions_ini.shape[1])]
 
     volume_ini = ut.coordinate.get_volume_of_convex_hull(positions_ini)
-    density_ini = part_ini.Cosmology.density(
+    density_ini = part_ini.Cosmology.get_density(
         'matter', part_ini.snapshot['redshift'], 'kpc comoving')
     if part_ini.info['has.baryons']:
         # subtract baryonic mass

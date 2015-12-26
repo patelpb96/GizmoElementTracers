@@ -649,7 +649,7 @@ class GizmoClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale-factor to {Gyr}
-                    part[spec_name]['form.time'] = Cosmology.time_from_redshift(
+                    part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
                         1 / part[spec_name]['form.time'] - 1).astype(
                             part[spec_name]['form.time'].dtype)
                 else:
@@ -702,13 +702,14 @@ class GizmoClass(ut.io.SayClass):
             part[spec_name].info = part.info
 
         # store information on snapshot time
-        time = Cosmology.time_from_redshift(header['redshift'])
+        time = Cosmology.get_time_from_redshift(header['redshift'])
         part.snapshot = {
+            'index': snapshot_index,
             'redshift': header['redshift'],
             'scalefactor': header['scalefactor'],
             'time': time,
-            'time.lookback': Cosmology.time_from_redshift(0) - time,
-            'time.hubble': ut.const.Gyr_per_sec / Cosmology.hubble_parameter(0),
+            'time.lookback': Cosmology.get_time_from_redshift(0) - time,
+            'time.hubble': ut.const.Gyr_per_sec / Cosmology.get_hubble_parameter(0),
         }
         for spec_name in species_names:
             part[spec_name].snapshot = part.snapshot
