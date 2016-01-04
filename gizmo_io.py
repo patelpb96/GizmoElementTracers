@@ -51,16 +51,17 @@ class ParticleDictionaryClass(dict):
         property_name : string : name of property
         indices : array : indices to select on
         '''
+        ## parsing general to all catalogs ##
         property_name = property_name.strip()  # strip white space
 
-        # check if input is in self dictionary, return as is
+        # if input is in self dictionary, return as is
         if property_name in self:
             if indices is not None:
                 return self[property_name][indices]
             else:
                 return self[property_name]
 
-        # check for relational property (involves combining more than one property)
+        # math relation, combining more than one property
         if ('/' in property_name or '*' in property_name or '+' in property_name or
                 '-' in property_name):
             prop_names = property_name
@@ -72,15 +73,25 @@ class ParticleDictionaryClass(dict):
 
             if len(prop_names) == 1:
                 raise ValueError(
-                    'property = {} is not a valid input to halo catalog'.format(property_name))
+                    'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
-            prop_values = np.array(self.prop(prop_names[0], indices))
+            prop_values = self.prop(prop_names[0], indices)
+            if not np.isscalar(indices):
+                # make copy so not change values in input catalog
+                prop_values = np.array(prop_values)
+
             for prop_name in prop_names[1:]:
                 if '/' in property_name:
-                    masks = self.prop(prop_name, indices) != 0
-                    prop_values[masks] /= self.prop(prop_name, indices)[masks]
-                    masks = self.prop(prop_name, indices) == 0
-                    prop_values[masks] = 0
+                    if np.isscalar(prop_values):
+                        if self.prop(prop_name, indices) == 0:
+                            prop_values = np.nan
+                        else:
+                            prop_values = prop_values / self.prop(prop_name, indices)
+                    else:
+                        masks = self.prop(prop_name, indices) != 0
+                        prop_values[masks] /= self.prop(prop_name, indices)[masks]
+                        masks = self.prop(prop_name, indices) == 0
+                        prop_values[masks] = np.nan
                 if '*' in property_name:
                     prop_values *= self.prop(prop_name, indices)
                 if '+' in property_name:
@@ -88,16 +99,19 @@ class ParticleDictionaryClass(dict):
                 if '-' in property_name:
                     prop_values -= self.prop(prop_name, indices)
 
+            #if prop_values.size == 1:
+            #    prop_values = np.float(prop_values, dtype=prop_values.dtype)
+
             return prop_values
 
-        # check for math transformation of single property
+        # math transformation of single property
         if property_name[:3] == 'log':
-            return ut.math.get_log(
-                self.prop(property_name.replace('log', ''), indices))
+            return ut.math.get_log(self.prop(property_name.replace('log', ''), indices))
 
         if property_name[:3] == 'abs':
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
+        ## parsing specific to this catalog ##
         if 'hydrogen.fraction' in property_name:
             # mass fraction of hydrogen (excluding helium and metals)
             return(1 - self.prop('metallicity', indices)[:, 0] -
@@ -122,7 +136,7 @@ class ParticleDictionaryClass(dict):
             prop_name = property_name.replace('.lookback', '')
             return self.snapshot['time'] - self.prop(prop_name, indices)
 
-        # check for metallicity string -> index conversion
+        # metallicity string -> index conversion
         if 'metallicity.' in property_name:
             metal_index = None
             for prop_name in property_name.split('.'):
@@ -133,7 +147,7 @@ class ParticleDictionaryClass(dict):
 
             if metal_index is None:
                 raise ValueError(
-                    'property = {} is not a valid input to halo catalog'.format(property_name))
+                    'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
             if indices is None:
                 values = self['metallicity'][:, metal_index]
@@ -142,14 +156,15 @@ class ParticleDictionaryClass(dict):
 
             if '.ironderived' in property_name:
                 # conversion to [Fe/H] solar from Ma et al 2015
-                values = np.array(values) / 10 ** 0.2 * 0.02
+                values = values / 10 ** 0.2 * 0.02
 
             if '.solar' in property_name:
-                values = np.array(values) / ut.const.sun_composition[metal_name + '.mass.fraction']
+                values = values / ut.const.sun_composition[metal_name + '.mass.fraction']
 
             return values
 
-        raise ValueError('property = {} is not a valid input to halo catalog'.format(property_name))
+        raise ValueError(
+            'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
 
 #===================================================================================================

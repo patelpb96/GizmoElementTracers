@@ -187,8 +187,7 @@ def plot_nucleosynthetic_yields(
 
     for si in range(1):
         subplots[si].set_xlim([yield_indices.min() - 0.5, yield_indices.max() + 0.5])
-        subplots[si].set_ylim(
-            ut.plot.parse_axis_limits(axis_y_limits, yield_values, axis_y_scaling))
+        subplots[si].set_ylim(ut.plot.get_axis_limits(yield_values, axis_y_scaling, axis_y_limits))
 
         subplots[si].set_xticks(yield_indices)
         subplots[si].set_xticklabels(yield_labels)
@@ -425,11 +424,13 @@ class SpeciesProfileClass(ut.io.SayClass):
 
             # create circular velocity = sqrt (G m(< r) / r)
             for spec_name in species:
-                pros[spec_name]['vel.circ'] = (
-                    pros[spec_name]['histogram.cum'] / pros[spec_name]['distance.cum'] *
-                    ut.const.grav_kpc_msun_yr)
-                pros[spec_name]['vel.circ'] = np.sqrt(pros[spec_name]['vel.circ'])
-                pros[spec_name]['vel.circ'] *= ut.const.km_per_kpc * ut.const.yr_per_sec
+                pros[spec_name]['vel.circ'] = ut.halo_property.get_circular_velocity(
+                    pros[spec_name]['histogram.cum'], pros[spec_name]['distance.cum'])
+                #pros[spec_name]['vel.circ'] = (
+                #    pros[spec_name]['histogram.cum'] / pros[spec_name]['distance.cum'] *
+                #    ut.const.grav_kpc_msun_yr)
+                #pros[spec_name]['vel.circ'] = np.sqrt(pros[spec_name]['vel.circ'])
+                #pros[spec_name]['vel.circ'] *= ut.const.km_per_kpc * ut.const.yr_per_sec
 
         return pros
 
@@ -994,7 +995,7 @@ def plot_image(
 
         fig, subplots = plt.subplots(2, 2, num=figure_index, sharex=True, sharey=True,
                                      axisbg=background_color)
-        #fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
+        fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13, hspace=0.03, wspace=0.03)
 
         fig.gca().set_aspect('equal')
 
@@ -1036,13 +1037,13 @@ def plot_image(
             if hal is not None:
                 for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
                     circle = plt.Circle(
-                        hal_position[plot_dimen_is], hal_radius, color='w', linewidth=1, fill=False)
+                        hal_position[plot_dimen_is], hal_radius, linewidth=1, fill=False)
                     subplot.add_artist(circle)
 
-            subplot.axis('equal')
+                circle = plt.Circle((0, 0), 10, color='b', fill=False)
+                subplot.add_artist(circle)
 
-            circle = plt.Circle((0, 0), 10, color='w', fill=False)
-            subplot.add_artist(circle)
+            subplot.axis('equal')
 
     #plt.tight_layout(pad=0.02)
 
@@ -1075,7 +1076,7 @@ def plot_property_distribution(
     prop_bin_width : float : width of property bin (use this or prop_bin_number)
     prop_bin_number : int : number of property bins within limits (use this or prop_bin_width)
     prop_scaling : string : lin or log
-    prop_statistic : string : statistic to plot: probability,
+    prop_statistic : string : statistic to plot: 'probability', 'histogram'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
     center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
@@ -1141,10 +1142,10 @@ def plot_property_distribution(
     #fig, subplot = plt.subplots(1, 1, num=figure_index, sharex=True)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(ut.plot.parse_axis_limits(prop_limits, prop_values, prop_scaling))
+    subplot.set_xlim(ut.plot.get_axis_limits(prop_values, prop_scaling, prop_limits))
 
-    y_vals = [Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))]
-    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, y_vals, axis_y_scaling))
+    y_values = [Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))]
+    subplot.set_ylim(ut.plot.get_axis_limits(y_values, axis_y_scaling, axis_y_limits))
 
     subplot.set_xlabel(ut.plot.get_label(prop_name, species=spec_name, get_units=True))
     subplot.set_ylabel(
@@ -1155,7 +1156,8 @@ def plot_property_distribution(
     plot_func = ut.plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i, part in enumerate(parts):
         plot_func(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
-                  color=colors[part_i], alpha=0.5, linewidth=2, label=part.info['simulation.name'])
+                  color=colors[part_i], alpha=0.7, linewidth=2.5,
+                  label=part.info['simulation.name'])
 
     # redshift legend
     #legend_z = None
@@ -1174,7 +1176,7 @@ def plot_property_distribution(
 
     #plt.tight_layout(pad=0.02)
 
-    plot_name = spec_name + '.' + prop_name + '_distr_z.{.1f}'.format(part.info['redshift'])
+    plot_name = spec_name + '.' + prop_name + '_distr_z.{:.1f}'.format(part.info['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -1264,18 +1266,16 @@ def plot_property_v_property(
     subplot = fig.add_subplot(111)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    axis_x_limits = ut.plot.parse_axis_limits(log10(x_prop_limits), x_prop_values)
-    axis_y_limits = ut.plot.parse_axis_limits(log10(y_prop_limits), y_prop_values)
+    axis_x_limits = ut.plot.get_axis_limits(x_prop_values, 'lin', x_prop_limits)
+    axis_y_limits = ut.plot.get_axis_limits(y_prop_values, 'lin', y_prop_limits)
 
-    subplot.set_xlabel(
-        ut.plot.get_label(
-            x_prop_name, species=spec_name, get_units=True, get_symbol=True,
-            get_log=x_prop_scaling))
+    axis_x_label = ut.plot.get_label(
+        x_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=x_prop_scaling)
+    subplot.set_xlabel(axis_x_label, fontsize=32)
 
-    subplot.set_ylabel(
-        ut.plot.get_label(
-            y_prop_name, species=spec_name, get_units=True, get_symbol=True,
-            get_log=y_prop_scaling))
+    axis_y_label = ut.plot.get_label(
+        y_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=y_prop_scaling)
+    subplot.set_ylabel(axis_y_label, fontsize=60)
 
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
@@ -1403,11 +1403,12 @@ def plot_property_v_distance(
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(distance_limits)
-    y_vals = [pro[species][prop_statistic] for pro in pros]
-    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, y_vals, prop_scaling))
+    y_values = [pro[species][prop_statistic] for pro in pros]
+    axis_y_limits = ut.plot.get_axis_limits(y_values, prop_scaling, axis_y_limits)
+    subplot.set_ylim(axis_y_limits)
 
     #subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
-    subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=28)
+    subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
 
     if prop_statistic == 'vel.circ':
         label_prop_name = 'vel.circ'
@@ -1445,7 +1446,7 @@ def plot_property_v_distance(
                   label=parts[part_i].info['simulation.name'])
 
     if distance_reference is not None:
-        plot_func([distance_reference, distance_reference], [1e-3, 1e20],
+        plot_func([distance_reference, distance_reference], axis_y_limits,
                   color='black', linestyle=':', alpha=0.6)
 
     # redshift legend
@@ -1531,8 +1532,8 @@ def get_time_bin_dictionary(
 
 
 def get_star_form_history(
-    part, time_kind='time', time_limits=[0, 3], time_width=0.01, time_scaling='lin',
-    part_indices=None):
+    part, time_kind='redshift', time_limits=[0, 8], time_width=0.1, time_scaling='lin',
+    distance_limits=None, center_position=None, other_prop_limits=None, part_indices=None):
     '''
     Get array of times and star-formation rate at each time.
 
@@ -1543,7 +1544,10 @@ def get_star_form_history(
     time_limits : list : min and max limits of time_kind to impose
     time_width : float : width of time_kind bin (in units set by time_scaling)
     time_scaling : string : scaling of time_kind: lin, log
-    part_indices : array : indices of star particles
+    distance_limits : list : min and max limits of galaxy distance to select star particles
+    center_position : list : position of galaxy centers {kpc comoving}
+    other_prop_limits : dict : dictionary with properties as keys and limits as values
+    part_indices : array : indices of star particles to select
 
     Returns
     -------
@@ -1554,64 +1558,69 @@ def get_star_form_history(
     species = 'star'
 
     if part_indices is None:
-        part_indices = ut.array.get_null_array(part[species]['mass'].size)
+        part_indices = ut.array.arange_length(part[species]['mass'])
 
+    if other_prop_limits:
+        part_indices = ut.catalog.get_indices_catalog(
+            part['star'], other_prop_limits, part_indices)
+
+    center_position = ut.particle.parse_property(part, 'position', center_position)
+
+    if (center_position is not None and len(center_position) and
+            distance_limits is not None and len(distance_limits)):
+        distances = ut.coordinate.get_distances(
+            'scalar', part['star']['position'][part_indices], center_position,
+            part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
+        part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
+
+    # get star particle formation times, sorted from earliest
     part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
     form_times = part[species].prop('form.time', part_indices_sort)
     masses = part[species]['mass'][part_indices_sort]
     masses_cum = np.cumsum(masses)
 
-    time_limits = np.array(time_limits)
-
-    if 'lookback' in time_kind:
-        # convert from look-back time wrt z = 0 to age for the computation
-        time_limits = part.Cosmology.get_time_from_redshift(0) - time_limits
-
-    if 'log' in time_scaling:
-        if time_kind == 'redshift':
-            time_limits += 1  # convert to z + 1 so log is well-defined
-        time_bins = 10 ** np.arange(
-            log10(time_limits.min()), log10(time_limits.max()) + time_width, time_width)
-        if time_kind == 'redshift':
-            time_bins -= 1
-    else:
-        time_bins = np.arange(time_limits.min(), time_limits.max() + time_width, time_width)
-
-    if time_kind == 'redshift':
-        # input redshift limits and bins, need to convert to time
-        redshift_bins = np.array(time_bins)
-        time_bins = np.sort(part.Cosmology.get_time_from_redshift(time_bins))
+    # get time bins, ensure are ordered from earliest
+    time_dict = get_time_bin_dictionary(
+        time_kind, time_limits, time_width, time_scaling, part.Cosmology)
+    time_bins = np.sort(time_dict['time'])
 
     mass_cum_in_bins = np.interp(time_bins, form_times, masses_cum)
-    # convert to {M_sun / yr}
-    dm_dt_in_bins = np.diff(mass_cum_in_bins) / np.diff(time_bins) / ut.const.giga
-    dm_dt_in_bins /= 0.7  # crudely account for stellar mass loss, assume instantaneous recycling
-
-    if time_kind == 'redshift':
-        time_bins = redshift_bins
+    mass_difs = np.diff(mass_cum_in_bins)
+    time_difs = np.diff(time_bins)
+    dm_dt_in_bins = mass_difs / time_difs / ut.const.giga  # convert to {M_sun / yr}
 
     # convert to midpoints of bins
-    time_bins = time_bins[: time_bins.size - 1] + 0.5 * np.diff(time_bins)
-    mass_cum_in_bins = (mass_cum_in_bins[: mass_cum_in_bins.size - 1] +
-                        0.5 * np.diff(mass_cum_in_bins))
+    mass_cum_in_bins = mass_cum_in_bins[: mass_cum_in_bins.size - 1] + 0.5 * mass_difs
 
-    if 'lookback' in time_kind:
-        # convert back to lookback time wrt z = 0
-        time_bins = part.Cosmology.get_time_from_redshift(0) - time_bins
-    elif time_kind == 'redshift':
-        # reverse sort for redshift (mass already is properly sorted)
-        time_bins = np.sort(time_bins)[::-1]
-        if 'log' in time_scaling:
-            time_bins += 1
+    # account for stellar mass loss, crudely assuming instantaneous recycling
+    dm_dt_in_bins /= 0.7
+    #mass_cum_in_bins += mass_difs * (1 / 0.7 - 1)
 
-    return time_bins, dm_dt_in_bins, mass_cum_in_bins
+    for k in time_dict:
+        time_dict[k] = time_dict[k][: time_dict[k].size - 1] + 0.5 * np.diff(time_dict[k])
+
+    # ensure ordering jives with ordering of input limits
+    if time_dict['time'][0] > time_dict['time'][1]:
+        dm_dt_in_bins = dm_dt_in_bins[::-1]
+        mass_cum_in_bins = mass_cum_in_bins[::-1]
+
+    sfh = {}
+    for k in time_dict:
+        sfh[k] = time_dict[k]
+    sfh['form.rate'] = dm_dt_in_bins
+    sfh['form.rate.specific'] = dm_dt_in_bins / mass_cum_in_bins
+    sfh['mass'] = mass_cum_in_bins
+    sfh['mass.normalized'] = mass_cum_in_bins / mass_cum_in_bins.max()
+    sfh['particle.number'] = form_times.size
+
+    return sfh
 
 
 def plot_star_form_history(
     parts=None, sfh_kind='rate',
-    time_kind='time.lookback', time_limits=[0, 1], time_width=0.01, time_scaling='lin',
+    time_kind='time.lookback', time_limits=[13.8, 0], time_width=0.2, time_scaling='lin',
     distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indicess=None,
-    axis_y_scaling='log', axis_y_limits=[],
+    axis_y_limits=[], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot star-formation rate history v time_kind.
@@ -1629,8 +1638,8 @@ def plot_star_form_history(
     center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array : part_indices of particles from which to select
-    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     axis_y_limits : list : min and max limits for y-axis
+    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -1647,34 +1656,21 @@ def plot_star_form_history(
     if time_limits[1] is None:
         time_limits[1] = parts[0].snapshot[time_kind]
 
-    sfh = {'time': [], 'form.rate': [], 'form.rate.specific': [], 'mass': [], 'mass.normalized': []}
+    sfh = {}
 
     for part_i, part in enumerate(parts):
-        if part_indicess[part_i] is not None and len(part_indicess[part_i]):
-            part_indices = part_indicess[part_i]
-        else:
-            part_indices = ut.array.arange_length(part['star'].prop('form.time'))
+        sfh_p = get_star_form_history(
+            part, time_kind, time_limits, time_width, time_scaling,
+            distance_limits, center_positions[part_i], other_prop_limits, part_indicess[part_i])
 
-        if other_prop_limits:
-            part_indices = ut.catalog.get_indices_catalog(
-                part['star'], other_prop_limits, part_indices)
+        if part_i == 0:
+            for k in sfh_p:
+                sfh[k] = []  # initialize
 
-        if (center_positions[part_i] is not None and len(center_positions[part_i]) and
-                distance_limits is not None and len(distance_limits)):
-            distances = ut.coordinate.get_distances(
-                'scalar', part['star']['position'][part_indices], center_positions[part_i],
-                part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
-            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
+        for k in sfh_p:
+            sfh[k].append(sfh_p[k])
 
-        times, sfrs, masses = get_star_form_history(
-            part, time_kind, time_limits, time_width, time_scaling, part_indices)
-
-        sfh['time'].append(times)
-        sfh['form.rate'].append(sfrs)
-        sfh['form.rate.specific'].append(sfrs / masses)
-        sfh['mass'].append(masses)
-        sfh['mass.normalized'].append(masses / masses.max())
-        Say.say('star.mass max = {:.3e}'.format(masses.max()))
+        Say.say('star.mass max = {:.3e}'.format(sfh_p['mass'].max()))
 
     if time_kind == 'redshift' and 'log' in time_scaling:
         time_limits += 1  # convert to z + 1 so log is well-defined
@@ -1691,7 +1687,7 @@ def plot_star_form_history(
         subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=part.Cosmology,
         fontsize=26)
 
-    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, sfh[sfh_kind], axis_y_scaling))
+    subplot.set_ylim(ut.plot.get_axis_limits(sfh[sfh_kind], axis_y_scaling, axis_y_limits))
 
     if 'mass' in sfh_kind:
         axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
@@ -1704,7 +1700,7 @@ def plot_star_form_history(
     plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
 
     for part_i, part in enumerate(parts):
-        plot_func(sfh['time'][part_i], sfh[sfh_kind][part_i],
+        plot_func(sfh[time_kind][part_i], sfh[sfh_kind][part_i],
                   linewidth=3.0, color=colors[part_i], alpha=0.9,
                   label=part.info['simulation.name'])
 
@@ -1726,17 +1722,17 @@ def plot_star_form_history(
 
     #plt.tight_layout(pad=0.02)
 
-    sfh_name = 'star' + '.' + sfh_kind
+    sfh_name = 'star' + '.' + sfh_kind + '.history'
     plot_name = '{}_v_{}_z.{:.1f}'.format(sfh_name, time_kind, part.info['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
 def plot_star_form_history_galaxies(
-    part, hal, hal_indices=None, mass_kind='star.mass.part', mass_limits=[1e5, 1e9],
-    sfh_kind='mass.normalized',
+    part,
+    hal, mass_kind='star.mass.part', mass_limits=[1e5, 1e9], other_prop_limits={}, hal_indices=None,
+    sfh_kind='mass.normalized', sfh_limits=[], sfh_scaling='lin',
     time_kind='time.lookback', time_limits=[13.7, 0], time_width=0.2, time_scaling='lin',
-    other_prop_limits={},
-    axis_y_scaling='lin', axis_y_limits=[], write_plot=False, plot_directory='.', figure_index=1):
+    write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot star-formation rate history v time_kind.
     Note: assumes instantaneous recycling of 30% of mass, should fix this for mass lass v time.
@@ -1745,59 +1741,60 @@ def plot_star_form_history_galaxies(
     ----------
     part : dict : catalog of particles
     hal : dict : catalog of halos at snapshot
-    hal_indices : index or array : index[s] of halo[s] whose particles to plot
     mass_kind : string : mass kind by which to select halos
     mass_limits : list : min and max limits to impose on mass_kind
+    other_prop_limits : dict : dictionary with properties as keys and limits as values
+    hal_indices : index or array : index[s] of halo[s] whose particles to plot
     sfh_kind : string : star form kind to plot: 'rate', 'rate.specific', 'mass', 'mass.normalized'
+    sfh_limits : list : min and max limits for y-axis
+    sfh_scaling : string : scailng of y-axis: 'log', 'lin'
     time_kind : string : time kind to plot: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to plot
     time_width : float : width of time_kind bin
     time_scaling : string : scaling of time_kind: 'log', 'lin'
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
-    axis_y_scaling : string : scailng of y-axis: 'log', 'lin'
-    axis_y_limits : list : min and max limits for y-axis
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
-    Say = ut.io.SayClass(plot_star_form_history)
+    Say = ut.io.SayClass(plot_star_form_history_galaxies)
 
     time_limits = np.array(time_limits)
+    if time_limits[0] is None:
+        time_limits[0] = part.snapshot[time_kind]
     if time_limits[1] is None:
         time_limits[1] = part.snapshot[time_kind]
 
-    sfh = {'time': [], 'form.rate': [], 'form.rate.specific': [], 'mass': [], 'mass.normalized': []}
-
-    if hal_indices is not None and len(hal_indices):
-        hal_indices = hal_indices
-    else:
+    if hal_indices is None or not len(hal_indices):
         hal_indices = ut.array.get_indices(hal.prop('star.number'), [2, Inf])
 
     if mass_limits is not None and len(mass_limits):
         hal_indices = ut.array.get_indices(hal.prop(mass_kind), mass_limits, hal_indices)
 
+    if other_prop_limits:
+        hal_indices = ut.catalog.get_indices_catalog(
+            hal, other_prop_limits, hal_indices)
+
     hal_indices = hal_indices[np.argsort(hal.prop(mass_kind, hal_indices))]
 
     print('halo number = {}'.format(hal_indices.size))
 
-    for hal_i in hal_indices:
+    sfh = {}
+
+    for hal_ii, hal_i in enumerate(hal_indices):
         part_indices = hal.prop('star.indices', hal_i)
+        sfh_h = get_star_form_history(
+            part, time_kind, time_limits, time_width, time_scaling, part_indices=part_indices)
 
-        if other_prop_limits:
-            part_indices = ut.catalog.get_indices_catalog(
-                part['star'], other_prop_limits, part_indices)
+        if hal_ii == 0:
+            for k in sfh_h:
+                sfh[k] = []  # initialize
 
-        times, sfrs, masses = get_star_form_history(
-            part, time_kind, time_limits, time_width, time_scaling, part_indices)
+        for k in sfh_h:
+            sfh[k].append(sfh_h[k])
 
-        sfh['time'].append(times)
-        sfh['form.rate'].append(sfrs)
-        sfh['form.rate.specific'].append(sfrs / masses)
-        sfh['mass'].append(masses)
-        sfh['mass.normalized'].append(masses / masses.max())
-        Say.say('id = {}, star.mass = {:.3e}, number = {}'.format(
-                hal_i, masses.max(), part_indices.size))
-        print(hal.prop('position', hal_i))
+        Say.say('id = {:8d}, star.mass = {:.3e}, particle.number = {}'.format(
+                hal_i, sfh_h['mass'].max(), part_indices.size))
+        #print(hal.prop('position', hal_i))
 
     for k in sfh:
         sfh[k] = np.array(sfh[k])
@@ -1819,7 +1816,7 @@ def plot_star_form_history_galaxies(
         subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=part.Cosmology,
         fontsize=28)
 
-    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, sfh[sfh_kind], axis_y_scaling))
+    subplot.set_ylim(ut.plot.get_axis_limits(sfh[sfh_kind], sfh_scaling, sfh_limits))
 
     if 'mass' in sfh_kind:
         if 'normalized' in sfh_kind:
@@ -1832,12 +1829,12 @@ def plot_star_form_history_galaxies(
 
     colors = ut.plot.get_colors(len(hal_indices))
 
-    plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
+    plot_func = ut.plot.get_plot_function(subplot, time_scaling, sfh_scaling)
 
     for hal_ii, hal_i in enumerate(hal_indices):
         label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
             ut.io.get_string_exponential(sfh['mass'][hal_ii][-1], '{:.0e}'))
-        plot_func(sfh['time'][hal_ii], sfh[sfh_kind][hal_ii],
+        plot_func(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                   linewidth=3.0, color=colors[hal_ii], alpha=0.5, label=label)
 
     #plot_func(sfh['time'][0], sfh['mass.normalized.median'],
@@ -1864,139 +1861,6 @@ def plot_star_form_history_galaxies(
     sf_name = 'star' + '.' + sfh_kind
     plot_name = '{}_v_{}_z.{:.1f}'.format(sf_name, time_kind, part.info['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
-
-
-#===================================================================================================
-# compare simulations
-#===================================================================================================
-class CompareSimulationsClass(ut.io.SayClass):
-    '''
-    .
-    '''
-    def __init__(self):
-        '''
-        .
-        '''
-        self.simulation_names = [
-            ['fb-angle-max/m12_ref13_fb-angle-max', 'r13 angle-max n=100'],
-
-            #['m12_ref12', 'r12'],
-            #['m12_ref12_res-adapt', 'r12 res-adapt'],
-            #['m12_ref12_sfn100', 'r12 n=100'],
-
-            ['m12_ref13_sfn100', 'r13 iso n=100'],
-            ['m12_ref13', 'r13 iso n=1000'],
-            ['m12_ref13_pleiades', 'r13 non-iso n=1000'],
-
-            #['m12_ref13_res-adapt', 'r13 res-adapt'],
-            #['m12_ref13_res-lo', 'r13 res-low n=100'],
-
-            #['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
-            #['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
-            #['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
-            #['m12_ref13_rmax10hsml', 'r13 r.max=10h'],
-        ]
-
-    def read_simulations(
-        self, simulation_names=None, redshift=0, species='all',
-        property_names=['mass', 'position', 'form.time'], force_float32=True):
-        '''
-        .
-        '''
-        from . import gizmo_io
-
-        if simulation_names is None:
-            simulation_names = self.simulation_names
-
-        if not isinstance(simulation_names, collections.OrderedDict):
-            simulation_names = collections.OrderedDict(simulation_names)
-
-        parts = []
-        directories = []
-        for directory in simulation_names:
-            try:
-                part = gizmo_io.Gizmo.read_snapshot(
-                    species, 'redshift', redshift, directory, property_names=property_names,
-                    simulation_name=simulation_names[directory], force_float32=force_float32)
-
-                if 'velocity' in property_names:
-                    gizmo_io.Gizmo.assign_orbit(part, 'gas')
-
-                parts.append(part)
-                directories.append(directory)
-            except:
-                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
-                         redshift, directory))
-
-        if not len(parts):
-            self.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
-            return
-
-        if 'mass' in property_names and 'star' in part:
-            for part, directory in zip(parts, directories):
-                print('{} star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
-
-        return parts
-
-    def plot_simulations(
-        self, parts=None, simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
-        '''
-        .
-        '''
-        if np.isscalar(redshifts):
-            redshifts = [redshifts]
-
-        for redshift in redshifts:
-            if parts is None:
-                parts = self.read_simulations(
-                    simulation_names, redshift, species, property_names, force_float32)
-
-            plot_property_v_distance(
-                parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
-                axis_y_limits=[0, None], write_plot=True)
-
-            plot_property_v_distance(
-                parts, 'total', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-                axis_y_limits=[None, None], write_plot=True)
-
-            plot_property_v_distance(
-                parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-                axis_y_limits=[None, None], write_plot=True)
-
-            plot_property_v_distance(
-                parts, 'dark', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
-                axis_y_limits=[None, None], write_plot=True)
-
-            if 'gas' in parts[0]:
-                plot_property_v_distance(
-                    parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
-                    axis_y_limits=[0, 2], write_plot=True)
-
-                plot_property_v_distance(
-                    parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-                    axis_y_limits=[None, None], write_plot=True)
-
-            if 'star' in parts[0]:
-                plot_property_v_distance(
-                    parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
-                    axis_y_limits=[None, None], write_plot=True)
-
-                plot_property_v_distance(
-                    parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
-                    axis_y_limits=[None, None], write_plot=True)
-
-            if 'velocity' in property_names:
-                plot_property_v_distance(
-                    parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
-                    axis_y_limits=[None, None], write_plot=True)
-
-            if 'form.time' in property_names and redshift <= 4:
-                plot_star_form_history(
-                    parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
-                    write_plot=True)
-
-CompareSimulations = CompareSimulationsClass()
 
 
 #===================================================================================================
@@ -2081,7 +1945,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 def plot_galaxy_property_v_time(
     gals=None, sfhs=None, Cosmology=None,
     prop_name='star.mass',
-    time_kind='time.lookback', time_limits=[0, 1], time_scaling='lin', snapshot_subsample_factor=1,
+    time_kind='redshift', time_limits=[0, 8], time_scaling='lin', snapshot_subsample_factor=1,
     axis_y_scaling='log', axis_y_limits=[],
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -2097,6 +1961,7 @@ def plot_galaxy_property_v_time(
     time_kind : string : time kind to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to get
     time_scaling : string : scaling of time_kind: 'log', 'lin'
+    snapshot_subsample_factor : int : factor by which to sub-sample snapshots from gals
     axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     axis_y_limits : list : min and max limits for y-axis
     write_plot : boolean : whether to write figure to file
@@ -2108,8 +1973,8 @@ def plot_galaxy_property_v_time(
     if gals is not None and isinstance(gals, dict):
         gals = [gals]
 
-    if sfhs is not None and isinstance(gals, dict):
-        gals = [gals]
+    if sfhs is not None and isinstance(sfhs, dict):
+        sfhs = [sfhs]
 
     time_limits = np.array(time_limits)
     if time_limits[0] is None:
@@ -2132,7 +1997,7 @@ def plot_galaxy_property_v_time(
         subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=Cosmology,
         fontsize=26)
 
-    subplot.set_ylim(ut.plot.parse_axis_limits(axis_y_limits, gals[0][prop_name], axis_y_scaling))
+    subplot.set_ylim(ut.plot.get_axis_limits(gals[0][prop_name], axis_y_scaling, axis_y_limits))
 
     if 'mass' in prop_name:
         axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
@@ -2143,20 +2008,30 @@ def plot_galaxy_property_v_time(
     plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
 
     if gals is not None:
-        for gal_i, gal in enumerate(gals):
-            plot_func(gal[time_kind][::snapshot_subsample_factor],
-                      gal[prop_name][::snapshot_subsample_factor],
-                      linewidth=3.0, color=colors[gal_i], alpha=0.9)
+        for _gal_i, gal in enumerate(gals):
+            plot_func(
+                gal[time_kind][::snapshot_subsample_factor],
+                gal[prop_name][::snapshot_subsample_factor],
+                linewidth=3.0, alpha=0.9,
+                #color=colors[gal_i],
+                color=ut.plot.get_color('blue.mid'),
+                label='main progenitor',
+            )
 
     if sfhs is not None:
-        for sfh_i, sfh in enumerate(sfhs):
-            plot_func(sfh['time'], sfh['star.mass'], '--',
-                      linewidth=3.0, color=colors[sfh_i], alpha=0.9)
+        for _sfh_i, sfh in enumerate(sfhs):
+            plot_func(
+                sfh[time_kind], sfh['mass'],
+                '--', linewidth=3.0, alpha=0.9,
+                #color=colors[sfh_i],
+                color=ut.plot.get_color('green.mid'),
+                label='SFH computed at $z=0$',
+            )
 
     # property legend
     #if len(gals) > 1 and gals[0].info['simulation.name']:
-    #    legend_prop = subplot.legend(loc='best', prop=FontProperties(size=18))
-    #    legend_prop.get_frame().set_alpha(0.5)
+    legend_prop = subplot.legend(loc='best', prop=FontProperties(size=18))
+    legend_prop.get_frame().set_alpha(0.5)
 
     #plt.tight_layout(pad=0.02)
 
@@ -2339,3 +2214,136 @@ def print_galaxy_mass_v_redshift(gal):
         print('{:.3e} {:.3e} {:.3e} {:.3e}'.format(
               gal['radius.90'][ti], gal['star.mass.90'][ti], gal['gas.mass.90'][ti],
               gal['dark.mass.90'][ti]), end='\n')
+
+
+#===================================================================================================
+# compare simulations
+#===================================================================================================
+class CompareSimulationsClass(ut.io.SayClass):
+    '''
+    .
+    '''
+    def __init__(self):
+        '''
+        .
+        '''
+        self.simulation_names = [
+            ['fb-angle-max/m12_ref13_fb-angle-max', 'r13 angle-max n=100'],
+
+            #['m12_ref12', 'r12'],
+            #['m12_ref12_res-adapt', 'r12 res-adapt'],
+            #['m12_ref12_sfn100', 'r12 n=100'],
+
+            ['m12_ref13_sfn100', 'r13 iso n=100'],
+            ['m12_ref13', 'r13 iso n=1000'],
+            ['m12_ref13_pleiades', 'r13 non-iso n=1000'],
+
+            #['m12_ref13_res-adapt', 'r13 res-adapt'],
+            #['m12_ref13_res-lo', 'r13 res-low n=100'],
+
+            #['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
+            #['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
+            #['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
+            #['m12_ref13_rmax10hsml', 'r13 r.max=10h'],
+        ]
+
+    def read_simulations(
+        self, simulation_names=None, redshift=0, species='all',
+        property_names=['mass', 'position', 'form.time'], force_float32=True):
+        '''
+        .
+        '''
+        from . import gizmo_io
+
+        if simulation_names is None:
+            simulation_names = self.simulation_names
+
+        if not isinstance(simulation_names, collections.OrderedDict):
+            simulation_names = collections.OrderedDict(simulation_names)
+
+        parts = []
+        directories = []
+        for directory in simulation_names:
+            try:
+                part = gizmo_io.Gizmo.read_snapshot(
+                    species, 'redshift', redshift, directory, property_names=property_names,
+                    simulation_name=simulation_names[directory], force_float32=force_float32)
+
+                if 'velocity' in property_names:
+                    gizmo_io.Gizmo.assign_orbit(part, 'gas')
+
+                parts.append(part)
+                directories.append(directory)
+            except:
+                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
+                         redshift, directory))
+
+        if not len(parts):
+            self.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
+            return
+
+        if 'mass' in property_names and 'star' in part:
+            for part, directory in zip(parts, directories):
+                print('{} star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
+
+        return parts
+
+    def plot_simulations(
+        self, parts=None, simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+        '''
+        .
+        '''
+        if np.isscalar(redshifts):
+            redshifts = [redshifts]
+
+        for redshift in redshifts:
+            if parts is None:
+                parts = self.read_simulations(
+                    simulation_names, redshift, species, property_names, force_float32)
+
+            plot_property_v_distance(
+                parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
+                axis_y_limits=[0, None], write_plot=True)
+
+            plot_property_v_distance(
+                parts, 'total', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                axis_y_limits=[None, None], write_plot=True)
+
+            plot_property_v_distance(
+                parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                axis_y_limits=[None, None], write_plot=True)
+
+            plot_property_v_distance(
+                parts, 'dark', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
+                axis_y_limits=[None, None], write_plot=True)
+
+            if 'gas' in parts[0]:
+                plot_property_v_distance(
+                    parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
+                    axis_y_limits=[0, 2], write_plot=True)
+
+                plot_property_v_distance(
+                    parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                    axis_y_limits=[None, None], write_plot=True)
+
+            if 'star' in parts[0]:
+                plot_property_v_distance(
+                    parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
+                    axis_y_limits=[None, None], write_plot=True)
+
+                plot_property_v_distance(
+                    parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
+                    axis_y_limits=[None, None], write_plot=True)
+
+            if 'velocity' in property_names:
+                plot_property_v_distance(
+                    parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [1, 300], 0.25,
+                    axis_y_limits=[None, None], write_plot=True)
+
+            if 'form.time' in property_names and redshift <= 4:
+                plot_star_form_history(
+                    parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
+                    write_plot=True)
+
+CompareSimulations = CompareSimulationsClass()

@@ -186,7 +186,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         self.say('separating particle species by mass')
 
         for ti in tis:
-            self.say('  ti = %d' % (ti))
+            self.say('  ti = {}'.format(ti))
             spec_masses = np.unique(self.part[ti]['mass'])
 
             props = tuple(self.part[ti].keys())
@@ -197,13 +197,13 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
                 if spec_i == 0:
                     spec_name = 'dark'
                 else:
-                    spec_name = 'dark.%d' % (spec_i + 1)
+                    spec_name = 'dark.{}'.format(spec_i + 1)
 
                 self.part[ti][spec_name] = {}
                 for prop in props:
                     if prop != 'id-to-index':
                         self.part[ti][spec_name][prop] = self.part[ti][prop][spec_indices]
-                self.say('  %s: %d particles' % (spec_name, spec_indices.size))
+                self.say('  {}: {} particles'.format(spec_name, spec_indices.size))
 
             for prop in props:
                 del(self.part[ti][prop])
@@ -309,7 +309,7 @@ def print_contamination_around_halo(
         distance_scaling, [0, distance_max], width=distance_bin_width)
 
     pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial)
-    Say.say('read %d particles around halo' % pids.size)
+    Say.say('read {} particles around halo'.format(pids.size))
 
     pis = Agora.part[ti]['id-to-index'][pids]
     distances = ut.coordinate.get_distances(
@@ -317,23 +317,24 @@ def print_contamination_around_halo(
         Agora['box.length'])
     if scale_virial:
         distances /= Agora.hal['radius'][halo_index]
-        Say.say('halo radius = %.3f kpc comoving' % Agora.hal['radius'][halo_index])
+        Say.say('halo radius = {:.3f} kpc comoving'.format(Agora.hal['radius'][halo_index]))
 
     pis_contam = pis[Agora.part[ti]['mass'][pis] != Agora.part[ti].info['mass.unique'].min()]
     if pis_contam.size == 0:
-        Say.say('yay! no contaminating particles out to distance_max = %.3f' % distance_max)
+        Say.say('yay! no contaminating particles out to distance_max = {:.3f}'.format(distance_max))
         return
 
     for dist_i in range(DistanceBin.number):
         distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
         pis_d = pis[ut.array.get_indices(distances, distance_bin_limits)]
         pis_contam_d = np.intersect1d(pis_d, pis_contam)
-        num_frac = Fraction.get_fraction(pis_contam_d.size, pis_d.size)
+        number_frac = Fraction.get_fraction(pis_contam_d.size, pis_d.size)
         mass_frac = Fraction.get_fraction(
             np.sum(Agora.part[ti]['mass'][pis_contam_d]), np.sum(Agora.part[ti]['mass'][pis_d]))
-        Say.say('distance = [%.3f, %.3f]: fraction by number = %.5f, by mass = %.5f' %
-                (distance_bin_limits[0], distance_bin_limits[1], num_frac, mass_frac))
-        if num_frac >= 1.0:
+        Say.say('distance = [{:.3f}, {:.3f}]: fraction by mass = {:.5f}'.format(
+                distance_bin_limits[0], distance_bin_limits[1], mass_frac))
+
+        if number_frac >= 1:
             break
 
 
@@ -363,7 +364,7 @@ def print_contamination_in_box(
         center_position = np.zeros(part['position'].shape[1])
         for dimension_i in range(part['position'].shape[1]):
             center_position[dimension_i] = 0.5 * part.info['box.length']
-    print('center position = %s' % center_position)
+    print('center position = {}'.format(center_position))
 
     DistanceBin = ut.binning.DistanceBinClass(scaling, distance_limits, number=distance_bin_number)
 
@@ -394,9 +395,10 @@ def print_contamination_in_box(
 
         pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
         frac = Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
-        Say.say('distance = [%.3f, %.3f], fraction = %.5f' %
-                (distance_bin_limits[0], distance_bin_limits[1], frac))
-        if frac >= 1.0:
+        Say.say('distance = [{:.3f}, {:.3f}], fraction = {:.5f}'.format(
+                distance_bin_limits[0], distance_bin_limits[1], frac))
+
+        if frac >= 1:
             break
 
 
@@ -432,12 +434,13 @@ def print_ic_zoom_region_for_halo(
     for dimen_i in range(positions.shape[1]):
         limits[dimen_i] = np.array(ut.array.get_limits(positions[:, dimen_i]))
         widths[dimen_i] = limits[[dimen_i]].max() - limits[[dimen_i]].min()
-        Agora.say('dimension-%d: %s (%.3f) kpc, %s (%.8f) box length' %
-                  (dimen_i, ut.array.get_limits(limits[[dimen_i]], digit_number=3), widths[dimen_i],
-                   ut.array.get_limits(limits[[dimen_i]] / Agora['box.length'], digit_number=8),
-                   widths[dimen_i] / Agora['box.length']))
+        Agora.say('dimension-{}: {} ({:.3f}) kpc, {} ({:.8f}) box length'.format(
+                  dimen_i, ut.array.get_limits(limits[[dimen_i]], digit_number=3), widths[dimen_i],
+                  ut.array.get_limits(limits[[dimen_i]] / Agora['box.length'], digit_number=8),
+                  widths[dimen_i] / Agora['box.length']))
     limits /= Agora['box.length']
     widths /= Agora['box.length']
     Agora.say('for MUSIC config file:')
-    Agora.say('  ref_offset = %.8f, %.8f, %.8f' % (limits[0, 0], limits[1, 0], limits[2, 0]))
-    Agora.say('  ref_extent = %.8f, %.8f, %.8f' % (widths[0], widths[1], widths[2]))
+    Agora.say('  ref_offset = {:.8f}, {:.8f}, {:.8f}'.format(
+              limits[0, 0], limits[1, 0], limits[2, 0]))
+    Agora.say('  ref_extent = {:.8f}, {:.8f}, {:.8f}'.format(widths[0], widths[1], widths[2]))
