@@ -2228,23 +2228,25 @@ class CompareSimulationsClass(ut.io.SayClass):
         .
         '''
         self.simulation_names = [
-            ['fb-angle-max/m12_ref13_fb-angle-max', 'r13 angle-max n=100'],
+            ['fb-aniso-angle-max/m12_ref13', 'r13 aniso-angle-max n=100'],
 
-            #['m12_ref12', 'r12'],
-            #['m12_ref12_res-adapt', 'r12 res-adapt'],
-            #['m12_ref12_sfn100', 'r12 n=100'],
+            ['fb-aniso/m12_ref12', 'r12 aniso'],
+            ['fb-aniso/m12_ref12_fb-volume', 'r12 aniso-volume'],
+            ['fb-aniso/m12_ref13', 'r13 aniso'],
 
-            ['m12_ref13_sfn100', 'r13 iso n=100'],
-            ['m12_ref13', 'r13 iso n=1000'],
-            ['m12_ref13_pleiades', 'r13 non-iso n=1000'],
+            #['fb-iso/m12_ref12', 'r12 iso'],
+            #['fb-iso/m12_ref13', 'r13 iso'],
 
-            #['m12_ref13_res-adapt', 'r13 res-adapt'],
-            #['m12_ref13_res-lo', 'r13 res-low n=100'],
+            #['fb-iso/m12_ref12_sfn100', 'r12 iso n=100'],
+            #['fb-iso/m12_ref13_sfn100', 'r13 iso n=100'],
 
-            #['m12_ref12_rmax1kpc', 'r12 r.max=1kpc'],
-            #['m12_ref13_rmax1kpc', 'r13 r.max=1kpc'],
-            #['m12_ref12_rmax10hsml', 'r12 r.max=10h'],
-            #['m12_ref13_rmax10hsml', 'r13 r.max=10h'],
+            #['fb-iso/m12_ref12_res-adapt', 'r12 iso res-adapt'],
+            #['fb-iso/m12_ref13_res-adapt', 'r13 iso res-adapt'],
+
+            #['fb-iso-radius-max/m12_ref12_rmax1kpc', 'r12 iso r.max=1kpc'],
+            #['fb-iso-radius-max/m12_ref13_rmax1kpc', 'r13 iso r.max=1kpc'],
+            #['fb-iso-radius-max/m12_ref12_rmax10h', 'r12 iso r.max=10h'],
+            #['fb-iso-radius-max/m12_ref13_rmax10h', 'r13 iso r.max=10h'],
         ]
 
     def read_simulations(

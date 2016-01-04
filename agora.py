@@ -130,7 +130,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
         for ti in tis:
             self.part[ti]
             self.part[ti]['id'] = []
-            self.part[ti]['id-to-index'] = []
+            self.part[ti]['id.to.index'] = []
             self.part[ti]['mass'] = []
             self.part[ti]['position'] = []
             self.part[ti].info = {}
@@ -201,7 +201,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 
                 self.part[ti][spec_name] = {}
                 for prop in props:
-                    if prop != 'id-to-index':
+                    if prop != 'id.to.index':
                         self.part[ti][spec_name][prop] = self.part[ti][prop][spec_indices]
                 self.say('  {}: {} particles'.format(spec_name, spec_indices.size))
 
@@ -311,7 +311,7 @@ def print_contamination_around_halo(
     pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial)
     Say.say('read {} particles around halo'.format(pids.size))
 
-    pis = Agora.part[ti]['id-to-index'][pids]
+    pis = Agora.part[ti]['id.to.index'][pids]
     distances = ut.coordinate.get_distances(
         'scalar', Agora.part[ti]['position'][pis], Agora.hal['position'][halo_index],
         Agora['box.length'])
@@ -413,7 +413,7 @@ def print_ic_zoom_region_for_halo(
     halo_index : int : index of halo
     refinement_number : int : number of refinement levels beyond current level for zoom-in region
     distance_max : float : maximum distance want to be uncontaminated {kpc comoving}
-        if None, use R_vir
+        if None, use R_halo
     geometry : string : geometry of zoom-in lagrangian regon in initial conditions:
         'cube', 'ellipsoid'
     '''
@@ -427,7 +427,7 @@ def print_ic_zoom_region_for_halo(
 
     pids = Agora.get_particle_ids_around_halo(halo_index, distance_max, scale_vir=False)
 
-    pis = Agora.part[1]['id-to-index'][pids]
+    pis = Agora.part[1]['id.to.index'][pids]
     positions = Agora.part[1]['position'][pis]
     limits = np.zeros((positions.shape[1], 2))
     widths = np.zeros(positions.shape[1])
