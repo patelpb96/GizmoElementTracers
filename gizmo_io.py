@@ -748,7 +748,7 @@ class GizmoClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directory : string : directory of snaphot file
+        directory : string : directory of snapshot file
         snapshot_number_kind : string : kind of number that am supplying: 'redshift', 'index'
         snapshot_number : int or float : corresponding number
 
@@ -766,17 +766,19 @@ class GizmoClass(ut.io.SayClass):
             except:
                 Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
         except:
-            if snapshot_number_kind == 'redshift':
+            if snapshot_number_kind in ['redshift', 'scalefactor', 'time']:
                 raise ValueError(
-                    'input redshift for snapshot, but cannot find file of snapshot times in ' +
-                    directory)
+                    'input {} for snapshot, but cannot find snapshot time file in ' +
+                    snapshot_number_kind, directory)
 
-        if snapshot_number_kind == 'redshift':
-            snapshot_redshift = snapshot_number
-            snapshot_index = Snapshot.get_index(snapshot_number)
+        if snapshot_number_kind in ['redshift', 'scalefactor', 'time']:
+            snapshot_index = Snapshot.get_index(snapshot_number, time_kind=snapshot_number_kind)
             self.say(
-                'input redshift = {:.3f} -> read snapshot index = {}, redshift = {:.3f}\n'.format(
-                    snapshot_redshift, snapshot_index, Snapshot['redshift'][snapshot_index]))
+                'input {} = {:.3f} -> read snapshot index = {}, {} = {:.3f}\n'.format(
+                    snapshot_number_kind, snapshot_number, snapshot_index,
+                    snapshot_number_kind, Snapshot[snapshot_number_kind][snapshot_index]))
+        else:
+            snapshot_index = snapshot_number
 
         return Snapshot, snapshot_index
 

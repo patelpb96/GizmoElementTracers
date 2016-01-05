@@ -570,24 +570,23 @@ def plot_mass_contamination(
 
     Say = ut.io.SayClass(plot_mass_contamination)
 
-    species_test_t = []
-    for spec_test in species_test:
-        if spec_test in part:
-            species_test_t.append(spec_test)
-        else:
-            Say.say('! no {} in particle dictionary'.format(spec_test))
-    species_test = species_test_t
+    for spec_test in list(species_test):
+        if spec_test not in part:
+            species_test.remove(spec_test)
+            #Say.say('! no {} in particle dictionary'.format(spec_test))
 
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
     distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
-        distance_limits_use *= halo_radius
+        distance_limits_use = distance_limits_use * halo_radius
+        distance_bin_width = distance_bin_width * halo_radius
 
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits_use, distance_bin_width, distance_bin_number)
 
-    pros = {species_reference: {}}
+    pros = collections.OrderedDict()
+    pros[species_reference] = {}
     for spec_name in species_test:
         pros[spec_name] = {}
 
@@ -605,18 +604,26 @@ def plot_mass_contamination(
         ratios[spec_name] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
 
     # print diagnostics
-    spec_name = 'dark.2'
-    Say.say(spec_name + ' cumulative mass/number:')
-    distances = pros[spec_name]['distance.cum']
-    print_string = '  d < {:.3f} kpc: cumulative contamination mass = {:.2e}, number = {}'
-    if scale_to_halo_radius:
-        distances /= halo_radius
-        print_string = '  d/R_halo < {:.3f}: mass = {:.2e}, number = {}'
-    for dist_i in range(pros[spec_name]['histogram.cum'].size):
-        if pros[spec_name]['histogram.cum'][dist_i] > 0:
-            Say.say(print_string.format(
-                    distances[dist_i], pros[spec_name]['histogram.cum'][dist_i],
-                    pros[spec_name]['histogram.cum'][dist_i] / part[spec_name]['mass'][0]))
+    for spec_name in ['dark.2', 'dark.3']:
+        Say.say(spec_name + ' cumulative mass / mass_fraction / number:')
+        if pros[spec_name]['histogram.cum'][-1] == 0:
+            Say.say('  none. yay.')
+            continue
+        distances = pros[spec_name]['distance.cum']
+        print_string = '  d < {:.3f} kpc: mass = {:.2e}, mass_frac = {:.3f}, number = {:.0f}'
+        if scale_to_halo_radius:
+            distances /= halo_radius
+            print_string = '  d/R_halo < {:.3f}: mass = {:.2e}, mass_frac = {:.3f}, number = {:.0f}'
+
+        for dist_i in range(pros[spec_name]['histogram.cum'].size):
+            if pros[spec_name]['histogram.cum'][dist_i] > 0:
+                Say.say(print_string.format(
+                        distances[dist_i], pros[spec_name]['histogram.cum'][dist_i],
+                        ratios[spec_name]['cum'][dist_i],
+                        pros[spec_name]['histogram.cum'][dist_i] / part[spec_name]['mass'][0]))
+
+    if write_plot is None:
+        return
 
     # plot ----------
     colors = ut.plot.get_colors(len(species_test), use_black=False)
@@ -635,12 +642,13 @@ def plot_mass_contamination(
     # subplot.set_ylim([0, 0.1])
     subplot.set_ylim([0.0001, 3])
 
-    subplot.set_ylabel('$M_{\\rm species} / M_{\\rm {{}}}$'.format(species_reference), fontsize=20)
+    subplot.set_ylabel(
+        '$M_{{\\rm species}} / M_{{\\rm {}}}$'.format(species_reference), fontsize=30)
     if scale_to_halo_radius:
         axis_x_label = '$d \, / \, R_{\\rm 200m}$'
     else:
         axis_x_label = 'distance $[\\rm kpc]$'
-    subplot.set_xlabel(axis_x_label, fontsize=20)
+    subplot.set_xlabel(axis_x_label, fontsize=30)
 
     plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
 
@@ -652,9 +660,9 @@ def plot_mass_contamination(
         plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
     for spec_i, spec_name in enumerate(species_test):
-        plot_func(xs, ratios[spec_name]['bin'], color=colors[spec_i], alpha=0.6, label=spec_name)
+        plot_func(xs, ratios[spec_name]['bin'], color=colors[spec_i], alpha=0.7, label=spec_name)
 
-    legend = subplot.legend(loc='best', prop=FontProperties(size=12))
+    legend = subplot.legend(loc='best', prop=FontProperties(size=16))
     legend.get_frame().set_alpha(0.7)
 
     # plt.tight_layout(pad=0.02)
@@ -1415,7 +1423,7 @@ def plot_property_v_distance(
     else:
         label_prop_name = prop_name
     axis_y_label = ut.plot.get_label(
-        label_prop_name, prop_statistic, species, dimension_number=dimension_number,
+        label_prop_name, prop_statistic, species, dimension_number, weight_by_mass,
         get_symbol=True, get_units=True)
     if prop_statistic == 'vel.circ':
         axis_y_label = 'circular velocity ' + axis_y_label

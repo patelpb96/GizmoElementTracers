@@ -236,7 +236,8 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 #===================================================================================================
 # analysis
 #===================================================================================================
-def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig_mass_frac_min=0.5):
+def get_halos_around_halo(
+    hal, hal_index, distance_max, scale_to_halo_radius=True, neig_mass_frac_min=0.5):
     '''
     Get distances {kpc physical} and indices of halos that are within distance_max of center of
     given halo.
@@ -244,61 +245,61 @@ def get_halos_around_halo(hal, halo_index, distance_max, scale_virial=True, neig
     Parameters
     ----------
     hal : dict : catalog of halos
-    halo_index : int : index of halo to select
+    hal_index : int : index of halo to select
     distance_max : float : maximum distance {kpc physical or R_halo}
     neig_mass_frac_min : float : minimum fraction of input mass to select neighboring halos
     '''
     Neighbor = ut.neighbor.NeighborClass()
 
-    if scale_virial:
-        distance_max *= hal['radius'][halo_index]
+    if scale_to_halo_radius:
+        distance_max *= hal['radius'][hal_index]
 
-    mass_min = neig_mass_frac_min * hal['mass'][halo_index]
-    his_m = ut.array.get_indices(hal['mass'], [mass_min, Inf])
+    mass_min = neig_mass_frac_min * hal['total.mass'][hal_index]
+    his_m = ut.array.get_indices(hal['total.mass'], [mass_min, Inf])
 
     neig_distances, neig_indices = Neighbor.get_neighbors(
-        hal['position'][[halo_index]], hal['position'][his_m], 200, [1e-6, distance_max],
+        hal['position'][[hal_index]], hal['position'][his_m], 300, [1e-6, distance_max],
         hal.info['box.length'], hal.snapshot['scalefactor'], neig_ids=his_m)
 
-    if scale_virial:
-        neig_distances /= hal['radius'][halo_index]
+    if scale_to_halo_radius:
+        neig_distances /= hal['radius'][hal_index]
 
     return neig_distances, neig_indices
 
 
-def get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial=True):
+def get_particle_ids_around_halo(Agora, hal_index, distance_max, scale_to_halo_radius=True):
     '''
     Get ids of particles that are within distance_max of center of given halo.
 
     Parameters
     ----------
     Agora : class : Agora data class
-    halo_index: int : index of halo
+    hal_index: int : index of halo
     distance_max : float : maximum distance {kpc comoving or in units of R_halo}
-    scale_virial : boolean : whether to scale distance by virial radius
+    scale_to_halo_radius : boolean : whether to scale distance by virial radius
     '''
-    if scale_virial:
-        distance_max *= Agora.hal['radius'][halo_index]
+    if scale_to_halo_radius:
+        distance_max *= Agora.hal['radius'][hal_index]
 
     # convert distance_max to simulation units [0, 1)
     distance_max /= Agora['box.length']
-    sp = Agora.snapshot[0].h.sphere(Agora.hal_yt[halo_index].center_of_mass(), distance_max)
+    sp = Agora.snapshot[0].h.sphere(Agora.hal_yt[hal_index].center_of_mass(), distance_max)
 
     return np.array(sp['particle_index'], dtype=np.int32)
 
 
 def print_contamination_around_halo(
-    Agora, halo_index, distance_max, distance_bin_width=0.5, scale_virial=True):
+    Agora, hal_index, distance_max, distance_bin_width=0.5, scale_to_halo_radius=True):
     '''
     Test lower resolution particle contamination around halo as a function of distance.
 
     Parameters
     ----------
     Agora : class : Agora data class
-    halo_index: int : index of halo
+    hal_index: int : index of halo
     distance_max : float : maximum distance from halo center to check
     distance_bin_width : float : width of distance bin for printing
-    scale_virial : boolean : whether to scale distances by virial radius
+    scale_to_halo_radius : boolean : whether to scale distances by virial radius
     '''
     distance_scaling = 'lin'
     ti = 0
@@ -308,16 +309,16 @@ def print_contamination_around_halo(
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, [0, distance_max], width=distance_bin_width)
 
-    pids = get_particle_ids_around_halo(Agora, halo_index, distance_max, scale_virial)
+    pids = get_particle_ids_around_halo(Agora, hal_index, distance_max, scale_to_halo_radius)
     Say.say('read {} particles around halo'.format(pids.size))
 
     pis = Agora.part[ti]['id.to.index'][pids]
     distances = ut.coordinate.get_distances(
-        'scalar', Agora.part[ti]['position'][pis], Agora.hal['position'][halo_index],
+        'scalar', Agora.part[ti]['position'][pis], Agora.hal['position'][hal_index],
         Agora['box.length'])
-    if scale_virial:
-        distances /= Agora.hal['radius'][halo_index]
-        Say.say('halo radius = {:.3f} kpc comoving'.format(Agora.hal['radius'][halo_index]))
+    if scale_to_halo_radius:
+        distances /= Agora.hal['radius'][hal_index]
+        Say.say('halo radius = {:.3f} kpc comoving'.format(Agora.hal['radius'][hal_index]))
 
     pis_contam = pis[Agora.part[ti]['mass'][pis] != Agora.part[ti].info['mass.unique'].min()]
     if pis_contam.size == 0:
@@ -339,7 +340,7 @@ def print_contamination_around_halo(
 
 
 def print_contamination_in_box(
-    part, center_position=None, distance_limits=None, distance_bin_number=20, scaling='lin',
+    part, center_position=None, distance_limits=None, distance_bin_number=20, distance_scaling='lin',
     geometry='cube'):
     '''
     Test lower resolution particle contamination around center.
@@ -350,7 +351,7 @@ def print_contamination_in_box(
     center_position : array : 3-d position of center {kpc comoving}
     distance_limits : float : maximum distance from center to check {kpc physical}
     distance_bin_number : int : number of distance bins
-    scaling : string : 'log', 'lin'
+    distance_scaling : string : 'log', 'lin'
     geometry : string : geometry of region: 'cube', 'sphere'
     '''
     Say = ut.io.SayClass(print_contamination_in_box)
@@ -366,7 +367,7 @@ def print_contamination_in_box(
             center_position[dimension_i] = 0.5 * part.info['box.length']
     print('center position = {}'.format(center_position))
 
-    DistanceBin = ut.binning.DistanceBinClass(scaling, distance_limits, number=distance_bin_number)
+    DistanceBin = ut.binning.DistanceBinClass(distance_scaling, distance_limits, number=distance_bin_number)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])
@@ -383,7 +384,7 @@ def print_contamination_in_box(
             'vector', part['position'], center_position, part.info['box.length']))
 
     for dist_i in range(DistanceBin.number):
-        distance_bin_limits = DistanceBin.get_bin_limits(scaling, dist_i)
+        distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
 
         if geometry == 'sphere':
             pis_all_d = neig_pis[ut.array.get_indices(distances, distance_bin_limits)]
@@ -402,15 +403,15 @@ def print_contamination_in_box(
             break
 
 
-def print_ic_zoom_region_for_halo(
-    Agora, halo_index, refinement_number=1, distance_max=None, geometry='cube'):
+def print_initial_condition_region(
+    Agora, hal_index, refinement_number=1, distance_max=None, geometry='cube'):
     '''
     Print extent of lagrangian region at z_initial around given halo at z = 0.
     Use rules of thumb from Onorbe et al.
 
     Parameters
     ----------
-    halo_index : int : index of halo
+    hal_index : int : index of halo
     refinement_number : int : number of refinement levels beyond current level for zoom-in region
     distance_max : float : maximum distance want to be uncontaminated {kpc comoving}
         if None, use R_halo
@@ -418,14 +419,14 @@ def print_ic_zoom_region_for_halo(
         'cube', 'ellipsoid'
     '''
     if not distance_max:
-        distance_max = Agora.hal['radius'][halo_index] * 1.2
+        distance_max = Agora.hal['radius'][hal_index] * 1.2
 
     if geometry == 'cube':
         distance_max = (1.5 * refinement_number + 1) * distance_max
     elif geometry == 'ellipsoid':
         distance_max = (1.5 * refinement_number + 7) * distance_max
 
-    pids = Agora.get_particle_ids_around_halo(halo_index, distance_max, scale_vir=False)
+    pids = Agora.get_particle_ids_around_halo(hal_index, distance_max, scale_vir=False)
 
     pis = Agora.part[1]['id.to.index'][pids]
     positions = Agora.part[1]['position'][pis]

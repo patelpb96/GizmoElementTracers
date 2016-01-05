@@ -32,11 +32,11 @@ def sync_snapshots(
     to_directory : string : local directory to put snapshots
     '''
     if snapshot_kind == 'file':
-        snapshot_name_base = 'snapshot_%.3d.hdf5'
+        snapshot_name_base = 'snapshot_{:.3d}.hdf5'
     elif snapshot_kind == 'directory':
-        snapshot_name_base = 'snapdir_%.3d'
+        snapshot_name_base = 'snapdir_{:.3d}'
     else:
-        raise ValueError('not recognize snapshot_kind = %s' % snapshot_kind)
+        raise ValueError('not recognize snapshot_kind = ' + snapshot_kind)
 
     #if machine_name == 'stampede':
     #    from_directory = '$STAMPEDE_SCRATCH/' + from_directory
@@ -52,9 +52,9 @@ def sync_snapshots(
 
     snapshot_path_names = ''
     for snapshot_index in snapshot_indices:
-        snapshot_path_names += from_directory + snapshot_name_base % snapshot_index + ' '
+        snapshot_path_names += from_directory + snapshot_name_base.format(snapshot_index) + ' '
 
-    os.system('rsync -ahvPz %s:"%s" %s' % (machine_name, snapshot_path_names, to_directory))
+    os.system('rsync -ahvPz {}:"{}" {}'.format(machine_name, snapshot_path_names, to_directory))
 
 
 #===================================================================================================

@@ -59,13 +59,13 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
             break
 
     if mpi_number:
-        Say.say('MPI tasks = %d' % mpi_number)
+        Say.say('MPI tasks = {}'.format(mpi_number))
     else:
         Say.say('! unable to find number of MPI tasks')
         mpi_number = 1
 
     if omp_number:
-        Say.say('OpenMP threads = %d' % omp_number)
+        Say.say('OpenMP threads = {}'.format(omp_number))
     else:
         Say.say('did not find any OpenMP threads')
         omp_number = 1
@@ -117,9 +117,9 @@ def print_run_times(
     print_next_line = False
     for line in file_in:
         if ('Time: 1,' in line or
-                ('Time: %.1f,' % a_i in line and get_mod(a_i, 0.1) == 0) or
-                ('Time: %.2f,' % a_i in line and get_mod(a_i, 0.01) == 0) or
-                ('Time: %.3f' % a_i in line)):
+                ('Time: {:.1f},'.format(a_i) in line and get_mod(a_i, 0.1) == 0) or
+                ('Time: {:.2f},'.format(a_i) in line and get_mod(a_i, 0.01) == 0) or
+                ('Time: {:.3f}'.format(a_i) in line)):
             if print_lines:
                 print(line, end='')
             print_next_line = True
@@ -150,16 +150,16 @@ def print_run_times(
         print(' cpu-time[hr]', end='')
     print()
     for t_i in range(len(wall_times)):
-        print('%.3f %5.2f   %5.1f%% %7.2f %5.2f' %
-              (scale_factors[t_i], redshifts[t_i], 100 * wall_times[t_i] / wall_times.max(),
-               wall_times[t_i], wall_times[t_i] / 24), end='')
+        print('{:.3f} {:5.2f}   {:5.1f}% {:7.2f} {:5.2f}'.format(
+              scale_factors[t_i], redshifts[t_i], 100 * wall_times[t_i] / wall_times.max(),
+              wall_times[t_i], wall_times[t_i] / 24), end='')
         if cpu_number:
-            print(' %7.0f' % cpu_times[t_i], end='')
+            print(' {:7.0f}'.format(cpu_times[t_i]), end='')
         print()
 
     #for scale_factor in scale_factors:
-    #    os.system('grep "Time: %.2f" %s --after-context=1 --max-count=2' %
-    #              (scale_factor, file_path_name))
+    #    os.system('grep "Time: {:.2f}" {} --after-context=1 --max-count=2'.format(
+    #              scale_factor, file_path_name))
 
     if get_values:
         return scale_factors, redshifts, wall_times, cpu_times
@@ -209,10 +209,10 @@ def print_run_time_ratios(
     print()
 
     for a_i in range(snapshot_number_min):
-        print('%.3f %5.2f  ' % (scale_factors[a_i], redshifts[a_i]), end='')
+        print('{:.3f} {:5.2f}  '.format(scale_factors[a_i], redshifts[a_i]), end='')
         for d_i in range(1, len(wall_timess)):
-            print(' %7.2f' % (wall_timess[d_i][a_i] / wall_timess[0][a_i]), end='')
-            print(' %7.2f' % (cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
+            print(' {:7.2f}'.format(wall_timess[d_i][a_i] / wall_timess[0][a_i]), end='')
+            print(' {:7.2f}'.format(cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
         print()
 
 
@@ -278,7 +278,7 @@ def print_properties_extrema_all_snapshots(
                             part[spec_name].prop(prop_name))
                         species_property_dict[spec_name][prop_name].append(prop_ext)
                     except:
-                        Say.say('! %s %s not in particle dictionary' % (spec_name, prop_name))
+                        Say.say('! {} {} not in particle dictionary'.format(spec_name, prop_name))
         except:
             Say.say('! cannot read snapshot index {} in {}'.format(
                     snapshot_i, simulation_directory + output_directory))
@@ -292,9 +292,9 @@ def print_properties_extrema_all_snapshots(
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
-            Say.say('\n%s %s %s:' % (spec_name, prop_name, prop_func_name))
+            Say.say('\n{} {} {}:'.format(spec_name, prop_name, prop_func_name))
             for stat_name in ['min', 'percent.16', 'median', 'percent.84', 'max']:
-                Say.say('%10s = %.3f' % (stat_name, Statistic.stat[stat_name]))
+                Say.say('{:10s} = {:.3f}'.format(stat_name, Statistic.stat[stat_name]))
 
             #Statistic.print_statistics()
 
@@ -355,12 +355,12 @@ def delete_snapshots(directory='.'):
         for snapshot_name in snapshot_names:
             keep = False
             for snapshot_index in snapshot_indices:
-                if snapshot_name in ['snapshot_%03d.hdf5' % snapshot_index,
-                                     'snapdir_%03d' % snapshot_index]:
+                if snapshot_name in ['snapshot_{:03d}.hdf5'.format(snapshot_index),
+                                     'snapdir_{:03d}'.format(snapshot_index)]:
                     keep = True
 
             if not keep:
-                os.system('rm -rf %s' % snapshot_name)
+                os.system('rm -rf ' + snapshot_name)
 
 
 #===================================================================================================
@@ -471,7 +471,7 @@ def plot_scaling(
             subplot.set_ylim([4, 4000])
             subplot.set_ylabel('wall time to $z = 0$ [hr]')
             subplot.text(0.05, 0.5,
-                         'weak scaling:\nfixed particle number / core = %.1e' % ratio_ref,
+                         'weak scaling:\nfixed particle number / core = {:.1e}'.format(ratio_ref),
                          color='black', transform=subplot.transAxes)
 
         plot_func(dm_particle_nums, dm_times, '.-', linewidth=2.0, color='red')
