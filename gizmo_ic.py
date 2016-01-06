@@ -17,33 +17,49 @@ from scipy import spatial
 # local ----
 import utilities as ut
 from . import gizmo_io
-import rockstar
+from rockstar import rockstar_io
 
 """
 m12 halos
 
-latte
-breve
-cappuccino
-  cortado
-flatwhite
-macchiato
-  melange
+m12i - latte
+mass.200m = 1.26e12, 12.10 (ref13_dm direct)
+mass.200m = 1.21e12, 12.08
+mass.vir = 1.12e12
+mass.200c = 0.956e12
+vel.circ.max = 162.3 km/s
 
-m12i
-mass.200m = 1.3e12
-mass.vir = 1.13e12
-mass.200c = 0.95e12
 
-m12b
-index = 591
+m12b - breve
+halo index = 591
 id = 5276
-mass.200m = 1.46e12
-mass.200c = 1.19e12
-mass.vir = 1.37e12
-vel.circ.max = 179
-radius = 361
-position = [27920.49804688, 30227.87890625, 30514.91601562]
+mass.200m = 1.46e12, 12.16 M_sun
+mass.vir = 1.37e12 M_sun
+mass.200c = 1.19e12 M_sun
+vel.circ.max = 179 km/s
+position = 27920.50, 30227.88, 30514.92 kpc
+
+m12c - cappuccino
+halo index = 640
+id = 199769
+mass.200m = 1.36e12, 12.13 M_sun
+mass.vir = 1.28e12 M_sun
+mass.200c = 1.07e12 M_sun
+vel.circ.max = 151.62 km/s
+position = 35332.00, 47821.44, 54843.54 kpc
+
+m12m - macchiato
+halo index = 552
+id = 75486
+mass.200m = 1.55e12, 12.19 M_sun
+mass.vir = 1.43e12 M_sun
+mass.200c = 1.20e12 M_sun
+vel.circ.max = 169.52 km/s
+position = 37564.46, 32272.74, 54119.02 kpc
+
+flatwhite
+cortado
+melange
 
 """
 
@@ -53,11 +69,11 @@ position = [27920.49804688, 30227.87890625, 30514.91601562]
 #===================================================================================================
 class ReadClass():
     '''
-    .
+    Read particles and halo catalog.
     '''
     def __init__(self, snapshot_indices=[14, 0], simulation_directory='.'):
         '''
-        Read particles from final and initla snapshot and halos from final snapshot.
+        Read particles from final and initial snapshot and halos from final snapshot.
 
         Parameters
         ----------
@@ -70,7 +86,7 @@ class ReadClass():
 
     def read_all(self, mass_limits=[1e11, Inf]):
         '''
-        Read particles from final and initla snapshot and halos from final snapshot.
+        Read particles from final and initial snapshot and halos from final snapshot.
 
         Returns
         -------
@@ -80,7 +96,7 @@ class ReadClass():
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
 
-        rockstar.io.assign_lowres_mass(hal, parts[0], mass_limits)
+        rockstar_io.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
 
@@ -111,11 +127,11 @@ class ReadClass():
         -------
         hal : list : catalog of halos at final snapshot
         '''
-        hal = rockstar.io.Rockstar.read_catalog(
+        hal = rockstar_io.Rockstar.read_catalog(
             'index', self.snapshot_indices[0], self.simulation_directory, sort_by_mass=True,
             sort_host_first=False)
 
-        rockstar.io.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
+        rockstar_io.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
 
         return hal
 
@@ -126,7 +142,7 @@ Read = ReadClass()
 # analysis
 #===================================================================================================
 def get_indices(
-    hal, mass_limits=[1e12, 1.5e12], distance_halo_min=6, contaminate_mass_frac_max=0.05):
+    hal, mass_limits=[1.1e12, 1.8e12], distance_halo_min=6, contaminate_mass_frac_max=0.01):
     '''
     Get distances {kpc physical} and indices of halos that are within distance_max of center of
     input halo.
@@ -159,8 +175,24 @@ def get_indices(
     return his
 
 
+def print_properties(hal, hal_index, digits_after_period=2):
+    '''
+    Parameters
+    ----------
+    hal : dict : catalog of halos
+    hal_index : int : index of halo
+    digits_after_period : int
+    '''
+    prop_names = ['id', 'mass.200m', 'mass.vir', 'mass.200c', 'vel.circ.max', 'position']
+
+    print('halo index = {}'.format(hal_index))
+    for prop_name in prop_names:
+        string = ut.io.get_string_for_value(hal[prop_name][hal_index], digits_after_period)
+        print('{} = {}'.format(prop_name, string))
+
+
 def get_neighbors(
-    hal, hal_index, distance_max=30, scale_to_halo_radius=True, neig_mass_frac_min=0.4):
+    hal, hal_index, distance_max=30, scale_to_halo_radius=True, neig_mass_frac_min=0.333):
     '''
     Get distances {kpc physical} and indices of halos that are within distance_max of center of
     input halo.
@@ -168,7 +200,7 @@ def get_neighbors(
     Parameters
     ----------
     hal : dict : catalog of halos
-    hal_index : int : index of halo to select
+    hal_index : int : index of center halo
     distance_max : float : maximum distance {kpc physical or d/R_halo}
     neig_mass_frac_min : float : minimum mass (relative to central) to select neighboring halos
 
@@ -192,20 +224,27 @@ def get_neighbors(
         hal['position'][[hal_index]], hal['position'][his_m], 2000, [1e-6, distance_max],
         hal.info['box.length'], hal.snapshot['scalefactor'], neig_ids=his_m)
 
+    neig_distances = neig_distances[0]
+    neig_indices = neig_indices[0]
+
     if scale_to_halo_radius:
         neig_distances /= hal['radius'][hal_index]
 
     if neig_distances.size:
-        distance_min = neig_distances.min()
+        nearest_nii = np.argmin(neig_distances)
+        nearest_distance = neig_distances[nearest_nii]
+        nearest_mass = hal['total.mass'][neig_indices[nearest_nii]]
     else:
-        distance_min = Inf
+        nearest_distance = Inf
+        nearest_mass = 0
 
-    Say.say('minimum distance = {:.3f}'.format(distance_min))
+    Say.say('nearest neighbor: distance = {:.3f}, mass = {:.2e}'.format(
+            nearest_distance, nearest_mass))
 
     return neig_distances, neig_indices
 
 
-def print_contamination_around_halo(
+def print_contamination_v_distance(
     part, hal, hal_index, distance_max=7, distance_bin_width=0.5, scale_to_halo_radius=True):
     '''
     Print information on contamination from lower-resolution particles around halo as a function of
@@ -226,7 +265,7 @@ def print_contamination_around_halo(
     distance_limits = [0, distance_max]
     axis_y_scaling = 'log'
 
-    Say = ut.io.SayClass(print_contamination_around_halo)
+    Say = ut.io.SayClass(print_contamination_v_distance)
 
     Say.say('halo radius = {:.3f} kpc'.format(hal['radius'][hal_index]))
 

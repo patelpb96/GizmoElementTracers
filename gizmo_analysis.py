@@ -9,7 +9,6 @@ Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
 # system ----
 from __future__ import absolute_import, division, print_function
-import copy
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
@@ -313,22 +312,12 @@ class SpeciesProfileClass(ut.io.SayClass):
 
         Fraction = ut.math.FractionClass()
 
-        # ensure is list even if just one species
         if np.isscalar(species):
             species = [species]
-        else:
-            species = copy.copy(species)
-
-        if species == ['all'] or species == ['total'] or species == ['baryon']:
-            #species = part.keys()
-            species = ['dark', 'star', 'gas']
-            if 'dark.2' in part:
-                species.append('dark.2')
-
-            for spec_name in tuple(species):
-                if spec_name not in part:
-                    species.remove(spec_name)
-                    self.say('! {} not in particle catalog'.format(spec_name))
+        if species == ['baryon']:
+            # treat this case specially for baryon fraction
+            species = ['gas', 'star', 'dark', 'dark.2']
+        species = ut.particle.parse_species(part, species)
 
         center_position = ut.particle.parse_property(part, 'position', center_position)
         part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
@@ -464,12 +453,7 @@ class SpeciesProfileClass(ut.io.SayClass):
         '''
         pros = {}
 
-        if np.isscalar(species):
-            species = [species]  # ensure is list
-        if species == ['all'] or species == ['total']:
-            species = ['dark', 'gas', 'star', 'dark.2', 'dark.3']
-        elif species == ['baryon']:
-            species = ['gas', 'star']
+        species = ut.particle.parse_species(part, species)
 
         center_position = ut.particle.parse_property(part, 'position', center_position)
         part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
@@ -565,25 +549,17 @@ def plot_mass_contamination(
     figure_index : int : index of figure for matplotlib
     '''
     species_test = ['dark.2', 'dark.3', 'dark.4', 'dark.5', 'dark.6', 'gas', 'star']
-
     species_reference = 'dark'
+
+    virial_kind = '200m'
 
     Say = ut.io.SayClass(plot_mass_contamination)
 
-    for spec_test in list(species_test):
-        if spec_test not in part:
-            species_test.remove(spec_test)
-            #Say.say('! no {} in particle dictionary'.format(spec_test))
-
+    species_test = ut.particle.parse_species(part, species_test)
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
-    distance_limits_use = np.array(distance_limits)
-    if halo_radius and scale_to_halo_radius:
-        distance_limits_use = distance_limits_use * halo_radius
-        distance_bin_width = distance_bin_width * halo_radius
-
     DistanceBin = ut.binning.DistanceBinClass(
-        distance_scaling, distance_limits_use, distance_bin_width, distance_bin_number)
+        distance_scaling, distance_limits, distance_bin_width, distance_bin_number)
 
     pros = collections.OrderedDict()
     pros[species_reference] = {}
@@ -596,6 +572,8 @@ def plot_mass_contamination(
         distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
         distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
+        if scale_to_halo_radius:
+            distances /= halo_radius
         pros[spec_name] = DistanceBin.get_histogram_profile(distances, part[spec_name]['mass'])
 
     for spec_name in species_test:
@@ -610,10 +588,12 @@ def plot_mass_contamination(
             Say.say('  none. yay.')
             continue
         distances = pros[spec_name]['distance.cum']
-        print_string = '  d < {:.3f} kpc: mass = {:.2e}, mass_frac = {:.3f}, number = {:.0f}'
+
         if scale_to_halo_radius:
-            distances /= halo_radius
-            print_string = '  d/R_halo < {:.3f}: mass = {:.2e}, mass_frac = {:.3f}, number = {:.0f}'
+            print_string = '  d/R_halo < {:.3f}: '
+        else:
+            print_string = '  d < {:.3f} kpc: '
+        print_string += 'mass = {:.2e}, mass_frac = {:.3f}, number = {:.0f}'
 
         for dist_i in range(pros[spec_name]['histogram.cum'].size):
             if pros[spec_name]['histogram.cum'][dist_i] > 0:
@@ -627,9 +607,6 @@ def plot_mass_contamination(
 
     # plot ----------
     colors = ut.plot.get_colors(len(species_test), use_black=False)
-    xs = DistanceBin.mids
-    if halo_radius and scale_to_halo_radius:
-        xs /= halo_radius
 
     plt.minorticks_on()
     fig = plt.figure(figure_index)
@@ -645,7 +622,7 @@ def plot_mass_contamination(
     subplot.set_ylabel(
         '$M_{{\\rm species}} / M_{{\\rm {}}}$'.format(species_reference), fontsize=30)
     if scale_to_halo_radius:
-        axis_x_label = '$d \, / \, R_{\\rm 200m}$'
+        axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
     else:
         axis_x_label = 'distance $[\\rm kpc]$'
     subplot.set_xlabel(axis_x_label, fontsize=30)
@@ -660,7 +637,9 @@ def plot_mass_contamination(
         plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
     for spec_i, spec_name in enumerate(species_test):
-        plot_func(xs, ratios[spec_name]['bin'], color=colors[spec_i], alpha=0.7, label=spec_name)
+        plot_func(
+            DistanceBin.mids, ratios[spec_name]['bin'], color=colors[spec_i], alpha=0.7,
+            label=spec_name)
 
     legend = subplot.legend(loc='best', prop=FontProperties(size=16))
     legend.get_frame().set_alpha(0.7)
@@ -669,7 +648,7 @@ def plot_mass_contamination(
 
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
-        distance_name += '.200m'
+        distance_name += '.' + virial_kind
     plot_name = 'mass.ratio_v_{}_z.{:.1f}'.format(distance_name, part.snapshot['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
@@ -701,6 +680,8 @@ def plot_metal_v_distance(
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
+    virial_kind = '200m'
+
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
     distance_limits_use = np.array(distance_limits)
@@ -748,7 +729,7 @@ def plot_metal_v_distance(
         subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=20)
 
     if scale_to_halo_radius:
-        axis_x_label = '$d \, / \, R_{\\rm 200m}$'
+        axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
     else:
         #axis_x_label = 'distance $[\\rm kpc\,physical]$'
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
@@ -773,7 +754,7 @@ def plot_metal_v_distance(
 
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
-        distance_name += '.200m'
+        distance_name += '.' + virial_kind
     plot_name = plot_kind + '_v_' + distance_name + '_z.{:.1f}'.format(part.info['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
@@ -1841,7 +1822,7 @@ def plot_star_form_history_galaxies(
 
     for hal_ii, hal_i in enumerate(hal_indices):
         label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
-            ut.io.get_string_exponential(sfh['mass'][hal_ii][-1], '{:.0e}'))
+            ut.io.get_string_for_exponential(sfh['mass'][hal_ii][-1], 0))
         plot_func(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                   linewidth=3.0, color=colors[hal_ii], alpha=0.5, label=label)
 

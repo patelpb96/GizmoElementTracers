@@ -288,7 +288,7 @@ def get_particle_ids_around_halo(Agora, hal_index, distance_max, scale_to_halo_r
     return np.array(sp['particle_index'], dtype=np.int32)
 
 
-def print_contamination_around_halo(
+def print_contamination_v_distance(
     Agora, hal_index, distance_max, distance_bin_width=0.5, scale_to_halo_radius=True):
     '''
     Test lower resolution particle contamination around halo as a function of distance.
@@ -304,7 +304,7 @@ def print_contamination_around_halo(
     distance_scaling = 'lin'
     ti = 0
 
-    Say = ut.io.SayClass(print_contamination_around_halo)
+    Say = ut.io.SayClass(print_contamination_v_distance)
 
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, [0, distance_max], width=distance_bin_width)

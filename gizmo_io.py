@@ -528,7 +528,7 @@ class GizmoClass(ut.io.SayClass):
                         # initialize so calling an un-itialized value leads to error
                         part[spec_name][prop_name] -= part_number_tot
                 else:
-                    self.say('not reading {} {}'.format(spec_name, prop_name_in))
+                    self.say('not reading {:6} {}'.format(spec_name, prop_name_in))
 
             # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
@@ -620,7 +620,7 @@ class GizmoClass(ut.io.SayClass):
         if sort_dark_by_id:
             for spec_name in species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
-                    self.say('sorting {} particles by id'.format(spec_name))
+                    self.say('sorting {:6} particles by id'.format(spec_name))
                     indices_sorted_by_id = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = \
@@ -869,7 +869,7 @@ class GizmoClass(ut.io.SayClass):
         self, part, species=['star'], center_position=None, center_velocity=None,
         include_hubble_flow=True):
         '''
-        Assign derived orbital properties to species.
+        Assign derived orbital properties wrt single center to species.
 
         Parameters
         ----------
@@ -879,8 +879,7 @@ class GizmoClass(ut.io.SayClass):
         center_velocity : array : center velocity to use
         include_hubble_flow : boolean : whether to include hubble flow
         '''
-        if np.isscalar(species):
-            species = [species]  # ensure is list
+        species = ut.particle.parse_species(part, species)
 
         orb = ut.particle.get_orbit_dictionary(
             part, species, center_position, center_velocity,
