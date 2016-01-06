@@ -301,7 +301,7 @@ def print_properties_extrema_all_snapshots(
 
 def plot_halo_contamination(directory='.', redshift=0):
     '''
-    Plot contamination from lower-resolution particles in/near halo as a function of radius.
+    Plot contamination from lower-resolution particles around halo as a function of distance.
 
     Parameters
     ----------
@@ -320,8 +320,7 @@ def plot_halo_contamination(directory='.', redshift=0):
         ['dark', 'dark.2'], 'redshift', redshift, directory,
         property_names=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 
-    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(
-        part, 'all', virial_kind=virial_kind)
+    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(part, 'all', virial_kind)
 
     gizmo_analysis.plot_mass_contamination(
         part, distance_limits_phys, distance_bin_width, halo_radius=halo_radius,
