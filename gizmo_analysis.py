@@ -1040,7 +1040,7 @@ def plot_image(
 
     plot_name = spec_name + '.position'
     if add_simulation_name:
-        plot_name = part.info['simulation.name'] + plot_name
+        plot_name = part.info['simulation.name'].replace(' ', '_') + plot_name
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
     plot_name += '_d.{:.0f}_z.{:0.1f}'.format(distance_max, part.snapshot['redshift'])
