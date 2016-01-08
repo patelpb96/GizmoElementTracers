@@ -2222,7 +2222,7 @@ class CompareSimulationsClass(ut.io.SayClass):
     '''
     def __init__(self):
         '''
-        .
+        Set directories and names of simulations to read.
         '''
         self.simulation_names = [
             ['fb-aniso-angle-max/m12i_ref13', 'r13 aniso anglemax n100'],
@@ -2250,7 +2250,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         self, simulation_names=None, redshift=0, species='all',
         property_names=['mass', 'position', 'form.time'], force_float32=True):
         '''
-        .
+        Read snapshots from simulations.
         '''
         from . import gizmo_io
 
@@ -2291,7 +2291,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         self, parts=None, simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
         species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
         '''
-        .
+        Plot various properties, comparing all simulations at fixed redshift.
         '''
         if np.isscalar(redshifts):
             redshifts = [redshifts]
@@ -2349,7 +2349,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
                         plot_image(
-                            part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.02,
+                            part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.05,
                             align_principal_axes=True, write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()
