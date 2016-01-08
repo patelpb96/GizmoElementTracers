@@ -1040,7 +1040,7 @@ def plot_image(
 
     plot_name = spec_name + '.position'
     if add_simulation_name:
-        plot_name = part.info['simulation.name'].replace(' ', '_') + plot_name
+        plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
     plot_name += '_d.{:.0f}_z.{:0.1f}'.format(distance_max, part.snapshot['redshift'])
@@ -2226,25 +2226,25 @@ class CompareSimulationsClass(ut.io.SayClass):
         .
         '''
         self.simulation_names = [
-            ['fb-aniso-angle-max/m12_ref13', 'r13 aniso angle-max n100'],
+            ['fb-aniso-angle-max/m12i_ref13', 'r13 aniso anglemax n100'],
 
-            #['fb-aniso/m12_ref12_fb-volume', 'r12 aniso volume'],
-            ['fb-aniso/m12_ref12', 'r12 aniso'],
-            ['fb-aniso/m12_ref13', 'r13 aniso'],
+            #['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
+            ['fb-aniso/m12i_ref12', 'r12 aniso'],
+            ['fb-aniso/m12i_ref13', 'r13 aniso'],
 
-            #['fb-iso/m12_ref12', 'r12 iso'],
-            #['fb-iso/m12_ref13', 'r13 iso'],
+            #['fb-iso/m12i_ref12', 'r12 iso'],
+            #['fb-iso/m12i_ref13', 'r13 iso'],
 
-            ['fb-iso/m12_ref12_sfn100', 'r12 iso n100'],
-            ['fb-iso/m12_ref13_sfn100', 'r13 iso n100'],
+            ['fb-iso/m12i_ref12_sfn100', 'r12 iso n100'],
+            ['fb-iso/m12i_ref13_sfn100', 'r13 iso n100'],
 
-            #['fb-iso/m12_ref12_res-adapt', 'r12 iso res-adapt'],
-            #['fb-iso/m12_ref13_res-adapt', 'r13 iso res-adapt'],
+            #['fb-iso/m12i_ref12_res-adapt', 'r12 iso res-adapt'],
+            #['fb-iso/m12i_ref13_res-adapt', 'r13 iso res-adapt'],
 
-            #['fb-iso-radius-max/m12_ref12_rmax1kpc', 'r12 iso rmax1kpc'],
-            #['fb-iso-radius-max/m12_ref13_rmax1kpc', 'r13 iso rmax1kpc'],
-            #['fb-iso-radius-max/m12_ref12_rmax10h', 'r12 iso rmax10h'],
-            #['fb-iso-radius-max/m12_ref13_rmax10h', 'r13 iso rmax10h'],
+            #['fb-iso-radius-max/m12i_ref12_rmax1kpc', 'r12 iso rmax1kpc'],
+            #['fb-iso-radius-max/m12i_ref13_rmax1kpc', 'r13 iso rmax1kpc'],
+            #['fb-iso-radius-max/m12i_ref12_rmax10h', 'r12 iso rmax10h'],
+            #['fb-iso-radius-max/m12i_ref13_rmax10h', 'r13 iso rmax10h'],
         ]
 
     def read_simulations(
