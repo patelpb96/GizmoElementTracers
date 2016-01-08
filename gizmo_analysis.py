@@ -195,8 +195,8 @@ def plot_nucleosynthetic_yields(
             y_label = 'yield (mass fraction)'
         else:
             y_label = 'yield $[M_\odot]$'
-        subplots[si].set_ylabel(y_label, fontsize=26)
-        subplots[si].set_xlabel('element', fontsize=26)
+        subplots[si].set_ylabel(y_label, fontsize=28)
+        subplots[si].set_xlabel('element', fontsize=28)
         #fig.set_ylabel(y_label, fontsize=26)
         #fig.set_xlabel('element', fontsize=26)
 
@@ -670,12 +670,12 @@ def plot_metal_v_distance(
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
     distance_bin_number : int : number of distance bins
-    distance_scaling : string : lin or log
+    distance_scaling : string : scaling of distance: 'log', 'lin'
     halo_radius : float : radius of halo {kpc physical}
     scale_to_halo_radius : boolean : whether to scale distance to halo_radius
     center_position : array : position of galaxy center {kpc comoving}
     plot_kind : string : metallicity or metal.mass.cum
-    axis_y_scaling : string : scaling of y-axis
+    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -724,9 +724,9 @@ def plot_metal_v_distance(
     subplot.set_ylim(axis_y_limits)
 
     if 'metallicity' in plot_kind:
-        subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=20)
+        subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=30)
     elif 'metal.mass.cum' in plot_kind:
-        subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=20)
+        subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=30)
 
     if scale_to_halo_radius:
         axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
@@ -734,7 +734,7 @@ def plot_metal_v_distance(
         #axis_x_label = 'distance $[\\rm kpc\,physical]$'
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
 
-    subplot.set_xlabel(axis_x_label, fontsize=20)
+    subplot.set_xlabel(axis_x_label, fontsize=26)
 
     plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
 
@@ -786,7 +786,7 @@ def plot_image(
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
     align_principal_axes=False, image_limits=[None, None],
     hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-    write_plot=False, plot_directory='.', figure_index=1):
+    write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
     3 panels for all axes.
@@ -809,6 +809,7 @@ def plot_image(
     image_limits : list : min and max limits to impose on image dynamic range (exposure)
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
+    add_simulation_name : boolean : whether to add name of simulation to figure name
     figure_index : int : index of figure for matplotlib
     '''
     background_color = 'black'
@@ -840,7 +841,7 @@ def plot_image(
         positions -= center_position
         positions *= part.snapshot['scalefactor']
 
-        masks = positions[:, dimen_indices_select[0]] <= distance_max  # initialize masks
+        masks = (positions[:, dimen_indices_select[0]] <= distance_max)  # initialize masks
         for dimen_i in dimen_indices_select:
             masks *= ((positions[:, dimen_i] <= distance_max) *
                       (positions[:, dimen_i] >= -distance_max))
@@ -874,9 +875,10 @@ def plot_image(
         hal_positions = np.array(hal[hal_position_kind][hal_indices])
         if center_position is not None and len(center_position):
             hal_positions -= center_position
+        hal_positions *= hal.snapshot['scalefactor']
         hal_radiuss = hal[hal_radius_kind][hal_indices]
 
-        masks = hal_positions[:, dimen_indices_select[0]] <= distance_max  # initialize masks
+        masks = (hal_positions[:, dimen_indices_select[0]] <= distance_max)  # initialize masks
         for dimen_i in dimen_indices_select:
             masks *= ((hal_positions[:, dimen_i] <= distance_max) *
                       (hal_positions[:, dimen_i] >= -distance_max))
@@ -900,8 +902,8 @@ def plot_image(
         subplot.set_xlim(position_limits[0])
         subplot.set_ylim(position_limits[1])
 
-        subplot.set_xlabel('{} $[\\mathrm{kpc}]$'.format(dimen_label[dimen_indices_plot[0]]))
-        subplot.set_ylabel('{} $[\\mathrm{kpc}]$'.format(dimen_label[dimen_indices_plot[1]]))
+        subplot.set_xlabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[0]]))
+        subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
 
         """
         _histogramss, _xs, _ys, _Image = subplot.hist2d(
@@ -1037,6 +1039,8 @@ def plot_image(
     #plt.tight_layout(pad=0.02)
 
     plot_name = spec_name + '.position'
+    if add_simulation_name:
+        plot_name = part.info['simulation.name'] + plot_name
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
     plot_name += '_d.{:.0f}_z.{:0.1f}'.format(distance_max, part.snapshot['redshift'])
@@ -1064,7 +1068,7 @@ def plot_property_distribution(
     prop_limits : list : min and max limits of property
     prop_bin_width : float : width of property bin (use this or prop_bin_number)
     prop_bin_number : int : number of property bins within limits (use this or prop_bin_width)
-    prop_scaling : string : lin or log
+    prop_scaling : string : scaling of property: 'log', 'lin'
     prop_statistic : string : statistic to plot: 'probability', 'histogram'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
@@ -1072,7 +1076,7 @@ def plot_property_distribution(
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : lin or log
+    axis_y_scaling : string : 'log', 'lin'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -1186,10 +1190,10 @@ def plot_property_v_property(
     spec_name : string : particle species
     x_prop_name : string : property name for x-axis
     x_prop_limits : list : min and max limits to impose on x_prop_name
-    x_prop_scaling : string : lin or log
+    x_prop_scaling : string : 'log', 'lin'
     y_prop_name : string : property name for y-axis
     y_prop_limits : list : min and max limits to impose on y_prop_name
-    y_prop_scaling : string : lin or log
+    y_prop_scaling : string : 'log', 'lin'
     prop_bin_number : int : number of bins for histogram along each axis
     weight_by_mass : boolean : whether to weight property by particle mass
     host_distance_limitss : list : min and max limits for distance from galaxy
@@ -1260,11 +1264,11 @@ def plot_property_v_property(
 
     axis_x_label = ut.plot.get_label(
         x_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=x_prop_scaling)
-    subplot.set_xlabel(axis_x_label, fontsize=32)
+    subplot.set_xlabel(axis_x_label, fontsize=30)
 
     axis_y_label = ut.plot.get_label(
         y_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=y_prop_scaling)
-    subplot.set_ylabel(axis_y_label, fontsize=60)
+    subplot.set_ylabel(axis_y_label, fontsize=30)
 
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
@@ -1324,17 +1328,17 @@ def plot_property_v_distance(
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshot)
     species : string or list : species to compute total mass of
-        options: dark, star, gas, baryon, total
+        options: 'dark', 'star', 'gas', 'baryon', 'total'
     prop_name : string : property to get profile of
     prop_statistic : string : statistic/type to plot:
         histogram, histogram.cum, density, density.cum, vel.circ,
         histogram.fraction, histogram.cum.fraction, med, ave
-    prop_scaling : string : scaling for property (y-axis): lin, log
+    prop_scaling : string : scaling for property (y-axis): 'log', 'lin'
     weight_by_mass : boolean : whether to weight property by particle mass
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
     distance_bin_number : int : number of bins between limits
-    distance_scaling : string : lin or log
+    distance_scaling : string : 'log', 'lin'
     dimension_number : int : number of spatial dimensions for profile
         note : if 1, get profile along minor axis, if 2, get profile along 2 major axes
     rotation_vectors : array : eigen-vectors to define rotation
@@ -1532,7 +1536,7 @@ def get_star_form_history(
     time_kind : string : time kind to use: time, time.lookback, redshift
     time_limits : list : min and max limits of time_kind to impose
     time_width : float : width of time_kind bin (in units set by time_scaling)
-    time_scaling : string : scaling of time_kind: lin, log
+    time_scaling : string : scaling of time_kind: 'log', 'lin'
     distance_limits : list : min and max limits of galaxy distance to select star particles
     center_position : list : position of galaxy centers {kpc comoving}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -1935,7 +1939,7 @@ def plot_galaxy_property_v_time(
     gals=None, sfhs=None, Cosmology=None,
     prop_name='star.mass',
     time_kind='redshift', time_limits=[0, 8], time_scaling='lin', snapshot_subsample_factor=1,
-    axis_y_scaling='log', axis_y_limits=[],
+    axis_y_limits=[], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot host galaxy property v time_kind, using tabulated dictionary of properties of progenitor
@@ -1951,8 +1955,8 @@ def plot_galaxy_property_v_time(
     time_limits : list : min and max limits of time_kind to get
     time_scaling : string : scaling of time_kind: 'log', 'lin'
     snapshot_subsample_factor : int : factor by which to sub-sample snapshots from gals
-    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     axis_y_limits : list : min and max limits for y-axis
+    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -1986,13 +1990,18 @@ def plot_galaxy_property_v_time(
         subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=Cosmology,
         fontsize=26)
 
-    subplot.set_ylim(ut.plot.get_axis_limits(gals[0][prop_name], axis_y_scaling, axis_y_limits))
+    y_values = []
+    if gals is not None:
+        y_values.append(gals[0][prop_name])
+    if sfhs is not None:
+        y_values.append(sfhs[0][time_kind])
+    subplot.set_ylim(ut.plot.get_axis_limits(y_values, axis_y_scaling, axis_y_limits))
 
     if 'mass' in prop_name:
         axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
-    colors = ut.plot.get_colors(len(gals))
+    #colors = ut.plot.get_colors(len(gals))
 
     plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
 
@@ -2013,7 +2022,7 @@ def plot_galaxy_property_v_time(
                 sfh[time_kind], sfh['mass'],
                 '--', linewidth=3.0, alpha=0.9,
                 #color=colors[sfh_i],
-                color=ut.plot.get_color('green.mid'),
+                color=ut.plot.get_color('orange.mid'),
                 label='SFH computed at $z=0$',
             )
 
@@ -2217,25 +2226,25 @@ class CompareSimulationsClass(ut.io.SayClass):
         .
         '''
         self.simulation_names = [
-            ['fb-aniso-angle-max/m12_ref13', 'r13 aniso-angle-max n=100'],
+            ['fb-aniso-angle-max/m12_ref13', 'r13 aniso angle-max n100'],
 
+            #['fb-aniso/m12_ref12_fb-volume', 'r12 aniso volume'],
             ['fb-aniso/m12_ref12', 'r12 aniso'],
-            ['fb-aniso/m12_ref12_fb-volume', 'r12 aniso-volume'],
             ['fb-aniso/m12_ref13', 'r13 aniso'],
 
             #['fb-iso/m12_ref12', 'r12 iso'],
             #['fb-iso/m12_ref13', 'r13 iso'],
 
-            #['fb-iso/m12_ref12_sfn100', 'r12 iso n=100'],
-            #['fb-iso/m12_ref13_sfn100', 'r13 iso n=100'],
+            ['fb-iso/m12_ref12_sfn100', 'r12 iso n100'],
+            ['fb-iso/m12_ref13_sfn100', 'r13 iso n100'],
 
             #['fb-iso/m12_ref12_res-adapt', 'r12 iso res-adapt'],
             #['fb-iso/m12_ref13_res-adapt', 'r13 iso res-adapt'],
 
-            #['fb-iso-radius-max/m12_ref12_rmax1kpc', 'r12 iso r.max=1kpc'],
-            #['fb-iso-radius-max/m12_ref13_rmax1kpc', 'r13 iso r.max=1kpc'],
-            #['fb-iso-radius-max/m12_ref12_rmax10h', 'r12 iso r.max=10h'],
-            #['fb-iso-radius-max/m12_ref13_rmax10h', 'r13 iso r.max=10h'],
+            #['fb-iso-radius-max/m12_ref12_rmax1kpc', 'r12 iso rmax1kpc'],
+            #['fb-iso-radius-max/m12_ref13_rmax1kpc', 'r13 iso rmax1kpc'],
+            #['fb-iso-radius-max/m12_ref12_rmax10h', 'r12 iso rmax10h'],
+            #['fb-iso-radius-max/m12_ref13_rmax10h', 'r13 iso rmax10h'],
         ]
 
     def read_simulations(
@@ -2336,5 +2345,12 @@ class CompareSimulationsClass(ut.io.SayClass):
                 plot_star_form_history(
                     parts, 'mass', 'time', [0.1, None], 0.1, 'lin', distance_limits=[0, 15],
                     write_plot=True)
+
+            for part in parts:
+                for spec_name in ['star', 'gas']:
+                    if spec_name in part:
+                        plot_image(
+                            part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.02,
+                            align_principal_axes=True, write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()

@@ -23,7 +23,7 @@ from rockstar import rockstar_io
 m12 halos
 
 m12i - latte
-mass.200m = 1.26e12, 12.10 (ref13_dm direct)
+mass.200m = 1.26e12, 12.10 (ref13_dm particles)
 mass.200m = 1.21e12, 12.08
 mass.vir = 1.12e12
 mass.200c = 0.956e12
@@ -33,6 +33,7 @@ vel.circ.max = 162.3 km/s
 m12b - breve
 halo index = 591
 id = 5276
+mass.200m = 1.50e12, 12.18 (ref12_dm particles)
 mass.200m = 1.46e12, 12.16 M_sun
 mass.vir = 1.37e12 M_sun
 mass.200c = 1.19e12 M_sun
@@ -42,6 +43,7 @@ position = 27920.50, 30227.88, 30514.92 kpc
 m12c - cappuccino
 halo index = 640
 id = 199769
+mass.200m = 1.39e12, 12.14 M_sun (ref12_dm particles)
 mass.200m = 1.36e12, 12.13 M_sun
 mass.vir = 1.28e12 M_sun
 mass.200c = 1.07e12 M_sun
@@ -51,6 +53,7 @@ position = 35332.00, 47821.44, 54843.54 kpc
 m12m - macchiato
 halo index = 552
 id = 75486
+mass.200m = 1.57e12, 12.20 M_sun (ref12_dm particles)
 mass.200m = 1.55e12, 12.19 M_sun
 mass.vir = 1.43e12 M_sun
 mass.200c = 1.20e12 M_sun
@@ -60,7 +63,6 @@ position = 37564.46, 32272.74, 54119.02 kpc
 flatwhite
 cortado
 melange
-
 """
 
 
@@ -342,16 +344,21 @@ def print_contamination_in_box(
 
 
 #===================================================================================================
-# generate initial conditions
+# generate region for initial conditions
 #===================================================================================================
 def write_initial_condition_points(
     parts, center_position=None, distance_max=7, scale_to_halo_radius=True,
-    halo_radius=None, virial_kind='200m',
-    use_onorbe_method=False, refinement_number=1,
-    region_kind='convex-hull'):
+    halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
     '''
     Select dark matter particles at final snapshot and print their positions at initial snapshot.
     Can use rules of thumb from Onorbe et al.
+
+    Rule of thumb from Onorbe et al:
+        given distance_pure
+        if region_kind == 'cube':
+            distance_max = (1.5 * refinement_number + 1) * distance_pure
+        elif region_kind in ['particles', 'convex-hull']:
+            distance_max = (1.5 * refinement_number + 7) * distance_pure
 
     Parameters
     ----------
@@ -362,8 +369,6 @@ def write_initial_condition_points(
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
     halo_radius : float : radius of halo {kpc physical}
     virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
-    use_onorbe_method : boolean : whether to use method of Onorbe et al to get uncontaminated region
-    refinement_number : int : if above true, number of refinement levels beyond current for region
     region_kind : string : method to identify zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
     '''
@@ -398,14 +403,6 @@ def write_initial_condition_points(
             halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(
                 part_fin, 'all', virial_kind, center_position=center_position)
         distance_max *= halo_radius
-
-    if use_onorbe_method:
-        # convert distance_max according to Onorbe et al
-        distance_pure = distance_max
-        if region_kind == 'cube':
-            distance_max = (1.5 * refinement_number + 1) * distance_pure
-        elif region_kind in ['particles', 'convex-hull']:
-            distance_max = (1.5 * refinement_number + 7) * distance_pure
 
     mass_select = 0
     positions_ini = []
@@ -451,10 +448,6 @@ def write_initial_condition_points(
     if scale_to_halo_radius:
         Write.write('  = {:.2f} x R_{}, R_{} = {:.2f} kpc physical'.format(
                     distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
-    if use_onorbe_method:
-        Write.write(
-            '# uncontaminated radius (Onorbe et al) at final time = {:.3f} kpc physical'.format(
-                distance_pure))
     Write.write('# number of particles in selection region at final time = {}'.format(
                 np.sum(spec_select_number)))
     for spec_i in range(len(spec_names)):
@@ -492,55 +485,37 @@ def write_initial_condition_points(
     file_out.close()
 
 
-def print_initial_condition_region(
-    parts, hal, hal_index, refinement_number=1, distance_max=None, geometry='cube'):
+def generate_initial_condition_points(
+    snapshot_indices=[14, 0], simulation_directory='.', distance_max=7, scale_to_halo_radius=True,
+    halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
     '''
-    Print extent of lagrangian region at z_initial around given halo at z = 0.
-    Use rules of thumb from Onorbe et al.
+    Catch-all function: read particles, identify center, and write points for initial conditions.
 
     Parameters
     ----------
-    hal_index : int : index of halo
-    refinement_number : int : number of refinement levels beyond current level for zoom-in region
-    distance_max : float : maximum distance want to be uncontaminated {kpc comoving}
-        if None, use R_halo
-    geometry : string : geometry of zoom-in lagrangian regon in initial conditions:
-        'cube', 'ellipsoid'
+    snapshot_indices : list : indices of final and initial snapshots
+    simulation_directory : string : directory of simulation
+    distance_max : float : distance from center to select particles at final time
+        {kpc physical, or in units of R_halo}
+    scale_to_halo_radius : boolean : whether to scale distance to halo radius
+    halo_radius : float : radius of halo {kpc physical}
+    virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
+    region_kind : string : method to identify zoom-in regon at initial time:
+        'particles', 'convex-hull', 'cube'
     '''
-    Say = ut.io.SayClass(print_initial_condition_region)
+    if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
+        print('! selection radius = {} looks odd. are you sure aboutg this?'.format(distance_max))
 
-    if not distance_max:
-        distance_max = hal['radius'][hal_index] * 1.2
+    Read = ReadClass(snapshot_indices, simulation_directory)
 
-    if geometry == 'cube':
-        distance_max = (1.5 * refinement_number + 1) * distance_max
-    elif geometry == 'ellipsoid':
-        distance_max = (1.5 * refinement_number + 7) * distance_max
+    parts = Read.read_particles()
 
-    part_fin, part_ini = parts
+    center_position = ut.particle.get_center_position(
+        parts[0], 'all', 'center-of-mass', compare_centers=True)
 
-    """
-    FIX THIS
-    limits = np.zeros((positions.shape[1], 2))
-    widths = np.zeros(positions.shape[1])
-    for dimen_i in range(positions.shape[1]):
-        limits[dimen_i] = np.array(ut.array.get_limits(positions[:, dimen_i]))
-        widths[dimen_i] = limits[[dimen_i]].max() - limits[[dimen_i]].min()
-        Say.say('dimension-{}: {} ({:.3f}) kpc, {} ({:.8f}) box length'.format(
-                dimen_i, ut.array.get_limits(limits[[dimen_i]], digit_number=3), widths[dimen_i],
-                ut.array.get_limits(limits[[dimen_i]] / part_ini.info['box.length'],
-                                    digit_number=8),
-                widths[dimen_i] / part_ini.info['box.length']))
-
-
-    limits /= part_ini.info['box.length']
-    widths /= part_ini.info['box.length']
-
-    Say.say('for MUSIC config file:')
-    Say.say('  ref_offset = {:.8f}, {:.8f}, {:.8f}'.format(
-            limits[0, 0], limits[1, 0], limits[2, 0]))
-    Say.say('  ref_extent = {:.8f}, {:.8f}, {:.8f}'.format(widths[0], widths[1], widths[2]))
-    """
+    write_initial_condition_points(
+        parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
+        region_kind)
 
 
 #===================================================================================================
@@ -551,17 +526,5 @@ if __name__ == '__main__':
         raise ValueError('must specify selection radius, in terms of R_200m')
 
     distance_max = float(sys.argv[1])
-    if distance_max < 1 or distance_max > 100:
-        raise ValueError('selection radius = {} is odd. you shall not pass.'.format(distance_max))
 
-    snapshot_indices = [14, 0]
-    simulation_directory = '.'
-
-    Read = ReadClass(snapshot_indices, simulation_directory)
-    parts = Read.read_particles()
-
-    center_position = ut.particle.get_center_position(
-        parts[0], 'all', 'center-of-mass', compare_centers=True)
-
-    write_initial_condition_points(
-        parts, center_position, distance_max, scale_to_halo_radius=True, region_kind='convex-hull')
+    generate_initial_condition_points(distance_max=distance_max)
