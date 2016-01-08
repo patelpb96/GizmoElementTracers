@@ -1408,8 +1408,7 @@ def plot_property_v_distance(
     else:
         label_prop_name = prop_name
     axis_y_label = ut.plot.get_label(
-        label_prop_name, prop_statistic, species, dimension_number, weight_by_mass,
-        get_symbol=True, get_units=True)
+        label_prop_name, prop_statistic, species, dimension_number, get_symbol=True, get_units=True)
     if prop_statistic == 'vel.circ':
         axis_y_label = 'circular velocity ' + axis_y_label
     subplot.set_ylabel(axis_y_label, fontsize=26)
@@ -2303,37 +2302,37 @@ class CompareSimulationsClass(ut.io.SayClass):
                     simulation_names, redshift, species, property_names, force_float32)
 
             plot_property_v_distance(
-                parts, 'total', 'mass', 'vel.circ', 'lin', True, [0.1, 300], 0.1,
+                parts, 'total', 'mass', 'vel.circ', 'lin', False, [0.1, 300], 0.1,
                 axis_y_limits=[0, None], write_plot=True)
 
             plot_property_v_distance(
-                parts, 'total', 'mass', 'histogram.cum', 'log', True, [1, 300], 0.1,
+                parts, 'total', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
                 axis_y_limits=[None, None], write_plot=True)
 
             plot_property_v_distance(
-                parts, 'dark', 'mass', 'histogram.cum', 'log', True, [1, 300], 0.1,
+                parts, 'dark', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
                 axis_y_limits=[None, None], write_plot=True)
 
             plot_property_v_distance(
-                parts, 'dark', 'mass', 'density', 'log', True, [0.1, 30], 0.1,
+                parts, 'dark', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
                 axis_y_limits=[None, None], write_plot=True)
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
-                    parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', True, [1, 2000], 0.1,
+                    parts, 'baryon', 'mass', 'histogram.cum.fraction', 'lin', False, [1, 2000], 0.1,
                     axis_y_limits=[0, 2], write_plot=True)
 
                 plot_property_v_distance(
-                    parts, 'gas', 'mass', 'histogram.cum', 'log', True, [1, 300], 0.1,
+                    parts, 'gas', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
                     axis_y_limits=[None, None], write_plot=True)
 
             if 'star' in parts[0]:
                 plot_property_v_distance(
-                    parts, 'star', 'mass', 'histogram.cum', 'log', True, [1, 300], 0.1,
+                    parts, 'star', 'mass', 'histogram.cum', 'log', False, [1, 300], 0.1,
                     axis_y_limits=[None, None], write_plot=True)
 
                 plot_property_v_distance(
-                    parts, 'star', 'mass', 'density', 'log', True, [0.1, 30], 0.1,
+                    parts, 'star', 'mass', 'density', 'log', False, [0.1, 30], 0.1,
                     axis_y_limits=[None, None], write_plot=True)
 
             if 'velocity' in property_names:
