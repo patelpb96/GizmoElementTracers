@@ -463,8 +463,8 @@ def write_initial_condition_points(
         spec_select_number.append(select_indices.size)
 
     positions_ini = np.array(positions_ini)
-    poss_ini_limits = [[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
-                       for dimen_i in range(positions_ini.shape[1])]
+    poss_ini_limits = np.array([[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
+                                for dimen_i in range(positions_ini.shape[1])])
 
     # properties of initial volume
     density_ini = part_ini.Cosmology.get_density(
@@ -480,7 +480,7 @@ def write_initial_condition_points(
     # encompasing cube (relevant for MUSIC FFT)
     position_dif_max = 0
     for dimen_i in range(positions_ini.shape[1]):
-        if (poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min()) > position_dif_max:
+        if poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min() > position_dif_max:
             position_dif_max = poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min()
     volume_ini_cube = position_dif_max ** 3
     mass_ini_cube = volume_ini_cube * density_ini  # assume cosmic density within volume
