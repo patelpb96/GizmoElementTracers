@@ -28,6 +28,8 @@ mass.200m = 1.21e12, 12.08
 mass.vir = 1.12e12
 mass.200c = 0.956e12
 vel.circ.max = 162.3 km/s
+spin.bullock = 0.022
+spin.peebles = 0.020
 
 
 m12b - breve
@@ -38,6 +40,8 @@ mass.200m = 1.46e12, 12.16 M_sun
 mass.vir = 1.37e12 M_sun
 mass.200c = 1.19e12 M_sun
 vel.circ.max = 179 km/s
+spin.bullock = 0.041
+spin.peebles = 0.039
 position = 27920.50, 30227.88, 30514.92 kpc
 
 m12c - cappuccino
@@ -47,7 +51,9 @@ mass.200m = 1.39e12, 12.14 M_sun (ref12_dm particles)
 mass.200m = 1.36e12, 12.13 M_sun
 mass.vir = 1.28e12 M_sun
 mass.200c = 1.07e12 M_sun
-vel.circ.max = 151.62 km/s
+vel.circ.max = 151.6 km/s
+spin.bullock = 0.027
+spin.peebles = 0.022
 position = 35332.00, 47821.44, 54843.54 kpc
 
 m12m - macchiato
@@ -57,11 +63,43 @@ mass.200m = 1.57e12, 12.20 M_sun (ref12_dm particles)
 mass.200m = 1.55e12, 12.19 M_sun
 mass.vir = 1.43e12 M_sun
 mass.200c = 1.20e12 M_sun
-vel.circ.max = 169.52 km/s
+vel.circ.max = 169.5 km/s
+spin.bullock = 0.044
+spin.peebles = 0.039
 position = 37564.46, 32272.74, 54119.02 kpc
 
-flatwhite
-cortado
+m12f - flatwhite
+halo index = 486
+id = 131989
+mass.200m = 1.77e12
+mass.vir = 1.60e12
+mass.200c = 1.32e12
+vel.circ.max = 176.8
+spin.bullock = 0.055
+spin.peebles = 0.047
+position = 47399.19, 50992.88, 48106.79
+
+m12o - cortado
+halo index = 674
+id = 132251
+mass.200m = 1.27e12
+mass.vir = 1.13e12
+mass.200c = 8.79e11
+vel.circ.max = 164.1
+spin.bullock = 0.064
+spin.peebles = 0.054
+position = 36860.04, 65798.20, 25176.82
+
+531 - major merger at z = 0
+573 - low spin
+587 - mid spin
+624 - low spin
+629 - high spin, some massive neighbors
+647 - med spin
+674 - high spin, some massive neighbors
+693 - low spin
+768 - high spin, massive neighbor inside
+
 melange
 """
 
@@ -153,7 +191,7 @@ def get_indices(
     ----------
     hal : dict : catalog of halos
     mass_limits : list : min and max limits of mass
-    distance_halo_min : float : minimum d/R_{halo,neig}
+    distance_halo_min : float : minimum d/R_{halo,nearest}
     contaminate_mass_frac_max : float : maximum contamination by mass from low-res dark particles
 
     Returns
@@ -170,14 +208,14 @@ def get_indices(
     Say.say('{} within mass limits = [{:.3e}, {:.3e}]'.format(
             his.size, mass_limits[0], mass_limits[1]))
 
-    his = ut.array.get_indices(hal['near.halo.distance.halo'], [6, Inf], his)
+    his = ut.array.get_indices(hal['near.halo.distance.halo'], [distance_halo_min, Inf], his)
     Say.say('{} with nearest more massive halo >{} d/R_halo,neig away'.format(
             his.size, distance_halo_min))
 
     return his
 
 
-def print_properties(hal, hal_index, digits_after_period=2):
+def print_properties(hal, hal_index, digits_after_period=3):
     '''
     Parameters
     ----------
@@ -185,7 +223,10 @@ def print_properties(hal, hal_index, digits_after_period=2):
     hal_index : int : index of halo
     digits_after_period : int
     '''
-    prop_names = ['id', 'mass.200m', 'mass.vir', 'mass.200c', 'vel.circ.max', 'position']
+    prop_names = [
+        'id', 'mass.200m', 'mass.vir', 'mass.200c', 'vel.circ.max',
+        'spin.bullock', 'spin.peebles', 'position',
+    ]
 
     print('halo index = {}'.format(hal_index))
     for prop_name in prop_names:
@@ -194,7 +235,7 @@ def print_properties(hal, hal_index, digits_after_period=2):
 
 
 def get_neighbors(
-    hal, hal_index, distance_max=30, scale_to_halo_radius=True, neig_mass_frac_min=0.333):
+    hal, hal_index, distance_max=50, scale_to_halo_radius=True, neig_mass_frac_min=0.25):
     '''
     Get distances {kpc physical} and indices of halos that are within distance_max of center of
     input halo.
@@ -425,13 +466,24 @@ def write_initial_condition_points(
     poss_ini_limits = [[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
                        for dimen_i in range(positions_ini.shape[1])]
 
-    volume_ini = ut.coordinate.get_volume_of_convex_hull(positions_ini)
+    # properties of initial volume
     density_ini = part_ini.Cosmology.get_density(
         'matter', part_ini.snapshot['redshift'], 'kpc comoving')
     if part_ini.info['has.baryons']:
         # subtract baryonic mass
         density_ini *= part_ini.Cosmology['omega_dark'] / part_ini.Cosmology['omega_matter']
-    mass_ini = volume_ini * density_ini  # assume cosmic density within volume
+
+    # convex hull
+    volume_ini_chull = ut.coordinate.get_volume_of_convex_hull(positions_ini)
+    mass_ini_chull = volume_ini_chull * density_ini  # assume cosmic density within volume
+
+    # encompasing cube (relevant for MUSIC FFT)
+    position_dif_max = 0
+    for dimen_i in range(positions_ini.shape[1]):
+        if (poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min()) > position_dif_max:
+            position_dif_max = poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min()
+    volume_ini_cube = position_dif_max ** 3
+    mass_ini_cube = volume_ini_cube * density_ini  # assume cosmic density within volume
 
     # MUSIC does not support header information in points file, so put in separate log file
     log_file_name = file_name.replace('.txt', '_log.txt')
@@ -457,9 +509,16 @@ def write_initial_condition_points(
     Write.write('  at highest-resolution in input catalog = {:.2e} M_sun'.format(
                 part_ini['dark']['mass'].sum()))
     Write.write('  in selection region at final time = {:.2e} M_sun'.format(mass_select))
-    Write.write('  in convex hull at initial time = {:.2e} M_sun'.format(mass_ini))
-    Write.write('# volume of convex hull at initial time = {:.1f} Mpc ^ 3 comoving'.format(
-                volume_ini * ut.const.mega_per_kilo ** 3))
+
+    Write.write('# within convex hull at initial time')
+    Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
+    Write.write('  volume = {:.1f} Mpc ^ 3 comoving'.format(
+                volume_ini_chull * ut.const.mega_per_kilo ** 3))
+
+    Write.write('# within encompasing cube at initial time')
+    Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
+    Write.write('  volume = {:.1f} Mpc ^ 3 comoving'.format(
+                volume_ini_cube * ut.const.mega_per_kilo ** 3))
 
     for dimen_i in range(positions_ini.shape[1]):
         Write.write('# initial position-{} [min, max] = {} kpc comoving, {} box units'.format(

@@ -2255,32 +2255,40 @@ class CompareSimulationsClass(ut.io.SayClass):
         Set directories and names of simulations to read.
         '''
         self.simulation_names = [
+            # original FIRE
             ['/work/02769/arwetzel/fire/m12i_ref12', 'r12 FIRE n100'],
 
+            # first ref13
             ['fb-aniso-angle-max/m12i_ref13', 'r13 aniso anglemax n100'],
 
             #['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
             ['fb-aniso/m12i_ref12', 'r12 aniso'],
             ['fb-aniso/m12i_ref13', 'r13 aniso'],
 
-            #['fb-iso/m12i_ref12', 'r12 iso'],
-            #['fb-iso/m12i_ref13', 'r13 iso'],
+            ['fb-iso/m12i_ref11', 'r11 iso'],
+            ['fb-iso/m12i_ref12', 'r12 iso'],
+            ['fb-iso/m12i_ref13', 'r13 iso'],
 
             ['fb-iso/m12i_ref12_sfn100', 'r12 iso n100'],
             ['fb-iso/m12i_ref13_sfn100', 'r13 iso n100'],
 
+            # test adaptive resolution
             #['fb-iso/m12i_ref12_res-adapt', 'r12 iso res-adapt'],
             #['fb-iso/m12i_ref13_res-adapt', 'r13 iso res-adapt'],
 
+            # test maximum radius of coupling
             #['fb-iso-radius-max/m12i_ref12_rmax1kpc', 'r12 iso rmax1kpc'],
             #['fb-iso-radius-max/m12i_ref13_rmax1kpc', 'r13 iso rmax1kpc'],
             #['fb-iso-radius-max/m12i_ref12_rmax10h', 'r12 iso rmax10h'],
             #['fb-iso-radius-max/m12i_ref13_rmax10h', 'r13 iso rmax10h'],
 
-            # comparing different halos
+            # compare different halos
             ['m12i/fb-iso/m12i_ref12', 'latte r12'],
             ['m12b/m12b_ref12', 'breve r12'],
             ['m12m/m12m_ref12', 'macchiato r12'],
+            ['m12c/m12c_ref12', 'cappuccino r12'],
+            ['m12f/m12f_ref12', 'flatwhite r12'],
+
         ]
 
     def read_simulations(
@@ -2379,8 +2387,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             if 'form.time' in property_names and redshift <= 4:
                 plot_star_form_history(
-                    parts, 'mass', 'redshift', [0, 9], 0.2, 'lin', distance_limits=[0, 15],
-                    axis_y_limits=[1e6, None], write_plot=True)
+                    parts, 'mass', 'redshift', [0, 6], 0.2, 'lin', distance_limits=[0, 15],
+                    axis_y_limits=[None, None], write_plot=True)
 
             for part in parts:
                 for spec_name in ['star', 'gas']:
