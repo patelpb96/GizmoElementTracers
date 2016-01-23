@@ -784,9 +784,10 @@ def plot_image(
     part, spec_name='dark', dimen_indices_plot=[0, 1], dimen_indices_select=[0, 1, 2],
     distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
-    align_principal_axes=False, image_limits=[None, None],
+    align_principal_axes=False, image_limits=[None, None], background_color='white',
     hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-    write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
+    write_plot=False, plot_directory='.', add_image_range=True, add_simulation_name=False,
+    figure_index=1):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
     3 panels for all axes.
@@ -796,7 +797,9 @@ def plot_image(
     part : dict : catalog of particles
     spec_name : string : particle species to plot
     dimen_indices_plot : list : which dimensions to plot
-        if 2, plot one v other, if 3, plot all via 3 panels
+        if length 2, plot one v other, if length 3, plot all via 3 panels
+    dimen_indices_select : list : which dimensions to use to select particles
+        note : use this to set selection 'depth' of an image
     distance_max : float : distance from center to plot
     distance_bin_width : float : length pixel
     distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
@@ -807,12 +810,18 @@ def plot_image(
     subsample_factor : int : factor by which periodically to sub-sample particles
     align_principal_axes : boolean : whether to align positions with principal axes
     image_limits : list : min and max limits to impose on image dynamic range (exposure)
+    background_color : string : name of color for background: 'white', 'black'
+    hal : dict : catalog of halos at snapshot
+    hal_indices : array : indices of halos to plot
+    hal_position_kind : string : name of position to use for center of halo
+    hal_radius_kind : string : name of radius to use for size of halo
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
+    add_image_range : boolean : add range of image to file name
     add_simulation_name : boolean : whether to add name of simulation to figure name
     figure_index : int : index of figure for matplotlib
     '''
-    background_color = 'black'
+    Say = ut.io.SayClass(plot_image)
 
     dimen_label = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -832,7 +841,10 @@ def plot_image(
         part_indices = part_indices[::subsample_factor]
 
     positions = np.array(part[spec_name]['position'][part_indices])
-    weights = part[spec_name].prop(weight_prop_name, part_indices)
+    if weight_prop_name:
+        weights = part[spec_name].prop(weight_prop_name, part_indices)
+    else:
+        weights = None
 
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
@@ -847,7 +859,8 @@ def plot_image(
                       (positions[:, dimen_i] >= -distance_max))
 
         positions = positions[masks]
-        weights = weights[masks]
+        if weights is not None:
+            weights = weights[masks]
 
         if align_principal_axes:
             eigen_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
@@ -892,8 +905,19 @@ def plot_image(
     fig = plt.figure(figure_index)
     fig.clf()
 
-    BYW = colors.LinearSegmentedColormap('test', ut.plot.cmap_dict['BlackYellowWhite'])
+    BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
     plt.register_cmap(cmap=BYW)
+    BBW = colors.LinearSegmentedColormap('bbw', ut.plot.cmap_dict['BlackBlueWhite'])
+    plt.register_cmap(cmap=BBW)
+
+    if background_color == 'black':
+        if spec_name == 'dark':
+            color_map = plt.get_cmap('bbw')
+        elif spec_name == 'star':
+            color_map = plt.get_cmap('byw')
+    elif background_color == 'white':
+        color_map = plt.cm.YlOrBr  # @UndefinedVariable
+        #color_map = plt.cm.Greys_r,  # @UndefinedVariable
 
     if len(dimen_indices_plot) == 2:
         subplot = fig.add_subplot(111, axisbg=background_color)
@@ -905,55 +929,57 @@ def plot_image(
         subplot.set_xlabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[0]]))
         subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
 
+        # smooth image
+        histogramss, xs, ys = np.histogram2d(
+            positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+            position_bin_number, position_limits,
+            normed=False,
+            weights=weights,
+        )
+
+        # convert to surface density
+        histogramss /= np.diff(xs)[0] * np.diff(ys)[0]
+
+        masks = (histogramss > 0)
+        Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
+                histogramss[masks].min(), np.median(histogramss[masks]), histogramss[masks].max()))
+
+        image_limits_use = np.clip([histogramss[masks].min(), histogramss[masks].max()],
+                                   image_limits[0], image_limits[1])
+
+        subplot.imshow(
+            histogramss.transpose(),
+            norm=colors.LogNorm(),
+            cmap=color_map,
+            aspect='auto',
+            interpolation='none',
+            #interpolation='bilinear',
+            #interpolation='bicubic',
+            #interpolation='gaussian',
+            extent=np.concatenate(position_limits),
+            vmin=image_limits[0], vmax=image_limits[1],
+        )
+
+        # standard method
         """
         _histogramss, _xs, _ys, _Image = subplot.hist2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             weights=weights, range=position_limits, bins=position_bin_number,
             norm=colors.LogNorm(),
             #cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-            #cmap=plt.cm.inferno,  # @UndefinedVariable
-            #cmap=plt.cm.Greys_r,  # @UndefinedVariable
-            #cmap=plt.cm.Blues_r,  # @UndefinedVariable
             cmap=plt.get_cmap('test'),
             vmin=image_limits[0], vmax=image_limits[1],
         )
         """
 
-        # to smooth image
-        #"""
-        valuess, _xs, _ys = np.histogram2d(
-            positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-            range=position_limits, bins=position_bin_number, weights=weights,
-            normed=True,
-        )
-
-        print(valuess[valuess > 0].min(), valuess.max())
-
-        subplot.imshow(
-            valuess.transpose(),
-            norm=colors.LogNorm(),
-            #cmap=plt.cm.Blues_r,  # @UndefinedVariable
-            #cmap=plt.cm.Greys_r,  # @UndefinedVariable
-            cmap=plt.get_cmap('test'),
-            aspect='auto',
-            #interpolation='none',
-            #interpolation='bilinear',
-            #interpolation='bicubic',
-            interpolation='gaussian',
-            extent=np.concatenate(position_limits),
-            vmin=image_limits[0], vmax=image_limits[1],
-        )
-        #"""
-
-        # to plot map of average of property
+        # plot average of property
         """
-        histogramss, xs, ys, Image = subplot.hist2d(
+        histogramss, xs, ys = np.histogram2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-            weights=None, range=position_limits, bins=position_bin_number,
-            norm=colors.LogNorm(), cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+            position_bin_number, position_limits, weights=None,
+            normed=False)
 
-        #Fraction = ut.math.FractionClass()
-        #histogramss = Fraction.get_fraction(weight_grid, grid_number)
+        #histogramss = ut.math.Fraction.get_fraction(weight_grid, grid_number)
         subplot.imshow(
             histogramss.transpose(),
             #norm=colors.LogNorm(),
@@ -1017,7 +1043,7 @@ def plot_image(
             elif subplot_is == [1, 1]:
                 subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
 
-            _histogramss, _xs, _ys, _Image = subplot.hist2d(
+            histogramss, _xs, _ys, _Image = subplot.hist2d(
                 positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
                 range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
                 cmap=plt.cm.YlOrBr)  # @UndefinedVariable
@@ -1039,11 +1065,18 @@ def plot_image(
     #plt.tight_layout(pad=0.02)
 
     plot_name = spec_name + '.position'
-    if add_simulation_name:
-        plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
     plot_name += '_d.{:.0f}_z.{:0.1f}'.format(distance_max, part.snapshot['redshift'])
+
+    if add_image_range:
+        plot_name += '_i.{}-{}'.format(
+            ut.io.get_string_for_exponential(image_limits_use[0], 0),
+            ut.io.get_string_for_exponential(image_limits_use[1], 0))
+
+    if add_simulation_name:
+        plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
+
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -2261,9 +2294,10 @@ class CompareSimulationsClass(ut.io.SayClass):
             # first ref13
             ['fb-aniso-angle-max/m12i_ref13', 'r13 aniso anglemax n100'],
 
-            #['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
+            ['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
             ['fb-aniso/m12i_ref12', 'r12 aniso'],
             ['fb-aniso/m12i_ref13', 'r13 aniso'],
+            ['/scratch/01799/phopkins/m12i_hybrid_test/quadratic_test', 'r12 mom-cons'],
 
             ['fb-iso/m12i_ref11', 'r11 iso'],
             ['fb-iso/m12i_ref12', 'r12 iso'],
@@ -2364,7 +2398,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
-                    parts, 'baryon', 'mass', 'sum.cum.fraction', 'lin', False, [1, 2000], 0.1,
+                    parts, 'baryon', 'mass', 'sum.cum.fraction', 'lin', False, [10, 2000], 0.1,
                     axis_y_limits=[0, 2], write_plot=True)
 
                 plot_property_v_distance(
@@ -2394,7 +2428,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
                         plot_image(
-                            part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.05,
+                            part, spec_name, [0, 1, 2], [0, 1, 2], 16, 0.05,
                             align_principal_axes=True, write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()

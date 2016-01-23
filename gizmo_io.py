@@ -112,24 +112,30 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ##
-        if 'hydrogen.fraction' in property_name:
+        if 'hydrogen.mass.fraction' in property_name:
             # mass fraction of hydrogen (excluding helium and metals)
-            return(1 - self.prop('metallicity', indices)[:, 0] -
-                   self.prop('metallicity', indices)[:, 1])
+            values = (1 - self.prop('metallicity', indices)[:, 0] -
+                      self.prop('metallicity', indices)[:, 1])
+
+            if property_name == 'neutral.hydrogen.mass.fraction':
+                # mass fraction of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
+                values = values * self.prop('hydrogen.neutral.fraction', indices)
+
+            return values
 
         if 'mass.hydrogen' in property_name:
             # mass of hydrogen (excluding helium and metals)
-            values = self.prop('mass', indices) * self.prop('hydrogen.fraction', indices)
+            values = self.prop('mass', indices) * self.prop('hydrogen.mass.fraction', indices)
 
             if property_name == 'mass.hydrogen.neutral':
                 # mass of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
-                values = np.array(values) * self.prop('hydrogen.neutral.fraction', indices)
+                values = values * self.prop('hydrogen.neutral.fraction', indices)
 
             return values
 
         if property_name in ['number.density', 'density.number']:
             # number density of hydrogen {cm ^ -3}
-            return (self.prop('density', indices) * self.prop('hydrogen.fraction', indices) *
+            return (self.prop('density', indices) * self.prop('hydrogen.mass.fraction', indices) *
                     ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3)
 
         if 'form.time' in property_name and 'lookback' in property_name:
