@@ -944,8 +944,12 @@ def plot_image(
         Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
                 histogramss[masks].min(), np.median(histogramss[masks]), histogramss[masks].max()))
 
-        image_limits_use = np.clip([histogramss[masks].min(), histogramss[masks].max()],
-                                   image_limits[0], image_limits[1])
+        image_limits_use = [histogramss[masks].min(), histogramss[masks].max()]
+        if image_limits is not None and len(image_limits):
+            if image_limits[0] is not None and image_limits[0] > image_limits_use[0]:
+                image_limits_use[0] = image_limits[0]
+            if image_limits[1] is not None and image_limits[1] < image_limits_use[1]:
+                image_limits_use[1] = image_limits[1]
 
         subplot.imshow(
             histogramss.transpose(),
@@ -1043,10 +1047,48 @@ def plot_image(
             elif subplot_is == [1, 1]:
                 subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
 
+            histogramss, xs, ys = np.histogram2d(
+                positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]],
+                position_bin_number, position_limits,
+                normed=False,
+                weights=weights,
+            )
+
+            # convert to surface density
+            histogramss /= np.diff(xs)[0] * np.diff(ys)[0]
+
+            masks = (histogramss > 0)
+            Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
+                    histogramss[masks].min(), np.median(histogramss[masks]),
+                    histogramss[masks].max()))
+
+            image_limits_use = [histogramss[masks].min(), histogramss[masks].max()]
+            if image_limits is not None and len(image_limits):
+                if image_limits[0] is not None and image_limits[0] > image_limits_use[0]:
+                    image_limits_use[0] = image_limits[0]
+                if image_limits[1] is not None and image_limits[1] < image_limits_use[1]:
+                    image_limits_use[1] = image_limits[1]
+
+            subplot.imshow(
+                histogramss.transpose(),
+                norm=colors.LogNorm(),
+                cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+                #aspect='auto',
+                interpolation='nearest',
+                #interpolation='bilinear',
+                #interpolation='bicubic',
+                #interpolation='gaussian',
+                extent=np.concatenate(position_limits),
+                vmin=image_limits[0], vmax=image_limits[1],
+            )
+
+            # default method
+            """
             histogramss, _xs, _ys, _Image = subplot.hist2d(
                 positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
                 range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
                 cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+            """
 
             #fig.colorbar(_Image)  # , ax=subplot)
 
@@ -1441,9 +1483,9 @@ def plot_property_v_distance(
         label_prop_name = prop_name
     axis_y_label = ut.plot.get_label(
         label_prop_name, prop_statistic, species, dimension_number, get_symbol=True, get_units=True)
-    if prop_statistic == 'vel.circ':
-        axis_y_label = 'circular velocity ' + axis_y_label
-    subplot.set_ylabel(axis_y_label, fontsize=26)
+    #if prop_statistic == 'vel.circ':
+    #    axis_y_label = 'circular velocity ' + axis_y_label
+    subplot.set_ylabel(axis_y_label, fontsize=30)
 
     plot_func = ut.plot.get_plot_function(subplot, distance_scaling, prop_scaling)
     colors = ut.plot.get_colors(len(parts))
@@ -1459,10 +1501,10 @@ def plot_property_v_distance(
 
     if len(pros) == 1:
         alpha = 0.9
-        linewidth = 3
+        linewidth = 3.5
     else:
-        alpha = 0.5
-        linewidth = 2
+        alpha = 0.6
+        linewidth = 2.5
 
     for part_i, pro in enumerate(pros):
         plot_func(pro[species]['distance'], pro[species][prop_statistic], color=colors[part_i],
@@ -2428,7 +2470,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
                         plot_image(
-                            part, spec_name, [0, 1, 2], [0, 1, 2], 16, 0.05,
-                            align_principal_axes=True, write_plot=True, add_simulation_name=True)
+                            part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.05,
+                            image_limits=[3e7, 1e10], align_principal_axes=True,
+                            write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()
