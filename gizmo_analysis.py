@@ -786,7 +786,7 @@ def plot_image(
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
     align_principal_axes=False, image_limits=[None, None], background_color='white',
     hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-    write_plot=False, plot_directory='.', add_image_range=True, add_simulation_name=False,
+    write_plot=False, plot_directory='.', add_image_limits=True, add_simulation_name=False,
     figure_index=1):
     '''
     Visualize the positions of given partcle species, using either a single panel for 2 axes or
@@ -817,7 +817,7 @@ def plot_image(
     hal_radius_kind : string : name of radius to use for size of halo
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
-    add_image_range : boolean : add range of image to file name
+    add_image_limits : boolean : add range of image to file name
     add_simulation_name : boolean : whether to add name of simulation to figure name
     figure_index : int : index of figure for matplotlib
     '''
@@ -946,9 +946,9 @@ def plot_image(
 
         image_limits_use = [histogramss[masks].min(), histogramss[masks].max()]
         if image_limits is not None and len(image_limits):
-            if image_limits[0] is not None and image_limits[0] > image_limits_use[0]:
+            if image_limits[0] is not None:
                 image_limits_use[0] = image_limits[0]
-            if image_limits[1] is not None and image_limits[1] < image_limits_use[1]:
+            if image_limits[1] is not None:
                 image_limits_use[1] = image_limits[1]
 
         subplot.imshow(
@@ -1062,11 +1062,11 @@ def plot_image(
                     histogramss[masks].min(), np.median(histogramss[masks]),
                     histogramss[masks].max()))
 
-            image_limits_use = [histogramss[masks].min(), histogramss[masks].max()]
+            image_limits_use = np.array([histogramss[masks].min(), histogramss[masks].max()])
             if image_limits is not None and len(image_limits):
-                if image_limits[0] is not None and image_limits[0] > image_limits_use[0]:
+                if image_limits[0] is not None:
                     image_limits_use[0] = image_limits[0]
-                if image_limits[1] is not None and image_limits[1] < image_limits_use[1]:
+                if image_limits[1] is not None:
                     image_limits_use[1] = image_limits[1]
 
             subplot.imshow(
@@ -1111,10 +1111,12 @@ def plot_image(
         plot_name += '.' + dimen_label[dimen_i]
     plot_name += '_d.{:.0f}_z.{:0.1f}'.format(distance_max, part.snapshot['redshift'])
 
-    if add_image_range:
-        plot_name += '_i.{}-{}'.format(
-            ut.io.get_string_for_exponential(image_limits_use[0], 0),
-            ut.io.get_string_for_exponential(image_limits_use[1], 0))
+    if add_image_limits:
+        plot_name += '_i.{:.1f}-{:.1f}'.format(
+            log10(image_limits_use[0]), log10(image_limits_use[1]))
+        #plot_name += '_i.{}-{}'.format(
+        #    ut.io.get_string_for_exponential(image_limits_use[0], 0),
+        #    ut.io.get_string_for_exponential(image_limits_use[1], 0))
 
     if add_simulation_name:
         plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
