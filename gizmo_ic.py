@@ -17,91 +17,6 @@ from scipy import spatial
 # local ----
 import utilities as ut
 from . import gizmo_io
-from rockstar import rockstar_io
-
-"""
-m12 halos
-
-m12i - latte
-mass.200m = 1.26e12, 12.10 (ref13_dm particles)
-mass.200m = 1.21e12, 12.08
-mass.vir = 1.12e12
-mass.200c = 0.956e12
-vel.circ.max = 162.3 km/s
-spin.bullock = 0.022
-spin.peebles = 0.020
-
-
-m12b - breve
-halo index = 591
-id = 5276
-mass.200m = 1.50e12, 12.18 (ref12_dm particles)
-mass.200m = 1.46e12, 12.16 M_sun
-mass.vir = 1.37e12 M_sun
-mass.200c = 1.19e12 M_sun
-vel.circ.max = 179 km/s
-spin.bullock = 0.041
-spin.peebles = 0.039
-position = 27920.50, 30227.88, 30514.92 kpc
-
-m12c - cappuccino
-halo index = 640
-id = 199769
-mass.200m = 1.39e12, 12.14 M_sun (ref12_dm particles)
-mass.200m = 1.36e12, 12.13 M_sun
-mass.vir = 1.28e12 M_sun
-mass.200c = 1.07e12 M_sun
-vel.circ.max = 151.6 km/s
-spin.bullock = 0.027
-spin.peebles = 0.022
-position = 35332.00, 47821.44, 54843.54 kpc
-
-m12m - macchiato
-halo index = 552
-id = 75486
-mass.200m = 1.57e12, 12.20 M_sun (ref12_dm particles)
-mass.200m = 1.55e12, 12.19 M_sun
-mass.vir = 1.43e12 M_sun
-mass.200c = 1.20e12 M_sun
-vel.circ.max = 169.5 km/s
-spin.bullock = 0.044
-spin.peebles = 0.039
-position = 37564.46, 32272.74, 54119.02 kpc
-
-m12f - flatwhite
-halo index = 486
-id = 131989
-mass.200m = 1.77e12
-mass.vir = 1.60e12
-mass.200c = 1.32e12
-vel.circ.max = 176.8
-spin.bullock = 0.055
-spin.peebles = 0.047
-position = 47399.19, 50992.88, 48106.79
-
-m12o - cortado
-halo index = 674
-id = 132251
-mass.200m = 1.27e12
-mass.vir = 1.13e12
-mass.200c = 8.79e11
-vel.circ.max = 164.1
-spin.bullock = 0.064
-spin.peebles = 0.054
-position = 36860.04, 65798.20, 25176.82
-
-531 - major merger at z = 0
-573 - low spin
-587 - mid spin
-624 - low spin
-629 - high spin, some massive neighbors
-647 - med spin
-674 - high spin, some massive neighbors
-693 - low spin
-768 - high spin, massive neighbor inside
-
-melange
-"""
 
 
 #===================================================================================================
@@ -133,6 +48,8 @@ class ReadClass():
         parts : list : catalogs of particles at initial and final snapshots
         hal : list : catalog of halos at final snapshot
         '''
+        from rockstar import rockstar_io
+
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
 
@@ -167,6 +84,8 @@ class ReadClass():
         -------
         hal : list : catalog of halos at final snapshot
         '''
+        from rockstar import rockstar_io
+
         hal = rockstar_io.Rockstar.read_catalog(
             'index', self.snapshot_indices[0], self.simulation_directory, sort_by_mass=True,
             sort_host_first=False)
