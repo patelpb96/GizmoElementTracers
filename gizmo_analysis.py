@@ -2342,7 +2342,7 @@ def get_galaxy_mass_profiles_v_redshift(
     parts=None):
     '''
     Read snapshots and store dictionary of galaxy/halo position, velocity, size, mass at input
-    scale-factors.
+    scale-factors, for Shea.
 
     Parameters
     ----------
@@ -2355,23 +2355,24 @@ def get_galaxy_mass_profiles_v_redshift(
     '''
     from . import gizmo_io
 
+    species_read = ['star', 'dark']
+    properties_read = ['mass', 'position', 'velocity', 'potential']
+
     star_distance_max = 20
     dark_distance_max = 50
 
-    property_names = ['mass', 'position', 'velocity', 'potential']
-
-    species_read = ['star', 'dark']
-    spec_name = 'star'
-    mass_percents = [90]
+    profile_spec_name = 'star'
+    profile_mass_percents = [50, 90]
 
     gal = {
         'index': [],
         'redshift': [],
         'scalefactor': [],
         'time': [],
+        'time.lookback': [],
 
-        'position': [],
-        'velocity': [],
+        'star.position': [],
+        'star.velocity': [],
         'dark.position': [],
         'dark.velocity': [],
         'rotation.tensor': [],
@@ -2387,12 +2388,11 @@ def get_galaxy_mass_profiles_v_redshift(
         'profile.major.density': [],
     }
 
-    for mass_percent in mass_percents:
+    for mass_percent in profile_mass_percents:
         mass_percent_name = '{:.0f}'.format(mass_percent)
 
         gal['radius.3d.' + mass_percent_name] = []
         gal['mass.3d.' + mass_percent_name] = []
-        gal['profile.3d.distance'] = []
 
         gal['radius.major.' + mass_percent_name] = []
         gal['mass.major.' + mass_percent_name] = []
@@ -2405,15 +2405,15 @@ def get_galaxy_mass_profiles_v_redshift(
             part = parts[zi]
         else:
             part = gizmo_io.Gizmo.read_snapshot(
-                species_read, 'redshift', redshift, directory, property_names=property_names,
+                species_read, 'redshift', redshift, directory, property_names=properties_read,
                 force_float32=True)
 
-        for k in ['redshift', 'scalefactor', 'time']:
+        for k in ['index', 'redshift', 'scalefactor', 'time', 'time.lookback']:
             gal[k].append(part.snapshot[k])
 
         # get position and velocity
-        gal['position'].append(part.center_position)
-        gal['velocity'].append(part.center_velocity)
+        gal['star.position'].append(part.center_position)
+        gal['star.velocity'].append(part.center_velocity)
 
         gal['dark.position'].append(ut.particle.get_center_position(part, 'dark', 'potential'))
         gal['dark.velocity'].append(
@@ -2421,59 +2421,56 @@ def get_galaxy_mass_profiles_v_redshift(
 
         # get radius_90 as fiducial
         gal_radius_90, _gal_mass_90 = ut.particle.get_galaxy_radius_mass(
-            part, spec_name, 'mass.percent', mass_percent, star_distance_max)
+            part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max)
 
         rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
-            part, spec_name, gal_radius_90, scalarize=True)
+            part, profile_spec_name, gal_radius_90, scalarize=True)
 
         gal['rotation.tensor'].append(rotation_vectors)
         gal['axis.ratio'].append(axis_ratios)
 
-        for mass_percent in mass_percents:
+        for mass_percent in profile_mass_percents:
             mass_percent_name = '{:.0f}'.format(mass_percent)
 
             gal_radius, gal_mass = ut.particle.get_galaxy_radius_mass(
-                part, spec_name, 'mass.percent', mass_percent, star_distance_max)
+                part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max)
             gal['radius.3d.' + mass_percent_name].append(gal_radius)
             gal['mass.3d.' + mass_percent_name].append(gal_mass)
 
             gal_radius_minor, gal_mass_minor = ut.particle.get_galaxy_radius_mass(
-                part, spec_name, 'mass.percent', mass_percent, star_distance_max,
+                part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='minor', rotation_vectors=rotation_vectors,
                 other_axis_distance_max=gal_radius_90)
             gal['radius.minor.' + mass_percent_name].append(gal_radius_minor)
             gal['mass.minor.' + mass_percent_name].append(gal_mass_minor)
 
             gal_radius_major, gal_mass_major = ut.particle.get_galaxy_radius_mass(
-                part, spec_name, 'mass.percent', mass_percent, star_distance_max,
+                part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='major', rotation_vectors=rotation_vectors,
                 other_axis_distance_max=gal_radius_minor)
             gal['radius.major.' + mass_percent_name].append(gal_radius_major)
             gal['mass.major.' + mass_percent_name].append(gal_mass_major)
 
         pro = plot_property_v_distance(
-            part, spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_spec_name, 'mass', 'density', 'log', False, None,
             [0.1, 20], 0.1, None, 'log', 3,
             rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
-
         for k in ['distance', 'density']:
-            gal['profile.3d.' + k].append(pro[spec_name][k])
+            gal['profile.3d.' + k].append(pro[profile_spec_name][k])
 
         pro = plot_property_v_distance(
-            part, spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_spec_name, 'mass', 'density', 'log', False, None,
             [0.1, 20], 0.1, None, 'log', 1,
             rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
-
         for k in ['distance', 'density']:
-            gal['profile.minor.' + k].append(pro[spec_name][k])
+            gal['profile.minor.' + k].append(pro[profile_spec_name][k])
 
         pro = plot_property_v_distance(
-            part, spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_spec_name, 'mass', 'density', 'log', False, None,
             [0.1, 20], 0.1, None, 'log', 2,
             rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
-
         for k in ['distance', 'density']:
-            gal['profile.major.' + k].append(pro[spec_name][k])
+            gal['profile.major.' + k].append(pro[profile_spec_name][k])
 
     for prop in gal:
         gal[prop] = np.array(gal[prop])
@@ -2499,7 +2496,8 @@ def print_galaxy_mass_v_redshift(gal):
         print('{:.5f} {:.5f} {:.5f} '.format(
               gal['redshift'][ti], gal['scalefactor'][ti], gal['time'][ti]), end='')
         print('{:.3f} {:.3f} {:.3f} '.format(
-              gal['position'][ti][0], gal['position'][ti][1], gal['position'][ti][2]), end='')
+              gal['star.position'][ti][0], gal['star.position'][ti][1],
+              gal['star.position'][ti][2]), end='')
         print('{:.3f} {:.3f} {:.3f} '.format(
               gal['star.velocity'][ti][0], gal['star.velocity'][ti][1],
               gal['star.velocity'][ti][2]), end='')
