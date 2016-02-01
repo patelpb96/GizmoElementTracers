@@ -2580,7 +2580,7 @@ def print_galaxy_mass_v_redshift(gal):
 #===================================================================================================
 class CompareSimulationsClass(ut.io.SayClass):
     '''
-    .
+    Plot different simulations on same figure for comparison.
     '''
     def __init__(self):
         '''
@@ -2635,6 +2635,14 @@ class CompareSimulationsClass(ut.io.SayClass):
         property_names=['mass', 'position', 'form.time'], force_float32=True):
         '''
         Read snapshots from simulations.
+
+        Parameters
+        ----------
+        simulation_names : list : list of simulation directories and name/label for figure.
+        redshift : float
+        species : string or list : particle species to read
+        property_names : string or list : names of properties to read
+        force_float32 : boolean : whether to force positions to be 32-bit
         '''
         from . import gizmo_io
 
@@ -2671,11 +2679,20 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         return parts
 
-    def plot_simulations(
+    def plot_profiles(
         self, parts=None, simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
         species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
         '''
-        Plot various properties, comparing all simulations at fixed redshift.
+        Plot profiles of various properties, comparing all simulations at each redshift.
+
+        Parameters
+        ----------
+        parts : list : dictionaries of particles at snapshot
+        simulation_names : list : list of simulation directories and name/label for figure.
+        redshifts : float or list
+        species : string or list : particle species to read
+        property_names : string or list : names of properties to read
+        force_float32 : boolean : whether to force positions to be 32-bit
         '''
         if np.isscalar(redshifts):
             redshifts = [redshifts]
@@ -2729,17 +2746,44 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'mass', 'redshift', [0, 6], 0.2, 'lin', distance_limits=[0, 15],
                     axis_y_limits=[None, None], write_plot=True)
 
+            self.plot_images(parts)
+
+    def plot_images(
+        self, parts=None, align_principal_axes=True,
+        simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+        '''
+        Plot images of simulations at each snapshot.
+
+        Parameters
+        ----------
+        parts : list : dictionaries of particles at snapshot
+        align_principal_axes : boolean : whether to align plot axes with principal axes
+        simulation_names : list : list of simulation directories and name/label for figure.
+        redshifts : float or list
+        species : string or list : particle species to read
+        property_names : string or list : names of properties to read
+        force_float32 : boolean : whether to force positions to be 32-bit
+        '''
+        if np.isscalar(redshifts):
+            redshifts = [redshifts]
+
+        for redshift in redshifts:
+            if parts is None:
+                parts = self.read_simulations(
+                    simulation_names, redshift, species, property_names, force_float32)
+
             for part in parts:
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
                         if spec_name == 'star':
-                            image_limits = [10 ** 7.5, 10 ** 10]
+                            image_limits = [10 ** 7, 10 ** 10]
                         elif spec_name == 'gas':
                             image_limits = [10 ** 7, 10 ** 9.5]
 
                         plot_image(
                             part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.05,
-                            image_limits=image_limits, align_principal_axes=True,
+                            image_limits=image_limits, align_principal_axes=align_principal_axes,
                             write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()
