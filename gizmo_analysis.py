@@ -2698,7 +2698,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             redshifts = [redshifts]
 
         for redshift in redshifts:
-            if parts is None:
+            if parts is None or len(redshifts) > 1:
                 parts = self.read_simulations(
                     simulation_names, redshift, species, property_names, force_float32)
 
@@ -2751,7 +2751,7 @@ class CompareSimulationsClass(ut.io.SayClass):
     def plot_images(
         self, parts=None, align_principal_axes=True,
         simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
+        species=['star', 'gas'], property_names=['mass', 'position'], force_float32=False):
         '''
         Plot images of simulations at each snapshot.
 
@@ -2765,11 +2765,14 @@ class CompareSimulationsClass(ut.io.SayClass):
         property_names : string or list : names of properties to read
         force_float32 : boolean : whether to force positions to be 32-bit
         '''
+        distance_max = 15
+        distance_bin_width = 0.05
+
         if np.isscalar(redshifts):
             redshifts = [redshifts]
 
         for redshift in redshifts:
-            if parts is None:
+            if parts is None or len(redshifts) > 1:
                 parts = self.read_simulations(
                     simulation_names, redshift, species, property_names, force_float32)
 
@@ -2782,7 +2785,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                             image_limits = [10 ** 7, 10 ** 9.5]
 
                         plot_image(
-                            part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.05,
+                            part, spec_name, [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                             image_limits=image_limits, align_principal_axes=align_principal_axes,
                             write_plot=True, add_simulation_name=True)
 
