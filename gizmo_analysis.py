@@ -1555,7 +1555,7 @@ def plot_property_v_distance_halos(
         options: 'dark', 'star', 'gas', 'baryon', 'total'
     prop_name : string : property to get profile of
     prop_statistic : string : statistic/type to plot:
-        sum, sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction, med, ave
+        'sum', sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction, med, ave'
     prop_scaling : string : scaling for property (y-axis): 'log', 'lin'
     weight_by_mass : boolean : whether to weight property by particle mass
     prop_limits : list : limits to impose on y-axis
@@ -1586,9 +1586,8 @@ def plot_property_v_distance_halos(
 
     SpeciesProfile = SpeciesProfileClass()
 
+    pros = []
     if hals is not None:
-        pros = []
-
         for cat_i, hal in enumerate(hals):
             part = parts[cat_i]
             hal_indices = hal_indicess[cat_i]
@@ -1641,8 +1640,8 @@ def plot_property_v_distance_halos(
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
     plot_func = ut.plot.get_plot_function(subplot, distance_scaling, prop_scaling)
-    colors = ut.plot.get_colors(len(hals))
 
+    # draw reference values
     if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
         if 'fraction' in prop_statistic:
             y_values = [1, 1]
@@ -1652,23 +1651,39 @@ def plot_property_v_distance_halos(
             y_values = [0, 0]
         plot_func(distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
 
-    alpha = 0.7
-    linewidth = 2.0
-
-    for cat_i, hal in enumerate(hals):
-        hal_indices = hal_indicess[cat_i]
-        for hal_ii, hal_i in enumerate(hal_indices):
-            plot_func(
-                pros[cat_i][hal_ii][species]['distance'],
-                pros[cat_i][hal_ii][species][prop_statistic],
-                color=colors[cat_i],
-                linestyle='-', alpha=alpha, linewidth=linewidth,
-                #label=parts[part_i].info['simulation.name'],
-            )
-
     if distance_reference is not None:
         plot_func([distance_reference, distance_reference], prop_limits,
                   color='black', linestyle=':', alpha=0.6)
+
+    # draw actual values
+    alpha = 0.7
+    linewidth = 2.0
+
+    if hals is not None:
+        colors = ut.plot.get_colors(len(hals))
+        for cat_i, hal in enumerate(hals):
+            hal_indices = hal_indicess[cat_i]
+            for hal_ii, hal_i in enumerate(hal_indices):
+                plot_func(
+                    pros[cat_i][hal_ii][species]['distance'],
+                    pros[cat_i][hal_ii][species][prop_statistic],
+                    color=colors[cat_i],
+                    linestyle='-', alpha=alpha, linewidth=linewidth,
+                    #label=parts[part_i].info['simulation.name'],
+                )
+
+    if gal is not None:
+        subplot.set_xscale('log')
+        gis = ut.array.get_indices(gal['star.mass'], [1e5, Inf])
+        gis = ut.array.get_indices(gal['host.distance'], [0, 300], gis)
+        gis = ut.array.get_indices(gal['host.name'], [0, 300], gis)
+        for gal_i in gis:
+            print(gal['star.radius.50'][gal_i])
+            subplot.errorbar(
+                gal['star.radius.50'][gal_i], gal['star.vel.std'][gal_i],
+                gal['star.vel.std.err'][gal_i], color='black', marker='o',
+                alpha=alpha, linewidth=linewidth,
+            )
 
     # redshift legend
     legend_z = None
@@ -1688,8 +1703,9 @@ def plot_property_v_distance_halos(
             subplot.add_artist(legend_z)
     """
 
-    plot_name = (species + '.' + prop_name + '.' + prop_statistic + '_v_dist_z.{:.1f}'.format(
-                 part.info['redshift']))
+    plot_name = species + '.' + prop_name + '.' + prop_statistic + '_v_dist'
+    if parts is not None:
+        plot_name += '_z.{:.1f}'.format(parts[0].info['redshift'])
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
@@ -1700,25 +1716,29 @@ def plot_vel_circ_v_distance_halos(
     hals=None, parts=None, gal=None,
     total_mass_limits=[1e8, 9e11], host_distance_limits=[1, 300],
     sort_prop_name='vel.circ.max', halo_number=10,
-    vel_circ_limits=[8, 50], vel_circ_scaling='lin',
+    vel_circ_limits=[0, 50], vel_circ_scaling='lin',
     distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     .
     '''
-    hal_indicess = []
-    for hal in hals:
-        his = ut.array.get_indices(hal['total.mass'], total_mass_limits)
-        his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
-        if 'star.indices' in hal:
-            his = ut.array.get_indices(hal['star.mass.part'], [1, Inf], his)
-        else:
-            his = his[np.argsort(hal[sort_prop_name][his])]
-            his = his[::-1]
-            his = his[: halo_number]
-        print(hal[sort_prop_name][his])
-        hal_indicess.append(his)
+    hal_indicess = None
+
+    if hals is not None:
+        hal_indicess = []
+        for hal in hals:
+            his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.5, Inf])
+            his = ut.array.get_indices(hal['total.mass'], total_mass_limits)
+            his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
+            if 'star.indices' in hal:
+                his = ut.array.get_indices(hal['star.mass.part'], [1, Inf], his)
+            else:
+                his = his[np.argsort(hal[sort_prop_name][his])]
+                his = his[::-1]
+                his = his[: halo_number]
+            print(hal[sort_prop_name][his])
+            hal_indicess.append(his)
 
     plot_property_v_distance_halos(
         hals, hal_indicess, parts, gal,
@@ -2375,6 +2395,7 @@ def get_galaxy_mass_profiles_v_redshift(
         'star.velocity': [],
         'dark.position': [],
         'dark.velocity': [],
+
         'rotation.tensor': [],
         'axis.ratio': [],
 
@@ -2530,11 +2551,17 @@ class CompareSimulationsClass(ut.io.SayClass):
             # first ref13
             ['fb-aniso-angle-max/m12i_ref13', 'r13 aniso anglemax n100'],
 
+            # anisotropic
             ['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
             ['fb-aniso/m12i_ref12', 'r12 aniso'],
             ['fb-aniso/m12i_ref13', 'r13 aniso'],
-            ['/scratch/01799/phopkins/m12i_hybrid_test/quadratic_test', 'r12 mom-cons'],
 
+            # symmetric
+            ['/scratch/01799/phopkins/m12i_hybrid_test/quadratic_test', 'r12 sym'],
+            ['fb-sym/m12i_ref12', 'r12 sym'],
+            ['fb-sym/m12i_ref13', 'r13 sym'],
+
+            # isotropic
             ['fb-iso/m12i_ref11', 'r11 iso'],
             ['fb-iso/m12i_ref12', 'r12 iso'],
             ['fb-iso/m12i_ref13', 'r13 iso'],
@@ -2542,22 +2569,22 @@ class CompareSimulationsClass(ut.io.SayClass):
             ['fb-iso/m12i_ref12_sfn100', 'r12 iso n100'],
             ['fb-iso/m12i_ref13_sfn100', 'r13 iso n100'],
 
-            # test adaptive resolution
+            # adaptive resolution
             #['fb-iso/m12i_ref12_res-adapt', 'r12 iso res-adapt'],
             #['fb-iso/m12i_ref13_res-adapt', 'r13 iso res-adapt'],
 
-            # test maximum radius of coupling
+            # maximum radius of coupling
             #['fb-iso-radius-max/m12i_ref12_rmax1kpc', 'r12 iso rmax1kpc'],
             #['fb-iso-radius-max/m12i_ref13_rmax1kpc', 'r13 iso rmax1kpc'],
             #['fb-iso-radius-max/m12i_ref12_rmax10h', 'r12 iso rmax10h'],
             #['fb-iso-radius-max/m12i_ref13_rmax10h', 'r13 iso rmax10h'],
 
-            # compare different halos
-            ['m12i/fb-iso/m12i_ref12', 'latte r12'],
-            ['m12b/m12b_ref12', 'breve r12'],
-            ['m12m/m12m_ref12', 'macchiato r12'],
-            ['m12c/m12c_ref12', 'cappuccino r12'],
-            ['m12f/m12f_ref12', 'flatwhite r12'],
+            # different halos
+            ['m12i/fb-sym/m12i_ref12', 'latte r12'],
+            ['m12b/m12b_ref12_fb-sym', 'breve r12'],
+            ['m12m/m12m_ref12_fb-sym', 'macchiato r12'],
+            ['m12c/m12c_ref12_fb-sym', 'cappuccino r12'],
+            ['m12f/m12f_ref12_fb-sym', 'flatwhite r12'],
 
         ]
 
@@ -2663,9 +2690,14 @@ class CompareSimulationsClass(ut.io.SayClass):
             for part in parts:
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
+                        if spec_name == 'star':
+                            image_limits = [10 ** 7.5, 10 ** 10]
+                        elif spec_name == 'gas':
+                            image_limits = [10 ** 7, 10 ** 9.5]
+
                         plot_image(
                             part, spec_name, [0, 1, 2], [0, 1, 2], 15, 0.05,
-                            image_limits=[3e7, 1e10], align_principal_axes=True,
+                            image_limits=image_limits, align_principal_axes=True,
                             write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()

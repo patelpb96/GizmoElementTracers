@@ -29,11 +29,10 @@ element_dict['nitrogen'] = 3
 element_dict['oxygen'] = 4
 element_dict['neon'] = 5
 element_dict['magnesium'] = 6
-element_dict['silicon'] = 7,
-element_dict['sulphur'] = 8,
+element_dict['silicon'] = 7
+element_dict['sulphur'] = 8
 element_dict['calcium'] = 9
 element_dict['iron'] = 10
-element_dict['ironderived'] = 0
 
 
 class ParticleDictionaryClass(dict):
@@ -160,9 +159,9 @@ class ParticleDictionaryClass(dict):
             else:
                 values = self['metallicity'][indices, metal_index]
 
-            if '.ironderived' in property_name:
-                # conversion to [Fe/H] solar from Ma et al 2015
-                values = values / 10 ** 0.2 * 0.02
+            #if '.ironderived' in property_name:
+            #    # conversion to [Fe/H] solar from Ma et al 2015
+            #    values = values / 10 ** 0.2 * 0.02
 
             if '.solar' in property_name:
                 values = values / ut.const.sun_composition[metal_name + '.mass.fraction']
@@ -193,10 +192,10 @@ class GizmoClass(ut.io.SayClass):
         self.eos = 5 / 3  # gas equation of state
 
     def read_snapshot(
-        self, species_types='all', snapshot_number_kind='index', snapshot_number=600,
+        self, species_types='all',
+        snapshot_number_kind='index', snapshot_number=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
-        property_names='all', property_names_exclude=[],
-        metal_index_max=1, particle_subsample_factor=0,
+        property_names='all', metal_index_max=1, particle_subsample_factor=0,
         assign_center=True, sort_dark_by_id=False, force_float32=False, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -206,14 +205,12 @@ class GizmoClass(ut.io.SayClass):
         ----------
         species_types : string or int, or list of these : type[s] of particle species - options:
             'all' = all species in file
-            0 or gas = gas
-            1 or dark = dark matter at highest resolution
-            2 or dark.2 = dark matter at 2nd highest resolutions for cosmological
-            3 or dark.3 = dark matter at 3rd highest resolutions for cosmological
-            4 or star = stars
-            5 or dark.4 = dark matter at all lower resolutions for cosmological, non black hole runs
-            5 or black.hole = black holes, if run contains them
-            2 or bulge, 3 or disk = stars for non-cosmological run
+            0 or 'gas' = gas
+            1 or 'dark' = dark matter at highest resolution
+            2 or 'dark.2' = dark matter at lower resolution for cosmological
+            4 or 'star' = stars
+            5 or 'blackhole' = black holes, if run contains them
+            2 or 'bulge', 3 or 'disk' = stars for non-cosmological run
         snapshot_number_kind : string : input snapshot number kind: index, redshift
         snapshot_number : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
@@ -222,8 +219,6 @@ class GizmoClass(ut.io.SayClass):
         property_names : string or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_name_dict
-        property_names_exclude : string or list : name[s] of particle properties not to read
-            note: can use this instead of property_names if just want to exclude a few properties
         metal_index_max : int : maximum metal index to keep
             options: None = keep all, 0 = total, 1 = total + helium, 10 = iron (no r-process)
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
@@ -245,7 +240,7 @@ class GizmoClass(ut.io.SayClass):
             # 'bulge': 2,
             # 'disk': 3,
             'star': 4,
-            # 'black.hole': 5,
+            # 'blackhole': 5,
             'dark.4': 5,
 
             # use below types to divvy out coarser dark matter
@@ -264,7 +259,7 @@ class GizmoClass(ut.io.SayClass):
             'dark.4',
             'gas',
             'star',
-            'black.hole',
+            'blackhole',
             'bulge',
             'disk',
         ]
@@ -393,16 +388,6 @@ class GizmoClass(ut.io.SayClass):
             property_names = property_names_temp
             del(property_names_temp)
 
-        if property_names_exclude:
-            if np.isscalar(property_names_exclude):
-                property_names_exclude = [property_names_exclude]  # ensure is list
-            for prop_name in property_names_exclude:
-                prop_name = str.lower(prop_name)
-                for prop_name_in in property_names:
-                    if (prop_name == str.lower(prop_name_in) or
-                            prop_name == str.lower(property_name_dict[prop_name_in])):
-                        property_names.remove(prop_name_in)
-
         if 'InternalEnergy' in property_names:
             # need helium and electron fraction to compute temperature
             for prop_name in ['ElectronAbundance', 'Metallicity']:
@@ -429,7 +414,7 @@ class GizmoClass(ut.io.SayClass):
             prop_name = header_name_dict[prop_name_in]
             header[prop_name] = header_in[prop_name_in]  # transfer to custom header dict
 
-        # infer whether simulation is cosmological
+        # determine whether simulation is cosmological
         if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] < 1 and
                 0 < header['omega_lambda'] < 1):
             header['is.cosmological'] = True
@@ -485,11 +470,11 @@ class GizmoClass(ut.io.SayClass):
             file_in.close()
             return header
 
-        ## end reading header ##
+        ## finish reading header ##
 
         # assign cosmological parameters
         if header['is.cosmological']:
-            # assume that cosmology parameters not in header are from AGORA
+            # for cosmology parameters not in header, assume those from AGORA
             omega_baryon = 0.0455
             sigma_8 = 0.807
             n_s = 0.961
@@ -608,7 +593,6 @@ class GizmoClass(ut.io.SayClass):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
                     spec_name = 'dark.{}'.format(dark_i + 2)
 
-                    #part[spec_name] = {}
                     part[spec_name] = ParticleDictionaryClass()
 
                     for prop_name in dark_lowres:
@@ -658,7 +642,7 @@ class GizmoClass(ut.io.SayClass):
                 part[spec_name]['velocity'] *= np.sqrt(header['scalefactor'])
 
             if 'density' in part[spec_name]:
-                # convert to {M_sun / kpc ** 3 physical}
+                # convert to {M_sun / kpc ^ 3 physical}
                 part[spec_name]['density'] *= (1e10 / header['hubble'] /
                                                (header['scalefactor'] / header['hubble']) ** 3)
 
@@ -742,7 +726,6 @@ class GizmoClass(ut.io.SayClass):
         part.center_position = []
         part.center_velocity = []
         if assign_center:
-            # assign center now
             self.assign_center(part)
 
         return part
