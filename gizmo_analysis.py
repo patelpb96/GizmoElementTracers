@@ -2749,7 +2749,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             self.plot_images(parts)
 
     def plot_images(
-        self, parts=None, align_principal_axes=True,
+        self, parts=None, distance_max=15, distance_bin_width=0.05, align_principal_axes=True,
         simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
         species=['star', 'gas'], property_names=['mass', 'position'], force_float32=False):
         '''
@@ -2758,6 +2758,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
+        distance_max : float : maximum distance from center to plot
+        distance_bin_width : float : distance bin width (pixel size)
         align_principal_axes : boolean : whether to align plot axes with principal axes
         simulation_names : list : list of simulation directories and name/label for figure.
         redshifts : float or list
@@ -2765,9 +2767,6 @@ class CompareSimulationsClass(ut.io.SayClass):
         property_names : string or list : names of properties to read
         force_float32 : boolean : whether to force positions to be 32-bit
         '''
-        distance_max = 15
-        distance_bin_width = 0.05
-
         if np.isscalar(redshifts):
             redshifts = [redshifts]
 
