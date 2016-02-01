@@ -240,7 +240,7 @@ class GizmoClass(ut.io.SayClass):
             # 'bulge': 2,
             # 'disk': 3,
             'star': 4,
-            # 'blackhole': 5,
+            #'blackhole': 5,
             'dark.4': 5,
 
             # use below types to divvy out coarser dark matter
@@ -706,7 +706,7 @@ class GizmoClass(ut.io.SayClass):
         for spec_name in species_names:
             part[spec_name].info = part.info
 
-        # store information on snapshot time
+        # store information about snapshot time
         time = Cosmology.get_time_from_redshift(header['redshift'])
         part.snapshot = {
             'index': snapshot_index,

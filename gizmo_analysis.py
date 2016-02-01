@@ -12,6 +12,7 @@ from __future__ import absolute_import, division, print_function
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
+import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib import colors
@@ -417,11 +418,6 @@ class SpeciesProfileClass(ut.io.SayClass):
             for spec_name in species:
                 pros[spec_name]['vel.circ'] = ut.halo_property.get_circular_velocity(
                     pros[spec_name]['sum.cum'], pros[spec_name]['distance.cum'])
-                #pros[spec_name]['vel.circ'] = (
-                #    pros[spec_name]['sum.cum'] / pros[spec_name]['distance.cum'] *
-                #    ut.const.grav_kpc_msun_yr)
-                #pros[spec_name]['vel.circ'] = np.sqrt(pros[spec_name]['vel.circ'])
-                #pros[spec_name]['vel.circ'] *= ut.const.km_per_kpc * ut.const.yr_per_sec
 
         return pros
 
@@ -1538,7 +1534,7 @@ def plot_property_v_distance(
 
 
 def plot_property_v_distance_halos(
-    hals=None, hal_indicess=None, parts=None, gal=None,
+    parts=None, hals=None, hal_indicess=None, gal=None, gal_indices=None,
     species='total',
     prop_name='mass', prop_statistic='vel.circ', prop_scaling='lin', weight_by_mass=False,
     prop_limits=[],
@@ -1547,10 +1543,11 @@ def plot_property_v_distance_halos(
     distance_reference=None, label_redshift=True,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
+    parts : dict or list : catalog[s] of particles at snapshot
     hals : dict or list : catalog[s] of halos at snapshot
     hal_indicess : array (halo catalog number x halo number) : indices of halos to plot
-    parts : dict or list : catalog[s] of particles at snapshot
     gal : dict : catalog of observed galaxies
+    gal_indices : array : indices of galaxies to plot
     species : string or list : species to compute total mass of
         options: 'dark', 'star', 'gas', 'baryon', 'total'
     prop_name : string : property to get profile of
@@ -1580,9 +1577,11 @@ def plot_property_v_distance_halos(
     if isinstance(parts, dict):
         parts = [parts]
 
+    distance_limits_bin = [0.1, 1.2]  # overwrite for TBTF figure
+
     DistanceBin = ut.binning.DistanceBinClass(
-        distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
-        dimension_number=dimension_number)
+        distance_scaling, distance_limits_bin, width=distance_bin_width,
+        number=distance_bin_number, dimension_number=dimension_number)
 
     SpeciesProfile = SpeciesProfileClass()
 
@@ -1620,12 +1619,18 @@ def plot_property_v_distance_halos(
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     subplot.set_xlim(distance_limits)
+    subplot.set_xscale(distance_scaling.replace('lin', 'linear'))
+    if 'log' in distance_scaling:
+        subplot.xaxis.set_ticks([0.1, 0.2, 0.3, 0.5, 1, 2])
+        subplot.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
+
     y_values = []
     for pro_cat in pros:
         for pro_hal in pro_cat:
             y_values.append(pro_hal[species][prop_statistic])
     prop_limits = ut.plot.get_axis_limits(y_values, prop_scaling, prop_limits)
     subplot.set_ylim(prop_limits)
+    subplot.set_yscale(prop_scaling.replace('lin', 'linear'))
 
     subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
 
@@ -1673,16 +1678,13 @@ def plot_property_v_distance_halos(
                 )
 
     if gal is not None:
-        subplot.set_xscale('log')
-        gis = ut.array.get_indices(gal['star.mass'], [1e5, Inf])
-        gis = ut.array.get_indices(gal['host.distance'], [0, 300], gis)
-        gis = ut.array.get_indices(gal['host.name'], [0, 300], gis)
+        gis = ut.array.get_indices(gal['star.radius.50'], distance_limits, gal_indices)
         for gal_i in gis:
-            print(gal['star.radius.50'][gal_i])
             subplot.errorbar(
-                gal['star.radius.50'][gal_i], gal['star.vel.std'][gal_i],
-                gal['star.vel.std.err'][gal_i], color='black', marker='o',
-                alpha=alpha, linewidth=linewidth,
+                gal['star.radius.50'][gal_i], gal['vel.circ.50'][gal_i],
+                [[gal['vel.circ.50.err.lo'][gal_i]], [gal['vel.circ.50.err.hi'][gal_i]]],
+                color='black', marker='s', markersize=10, alpha=alpha,
+                linewidth=2.5, capthick=2.5,
             )
 
     # redshift legend
@@ -1713,9 +1715,9 @@ def plot_property_v_distance_halos(
 
 
 def plot_vel_circ_v_distance_halos(
-    hals=None, parts=None, gal=None,
-    total_mass_limits=[1e8, 9e11], host_distance_limits=[1, 300],
-    sort_prop_name='vel.circ.max', halo_number=10,
+    parts=None, hals=None, gal=None,
+    total_mass_limits=[1e7, Inf], star_mass_limits=[1e5, Inf], host_distance_limits=[1, 310],
+    sort_prop_name='vel.circ.max', halo_number=20,
     vel_circ_limits=[0, 50], vel_circ_scaling='lin',
     distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log',
@@ -1724,15 +1726,14 @@ def plot_vel_circ_v_distance_halos(
     .
     '''
     hal_indicess = None
-
     if hals is not None:
         hal_indicess = []
         for hal in hals:
-            his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.5, Inf])
-            his = ut.array.get_indices(hal['total.mass'], total_mass_limits)
+            his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
+            his = ut.array.get_indices(hal['total.mass'], total_mass_limits, his)
             his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
             if 'star.indices' in hal:
-                his = ut.array.get_indices(hal['star.mass.part'], [1, Inf], his)
+                his = ut.array.get_indices(hal['star.mass.part'], star_mass_limits, his)
             else:
                 his = his[np.argsort(hal[sort_prop_name][his])]
                 his = his[::-1]
@@ -1740,11 +1741,44 @@ def plot_vel_circ_v_distance_halos(
             print(hal[sort_prop_name][his])
             hal_indicess.append(his)
 
+    gal_indices = None
+    if gal is not None:
+        gal_indices = ut.array.get_indices(gal['star.mass'], star_mass_limits)
+        gal_indices = ut.array.get_indices(gal['host.distance'], host_distance_limits, gal_indices)
+        gal_indices = gal_indices[gal['host.name'][gal_indices] == 'MW'.encode()]
+
     plot_property_v_distance_halos(
-        hals, hal_indicess, parts, gal,
+        parts, hals, hal_indicess, gal, gal_indices,
         'total', 'mass', 'vel.circ', vel_circ_scaling, False, vel_circ_limits,
         distance_limits, distance_bin_width, distance_bin_number, distance_scaling, 3, None, False,
         write_plot, plot_directory, figure_index)
+
+
+def assign_vel_circ_at_radius(
+    hal, part, radius=0.4, sort_prop_name='vel.circ.max', sort_prop_min=20, halo_number=100,
+    host_distance_limits=[1, 310]):
+    '''
+    .
+    '''
+    his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
+    his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
+    his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_min, Inf], his)
+    ut.io.print_flush(his.size)
+    his = his[np.argsort(hal[sort_prop_name][his])]
+    his = his[::-1][: halo_number]
+    ut.io.print_flush(hal[sort_prop_name][his[-1]])
+
+    mass_key = 'vel.circ.rad.{:.1f}'.format(radius)
+    hal[mass_key] = np.zeros(hal['total.mass'].size)
+    dark_mass = np.median(part['dark']['mass'])
+
+    for hii, hi in enumerate(his):
+        if hii > 0 and hii % 10 == 0:
+            ut.io.print_flush(hii)
+        pis = ut.particle.get_indices_within_distances(
+            part, 'dark', [0, radius], hal['position'][hi], scalarize=True)
+        hal[mass_key][hi] = ut.halo_property.get_circular_velocity(
+            pis.size * dark_mass, radius)
 
 
 #===================================================================================================
@@ -2007,20 +2041,20 @@ def plot_star_form_history(
 
 
 def plot_star_form_history_galaxies(
-    hal=None, part=None, gals=None,
+    part=None, hal=None, gal=None,
     mass_kind='star.mass.part', mass_limits=[1e5, 1e9], other_prop_limits={}, hal_indices=None,
     sfh_kind='mass.normalized', sfh_limits=[], sfh_scaling='lin',
     time_kind='time.lookback', time_limits=[13.7, 0], time_width=0.2, time_scaling='lin',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
-    Plot star-formation rate history v time_kind.
+    Plot star-formation history v time_kind.
     Note: assumes instantaneous recycling of 30% of mass, should fix this for mass lass v time.
 
     Parameters
     ----------
-    hal : dict : catalog of halos at snapshot
     part : dict : catalog of particles
-    gals : dict : SFHs of observed galaxies in the Local Group
+    hal : dict : catalog of halos at snapshot
+    gal : dict : catalog of galaxies in the Local Group with SFHs
     mass_kind : string : mass kind by which to select halos
     mass_limits : list : min and max limits to impose on mass_kind
     other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -2054,8 +2088,7 @@ def plot_star_form_history_galaxies(
             hal_indices = ut.array.get_indices(hal.prop(mass_kind), mass_limits, hal_indices)
 
         if other_prop_limits:
-            hal_indices = ut.catalog.get_indices_catalog(
-                hal, other_prop_limits, hal_indices)
+            hal_indices = ut.catalog.get_indices_catalog(hal, other_prop_limits, hal_indices)
 
         hal_indices = hal_indices[np.argsort(hal.prop(mass_kind, hal_indices))]
 
@@ -2075,8 +2108,10 @@ def plot_star_form_history_galaxies(
             for k in sfh_h:
                 sfh[k].append(sfh_h[k])
 
-            Say.say('id = {:8d}, star.mass = {:.3e}, particle.number = {}'.format(
-                    hal_i, sfh_h['mass'].max(), part_indices.size))
+            Say.say(
+                'id = {:8d}, star.mass = {:.3e}, particle.number = {}, distance = {:.0f}'.format(
+                    hal_i, sfh_h['mass'].max(), part_indices.size,
+                    hal.prop('host.distance', hal_i)))
             #print(hal.prop('position', hal_i))
 
         for k in sfh:
@@ -2115,8 +2150,8 @@ def plot_star_form_history_galaxies(
 
     if hal is not None:
         colors = ut.plot.get_colors(len(hal_indices))
-    elif gals is not None:
-        colors = ut.plot.get_colors(len(gals))
+    elif gal is not None:
+        colors = ut.plot.get_colors(len(gal.sfhs))
 
     plot_func = ut.plot.get_plot_function(subplot, time_scaling, sfh_scaling)
 
@@ -2128,19 +2163,23 @@ def plot_star_form_history_galaxies(
             plot_func(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                       linewidth=3.0, color=colors[hal_ii], alpha=0.5, label=label)
 
-    if gals is not None:
-        for gal_i, gal_name in enumerate(gals):
+    if gal is not None:
+        gal_names = np.array(list(gal.sfh.keys()))
+        gal_indices = [gal['name.to.index'][gal_name] for gal_name in gal_names]
+        gal_masses = gal['star.mass'][gal_indices]
+        gal_names_sort = gal_names[np.argsort(gal_masses)]
+
+        for gal_i, gal_name in enumerate(gal_names_sort):
+            linestyle = '-'
             if hal is not None:
                 color = 'black'
                 linewidth = 2.0
                 alpha = 0.15
-                linestyle = '-'
             else:
                 color = colors[gal_i]
                 linewidth = 3.0
                 alpha = 0.5
-                linestyle = '-'
-            plot_func(gals[gal_name][time_kind], gals[gal_name][sfh_kind],
+            plot_func(gal.sfh[gal_name][time_kind], gal.sfh[gal_name][sfh_kind],
                       linewidth=linewidth, linestyle=linestyle, alpha=alpha, color=color)
 
     #plot_func(sfh['time'][0], sfh['mass.normalized.median'],
@@ -2166,10 +2205,13 @@ def plot_star_form_history_galaxies(
 
     sf_name = 'star' + '.' + sfh_kind
     plot_name = '{}_v_{}'.format(sf_name, time_kind)
-    if gals is not None:
+    if gal is not None:
         plot_name += '_lg'
     if hal is not None:
         plot_name += '_z.{:.1f}'.format(part.snapshot['redshift'])
+    if 'host.distance' in other_prop_limits:
+        plot_name += '_d.{:.0f}-{:.0f}'.format(
+            other_prop_limits['host.distance'][0], other_prop_limits['host.distance'][1])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
