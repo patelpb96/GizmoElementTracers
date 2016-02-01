@@ -2749,9 +2749,11 @@ class CompareSimulationsClass(ut.io.SayClass):
             self.plot_images(parts)
 
     def plot_images(
-        self, parts=None, distance_max=15, distance_bin_width=0.05, align_principal_axes=True,
+        self, parts=None,
+        distance_max=15, distance_bin_width=0.05, image_limits=[10 ** 7, 10 ** 10],
+        align_principal_axes=True,
         simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species=['star', 'gas'], property_names=['mass', 'position'], force_float32=False):
+        species=['star', 'gas'], property_names=['mass', 'position'], force_float32=True):
         '''
         Plot images of simulations at each snapshot.
 
@@ -2760,6 +2762,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         parts : list : dictionaries of particles at snapshot
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
+        image_limits : list : min and max limits for image dyanmic range
         align_principal_axes : boolean : whether to align plot axes with principal axes
         simulation_names : list : list of simulation directories and name/label for figure.
         redshifts : float or list
@@ -2778,11 +2781,6 @@ class CompareSimulationsClass(ut.io.SayClass):
             for part in parts:
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
-                        if spec_name == 'star':
-                            image_limits = [10 ** 7, 10 ** 10]
-                        elif spec_name == 'gas':
-                            image_limits = [10 ** 7, 10 ** 9.5]
-
                         plot_image(
                             part, spec_name, [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                             image_limits=image_limits, align_principal_axes=align_principal_axes,
