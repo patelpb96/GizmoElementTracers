@@ -86,7 +86,7 @@ class ReadClass():
         '''
         from rockstar import rockstar_io
 
-        hal = rockstar_io.Rockstar.read_catalog(
+        hal = rockstar_io.Read.read_catalog(
             'index', self.snapshot_indices[0], self.simulation_directory, sort_by_mass=True,
             sort_host_first=False)
 

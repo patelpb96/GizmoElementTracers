@@ -1092,7 +1092,8 @@ def plot_image(
     plot_name = spec_name + '.position'
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
-    plot_name += '_d.{:.0f}_z.{:.2f}'.format(distance_max, part.snapshot['redshift'])
+    plot_name += '_d.{:.0f}'.format(distance_max)
+    plot_name += '_z.{:.2f}'.format(part.snapshot['redshift'])
 
     if add_image_limits:
         plot_name += '_i.{:.1f}-{:.1f}'.format(
