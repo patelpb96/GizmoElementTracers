@@ -1092,7 +1092,7 @@ def plot_image(
     plot_name = spec_name + '.position'
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
-    plot_name += '_d.{:.0f}_z.{:0.1f}'.format(distance_max, part.snapshot['redshift'])
+    plot_name += '_d.{:.0f}_z.{:.2f}'.format(distance_max, part.snapshot['redshift'])
 
     if add_image_limits:
         plot_name += '_i.{:.1f}-{:.1f}'.format(
@@ -2746,7 +2746,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'mass', 'redshift', [0, 6], 0.2, 'lin', distance_limits=[0, 15],
                     axis_y_limits=[None, None], write_plot=True)
 
-            self.plot_images(parts)
+            self.plot_images(parts, redshifts=redshift)
 
     def plot_images(
         self, parts=None,
