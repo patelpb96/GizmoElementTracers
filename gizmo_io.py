@@ -1,5 +1,5 @@
 '''
-Read Gizmo snapshot files.
+Read Read snapshot files.
 
 Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
@@ -175,9 +175,9 @@ class ParticleDictionaryClass(dict):
 #===================================================================================================
 # read class
 #===================================================================================================
-class GizmoClass(ut.io.SayClass):
+class ReadClass(ut.io.SayClass):
     '''
-    Read Gizmo snapshot.
+    Read Read snapshot.
     '''
     def __init__(
         self, snapshot_name_base='snap*', file_extension='.hdf5'):
@@ -860,29 +860,28 @@ class GizmoClass(ut.io.SayClass):
 
         print()
 
-    def assign_orbit(
-        self, part, species=['star'], center_position=None, center_velocity=None,
-        include_hubble_flow=True):
-        '''
-        Assign derived orbital properties wrt single center to species.
-
-        Parameters
-        ----------
-        part : dict : catalog of particles at snapshot
-        species : string or list : particle species to compute
-        center_position : array : center position to use
-        center_velocity : array : center velocity to use
-        include_hubble_flow : boolean : whether to include hubble flow
-        '''
-        species = ut.particle.parse_species(part, species)
-
-        orb = ut.particle.get_orbit_dictionary(
-            part, species, center_position, center_velocity,
-            include_hubble_flow=include_hubble_flow, scalarize=False)
-
-        for spec_name in species:
-            for prop in orb[spec_name]:
-                part[spec_name]['host.' + prop] = orb[spec_name][prop]
+Read = ReadClass()
 
 
-Gizmo = GizmoClass()
+def assign_orbit(
+    part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True):
+    '''
+    Assign derived orbital properties wrt single center to species.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    species : string or list : particle species to compute
+    center_position : array : center position to use
+    center_velocity : array : center velocity to use
+    include_hubble_flow : boolean : whether to include hubble flow
+    '''
+    species = ut.particle.parse_species(part, species)
+
+    orb = ut.particle.get_orbit_dictionary(
+        part, species, center_position, center_velocity,
+        include_hubble_flow=include_hubble_flow, scalarize=False)
+
+    for spec_name in species:
+        for prop in orb[spec_name]:
+            part[spec_name]['host.' + prop] = orb[spec_name][prop]
