@@ -2295,7 +2295,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     redshifts = np.sort(redshifts)
 
     for _zi, redshift in enumerate(redshifts):
-        part = gizmo_io.Gizmo.read_snapshot(
+        part = gizmo_io.Read.read_snapshot(
             species, 'redshift', redshift, simulation_directory, property_names=properties_read,
             force_float32=True)
 
@@ -2491,7 +2491,7 @@ def get_galaxy_mass_profiles_v_redshift(
         if parts is not None and len(parts):
             part = parts[zi]
         else:
-            part = gizmo_io.Gizmo.read_snapshot(
+            part = gizmo_io.Read.read_snapshot(
                 species_read, 'redshift', redshift, directory, property_names=properties_read,
                 force_float32=True)
 
@@ -2680,12 +2680,12 @@ class CompareSimulationsClass(ut.io.SayClass):
         directories = []
         for directory in simulation_names:
             try:
-                part = gizmo_io.Gizmo.read_snapshot(
+                part = gizmo_io.Read.read_snapshot(
                     species, 'redshift', redshift, directory, property_names=property_names,
                     simulation_name=simulation_names[directory], force_float32=force_float32)
 
                 if 'velocity' in property_names:
-                    gizmo_io.Gizmo.assign_orbit(part, 'gas')
+                    gizmo_io.assign_orbit(part, 'gas')
 
                 parts.append(part)
                 directories.append(directory)

@@ -227,7 +227,7 @@ def print_properties_extrema_all_snapshots(
     output_directory : string : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
-    metal_index_max = 1
+    element_indices = [0, 1]
 
     property_statistic = {
         'smooth.length': {'function.name': 'min', 'function': np.min},
@@ -266,9 +266,9 @@ def print_properties_extrema_all_snapshots(
 
     for snapshot_i in Snapshot['index']:
         try:
-            part = gizmo_io.Gizmo.read_snapshot(
+            part = gizmo_io.Read.read_snapshot(
                 species_read, 'index', snapshot_i, simulation_directory, output_directory,
-                properties_read, metal_index_max=metal_index_max, sort_dark_by_id=False,
+                properties_read, element_indices=element_indices, sort_dark_by_id=False,
                 assign_center=False, force_float32=True)
 
             for spec_name in species_property_dict:
@@ -316,7 +316,7 @@ def plot_halo_contamination(directory='.', redshift=0):
 
     os.chdir(directory)
 
-    part = gizmo_io.Gizmo.read_snapshot(
+    part = gizmo_io.Read.read_snapshot(
         ['dark', 'dark.2'], 'redshift', redshift, directory,
         property_names=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 

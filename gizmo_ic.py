@@ -68,7 +68,7 @@ class ReadClass():
         parts = []
 
         for snapshot_index in self.snapshot_indices:
-            part = gizmo_io.Gizmo.read_snapshot(
+            part = gizmo_io.Read.read_snapshot(
                 'all', 'index', snapshot_index, self.simulation_directory,
                 property_names=['position', 'mass', 'id'], assign_center=False,
                 sort_dark_by_id=True, force_float32=False)
