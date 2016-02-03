@@ -2779,7 +2779,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
 
                 plot_star_form_history(
-                    parts, 'form.rate.specific', 'redshift', [0, 13], 0.5, 'linear',
+                    parts, 'form.rate.specific', 'time.lookback', [0, 13], 0.5, 'linear',
                     distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
 
             self.plot_images(parts, redshifts=redshift)
