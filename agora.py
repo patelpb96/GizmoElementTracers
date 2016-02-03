@@ -301,7 +301,7 @@ def print_contamination_v_distance(
     distance_bin_width : float : width of distance bin for printing
     scale_to_halo_radius : boolean : whether to scale distances by virial radius
     '''
-    distance_scaling = 'lin'
+    distance_scaling = 'linear'
     ti = 0
 
     Say = ut.io.SayClass(print_contamination_v_distance)
@@ -340,8 +340,8 @@ def print_contamination_v_distance(
 
 
 def print_contamination_in_box(
-    part, center_position=None, distance_limits=None, distance_bin_number=20, distance_scaling='lin',
-    geometry='cube'):
+    part, center_position=None, distance_limits=None, distance_bin_number=20,
+    distance_scaling='linear', geometry='cube'):
     '''
     Test lower resolution particle contamination around center.
 
@@ -351,7 +351,7 @@ def print_contamination_in_box(
     center_position : array : 3-d position of center {kpc comoving}
     distance_limits : float : maximum distance from center to check {kpc physical}
     distance_bin_number : int : number of distance bins
-    distance_scaling : string : 'log', 'lin'
+    distance_scaling : string : 'log', 'linear'
     geometry : string : geometry of region: 'cube', 'sphere'
     '''
     Say = ut.io.SayClass(print_contamination_in_box)
@@ -367,7 +367,8 @@ def print_contamination_in_box(
             center_position[dimension_i] = 0.5 * part.info['box.length']
     print('center position = {}'.format(center_position))
 
-    DistanceBin = ut.binning.DistanceBinClass(distance_scaling, distance_limits, number=distance_bin_number)
+    DistanceBin = ut.binning.DistanceBinClass(
+        distance_scaling, distance_limits, number=distance_bin_number)
 
     masses_unique = np.unique(part['mass'])
     pis_all = ut.array.arange_length(part['mass'])

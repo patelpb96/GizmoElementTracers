@@ -223,7 +223,7 @@ def print_contamination_v_distance(
     '''
     from . import gizmo_analysis
 
-    distance_scaling = 'lin'
+    distance_scaling = 'linear'
     distance_limits = [0, distance_max]
     axis_y_scaling = 'log'
 
@@ -240,7 +240,7 @@ def print_contamination_v_distance(
 
 def print_contamination_in_box(
     part, center_position=None, distance_limits=None, distance_bin_number=20,
-    distance_scaling='lin', geometry='cube'):
+    distance_scaling='linear', geometry='cube'):
     '''
     Test lower resolution particle contamination around center.
 
@@ -250,7 +250,7 @@ def print_contamination_in_box(
     center_position : array : 3-d position of center {kpc comoving}
     distance_limits : float : maximum distance from center to check {kpc physical}
     distance_bin_number : int : number of distance bins
-    distance_scaling : string : 'log', 'lin'
+    distance_scaling : string : 'log', 'linear'
     geometry : string : geometry of region: 'cube', 'sphere'
     '''
     Say = ut.io.SayClass(print_contamination_in_box)

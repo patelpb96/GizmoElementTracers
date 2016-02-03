@@ -15,6 +15,7 @@ from numpy import log10, Inf  # @UnusedImport
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties
+from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 # local ----
 import utilities as ut
@@ -145,7 +146,7 @@ def get_nucleosynthetic_yields(
 
 def plot_nucleosynthetic_yields(
     event_kind='wind', star_metallicity=0.1, normalize=False,
-    axis_y_scaling='lin', axis_y_limits=[1e-3, None],
+    axis_y_scaling='linear', axis_y_limits=[1e-3, None],
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot nucleosynthetic element yields, according to input event_kind.
@@ -155,7 +156,7 @@ def plot_nucleosynthetic_yields(
     event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float : total metallicity of star prior to event, relative to solar
     normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
-    axis_y_scaling : string : scaling along y-axis: 'log', 'lin'
+    axis_y_scaling : string : scaling along y-axis: 'log', 'linear'
     axis_y_limits : list : min and max limits of y-axis
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
@@ -201,11 +202,10 @@ def plot_nucleosynthetic_yields(
         #fig.set_ylabel(y_label, fontsize=26)
         #fig.set_xlabel('element', fontsize=26)
 
-        plot_func = ut.plot.get_plot_function(subplots[si], 'lin', axis_y_scaling)
-
         for yi in yield_indices:
             if yield_values[yi] > 0:
-                plot_func(yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi])
+                subplot.plot(
+                    yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi])
                 subplots[si].text(yield_indices[yi] * 0.98, yield_values[yi] * 0.6,
                                   yield_labels[yi])
 
@@ -463,7 +463,10 @@ class SpeciesProfileClass(ut.io.SayClass):
         for spec_i, spec_name in enumerate(species):
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
-                part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
+                try:
+                    part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
+                except:
+                    part_indices = ut.array.arange_length(part[spec_name].prop('mass'))
 
             if other_prop_limits:
                 part_indices = ut.catalog.get_indices_catalog(
@@ -474,7 +477,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                 masses = part[spec_name].prop('mass', part_indices)
 
             if 'velocity' in prop_name:
-                distances = ut.coordinate.get_distances(
+                distance_vectors = ut.coordinate.get_distances(
                     'vector', part[spec_name]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scalefactor']  # {kpc physical}
 
@@ -484,7 +487,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                     part.snapshot['scalefactor'], part.snapshot['time.hubble'],
                     part.info['box.length'])
 
-                pro = DistanceBin.get_velocity_profile(distances, velocity_vectors, masses)
+                pro = DistanceBin.get_velocity_profile(distance_vectors, velocity_vectors, masses)
 
                 pros[spec_name] = pro[prop_name.replace('host.', '')]
                 for prop in pro:
@@ -529,7 +532,7 @@ def plot_mass_contamination(
     distance_limits=[1, 2000], distance_bin_width=0.02, distance_bin_number=None,
     distance_scaling='log',
     halo_radius=None, scale_to_halo_radius=False, center_position=None,
-    axis_y_scaling='log',
+    axis_y_limits=[0.0001, 3], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot contamination from lower-resolution particles v distance from center.
@@ -540,11 +543,12 @@ def plot_mass_contamination(
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
     distance_bin_number : int : number of distance bins
-    distance_scaling : string : 'log', 'lin'
+    distance_scaling : string : 'log', 'linear'
     halo_radius : float : radius of halo {kpc physical}
     scale_to_halo_radius : boolean : whether to scale distance to halo_radius
     center_position : array : position of galaxy/halo center
-    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
+    axis_y_limits : list : min and max limits for y-axis
+    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -607,8 +611,6 @@ def plot_mass_contamination(
         return
 
     # plot ----------
-    colors = ut.plot.get_colors(len(species_test), use_black=False)
-
     plt.minorticks_on()
     fig = plt.figure(figure_index)
     fig.clf()
@@ -616,9 +618,8 @@ def plot_mass_contamination(
     #fig, subplot = plt.subplots(1, 1, num=1, sharex=True)
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(distance_limits)
-    # subplot.set_ylim([0, 0.1])
-    subplot.set_ylim([0.0001, 3])
+    ut.plot.set_axes_scaling_limits(
+        subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits)
 
     subplot.set_ylabel(
         '$M_{{\\rm species}} / M_{{\\rm {}}}$'.format(species_reference), fontsize=30)
@@ -628,17 +629,17 @@ def plot_mass_contamination(
         axis_x_label = 'distance $[\\rm kpc]$'
     subplot.set_xlabel(axis_x_label, fontsize=30)
 
-    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
+    colors = ut.plot.get_colors(len(species_test), use_black=False)
 
     if halo_radius:
         if scale_to_halo_radius:
             x_ref = 1
         else:
             x_ref = halo_radius
-        plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
+        subplot.plot([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
     for spec_i, spec_name in enumerate(species_test):
-        plot_func(
+        subplot.plot(
             DistanceBin.mids, ratios[spec_name]['bin'], color=colors[spec_i], alpha=0.7,
             label=spec_name)
 
@@ -669,11 +670,11 @@ def plot_metal_v_distance(
     part : dict : catalog of particles at snapshot
     spec_name : string : particle species
     plot_kind : string : 'metallicity' or 'metal.mass.cum'
-    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
+    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
     distance_bin_number : int : number of distance bins
-    distance_scaling : string : scaling of distance: 'log', 'lin'
+    distance_scaling : string : scaling of distance: 'log', 'linear'
     halo_radius : float : radius of halo {kpc physical}
     scale_to_halo_radius : boolean : whether to scale distance to halo_radius
     center_position : array : position of galaxy center {kpc comoving}
@@ -708,11 +709,6 @@ def plot_metal_v_distance(
         axis_y_limits = [0.001, 1]
 
     # plot ----------
-    # colors = ut.plot.get_colors(len(species_test), use_black=False)
-    xs = DistanceBin.mids
-    if halo_radius and scale_to_halo_radius:
-        xs /= halo_radius
-
     plt.minorticks_on()
     fig = plt.figure(figure_index)
     fig.clf()
@@ -720,9 +716,8 @@ def plot_metal_v_distance(
     #fig, subplot = plt.subplots(1, 1, num=1, sharex=True)
     fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(distance_limits)
-    # subplot.set_ylim([0, 0.1])
-    subplot.set_ylim(axis_y_limits)
+    ut.plot.set_axes_scaling_limits(
+        subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits)
 
     if 'metallicity' in plot_kind:
         subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=30)
@@ -734,19 +729,21 @@ def plot_metal_v_distance(
     else:
         #axis_x_label = 'distance $[\\rm kpc\,physical]$'
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
-
     subplot.set_xlabel(axis_x_label, fontsize=26)
 
-    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, axis_y_scaling)
+    # colors = ut.plot.get_colors(len(species_test), use_black=False)
+    xs = DistanceBin.mids
+    if halo_radius and scale_to_halo_radius:
+        xs /= halo_radius
 
     if halo_radius:
         if scale_to_halo_radius:
             x_ref = 1
         else:
             x_ref = halo_radius
-        plot_func([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
+        subplot.plot([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-    plot_func(xs, ys, color='blue', alpha=0.6)
+    subplot.plot(xs, ys, color='blue', alpha=0.6)
 
     # legend = subplot.legend(loc='best', prop=FontProperties(size=12))
     # legend.get_frame().set_alpha(0.7)
@@ -1130,7 +1127,7 @@ def plot_property_distribution(
     prop_limits : list : min and max limits of property
     prop_bin_width : float : width of property bin (use this or prop_bin_number)
     prop_bin_number : int : number of property bins within limits (use this or prop_bin_width)
-    prop_scaling : string : scaling of property: 'log', 'lin'
+    prop_scaling : string : scaling of property: 'log', 'linear'
     prop_statistic : string : statistic to plot: 'probability', 'histogram'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
@@ -1138,7 +1135,7 @@ def plot_property_distribution(
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : 'log', 'lin'
+    axis_y_scaling : string : 'log', 'linear'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -1197,10 +1194,9 @@ def plot_property_distribution(
     #fig, subplot = plt.subplots(1, 1, num=figure_index, sharex=True)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(ut.plot.get_axis_limits(prop_values, prop_scaling, prop_limits))
-
-    y_values = [Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))]
-    subplot.set_ylim(ut.plot.get_axis_limits(y_values, axis_y_scaling, axis_y_limits))
+    y_values = np.array([Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))])
+    ut.plot.set_axes_scaling_limits(
+        subplot, prop_scaling, prop_limits, prop_values, axis_y_scaling, axis_y_limits, y_values)
 
     subplot.set_xlabel(ut.plot.get_label(prop_name, species=spec_name, get_units=True))
     subplot.set_ylabel(
@@ -1208,11 +1204,10 @@ def plot_property_distribution(
             prop_name, prop_statistic, spec_name, get_symbol=True, get_units=False,
             get_log=prop_scaling))
 
-    plot_func = ut.plot.get_plot_function(subplot, prop_scaling, axis_y_scaling)
     for part_i, part in enumerate(parts):
-        plot_func(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
-                  color=colors[part_i], alpha=0.7, linewidth=2.5,
-                  label=part.info['simulation.name'])
+        subplot.plot(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
+                     color=colors[part_i], alpha=0.8, linewidth=3.0,
+                     label=part.info['simulation.name'])
 
     # redshift legend
     #legend_z = None
@@ -1252,10 +1247,10 @@ def plot_property_v_property(
     spec_name : string : particle species
     x_prop_name : string : property name for x-axis
     x_prop_limits : list : min and max limits to impose on x_prop_name
-    x_prop_scaling : string : 'log', 'lin'
+    x_prop_scaling : string : 'log', 'linear'
     y_prop_name : string : property name for y-axis
     y_prop_limits : list : min and max limits to impose on y_prop_name
-    y_prop_scaling : string : 'log', 'lin'
+    y_prop_scaling : string : 'log', 'linear'
     prop_bin_number : int : number of bins for histogram along each axis
     weight_by_mass : boolean : whether to weight property by particle mass
     host_distance_limitss : list : min and max limits for distance from galaxy
@@ -1321,8 +1316,9 @@ def plot_property_v_property(
     subplot = fig.add_subplot(111)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    axis_x_limits = ut.plot.get_axis_limits(x_prop_values, 'lin', x_prop_limits)
-    axis_y_limits = ut.plot.get_axis_limits(y_prop_values, 'lin', y_prop_limits)
+    axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot, x_prop_scaling, x_prop_limits, x_prop_values,
+        y_prop_scaling, y_prop_limits, y_prop_values)
 
     axis_x_label = ut.plot.get_label(
         x_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=x_prop_scaling)
@@ -1395,13 +1391,13 @@ def plot_property_v_distance(
     prop_name : string : property to get profile of
     prop_statistic : string : statistic/type to plot:
         sum, sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction, med, ave
-    prop_scaling : string : scaling for property (y-axis): 'log', 'lin'
+    prop_scaling : string : scaling for property (y-axis): 'log', 'linear'
     weight_by_mass : boolean : whether to weight property by particle mass
     prop_limits : list : limits to impose on y-axis
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
     distance_bin_number : int : number of bins between limits
-    distance_scaling : string : 'log', 'lin'
+    distance_scaling : string : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
         note : if 1, get profile along minor axis, if 2, get profile along 2 major axes
     rotation_vectors : array : eigen-vectors to define rotation
@@ -1457,10 +1453,9 @@ def plot_property_v_distance(
     #fig, subplot = plt.subplots(1, 1, num=figure_index, sharex=True)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(distance_limits)
     y_values = [pro[species][prop_statistic] for pro in pros]
-    prop_limits = ut.plot.get_axis_limits(y_values, prop_scaling, prop_limits)
-    subplot.set_ylim(prop_limits)
+    ut.plot.set_axes_scaling_limits(
+        subplot, distance_scaling, distance_limits, None, prop_scaling, prop_limits, y_values)
 
     #subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
     subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
@@ -1475,7 +1470,6 @@ def plot_property_v_distance(
     #    axis_y_label = 'circular velocity ' + axis_y_label
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
-    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, prop_scaling)
     colors = ut.plot.get_colors(len(parts))
 
     if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
@@ -1485,7 +1479,8 @@ def plot_property_v_distance(
             y_values = [0, 0]
         elif 'velocity.rad' in prop_name:
             y_values = [0, 0]
-        plot_func(distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
+        subplot.plot(
+            distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
 
     if len(pros) == 1:
         alpha = 0.9
@@ -1495,13 +1490,13 @@ def plot_property_v_distance(
         linewidth = 2.5
 
     for part_i, pro in enumerate(pros):
-        plot_func(pro[species]['distance'], pro[species][prop_statistic], color=colors[part_i],
-                  linestyle='-', alpha=alpha, linewidth=linewidth,
-                  label=parts[part_i].info['simulation.name'])
+        subplot.plot(pro[species]['distance'], pro[species][prop_statistic], color=colors[part_i],
+                     linestyle='-', alpha=alpha, linewidth=linewidth,
+                     label=parts[part_i].info['simulation.name'])
 
     if distance_reference is not None:
-        plot_func([distance_reference, distance_reference], prop_limits,
-                  color='black', linestyle=':', alpha=0.6)
+        subplot.plot([distance_reference, distance_reference], prop_limits,
+                     color='black', linestyle=':', alpha=0.6)
 
     # redshift legend
     legend_z = None
@@ -1534,10 +1529,94 @@ def plot_property_v_distance(
         return pros
 
 
+#===================================================================================================
+# properties of halos
+#===================================================================================================
+def assign_vel_circ_at_radius(
+    hal, part, radius=0.4, sort_prop_name='vel.circ.max', sort_prop_value_min=20,
+    halo_number_max=100, host_distance_limits=[1, 310]):
+    '''
+    .
+    '''
+    Say = ut.io.SayClass(assign_vel_circ_at_radius)
+
+    his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
+    his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
+    his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_value_min, Inf], his)
+    Say.say('{} halos within limits'.format(his.size))
+
+    his = his[np.argsort(hal[sort_prop_name][his])]
+    his = his[::-1][: halo_number_max]
+
+    mass_key = 'vel.circ.rad.{:.1f}'.format(radius)
+    hal[mass_key] = np.zeros(hal['total.mass'].size)
+    dark_mass = np.median(part['dark']['mass'])
+
+    for hii, hi in enumerate(his):
+        if hii > 0 and hii % 10 == 0:
+            ut.io.print_flush(hii)
+        pis = ut.particle.get_indices_within_distances(
+            part, 'dark', [0, radius], hal['position'][hi], scalarize=True)
+        hal[mass_key][hi] = ut.halo_property.get_circular_velocity(
+            pis.size * dark_mass, radius)
+
+
+def plot_vel_circ_v_radius_halos(
+    parts=None, hals=None, gal=None,
+    total_mass_limits=None, star_mass_limits=[1e5, Inf], host_distance_limits=[1, 310],
+    sort_prop_name='vel.circ.max', sort_prop_value_min=15, halo_number_max=20,
+    vel_circ_limits=[0, 50], vel_circ_scaling='linear',
+    radius_limits=[0.1, 3], radius_bin_width=0.1, radius_bin_number=None, radius_scaling='log',
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    .
+    '''
+    Say = ut.io.SayClass(plot_vel_circ_v_radius_halos)
+
+    hal_indicess = None
+    if hals is not None:
+        hal_indicess = []
+        for hal in hals:
+            his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
+            his = ut.array.get_indices(hal['total.mass'], total_mass_limits, his)
+            his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
+
+            if 'star.indices' in hal:
+                his = ut.array.get_indices(hal['star.mass.part'], star_mass_limits, his)
+            else:
+                his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_value_min, Inf], his)
+                his = his[np.argsort(hal[sort_prop_name][his])[::-1]]
+                his = his[: halo_number_max]
+
+                Say.say('{} halos with {} [min, max] = [{:.3f}, {:.3f}]'.format(
+                        his.size, sort_prop_name,
+                        hal[sort_prop_name][his[0]], hal[sort_prop_name][his[-1]]))
+
+            hal_indicess.append(his)
+
+    gal_indices = None
+    if gal is not None:
+        gal_indices = ut.array.get_indices(gal['star.mass'], star_mass_limits)
+        gal_indices = ut.array.get_indices(gal['host.distance'], host_distance_limits, gal_indices)
+        gal_indices = gal_indices[gal['host.name'][gal_indices] == 'MW'.encode()]
+
+    #plot_property_v_distance_halos(
+    #    parts, hals, hal_indicess, gal, gal_indices,
+    #    'total', 'mass', 'vel.circ', vel_circ_scaling, False, vel_circ_limits,
+    #    radius_limits, radius_bin_width, radius_bin_number, radius_scaling, 3, None, False,
+    #    write_plot, plot_directory, figure_index)
+
+    plot_property_v_distance_halos(
+        parts, hals, hal_indicess, gal, gal_indices,
+        'star', 'velocity.tot', 'std.cum', vel_circ_scaling, True, vel_circ_limits,
+        radius_limits, radius_bin_width, radius_bin_number, radius_scaling, 3, None, False,
+        write_plot, plot_directory, figure_index)
+
+
 def plot_property_v_distance_halos(
     parts=None, hals=None, hal_indicess=None, gal=None, gal_indices=None,
     species='total',
-    prop_name='mass', prop_statistic='vel.circ', prop_scaling='lin', weight_by_mass=False,
+    prop_name='mass', prop_statistic='vel.circ', prop_scaling='linear', weight_by_mass=False,
     prop_limits=[],
     distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log', dimension_number=3,
@@ -1554,13 +1633,13 @@ def plot_property_v_distance_halos(
     prop_name : string : property to get profile of
     prop_statistic : string : statistic/type to plot:
         'sum', sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction, med, ave'
-    prop_scaling : string : scaling for property (y-axis): 'log', 'lin'
+    prop_scaling : string : scaling for property (y-axis): 'log', 'linear'
     weight_by_mass : boolean : whether to weight property by particle mass
     prop_limits : list : limits to impose on y-axis
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
     distance_bin_number : int : number of bins between limits
-    distance_scaling : string : 'log', 'lin'
+    distance_scaling : string : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
     distance_reference : float : reference distance at which to draw vertical line
     label_redshift : boolean : whether to label redshift
@@ -1578,7 +1657,7 @@ def plot_property_v_distance_halos(
     if isinstance(parts, dict):
         parts = [parts]
 
-    distance_limits_bin = [0.1, 1.2]  # overwrite for TBTF figure
+    distance_limits_bin = [0.1, 1.2]  # widen for TBTF figure
 
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits_bin, width=distance_bin_width,
@@ -1619,22 +1698,25 @@ def plot_property_v_distance_halos(
     #fig, subplot = plt.subplots(1, 1, num=figure_index, sharex=True)
     fig.subplots_adjust(left=0.18, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    subplot.set_xlim(distance_limits)
-    subplot.set_xscale(distance_scaling.replace('lin', 'linear'))
-    if 'log' in distance_scaling:
-        subplot.xaxis.set_ticks([0.1, 0.2, 0.3, 0.5, 1, 2])
-        subplot.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
-
     y_values = []
     for pro_cat in pros:
         for pro_hal in pro_cat:
             y_values.append(pro_hal[species][prop_statistic])
-    prop_limits = ut.plot.get_axis_limits(y_values, prop_scaling, prop_limits)
-    subplot.set_ylim(prop_limits)
-    subplot.set_yscale(prop_scaling.replace('lin', 'linear'))
+
+    ut.plot.set_axes_scaling_limits(
+        subplot, distance_scaling, distance_limits, None, prop_scaling, prop_limits, y_values)
+
+    if 'log' in distance_scaling:
+        subplot.xaxis.set_ticks([0.1, 0.2, 0.3, 0.5, 1, 2])
+        subplot.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
+    else:
+        minor_locator = AutoMinorLocator(2)
+        subplot.xaxis.set_minor_locator(minor_locator)
+
+    minor_locator = AutoMinorLocator(5)
+    subplot.yaxis.set_minor_locator(minor_locator)
 
     subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
-
     if prop_statistic == 'vel.circ':
         label_prop_name = prop_statistic
     else:
@@ -1645,8 +1727,6 @@ def plot_property_v_distance_halos(
     #    axis_y_label = 'circular velocity ' + axis_y_label
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
-    plot_func = ut.plot.get_plot_function(subplot, distance_scaling, prop_scaling)
-
     # draw reference values
     if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
         if 'fraction' in prop_statistic:
@@ -1655,22 +1735,22 @@ def plot_property_v_distance_halos(
             y_values = [0, 0]
         elif 'velocity.rad' in prop_name:
             y_values = [0, 0]
-        plot_func(distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
+        subplot.plot(
+            distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
 
     if distance_reference is not None:
-        plot_func([distance_reference, distance_reference], prop_limits,
-                  color='black', linestyle=':', alpha=0.6)
+        subplot.plot([distance_reference, distance_reference], prop_limits,
+                     color='black', linestyle=':', alpha=0.6)
 
-    # draw actual values
-    alpha = 0.7
-    linewidth = 2.0
-
+    # draw simulation halos
     if hals is not None:
+        alpha = 0.5
+        linewidth = 1.8
         colors = ut.plot.get_colors(len(hals))
         for cat_i, hal in enumerate(hals):
             hal_indices = hal_indicess[cat_i]
             for hal_ii, hal_i in enumerate(hal_indices):
-                plot_func(
+                subplot.plot(
                     pros[cat_i][hal_ii][species]['distance'],
                     pros[cat_i][hal_ii][species][prop_statistic],
                     color=colors[cat_i],
@@ -1678,7 +1758,10 @@ def plot_property_v_distance_halos(
                     #label=parts[part_i].info['simulation.name'],
                 )
 
+    # draw observed galaxies
     if gal is not None:
+        alpha = 0.7
+        linewidth = 2.0
         gis = ut.array.get_indices(gal['star.radius.50'], distance_limits, gal_indices)
         for gal_i in gis:
             subplot.errorbar(
@@ -1715,78 +1798,12 @@ def plot_property_v_distance_halos(
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
-def plot_vel_circ_v_distance_halos(
-    parts=None, hals=None, gal=None,
-    total_mass_limits=[1e7, Inf], star_mass_limits=[1e5, Inf], host_distance_limits=[1, 310],
-    sort_prop_name='vel.circ.max', halo_number=20,
-    vel_circ_limits=[0, 50], vel_circ_scaling='lin',
-    distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
-    distance_scaling='log',
-    write_plot=False, plot_directory='.', figure_index=1):
-    '''
-    .
-    '''
-    hal_indicess = None
-    if hals is not None:
-        hal_indicess = []
-        for hal in hals:
-            his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
-            his = ut.array.get_indices(hal['total.mass'], total_mass_limits, his)
-            his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
-            if 'star.indices' in hal:
-                his = ut.array.get_indices(hal['star.mass.part'], star_mass_limits, his)
-            else:
-                his = his[np.argsort(hal[sort_prop_name][his])]
-                his = his[::-1]
-                his = his[: halo_number]
-            print(hal[sort_prop_name][his])
-            hal_indicess.append(his)
-
-    gal_indices = None
-    if gal is not None:
-        gal_indices = ut.array.get_indices(gal['star.mass'], star_mass_limits)
-        gal_indices = ut.array.get_indices(gal['host.distance'], host_distance_limits, gal_indices)
-        gal_indices = gal_indices[gal['host.name'][gal_indices] == 'MW'.encode()]
-
-    plot_property_v_distance_halos(
-        parts, hals, hal_indicess, gal, gal_indices,
-        'total', 'mass', 'vel.circ', vel_circ_scaling, False, vel_circ_limits,
-        distance_limits, distance_bin_width, distance_bin_number, distance_scaling, 3, None, False,
-        write_plot, plot_directory, figure_index)
-
-
-def assign_vel_circ_at_radius(
-    hal, part, radius=0.4, sort_prop_name='vel.circ.max', sort_prop_min=20, halo_number=100,
-    host_distance_limits=[1, 310]):
-    '''
-    .
-    '''
-    his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
-    his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
-    his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_min, Inf], his)
-    ut.io.print_flush(his.size)
-    his = his[np.argsort(hal[sort_prop_name][his])]
-    his = his[::-1][: halo_number]
-    ut.io.print_flush(hal[sort_prop_name][his[-1]])
-
-    mass_key = 'vel.circ.rad.{:.1f}'.format(radius)
-    hal[mass_key] = np.zeros(hal['total.mass'].size)
-    dark_mass = np.median(part['dark']['mass'])
-
-    for hii, hi in enumerate(his):
-        if hii > 0 and hii % 10 == 0:
-            ut.io.print_flush(hii)
-        pis = ut.particle.get_indices_within_distances(
-            part, 'dark', [0, radius], hal['position'][hi], scalarize=True)
-        hal[mass_key][hi] = ut.halo_property.get_circular_velocity(
-            pis.size * dark_mass, radius)
-
-
 #===================================================================================================
 # mass and star-formation history
 #===================================================================================================
 def get_time_bin_dictionary(
-    time_kind='redshift', time_limits=[0, 10], time_width=0.01, time_scaling='lin', Cosmology=None):
+    time_kind='redshift', time_limits=[0, 10], time_width=0.01, time_scaling='linear',
+    Cosmology=None):
     '''
     Get dictionary of time bin information.
 
@@ -1795,7 +1812,7 @@ def get_time_bin_dictionary(
     time_kind : string : time metric to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to impose
     time_width : float : width of time_kind bin (in units set by time_scaling)
-    time_scaling : string : scaling of time_kind: 'log', 'lin'
+    time_scaling : string : scaling of time_kind: 'log', 'linear'
     Cosmology : class : cosmology class, to convert between time metrics
 
     Returns
@@ -1846,7 +1863,7 @@ def get_time_bin_dictionary(
 
 
 def get_star_form_history(
-    part, time_kind='redshift', time_limits=[0, 8], time_width=0.1, time_scaling='lin',
+    part, time_kind='redshift', time_limits=[0, 8], time_width=0.1, time_scaling='linear',
     distance_limits=None, center_position=None, other_prop_limits=None, part_indices=None):
     '''
     Get array of times and star-formation rate at each time.
@@ -1857,7 +1874,7 @@ def get_star_form_history(
     time_kind : string : time metric to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to impose
     time_width : float : width of time_kind bin (in units set by time_scaling)
-    time_scaling : string : scaling of time_kind: 'log', 'lin'
+    time_scaling : string : scaling of time_kind: 'log', 'linear'
     distance_limits : list : min and max limits of galaxy distance to select star particles
     center_position : list : position of galaxy centers {kpc comoving}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -1932,7 +1949,7 @@ def get_star_form_history(
 
 def plot_star_form_history(
     parts=None, sfh_kind='rate',
-    time_kind='time.lookback', time_limits=[13.8, 0], time_width=0.2, time_scaling='lin',
+    time_kind='time.lookback', time_limits=[13.8, 0], time_width=0.2, time_scaling='linear',
     distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indicess=None,
     axis_y_limits=[], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
@@ -1947,13 +1964,13 @@ def plot_star_form_history(
     time_kind : string : time kind to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to get
     time_width : float : width of time_kind bin
-    time_scaling : string : scaling of time_kind: 'log', 'lin'
+    time_scaling : string : scaling of time_kind: 'log', 'linear'
     distance_limits : list : min and max limits of distance to select star particles
     center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array : part_indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
+    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -2011,12 +2028,10 @@ def plot_star_form_history(
 
     colors = ut.plot.get_colors(len(parts))
 
-    plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
-
     for part_i, part in enumerate(parts):
-        plot_func(sfh[time_kind][part_i], sfh[sfh_kind][part_i],
-                  linewidth=3.0, color=colors[part_i], alpha=0.9,
-                  label=part.info['simulation.name'])
+        subplot.plot(sfh[time_kind][part_i], sfh[sfh_kind][part_i],
+                     linewidth=3.0, color=colors[part_i], alpha=0.9,
+                     label=part.info['simulation.name'])
 
     # redshift legend
     legend_z = None
@@ -2044,8 +2059,8 @@ def plot_star_form_history(
 def plot_star_form_history_galaxies(
     part=None, hal=None, gal=None,
     mass_kind='star.mass.part', mass_limits=[1e5, 1e9], other_prop_limits={}, hal_indices=None,
-    sfh_kind='mass.normalized', sfh_limits=[], sfh_scaling='lin',
-    time_kind='time.lookback', time_limits=[13.7, 0], time_width=0.2, time_scaling='lin',
+    sfh_kind='mass.normalized', sfh_limits=[], sfh_scaling='linear',
+    time_kind='time.lookback', time_limits=[13.7, 0], time_width=0.2, time_scaling='linear',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot star-formation history v time_kind.
@@ -2062,11 +2077,11 @@ def plot_star_form_history_galaxies(
     hal_indices : index or array : index[s] of halo[s] whose particles to plot
     sfh_kind : string : star form kind to plot: 'rate', 'rate.specific', 'mass', 'mass.normalized'
     sfh_limits : list : min and max limits for y-axis
-    sfh_scaling : string : scailng of y-axis: 'log', 'lin'
+    sfh_scaling : string : scailng of y-axis: 'log', 'linear'
     time_kind : string : time kind to plot: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to plot
     time_width : float : width of time_kind bin
-    time_scaling : string : scaling of time_kind: 'log', 'lin'
+    time_scaling : string : scaling of time_kind: 'log', 'linear'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -2133,12 +2148,14 @@ def plot_star_form_history_galaxies(
 
     ut.plot.make_axis_time(
         subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=part.Cosmology,
-        fontsize=28)
+        fontsize=30)
 
     y_values = None
     if sfh is not None:
         y_values = sfh[sfh_kind]
-    subplot.set_ylim(ut.plot.get_axis_limits(y_values, sfh_scaling, sfh_limits))
+    #subplot.set_ylim(ut.plot.get_axis_limits(y_values, sfh_scaling, sfh_limits))
+    ut.plot.set_axes_scaling_limits(
+        subplot, y_scaling=sfh_scaling, y_limits=sfh_limits, y_values=y_values)
 
     if 'mass' in sfh_kind:
         if 'normalized' in sfh_kind:
@@ -2152,39 +2169,47 @@ def plot_star_form_history_galaxies(
     if hal is not None:
         colors = ut.plot.get_colors(len(hal_indices))
     elif gal is not None:
-        colors = ut.plot.get_colors(len(gal.sfhs))
-
-    plot_func = ut.plot.get_plot_function(subplot, time_scaling, sfh_scaling)
+        colors = ut.plot.get_colors(len(gal.sfh))
 
     label = None
-    if hal is not None:
-        for hal_ii, hal_i in enumerate(hal_indices):
-            label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
-                ut.io.get_string_for_exponential(sfh['mass'][hal_ii][-1], 0))
-            plot_func(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
-                      linewidth=3.0, color=colors[hal_ii], alpha=0.5, label=label)
 
+    # draw observed galaxies
     if gal is not None:
+        import string
         gal_names = np.array(list(gal.sfh.keys()))
         gal_indices = [gal['name.to.index'][gal_name] for gal_name in gal_names]
-        gal_masses = gal['star.mass'][gal_indices]
-        gal_names_sort = gal_names[np.argsort(gal_masses)]
+        gal_names_sort = gal_names[np.argsort(gal['star.mass'][gal_indices])]
 
         for gal_i, gal_name in enumerate(gal_names_sort):
             linestyle = '-'
             if hal is not None:
                 color = 'black'
-                linewidth = 2.0
+                linewidth = 1.2 + 0.2 * gal_i
                 alpha = 0.15
+                label = None
             else:
                 color = colors[gal_i]
-                linewidth = 3.0
-                alpha = 0.5
-            plot_func(gal.sfh[gal_name][time_kind], gal.sfh[gal_name][sfh_kind],
-                      linewidth=linewidth, linestyle=linestyle, alpha=alpha, color=color)
+                linewidth = 1.25 + 0.25 * gal_i
+                alpha = 0.45
+                label = string.capwords(gal_name)
+                label = label.replace('Canes Venatici I', 'CVn I').replace('Ii', 'II')
 
-    #plot_func(sfh['time'][0], sfh['mass.normalized.median'],
-    #          linewidth=4.0, color='black', alpha=0.5)
+                print(label)
+            subplot.plot(gal.sfh[gal_name][time_kind], gal.sfh[gal_name][sfh_kind],
+                         linewidth=linewidth, linestyle=linestyle, alpha=alpha, color=color,
+                         label=label)
+
+    # draw simulated galaxies
+    if hal is not None:
+        for hal_ii, hal_i in enumerate(hal_indices):
+            linewidth = 3.0
+            label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
+                ut.io.get_string_for_exponential(sfh['mass'][hal_ii][-1], 0))
+            subplot.plot(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
+                         linewidth=linewidth, color=colors[hal_ii], alpha=0.55, label=label)
+
+    #subplot.plot(sfh['time'][0], sfh['mass.normalized.median'],
+    #             linewidth=4.0, color='black', alpha=0.5)
 
     # redshift legend
     legend_z = None
@@ -2196,8 +2221,8 @@ def plot_star_form_history_galaxies(
         legend_z.get_frame().set_alpha(0.5)
 
     # property legend
-    if part is not None and part.info['simulation.name'] and label is not None:
-        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
+    if label is not None:
+        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=15))
         legend_prop.get_frame().set_alpha(0.5)
         if legend_z:
             subplot.add_artist(legend_z)
@@ -2298,7 +2323,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 def plot_galaxy_property_v_time(
     gals=None, sfhs=None, Cosmology=None,
     prop_name='star.mass',
-    time_kind='redshift', time_limits=[0, 8], time_scaling='lin', snapshot_subsample_factor=1,
+    time_kind='redshift', time_limits=[0, 8], time_scaling='linear', snapshot_subsample_factor=1,
     axis_y_limits=[], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -2313,10 +2338,10 @@ def plot_galaxy_property_v_time(
         'rate', 'rate.specific', 'mass', 'mass.normalized'
     time_kind : string : time kind to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to get
-    time_scaling : string : scaling of time_kind: 'log', 'lin'
+    time_scaling : string : scaling of time_kind: 'log', 'linear'
     snapshot_subsample_factor : int : factor by which to sub-sample snapshots from gals
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : scaling of y-axis: 'log', 'lin'
+    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -2363,11 +2388,9 @@ def plot_galaxy_property_v_time(
 
     #colors = ut.plot.get_colors(len(gals))
 
-    plot_func = ut.plot.get_plot_function(subplot, time_scaling, axis_y_scaling)
-
     if gals is not None:
         for _gal_i, gal in enumerate(gals):
-            plot_func(
+            subplot.plot(
                 gal[time_kind][::snapshot_subsample_factor],
                 gal[prop_name][::snapshot_subsample_factor],
                 linewidth=3.0, alpha=0.9,
@@ -2378,7 +2401,7 @@ def plot_galaxy_property_v_time(
 
     if sfhs is not None:
         for _sfh_i, sfh in enumerate(sfhs):
-            plot_func(
+            subplot.plot(
                 sfh[time_kind], sfh['mass'],
                 '--', linewidth=3.0, alpha=0.9,
                 #color=colors[sfh_i],
@@ -2698,13 +2721,17 @@ class CompareSimulationsClass(ut.io.SayClass):
         if np.isscalar(redshifts):
             redshifts = [redshifts]
 
+        if parts is not None and len(redshifts) > 1:
+            self.say('! input particles at single snapshot but also input more than one redshift')
+            return
+
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
                 parts = self.read_simulations(
                     simulation_names, redshift, species, property_names, force_float32)
 
             plot_property_v_distance(
-                parts, 'total', 'mass', 'vel.circ', 'lin', False, [0, None],
+                parts, 'total', 'mass', 'vel.circ', 'linear', False, [0, None],
                 [0.1, 300], 0.1, write_plot=True)
 
             plot_property_v_distance(
@@ -2721,7 +2748,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
-                    parts, 'baryon', 'mass', 'sum.cum.fraction', 'lin', False, [0, 2],
+                    parts, 'baryon', 'mass', 'sum.cum.fraction', 'linear', False, [0, 2],
                     [10, 2000], 0.1, write_plot=True)
 
                 plot_property_v_distance(
@@ -2739,12 +2766,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             if 'velocity' in property_names:
                 plot_property_v_distance(
-                    parts, 'gas', 'host.velocity.rad', 'average', 'lin', True, [None, None],
+                    parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
                     [1, 300], 0.25, write_plot=True)
 
             if 'form.time' in property_names and redshift <= 4:
                 plot_star_form_history(
-                    parts, 'mass', 'redshift', [0, 6], 0.2, 'lin', distance_limits=[0, 15],
+                    parts, 'mass', 'redshift', [0, 6], 0.2, 'linear', distance_limits=[0, 15],
                     axis_y_limits=[None, None], write_plot=True)
 
             self.plot_images(parts, redshifts=redshift)
@@ -2773,6 +2800,10 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         if np.isscalar(redshifts):
             redshifts = [redshifts]
+
+        if parts is not None and len(redshifts) > 1:
+            self.say('! input particles at single snapshot but also input more than one redshift')
+            return
 
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:

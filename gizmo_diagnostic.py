@@ -366,7 +366,7 @@ def delete_snapshots(directory='.'):
 # simulation performance and scaling
 #===================================================================================================
 def plot_scaling(
-    scaling_kind='strong', time_kind='cpu', axis_x_scaling='log', axis_y_scaling='lin',
+    scaling_kind='strong', time_kind='cpu', axis_x_scaling='log', axis_y_scaling='linear',
     write_plot=False, plot_directory='.'):
     '''
     Print simulation run times (all or CPU).
@@ -375,8 +375,8 @@ def plot_scaling(
     ----------
     scaling_kind : string : 'strong', 'weak'
     time_kind : string : 'cpu', 'wall'
-    axis_x_scaling : string : scaling along x-axis: 'log', 'lin'
-    axis_y_scaling : string : scaling along y-axis: 'log', 'lin'
+    axis_x_scaling : string : scaling along x-axis: 'log', 'linear'
+    axis_y_scaling : string : scaling along y-axis: 'log', 'linear'
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to write plot file
     '''
@@ -419,8 +419,6 @@ def plot_scaling(
     subplot = fig.add_subplot(111)
     fig.subplots_adjust(left=0.21, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
-    plot_func = ut.plot.get_plot_function(subplot, axis_x_scaling, axis_y_scaling)
-
     if scaling_kind == 'strong':
         cpu_nums = [k for k in hydro_ref14]
         # 2x == convert from a = 0.068 to a = 0.1
@@ -429,17 +427,19 @@ def plot_scaling(
         elif time_kind == 'wall':
             times = [hydro_ref14[k]['wall.time'] * 2 for k in hydro_ref14]
 
-        subplot.set_xlim([1e3, 2.5e4])
         subplot.set_xlabel('core number')
 
         if time_kind == 'cpu':
-            subplot.set_ylim([0, 1.6e5])
+            axis_y_limits = [0, 1.6e5]
             subplot.set_ylabel('CPU time to $z = 9$ [hr]')
         elif time_kind == 'wall':
-            subplot.set_ylim([0, 35])
+            axis_y_limits = [0, 35]
             subplot.set_ylabel('wall time to $z = 9$ [hr]')
 
-        plot_func(cpu_nums, times, '*-', linewidth=2.0, color='blue')
+        ut.plot.set_axes_scaling_limits(
+            subplot, axis_x_scaling, [1e3, 2.5e4], None, axis_y_scaling, axis_y_limits)
+
+        subplot.plot(cpu_nums, times, '*-', linewidth=2.0, color='blue')
 
         subplot.text(0.05, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                      transform=subplot.transAxes)
@@ -460,23 +460,25 @@ def plot_scaling(
                                   ratio_ref / (hydro[k]['particle.number'] / hydro[k]['cpu.number'])
                                   for k in sorted(hydro.keys())])
 
-        subplot.set_xlim([6e6, 1.5e9])
         subplot.set_xlabel('particle number')
 
         if time_kind == 'cpu':
-            subplot.set_ylim([2e2, 4e7])
+            axis_y_limits = [2e2, 4e7]
             subplot.set_ylabel('CPU time to $z = 0$ [hr]')
         elif time_kind == 'wall':
-            subplot.set_ylim([4, 4000])
+            axis_y_limits = [4, 4000]
             subplot.set_ylabel('wall time to $z = 0$ [hr]')
             subplot.text(0.05, 0.5,
                          'weak scaling:\nfixed particle number / core = {:.1e}'.format(ratio_ref),
                          color='black', transform=subplot.transAxes)
 
-        plot_func(dm_particle_nums, dm_times, '.-', linewidth=2.0, color='red')
-        plot_func(mfm_particle_nums[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
-        plot_func(mfm_particle_nums[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
-                  alpha=0.7)
+        ut.plot.set_axes_scaling_limits(
+            subplot, axis_x_scaling, [6e6, 1.5e9], None, axis_y_scaling, axis_y_limits)
+
+        subplot.plot(dm_particle_nums, dm_times, '.-', linewidth=2.0, color='red')
+        subplot.plot(mfm_particle_nums[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
+        subplot.plot(mfm_particle_nums[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
+                     alpha=0.7)
 
     plot_name = 'test'
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
