@@ -389,7 +389,7 @@ def plot_scaling(
                   'cpu.time': 154355, 'wall.time': 75.4},
     }
 
-    hydro = {
+    baryon = {
         'ref12': {'particle.number': 8.82e6 * 2, 'cpu.number': 512,
                   'cpu.time': 116482, 'wall.time': 228},
         'ref13': {'particle.number': 7.05e7 * 2, 'cpu.number': 2048,
@@ -401,7 +401,7 @@ def plot_scaling(
                   'cpu.time': 1.95e7, 'wall.time': 2380},
     }
 
-    hydro_ref14 = {
+    baryon_ref14 = {
         2048: {'particle.number': 5.64e8 * 2, 'cpu.number': 2048,
                'wall.time': 15.55, 'cpu.time': 31850},
         4096: {'particle.number': 5.64e8 * 2, 'cpu.number': 4096,
@@ -420,12 +420,12 @@ def plot_scaling(
     fig.subplots_adjust(left=0.21, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
 
     if scaling_kind == 'strong':
-        cpu_nums = [k for k in hydro_ref14]
+        cpu_numbers = [k for k in baryon_ref14]
         # 2x == convert from a = 0.068 to a = 0.1
         if time_kind == 'cpu':
-            times = [hydro_ref14[k]['cpu.time'] * 2 for k in hydro_ref14]
+            times = [baryon_ref14[k]['cpu.time'] * 2 for k in baryon_ref14]
         elif time_kind == 'wall':
-            times = [hydro_ref14[k]['wall.time'] * 2 for k in hydro_ref14]
+            times = [baryon_ref14[k]['wall.time'] * 2 for k in baryon_ref14]
 
         subplot.set_xlabel('core number')
 
@@ -439,26 +439,28 @@ def plot_scaling(
         ut.plot.set_axes_scaling_limits(
             subplot, axis_x_scaling, [1e3, 2.5e4], None, axis_y_scaling, axis_y_limits)
 
-        subplot.plot(cpu_nums, times, '*-', linewidth=2.0, color='blue')
+        subplot.plot(cpu_numbers, times, '*-', linewidth=2.0, color='blue')
 
         subplot.text(0.05, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                      transform=subplot.transAxes)
 
     elif scaling_kind == 'weak':
-        dm_particle_nums = np.array([dark[k]['particle.number'] for k in sorted(dark.keys())])
-        mfm_particle_nums = np.array([hydro[k]['particle.number'] for k in sorted(hydro.keys())])
+        dm_particle_numbers = np.array([dark[k]['particle.number'] for k in sorted(dark.keys())])
+        mfm_particle_numbers = np.array([baryon[k]['particle.number']
+                                         for k in sorted(baryon.keys())])
 
         if time_kind == 'cpu':
             dm_times = np.array([dark[k]['cpu.time'] for k in sorted(dark.keys())])
-            mfm_times = np.array([hydro[k]['cpu.time'] for k in sorted(hydro.keys())])
+            mfm_times = np.array([baryon[k]['cpu.time'] for k in sorted(baryon.keys())])
         elif time_kind == 'wall':
-            ratio_ref = hydro['ref14']['particle.number'] / hydro['ref14']['cpu.number']
+            ratio_ref = baryon['ref14']['particle.number'] / baryon['ref14']['cpu.number']
             dm_times = np.array([dark[k]['wall.time'] *
                                  ratio_ref / (dark[k]['particle.number'] / dark[k]['cpu.number'])
                                  for k in sorted(dark.keys())])
-            mfm_times = np.array([hydro[k]['wall.time'] *
-                                  ratio_ref / (hydro[k]['particle.number'] / hydro[k]['cpu.number'])
-                                  for k in sorted(hydro.keys())])
+            mfm_times = np.array(
+                [baryon[k]['wall.time'] *
+                 ratio_ref / (baryon[k]['particle.number'] / baryon[k]['cpu.number'])
+                 for k in sorted(baryon.keys())])
 
         subplot.set_xlabel('particle number')
 
@@ -475,9 +477,9 @@ def plot_scaling(
         ut.plot.set_axes_scaling_limits(
             subplot, axis_x_scaling, [6e6, 1.5e9], None, axis_y_scaling, axis_y_limits)
 
-        subplot.plot(dm_particle_nums, dm_times, '.-', linewidth=2.0, color='red')
-        subplot.plot(mfm_particle_nums[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
-        subplot.plot(mfm_particle_nums[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
+        subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
+        subplot.plot(mfm_particle_numbers[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
+        subplot.plot(mfm_particle_numbers[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
                      alpha=0.7)
 
     plot_name = 'test'

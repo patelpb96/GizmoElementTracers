@@ -1951,7 +1951,7 @@ def plot_star_form_history(
     parts=None, sfh_kind='rate',
     time_kind='time.lookback', time_limits=[13.8, 0], time_width=0.2, time_scaling='linear',
     distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indicess=None,
-    axis_y_limits=[], axis_y_scaling='log',
+    sfh_limits=[], sfh_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot star-formation rate history v time_kind.
@@ -1969,8 +1969,8 @@ def plot_star_form_history(
     center_positions : list or list of lists : position[s] of galaxy centers {kpc comoving}
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array : part_indices of particles from which to select
-    axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
+    sfh_limits : list : min and max limits for y-axis
+    sfh_scaling : string : scaling of y-axis: 'log', 'linear'
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -2016,14 +2016,18 @@ def plot_star_form_history(
 
     ut.plot.make_axis_time(
         subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=part.Cosmology,
-        fontsize=26)
+        fontsize=30)
 
-    subplot.set_ylim(ut.plot.get_axis_limits(sfh[sfh_kind], axis_y_scaling, axis_y_limits))
+    y_values = None
+    if sfh is not None:
+        y_values = sfh[sfh_kind]
+    ut.plot.set_axes_scaling_limits(
+        subplot, y_scaling=sfh_scaling, y_limits=sfh_limits, y_values=y_values)
 
-    if 'mass' in sfh_kind:
-        axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
+    if sfh_kind == 'mass.normalized':
+        axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
     else:
-        axis_y_label = ut.plot.get_label('sfr', get_symbol=True, get_units=True)
+        axis_y_label = ut.plot.get_label('star.' + sfh_kind, get_symbol=True, get_units=True)
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
     colors = ut.plot.get_colors(len(parts))
@@ -2153,17 +2157,13 @@ def plot_star_form_history_galaxies(
     y_values = None
     if sfh is not None:
         y_values = sfh[sfh_kind]
-    #subplot.set_ylim(ut.plot.get_axis_limits(y_values, sfh_scaling, sfh_limits))
     ut.plot.set_axes_scaling_limits(
         subplot, y_scaling=sfh_scaling, y_limits=sfh_limits, y_values=y_values)
 
-    if 'mass' in sfh_kind:
-        if 'normalized' in sfh_kind:
-            axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
-        else:
-            axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
+    if sfh_kind == 'mass.normalized':
+        axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
     else:
-        axis_y_label = ut.plot.get_label('sfr', get_symbol=True, get_units=True)
+        axis_y_label = ut.plot.get_label('star.' + sfh_kind, get_symbol=True, get_units=True)
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
     if hal is not None:
@@ -2771,8 +2771,16 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             if 'form.time' in property_names and redshift <= 4:
                 plot_star_form_history(
-                    parts, 'mass', 'redshift', [0, 6], 0.2, 'linear', distance_limits=[0, 15],
-                    axis_y_limits=[None, None], write_plot=True)
+                    parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
+                    distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+
+                plot_star_form_history(
+                    parts, 'form.rate', 'time.lookback', [0, 13], 0.5, 'linear',
+                    distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+
+                plot_star_form_history(
+                    parts, 'form.rate.specific', 'redshift', [0, 13], 0.5, 'linear',
+                    distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
 
             self.plot_images(parts, redshifts=redshift)
 
