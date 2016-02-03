@@ -20,26 +20,26 @@ import utilities as ut
 #===================================================================================================
 # utility
 #===================================================================================================
-# use to translate between element name and index in element table
-element_dict = collections.OrderedDict()
-element_dict['metal'] = 0
-element_dict['helium'] = 1
-element_dict['carbon'] = 2
-element_dict['nitrogen'] = 3
-element_dict['oxygen'] = 4
-element_dict['neon'] = 5
-element_dict['magnesium'] = 6
-element_dict['silicon'] = 7
-element_dict['sulphur'] = 8
-element_dict['calcium'] = 9
-element_dict['iron'] = 10
-
-
 class ParticleDictionaryClass(dict):
     '''
     Dictionary class to store particle data.
     Allows greater flexibility for producing derived quantities.
     '''
+    # use to translate between element name and index in element table
+    element_dict = collections.OrderedDict()
+    element_dict['metal'] = 0
+    element_dict['helium'] = 1
+    element_dict['carbon'] = 2
+    element_dict['nitrogen'] = 3
+    element_dict['oxygen'] = 4
+    element_dict['neon'] = 5
+    element_dict['magnesium'] = 6
+    element_dict['silicon'] = 7
+    element_dict['sulphur'] = 8
+    element_dict['calcium'] = 9
+    element_dict['iron'] = 10
+    element_pointer = np.arange(len(element_dict))  # use if read only subset of elements
+
     def prop(self, property_name='', indices=None):
         '''
         Get property, either from self dictionary or derive.
@@ -141,30 +141,30 @@ class ParticleDictionaryClass(dict):
             prop_name = property_name.replace('.lookback', '')
             return self.snapshot['time'] - self.prop(prop_name, indices)
 
-        # metallicity string -> index conversion
+        # element string -> index conversion
         if 'metallicity.' in property_name:
-            metal_index = None
+            element_index = None
             for prop_name in property_name.split('.'):
-                if prop_name in element_dict:
-                    metal_index = element_dict[prop_name]
-                    metal_name = prop_name
+                if prop_name in self.element_dict:
+                    element_index = self.element_pointer[self.element_dict[prop_name]]
+                    element_name = prop_name
                     break
 
-            if metal_index is None:
+            if element_index is None:
                 raise ValueError(
                     'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
             if indices is None:
-                values = self['metallicity'][:, metal_index]
+                values = self['metallicity'][:, element_index]
             else:
-                values = self['metallicity'][indices, metal_index]
+                values = self['metallicity'][indices, element_index]
 
             #if '.ironderived' in property_name:
             #    # conversion to [Fe/H] solar from Ma et al 2015
             #    values = values / 10 ** 0.2 * 0.02
 
             if '.solar' in property_name:
-                values = values / ut.const.sun_composition[metal_name + '.mass.fraction']
+                values = values / ut.const.sun_composition[element_name + '.mass.fraction']
 
             return values
 
@@ -195,7 +195,7 @@ class GizmoClass(ut.io.SayClass):
         self, species_types='all',
         snapshot_number_kind='index', snapshot_number=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
-        property_names='all', metal_index_max=1, particle_subsample_factor=0,
+        property_names='all', element_indices=[0, 1], particle_subsample_factor=0,
         assign_center=True, sort_dark_by_id=False, force_float32=False, get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -219,8 +219,8 @@ class GizmoClass(ut.io.SayClass):
         property_names : string or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_name_dict
-        metal_index_max : int : maximum metal index to keep
-            options: None = keep all, 0 = total, 1 = total + helium, 10 = iron (no r-process)
+        element_indices : int or list : indices of elements to keep
+            note: 0 = total metals, 1 = helium, 10 = iron
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
@@ -315,7 +315,7 @@ class GizmoClass(ut.io.SayClass):
             'StarFormationRate': 'sfr',  # {M_sun / yr}
 
             ## star/gas metallicity {mass fraction} ##
-            ## 0 = total metal mass fraction (everything not H, He)
+            ## 0 = total metals (everything not H, He)
             ## 1 = He
             ## 2 = C
             ## 3 = N
@@ -492,8 +492,14 @@ class GizmoClass(ut.io.SayClass):
             part_number_tot = header['particle.numbers.total'][spec_id]
 
             # add species to particle dictionary
-            #part[spec_name] = {}
             part[spec_name] = ParticleDictionaryClass()
+
+            # set element pointers if reading only subset of elements
+            if element_indices is not None:
+                if np.isscalar(element_indices):
+                    element_indices = [element_indices]
+                for element_i, element_index in enumerate(element_indices):
+                    part[spec_name].element_pointer[element_index] = element_i
 
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
@@ -504,8 +510,8 @@ class GizmoClass(ut.io.SayClass):
                         prop_shape = part_number_tot
                     elif len(part_in[prop_name_in].shape) == 2:
                         prop_shape = [part_number_tot, part_in[prop_name_in].shape[1]]
-                        if prop_name_in == 'Metallicity' and metal_index_max:
-                            prop_shape = [part_number_tot, metal_index_max + 1]
+                        if prop_name_in == 'Metallicity' and element_indices is not None:
+                            prop_shape = [part_number_tot, len(element_indices)]
 
                     # determine data type to store
                     prop_in_dtype = part_in[prop_name_in].dtype
@@ -566,8 +572,8 @@ class GizmoClass(ut.io.SayClass):
                                 part[spec_name][prop_name][part_index_lo:part_index_hi] = \
                                     part_in[prop_name_in]
                             elif len(part_in[prop_name_in].shape) == 2:
-                                if prop_name_in == 'Metallicity' and metal_index_max:
-                                    prop_in = part_in[prop_name_in][:, :metal_index_max + 1]
+                                if prop_name_in == 'Metallicity' and element_indices is not None:
+                                    prop_in = part_in[prop_name_in][:, element_indices]
                                 else:
                                     prop_in = part_in[prop_name_in]
                                 part[spec_name][prop_name][part_index_lo:part_index_hi, :] = prop_in
@@ -663,7 +669,7 @@ class GizmoClass(ut.io.SayClass):
 
             if 'temperature' in part[spec_name]:
                 # convert from {(km / s) ^ 2} to {Kelvin}
-                # ignore small corrections from metals (beyond He)
+                # ignore small corrections from elements beyond He
                 helium_mass_fracs = part[spec_name]['metallicity'][:, 1]
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
