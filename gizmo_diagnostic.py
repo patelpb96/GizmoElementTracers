@@ -413,11 +413,7 @@ def plot_scaling(
     }
 
     # plot ----------
-    plt.clf()
-    plt.minorticks_on()
-    fig = plt.figure(1)
-    subplot = fig.add_subplot(111)
-    fig.subplots_adjust(left=0.21, right=0.95, top=0.96, bottom=0.16, hspace=0.03, wspace=0.03)
+    _fig, subplot = ut.plot.make_figure(1, left=0.21, right=0.95, top=0.96, bottom=0.16)
 
     if scaling_kind == 'strong':
         cpu_numbers = [k for k in baryon_ref14]
