@@ -15,7 +15,6 @@ import sys
 import glob
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
-from matplotlib import pyplot as plt
 # local ----
 import utilities as ut
 from . import gizmo_io
@@ -217,14 +216,14 @@ def print_run_time_ratios(
 
 
 def print_properties_extrema_all_snapshots(
-    simulation_directory='.', output_directory='output',
+    simulation_directory='.', snapshot_directory='output',
     species_property_dict={'gas': ['smooth.length', 'density.number']}):
     '''
     For each input property, get its extremum at each snapshot.
     Print statistics of this across all snapshots.
 
     simulation_directory : string : directory of simulation
-    output_directory : string : directory of snapshot files
+    snapshot_directory : string : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
     element_indices = [0, 1]
@@ -267,9 +266,9 @@ def print_properties_extrema_all_snapshots(
     for snapshot_i in Snapshot['index']:
         try:
             part = gizmo_io.Read.read_snapshot(
-                species_read, 'index', snapshot_i, simulation_directory, output_directory,
-                properties_read, element_indices=element_indices, sort_dark_by_id=False,
-                assign_center=False, force_float32=True)
+                species_read, 'index', snapshot_i, simulation_directory, snapshot_directory, '',
+                properties_read, element_indices, assign_center=False, sort_dark_by_id=False,
+                force_float32=False)
 
             for spec_name in species_property_dict:
                 for prop_name in species_property_dict[spec_name]:
@@ -281,7 +280,7 @@ def print_properties_extrema_all_snapshots(
                         Say.say('! {} {} not in particle dictionary'.format(spec_name, prop_name))
         except:
             Say.say('! cannot read snapshot index {} in {}'.format(
-                    snapshot_i, simulation_directory + output_directory))
+                    snapshot_i, simulation_directory + snapshot_directory))
 
     Statistic = ut.statistic.StatisticClass()
 

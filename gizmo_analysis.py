@@ -1696,7 +1696,7 @@ def plot_property_v_distance_halos(
     else:
         subplot.xaxis.set_minor_locator(AutoMinorLocator(2))
 
-    subplot.yaxis.set_minor_locator(AutoMinorLocator(5))
+    #subplot.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
     if prop_statistic == 'vel.circ':
