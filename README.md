@@ -1,7 +1,6 @@
 # Description
 
 Python package for running and analyzing Gizmo cosmological simulations.
-Relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
 
 # Content
@@ -23,6 +22,9 @@ Relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python packag
 
 
 # Requirements
+
+This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
+
 I develop this package using the latest version of the Anaconda Python package, which I update weekly.
 I use python 3.5 and recommend that you do the same.
 However, I try to maintain backward compatibility with python 2.7.
