@@ -3,7 +3,7 @@
 Python package for running and analyzing Gizmo cosmological simulations.
 
 
-# Content
+# Contents
 
 ## gizmo_io.py
 * routines to read in Gizmo snapshot file in HDF5 format.
@@ -19,6 +19,9 @@ Python package for running and analyzing Gizmo cosmological simulations.
 
 ## gizmo_transfer.py
 * routines for transferring files/snapshots across machines.
+
+## tutorial.ipynb
+* ipython notebook tutorial for using this package and reading in Gizmo particle data from a snapshot.
 
 
 # Requirements
