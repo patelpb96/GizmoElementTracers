@@ -27,7 +27,7 @@ class ParticleDictionaryClass(dict):
     '''
     # use to translate between element name and index in element table
     element_dict = collections.OrderedDict()
-    element_dict['metal'] = 0
+    element_dict['metals'] = 0
     element_dict['helium'] = 1
     element_dict['carbon'] = 2
     element_dict['nitrogen'] = 3
@@ -111,12 +111,12 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ##
-        if 'hydrogen.mass.fraction' in property_name:
+        if 'massfraction.hydrogen' in property_name:
             # mass fraction of hydrogen (excluding helium and metals)
-            values = (1 - self.prop('metallicity', indices)[:, 0] -
-                      self.prop('metallicity', indices)[:, 1])
+            values = (1 - self.prop('massfraction', indices)[:, 0] -
+                      self.prop('massfraction', indices)[:, 1])
 
-            if property_name == 'neutral.hydrogen.mass.fraction':
+            if property_name == 'massfraction.hydrogen.neutral':
                 # mass fraction of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
                 values = values * self.prop('hydrogen.neutral.fraction', indices)
 
@@ -124,7 +124,7 @@ class ParticleDictionaryClass(dict):
 
         if 'mass.hydrogen' in property_name:
             # mass of hydrogen (excluding helium and metals)
-            values = self.prop('mass', indices) * self.prop('hydrogen.mass.fraction', indices)
+            values = self.prop('mass', indices) * self.prop('massfraction.hydrogen', indices)
 
             if property_name == 'mass.hydrogen.neutral':
                 # mass of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
@@ -134,7 +134,7 @@ class ParticleDictionaryClass(dict):
 
         if property_name in ['number.density', 'density.number']:
             # number density of hydrogen {cm ^ -3}
-            return (self.prop('density', indices) * self.prop('hydrogen.mass.fraction', indices) *
+            return (self.prop('density', indices) * self.prop('massfraction.hydrogen', indices) *
                     ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3)
 
         if 'form.time' in property_name and 'lookback' in property_name:
@@ -142,7 +142,7 @@ class ParticleDictionaryClass(dict):
             return self.snapshot['time'] - self.prop(prop_name, indices)
 
         # element string -> index conversion
-        if 'metallicity.' in property_name:
+        if 'massfraction.' in property_name or 'metallicity.' in property_name:
             element_index = None
             for prop_name in property_name.split('.'):
                 if prop_name in self.element_dict:
@@ -155,16 +155,12 @@ class ParticleDictionaryClass(dict):
                     'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
             if indices is None:
-                values = self['metallicity'][:, element_index]
+                values = self['massfraction'][:, element_index]
             else:
-                values = self['metallicity'][indices, element_index]
+                values = self['massfraction'][indices, element_index]
 
-            #if '.ironderived' in property_name:
-            #    # conversion to [Fe/H] solar from Ma et al 2015
-            #    values = values / 10 ** 0.2 * 0.02
-
-            if '.solar' in property_name:
-                values = values / ut.const.sun_composition[element_name + '.mass.fraction']
+            if 'metallicity.' in property_name:
+                values = values / ut.const.sun_composition[element_name + '.massfraction']
 
             return values
 
@@ -196,7 +192,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_number_kind='index', snapshot_number=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         property_names='all', element_indices=[0, 1], particle_subsample_factor=0,
-        assign_center=True, sort_dark_by_id=False, force_float32=False, get_header_only=False):
+        assign_center=True, sort_dark_by_id=False, separate_lowres_dark=True, force_float32=False,
+        get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary class.
@@ -220,7 +217,7 @@ class ReadClass(ut.io.SayClass):
             'all' = all species in file
             otherwise, choose subset from among property_name_dict
         element_indices : int or list : indices of elements to keep
-            note: 0 = total metals, 1 = helium, 10 = iron
+            note: 0 = total metals, 1 = helium, 10 = iron, None = read all elements
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
@@ -314,8 +311,8 @@ class ReadClass(ut.io.SayClass):
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
             'StarFormationRate': 'sfr',  # {M_sun / yr}
 
-            ## star/gas metallicity {mass fraction} ##
-            ## 0 = total metals (everything not H, He)
+            ## star/gas - mass fraction of individual elements ##
+            ## 0 = all metals (everything not H, He)
             ## 1 = He
             ## 2 = C
             ## 3 = N
@@ -326,7 +323,7 @@ class ReadClass(ut.io.SayClass):
             ## 8 = S
             ## 9 = Ca
             ## 10 = Fe
-            'Metallicity': 'metallicity',
+            'Metallicity': 'massfraction',
 
             ## star particles ##
             ## 'time' when star particle formed
@@ -589,7 +586,7 @@ class ReadClass(ut.io.SayClass):
         spec_name = 'dark.2'
         if spec_name in part and 'mass' in part[spec_name]:
             dark_lowres_masses = np.unique(part[spec_name]['mass'])
-            if dark_lowres_masses.size > 1:
+            if separate_lowres_dark and dark_lowres_masses.size > 1:
                 self.say('separating lower-resolution dark-matter species:')
                 dark_lowres = {}
                 for prop_name in part[spec_name]:
@@ -670,7 +667,7 @@ class ReadClass(ut.io.SayClass):
             if 'temperature' in part[spec_name]:
                 # convert from {(km / s) ^ 2} to {Kelvin}
                 # ignore small corrections from elements beyond He
-                helium_mass_fracs = part[spec_name]['metallicity'][:, 1]
+                helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
                 molecular_weights = mus * ut.const.proton_mass

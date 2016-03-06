@@ -35,7 +35,7 @@ def get_nucleosynthetic_yields(
     ----------
     event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float :
-        total metallicity of star prior to event, relative to solar (sun_metal_mass_fraction)
+        total metallicity of star prior to event, relative to solar = sun_metal_mass_fraction
     normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
 
     Returns
@@ -43,10 +43,10 @@ def get_nucleosynthetic_yields(
     yields : ordered dictionary : yield mass {M_sun} or mass fraction for each element
         can covert to regular dictionary via dict(yields) or list of values via yields.values()
     '''
-    sun_metal_mass_fraction = 0.02  # total metal mass fraction that Gizmo assumes
+    sun_metal_mass_fraction = 0.02  # total metal mass fraction of sun that Gizmo assumes
 
     element_dict = collections.OrderedDict()
-    element_dict['metal'] = 0
+    element_dict['metals'] = 0
     element_dict['helium'] = 1
     element_dict['carbon'] = 2
     element_dict['nitrogen'] = 3
@@ -84,7 +84,7 @@ def get_nucleosynthetic_yields(
 
         for k in yield_dict:
             if k is not 'helium':
-                yield_dict['metal'] += yield_dict[k]
+                yield_dict['metals'] += yield_dict[k]
 
     elif event_kind == 'supernova.ii':
         # yields from Nomoto et al 2006, IMF averaged
@@ -94,7 +94,7 @@ def get_nucleosynthetic_yields(
         # from 10.37 to 37.53 Myr, rate / M_sun = 2.516e-10 yr ^ -1
         ejecta_mass = 10.5  # {M_sun}
 
-        yield_dict['metal'] = 2.0
+        yield_dict['metals'] = 2.0
         yield_dict['helium'] = 3.87
         yield_dict['carbon'] = 0.133
         yield_dict['nitrogen'] = 0.0479
@@ -115,7 +115,7 @@ def get_nucleosynthetic_yields(
             yield_dict['nitrogen'] *= 1.65
 
         # correct total metal mass for nitrogen correction
-        yield_dict['metal'] += yield_dict['nitrogen'] - yield_nitrogen_orig
+        yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
@@ -125,7 +125,7 @@ def get_nucleosynthetic_yields(
         #                         ((star_age - 0.05) / 0.01)) yr ^ -1
         ejecta_mass = 1.4  # {M_sun}
 
-        yield_dict['metal'] = 1.4
+        yield_dict['metals'] = 1.4
         yield_dict['helium'] = 0.0
         yield_dict['carbon'] = 0.049
         yield_dict['nitrogen'] = 1.2e-6
@@ -684,7 +684,7 @@ def plot_metal_v_distance(
         'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
     distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
 
-    metal_masses = part[spec_name].prop('metallicity.total.solar') * part[spec_name]['mass']
+    metal_masses = part[spec_name].prop('metallicity.metals') * part[spec_name]['mass']
 
     pro_metal = DistanceBin.get_sum_profile(distances, metal_masses, get_fraction=True)
     if 'metallicity' in plot_kind:
@@ -869,7 +869,7 @@ def plot_image(
     plt.register_cmap(cmap=BBW)
 
     if background_color == 'black':
-        if spec_name == 'dark':
+        if 'dark' in spec_name:
             color_map = plt.get_cmap('bbw')
         elif spec_name == 'star':
             color_map = plt.get_cmap('byw')
@@ -2168,8 +2168,8 @@ def plot_star_form_history_galaxies(
             linestyle = '-'
             if hal is not None:
                 color = 'black'
-                linewidth = 1.2 + 0.2 * gal_i
-                alpha = 0.15
+                linewidth = 1.0 + 0.25 * gal_i
+                alpha = 0.2
                 label = None
             else:
                 color = colors[gal_i]

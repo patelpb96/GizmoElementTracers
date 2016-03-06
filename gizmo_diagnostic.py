@@ -257,8 +257,8 @@ def print_properties_extrema_all_snapshots(
             if prop_name_read not in properties_read:
                 properties_read.append(prop_name_read)
 
-            if '.number' in prop_name and 'metallicity' not in properties_read:
-                properties_read.append('metallicity')
+            if '.number' in prop_name and 'massfraction' not in properties_read:
+                properties_read.append('massfraction')
 
         # re-assign property list as dictionary so can store list of values
         species_property_dict[spec_name] = prop_dict
