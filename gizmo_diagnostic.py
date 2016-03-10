@@ -307,7 +307,6 @@ def plot_halo_contamination(directory='.', redshift=0):
     directory : string : directory of simulation (one level above directory of snapshot file)
     redshift : float : redshift of snapshot
     '''
-    #position_dif_max = 5  # {kpc comoving} - if centers differ by more than this, print warning
     distance_bin_width = 0.02
     distance_limits_phys = [1, 4000]  # {kpc physical}
     distance_limits_halo = [0.01, 10]  # {units of R_halo}

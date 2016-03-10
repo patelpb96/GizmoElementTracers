@@ -529,7 +529,7 @@ def plot_mass_contamination(
     axis_y_limits=[0.0001, 3], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
-    Plot contamination from lower-resolution particles v distance from center.
+    Plot contamination from low-resolution particles v distance from center.
 
     Parameters
     ----------
@@ -551,6 +551,8 @@ def plot_mass_contamination(
     species_reference = 'dark'
 
     virial_kind = '200m'
+    if halo_radius is None:
+        halo_radius = np.nan
 
     Say = ut.io.SayClass(plot_mass_contamination)
 
@@ -560,46 +562,97 @@ def plot_mass_contamination(
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits, distance_bin_width, distance_bin_number)
 
-    pros = collections.OrderedDict()
-    pros[species_reference] = {}
+    profile_mass = collections.OrderedDict()
+    profile_mass[species_reference] = {}
     for spec_name in species_test:
-        pros[spec_name] = {}
+        profile_mass[spec_name] = {}
 
-    ratios = {}
+    profile_mass_ratio = {}
+    profile_number = {}
 
-    for spec_name in pros:
+    for spec_name in profile_mass:
         distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
         distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
         if scale_to_halo_radius:
             distances /= halo_radius
-        pros[spec_name] = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
+        profile_mass[spec_name] = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
 
     for spec_name in species_test:
-        mass_ratio_bin = pros[spec_name]['sum'] / pros[species_reference]['sum']
-        mass_ratio_cum = pros[spec_name]['sum.cum'] / pros[species_reference]['sum.cum']
-        ratios[spec_name] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
+        mass_ratio_bin = profile_mass[spec_name]['sum'] / profile_mass[species_reference]['sum']
+        mass_ratio_cum = (profile_mass[spec_name]['sum.cum'] /
+                          profile_mass[species_reference]['sum.cum'])
+        profile_mass_ratio[spec_name] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
+        profile_number[spec_name] = {
+            'bin': np.int64(np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])),
+            'cum': np.int64(np.round(profile_mass[spec_name]['sum.cum'] /
+                                     part[spec_name]['mass'][0])),
+        }
 
     # print diagnostics
-    for spec_name in ['dark.2', 'dark.3']:
-        Say.say(spec_name + ' cumulative mass / mass_fraction / number:')
-        if pros[spec_name]['sum.cum'][-1] == 0:
-            Say.say('  none. yay.')
+    if scale_to_halo_radius:
+        distances_halo = profile_mass[species_test[0]]['distance.cum']
+        distances_phys = distances_halo * halo_radius
+    else:
+        distances_phys = profile_mass[species_test[0]]['distance.cum']
+        distances_halo = distances_phys / halo_radius
+
+    species_dark = [spec_name for spec_name in species_test if 'dark' in spec_name]
+
+    for spec_name in species_dark:
+        Say.say(spec_name)
+        if profile_mass[spec_name]['sum.cum'][-1] == 0:
+            Say.say('  none. yay!')
             continue
-        distances = pros[spec_name]['distance.cum']
 
         if scale_to_halo_radius:
-            print_string = '  d/R_halo < {:.3f}: '
+            print_string = '  d/R_halo < {:.2f}, d < {:.2f} kpc: '
         else:
-            print_string = '  d < {:.3f} kpc: '
-        print_string += 'mass = {:.2e}, mass_frac = {:.3f}, number = {:.0f}'
+            print_string = '  d < {:.2f} kpc, d/R_halo < {:.2f}: '
+        print_string += 'mass_frac = {:.3f}, mass = {:.2e}, number = {:.0f}'
 
-        for dist_i in range(pros[spec_name]['sum.cum'].size):
-            if pros[spec_name]['sum.cum'][dist_i] > 0:
+        for dist_i in range(profile_mass[spec_name]['sum.cum'].size):
+            if profile_mass[spec_name]['sum.cum'][dist_i] > 0:
+                if scale_to_halo_radius:
+                    distance_0 = distances_halo[dist_i]
+                    distance_1 = distances_phys[dist_i]
+                else:
+                    distance_0 = distances_phys[dist_i]
+                    distance_1 = distances_halo[dist_i] / halo_radius
+
                 Say.say(print_string.format(
-                        distances[dist_i], pros[spec_name]['sum.cum'][dist_i],
-                        ratios[spec_name]['cum'][dist_i],
-                        pros[spec_name]['sum.cum'][dist_i] / part[spec_name]['mass'][0]))
+                        distance_0, distance_1,
+                        profile_mass_ratio[spec_name]['cum'][dist_i],
+                        profile_mass[spec_name]['sum.cum'][dist_i],
+                        profile_number[spec_name]['cum'][dist_i]))
+
+                if spec_name != 'dark.2':
+                    # print only 1 distance bin for lower-resolution particles
+                    break
+
+    print()
+    print('contamination summary')
+    spec_name = 'dark.2'
+    dist_i_halo = np.searchsorted(distances_phys, halo_radius)
+    print('* {} {} particles within R_halo'.format(
+          profile_number[spec_name]['cum'][dist_i_halo], spec_name))
+    dist_i = np.where(profile_number[spec_name]['cum'] > 0)[0][0]
+    print('* {} closest d = {:.2f} kpc, {:.2f} R_halo'.format(
+          spec_name, distances_phys[dist_i], distances_halo[dist_i]))
+    dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.001)[0][0]
+    print('* {} mass_fraction = 0.1% at d < {:.2f} kpc, {:.2f} R_halo'.format(
+          spec_name, distances_phys[dist_i], distances_halo[dist_i]))
+    dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.01)[0][0]
+    print('* {} mass_fraction = 1% at d < {:.2f} kpc, {:.2f} R_halo'.format(
+          spec_name, distances_phys[dist_i], distances_halo[dist_i]))
+    for spec_name in species_dark:
+        if spec_name != 'dark.2' and profile_number[spec_name]['cum'][dist_i_halo] > 0:
+            print('! {} {} particles within R_halo'.format(
+                  profile_number[spec_name]['cum'][dist_i_halo], spec_name))
+            dist_i = np.where(profile_number[spec_name]['cum'] > 0)[0][0]
+            print('! {} closest d = {:.2f} kpc, {:.2f} R_halo'.format(
+                  spec_name, distances_phys[dist_i], distances_halo[dist_i]))
+    print()
 
     if write_plot is None:
         return
@@ -629,7 +682,7 @@ def plot_mass_contamination(
 
     for spec_i, spec_name in enumerate(species_test):
         subplot.plot(
-            DistanceBin.mids, ratios[spec_name]['bin'], color=colors[spec_i], alpha=0.7,
+            DistanceBin.mids, profile_mass_ratio[spec_name]['bin'], color=colors[spec_i], alpha=0.7,
             label=spec_name)
 
     legend = subplot.legend(loc='best', prop=FontProperties(size=16))
