@@ -185,14 +185,22 @@ class ReadClass(ut.io.SayClass):
         '''
         self.snapshot_name_base = snapshot_name_base
         self.file_extension = file_extension
+
         self.eos = 5 / 3  # gas equation of state
 
+        # snapshot file does not contain these cosmological parameters, so have to set manually
+        # these are from AGORA cosmology
+        self.omega_baryon = 0.0455
+        self.sigma_8 = 0.807
+        self.n_s = 0.961
+        self.w = -1.0
+
     def read_snapshot(
-        self, species_types='all',
+        self, species_names='all',
         snapshot_number_kind='index', snapshot_number=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         property_names='all', element_indices=[0, 1], particle_subsample_factor=0,
-        assign_center=True, sort_dark_by_id=False, separate_lowres_dark=True, force_float32=False,
+        assign_center=True, sort_dark_by_id=False, separate_dark_lowres=True, force_float32=False,
         get_header_only=False):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -200,14 +208,14 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        species_types : string or int, or list of these : type[s] of particle species - options:
+        species_names : string or list : name[s] of particle species - options:
             'all' = all species in file
-            0 or 'gas' = gas
-            1 or 'dark' = dark matter at highest resolution
-            2 or 'dark.2' = dark matter at lower resolution for cosmological
-            4 or 'star' = stars
-            5 or 'blackhole' = black holes, if run contains them
-            2 or 'bulge', 3 or 'disk' = stars for non-cosmological run
+            'gas' = gas
+            'dark' = dark matter at highest resolution
+            'dark.2' = dark matter at lower resolution for cosmological
+            'star' = stars
+            'blackhole' = black holes, if run contains them
+            'bulge' or 'disk' = stars for non-cosmological run
         snapshot_number_kind : string : input snapshot number kind: index, redshift
         snapshot_number : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
@@ -215,12 +223,14 @@ class ReadClass(ut.io.SayClass):
         simulation_name : string : name to store for future identification
         property_names : string or list : name[s] of particle properties to read - options:
             'all' = all species in file
-            otherwise, choose subset from among property_name_dict
+            otherwise, choose subset from among property_dict
         element_indices : int or list : indices of elements to keep
-            note: 0 = total metals, 1 = helium, 10 = iron, None = read all elements
+            note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
+        separate_dark_lowres : boolean :
+            whether to separate low-resolution dark matter into separate dicts according to mass
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
         get_header_only : boolean : whether to read only header
 
@@ -228,75 +238,31 @@ class ReadClass(ut.io.SayClass):
         -------
         dictionary class, with keys for each particle species
         '''
-        # connects particle species name to id, and determines all possible species types
-        species_name_dict = {
-            'gas': 0,
-            'dark': 1,
-            'dark.2': 2,
-            'dark.3': 3,
-            # 'bulge': 2,
-            # 'disk': 3,
-            'star': 4,
-            #'blackhole': 5,
-            'dark.4': 5,
+        # convert particle species name to its id, set all possible species,
+        # set the order in which to read species
+        species_dict = collections.OrderedDict()
+        # dark-matter species in snapshot file
+        species_dict['dark'] = 1  # dark matter at highest resolution
+        species_dict['dark.2'] = 2  # can include lower-res dark matter at many masses/refinements
+        species_dict['dark.3'] = 3
+        species_dict['dark.4'] = 5
+        # baryon species in snapshot file
+        species_dict['gas'] = 0
+        species_dict['star'] = 4
+        # other - these ids overlap with above, so have to comment in if using them
+        #species_dict['blackhole'] = 5
+        #species_dict['bulge'] = 2
+        #species_dict['disk'] = 3
 
-            # use below types to divvy out coarser dark matter
-            'dark.5': 6,
-            'dark.6': 7,
-            'dark.7': 8,
-            'dark.8': 9,
-        }
-
-        # sets the order in which to read species
-        species_name_list = [
-            'dark',
-            'dark.1',
-            'dark.2',
-            'dark.3',
-            'dark.4',
-            'gas',
-            'star',
-            'blackhole',
-            'bulge',
-            'disk',
-        ]
-
-        # converts each key in input header dictionary to another naming preference
-        header_name_dict = {
-            # 6-element array of number of particles of each type in file
-            'NumPart_ThisFile': 'particle.numbers.in.file',
-            # 6-element array of total number of particles of each type (across all files)
-            'NumPart_Total': 'particle.numbers.total',
-            'NumPart_Total_HighWord': 'particle.numbers.total.high.word',
-            # mass for each particle type, if all are same (0 if they are different, usually true)
-            'MassTable': 'mass.array',
-            'Time': 'time',  # {Gyr / h}
-            'BoxSize': 'box.length',  # {kpc / h comoving}
-            'Redshift': 'redshift',
-            # number of output files per snapshot
-            'NumFilesPerSnapshot': 'file.number.per.snapshot',
-            'Omega0': 'omega_matter',
-            'OmegaLambda': 'omega_lambda',
-            'HubbleParam': 'hubble',
-            'Flag_Sfr': 'has.star.formation',
-            'Flag_Cooling': 'has.cooling',
-            'Flag_StellarAge': 'has.star.age',
-            'Flag_Metals': 'has.metals',
-            'Flag_Feedback': 'has.feedback',
-            'Flag_DoublePrecision': 'has.double.precision',
-            'Flag_IC_Info': 'has.ic.info',
-        }
-
-        # converts each key in input particle dictionary to another naming preference
+        # convert name in snapshot's particle dictionary to custon name preference
         # if comment out any property, will not read it
-        property_name_dict = {
+        property_dict = {
             ## all particles ##
             'ParticleIDs': 'id',
             'Coordinates': 'position',
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
-
             ## particles with adaptive smoothing ##
             'AGS-Softening': 'smooth.length',  # for gas, this is same as SmoothingLength
 
@@ -332,73 +298,83 @@ class ReadClass(ut.io.SayClass):
 
             ## black hole particles ##
             'BH_Mass': 'bh.mass',
-            'BH_Mdot': 'dm/dt'
+            'BH_Mdot': 'form.rate'
         }
 
-        header = {}  # dictionary to store header information
+        # convert name in snapshot's header dictionary to custom name preference
+        header_dict = {
+            # 6-element array of number of particles of each type in file
+            'NumPart_ThisFile': 'particle.numbers.in.file',
+            # 6-element array of total number of particles of each type (across all files)
+            'NumPart_Total': 'particle.numbers.total',
+            'NumPart_Total_HighWord': 'particle.numbers.total.high.word',
+            # mass for each particle type, if all are same (0 if they are different, usually true)
+            'MassTable': 'particle.masses',
+            'Time': 'time',  # {Gyr / h}
+            'BoxSize': 'box.length',  # {kpc / h comoving}
+            'Redshift': 'redshift',
+            # number of output files per snapshot
+            'NumFilesPerSnapshot': 'file.number.per.snapshot',
+            'Omega0': 'omega_matter',
+            'OmegaLambda': 'omega_lambda',
+            'HubbleParam': 'hubble',
+            'Flag_Sfr': 'has.star.formation',
+            'Flag_Cooling': 'has.cooling',
+            'Flag_StellarAge': 'has.star.age',
+            'Flag_Metals': 'has.metals',
+            'Flag_Feedback': 'has.feedback',
+            'Flag_DoublePrecision': 'has.double.precision',
+            'Flag_IC_Info': 'has.ic.info',
+        }
 
-        # dictionary class to store properties for all particle species
-        part = ut.array.DictClass()
+        part = ut.array.DictClass()  # dictionary class to store properties for all particle species
+        header = {}  # dictionary to store header information
 
         ## parse input species list ##
         # if input 'all' for species, read all species in snapshot
-        if species_types == 'all' or species_types == ['all'] or not species_types:
-            species_types = [spec for spec in species_name_list if spec in species_name_dict.keys()]
+        if species_names == 'all' or species_names == ['all'] or not species_names:
+            species_names = list(species_dict.keys())
         else:
-            if np.isscalar(species_types):
-                species_types = [species_types]  # ensure is list
-
-        # check if input species types are string or int, and assign species id list
-        species_ids = []
-        for spec_type in species_types:
-            if isinstance(spec_type, str):
-                species_ids.append(species_name_dict[spec_type])
-            elif isinstance(spec_type, int):
-                if spec_type < 0 or spec_type > 9:
-                    raise ValueError('! not recognize species type = ' + spec_type)
-                species_ids.append(spec_type)
-            else:
-                raise ValueError('not recognize species type = ' + spec_type)
-
-        # assign species name list
-        species_names = []
-        for spec_id in species_ids:
-            for spec_name in species_name_dict:
-                if species_name_dict[spec_name] == spec_id:
-                    species_names.append(spec_name)
+            if np.isscalar(species_names):
+                species_names = [species_names]  # ensure is list
+            # check if input species names are valid
+            for spec_name in list(species_names):
+                if spec_name not in species_dict:
+                    species_names.remove(spec_name)
+                    self.say('! not recognize input species = {}'.format(spec_name))
 
         ## parse input property list ##
         # if input 'all' for particle properties, read all properties in snapshot
         if property_names == 'all' or property_names == ['all'] or not property_names:
-            property_names = [prop_name for prop_name in property_name_dict]
+            property_names = list(property_dict.keys())
         else:
             if np.isscalar(property_names):
                 property_names = [property_names]  # ensure is list
             # make safe list of property names to read in
             property_names_temp = []
-            for prop_name in property_names:
+            for prop_name in list(property_names):
                 prop_name = str.lower(prop_name)
-                for prop_name_in in property_name_dict:
+                for prop_name_in in property_dict:
                     if (prop_name == str.lower(prop_name_in) or
-                            prop_name == str.lower(property_name_dict[prop_name_in])):
+                            prop_name == str.lower(property_dict[prop_name_in])):
                         property_names_temp.append(prop_name_in)
             property_names = property_names_temp
             del(property_names_temp)
 
         if 'InternalEnergy' in property_names:
-            # need helium and electron fraction to compute temperature
+            # need helium mass fraction and electron fraction to compute temperature
             for prop_name in ['ElectronAbundance', 'Metallicity']:
                 if prop_name not in property_names:
                     property_names.append(prop_name)
 
-        ## read information on snapshot times ##
+        ## read information about snapshot times ##
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         Snapshot, snapshot_index = self.read_snapshot_times(
             simulation_directory, snapshot_number_kind, snapshot_number)
 
-        ## read and assign header ##
+        ## read header ##
         # get file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
         self.say('reading header from: ' + file_name, end='\n\n')
@@ -408,7 +384,7 @@ class ReadClass(ut.io.SayClass):
         header_in = file_in['Header'].attrs  # load header dictionary
 
         for prop_name_in in header_in:
-            prop_name = header_name_dict[prop_name_in]
+            prop_name = header_dict[prop_name_in]
             header[prop_name] = header_in[prop_name_in]  # transfer to custom header dict
 
         # determine whether simulation is cosmological
@@ -430,23 +406,17 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to {Gyr}
 
-        # check which species have any particles
-        part_number_min = 0
-        species_names_keep = []
-        species_ids_keep = []
-        for spec_name in species_names:
-            spec_id = species_name_dict[spec_name]
-            self.say('species name = {:7s} (id = {}): {} particles'.format(
+        # keep only species that have any particles
+        particle_number_min = 0
+        for spec_name in list(species_names):
+            spec_id = species_dict[spec_name]
+            self.say('species = {:7s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
             if header['particle.numbers.total'][spec_id] > 0:
-                part_number_min = header['particle.numbers.total'][spec_id]
-                species_ids_keep.append(spec_id)
-                species_names_keep.append(spec_name)
+                particle_number_min = header['particle.numbers.total'][spec_id]
+            else:
+                species_names.remove(spec_name)
         print()
-
-        # keep only names and ids of species that have particles
-        species_names = species_names_keep
-        species_ids = species_ids_keep
 
         # check if simulation contains baryons
         if ('gas' not in species_names and 'star' not in species_names and
@@ -460,9 +430,9 @@ class ReadClass(ut.io.SayClass):
             simulation_name = simulation_directory.strip('/')
         header['simulation.name'] = simulation_name
 
-        if get_header_only or part_number_min == 0:
+        if get_header_only or particle_number_min == 0:
             # only return header
-            if part_number_min == 0:
+            if particle_number_min == 0:
                 self.say('! found no particles in file', end='\n\n')
             file_in.close()
             return header
@@ -471,28 +441,22 @@ class ReadClass(ut.io.SayClass):
 
         # assign cosmological parameters
         if header['is.cosmological']:
-            # for cosmology parameters not in header, assume those from AGORA
-            omega_baryon = 0.0455
-            sigma_8 = 0.807
-            n_s = 0.961
-            w = -1.0
+            # for cosmological parameters not in header, use values set above
             Cosmology = ut.cosmology.CosmologyClass(
-                header['hubble'], header['omega_matter'], header['omega_lambda'], omega_baryon,
-                sigma_8, n_s, w)
+                header['hubble'], header['omega_matter'], header['omega_lambda'],
+                self.omega_baryon, self.sigma_8, self.n_s, self.w)
 
         ## initialize arrays to store each property for each species ##
         for spec_name in species_names:
-            spec_id = species_name_dict[spec_name]
-
+            spec_id = species_dict[spec_name]
             part_in = file_in['PartType' + str(spec_id)]
-
             part_number_tot = header['particle.numbers.total'][spec_id]
 
             # add species to particle dictionary
             part[spec_name] = ParticleDictionaryClass()
 
             # set element pointers if reading only subset of elements
-            if element_indices is not None:
+            if element_indices is not None and element_indices != 'all':
                 if np.isscalar(element_indices):
                     element_indices = [element_indices]
                 for element_i, element_index in enumerate(element_indices):
@@ -500,14 +464,15 @@ class ReadClass(ut.io.SayClass):
 
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
-                    prop_name = property_name_dict[prop_name_in]
+                    prop_name = property_dict[prop_name_in]
 
                     # determine shape of property array
                     if len(part_in[prop_name_in].shape) == 1:
                         prop_shape = part_number_tot
                     elif len(part_in[prop_name_in].shape) == 2:
                         prop_shape = [part_number_tot, part_in[prop_name_in].shape[1]]
-                        if prop_name_in == 'Metallicity' and element_indices is not None:
+                        if (prop_name_in == 'Metallicity' and element_indices is not None and
+                                element_indices != 'all'):
                             prop_shape = [part_number_tot, len(element_indices)]
 
                     # determine data type to store
@@ -526,7 +491,7 @@ class ReadClass(ut.io.SayClass):
 
             # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
-                prop_name = property_name_dict['Masses']
+                prop_name = property_dict['Masses']
                 part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
         # initial particle indices[s] to assign to each species from each file
@@ -550,26 +515,27 @@ class ReadClass(ut.io.SayClass):
             # read particle properties
             for spec_i, spec_name in enumerate(species_names):
                 if part_numbers_in_file[spec_id]:
-                    spec_id = species_name_dict[spec_name]
+                    spec_id = species_dict[spec_name]
                     part_in = file_in['PartType' + str(spec_id)]
 
                     part_index_lo = part_indices_lo[spec_i]
                     part_index_hi = part_index_lo + part_numbers_in_file[spec_id]
 
                     # check if mass of species is fixed, according to header mass array
-                    if 'Masses' in property_names and header['mass.array'][spec_id] > 0:
-                        prop_name = property_name_dict['Masses']
-                        part[spec_name][prop_name][part_index_lo:part_index_hi] = \
-                            header['mass.array'][spec_id]
+                    if 'Masses' in property_names and header['particle.masses'][spec_id] > 0:
+                        prop_name = property_dict['Masses']
+                        part[spec_name][prop_name][part_index_lo:part_index_hi] = (
+                            header['particle.masses'][spec_id])
 
                     for prop_name_in in part_in:
                         if prop_name_in in property_names:
-                            prop_name = property_name_dict[prop_name_in]
+                            prop_name = property_dict[prop_name_in]
                             if len(part_in[prop_name_in].shape) == 1:
-                                part[spec_name][prop_name][part_index_lo:part_index_hi] = \
-                                    part_in[prop_name_in]
+                                part[spec_name][prop_name][part_index_lo:part_index_hi] = (
+                                    part_in[prop_name_in])
                             elif len(part_in[prop_name_in].shape) == 2:
-                                if prop_name_in == 'Metallicity' and element_indices is not None:
+                                if (prop_name_in == 'Metallicity' and
+                                        element_indices is not None and element_indices != 'all'):
                                     prop_in = part_in[prop_name_in][:, element_indices]
                                 else:
                                     prop_in = part_in[prop_name_in]
@@ -582,12 +548,12 @@ class ReadClass(ut.io.SayClass):
         ## end reading properties for each species ##
 
         ## start adjusting properties for each species ##
-        # if species dark.2 contains several mass levels of dark matter, split into separate dicts
+        # if dark.2 contains different masses (refinements), split into separate dicts
         spec_name = 'dark.2'
         if spec_name in part and 'mass' in part[spec_name]:
             dark_lowres_masses = np.unique(part[spec_name]['mass'])
-            if separate_lowres_dark and dark_lowres_masses.size > 1:
-                self.say('separating lower-resolution dark-matter species:')
+            if separate_dark_lowres and dark_lowres_masses.size > 1:
+                self.say('separating low-resolution dark-matter by mass into separate dictionaries')
                 dark_lowres = {}
                 for prop_name in part[spec_name]:
                     dark_lowres[prop_name] = np.array(part[spec_name][prop_name])
@@ -601,10 +567,9 @@ class ReadClass(ut.io.SayClass):
                     for prop_name in dark_lowres:
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
                     self.say('  {}: {} particles'.format(spec_name, spec_indices.size))
+
                     if spec_name not in species_names:
                         species_names.append(spec_name)
-                    if spec_id not in species_ids:
-                        species_ids.append(species_name_dict[spec_name])
 
                 del(spec_indices)
                 print()
@@ -614,15 +579,13 @@ class ReadClass(ut.io.SayClass):
             for spec_name in species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
                     self.say('sorting {:6} particles by id'.format(spec_name))
-                    indices_sorted_by_id = np.argsort(part[spec_name]['id'])
+                    indices_sorted = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
-                        part[spec_name][prop_name] = \
-                            part[spec_name][prop_name][indices_sorted_by_id]
+                        part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted]
             print()
 
         # apply unit conversions
         for spec_name in species_names:
-            spec_id = species_name_dict[spec_name]
 
             if 'position' in part[spec_name]:
                 # convert to {kpc comoving}
@@ -763,14 +726,20 @@ class ReadClass(ut.io.SayClass):
                     'input {} for snapshot, but cannot find snapshot time file in ' +
                     snapshot_number_kind, directory)
 
+        self.is_first_print = True
+
         if snapshot_number_kind in ['redshift', 'scalefactor', 'time']:
             snapshot_index = Snapshot.get_index(snapshot_number, time_kind=snapshot_number_kind)
-            self.say(
-                'input {} = {:.3f} -> read snapshot index = {}, {} = {:.3f}\n'.format(
-                    snapshot_number_kind, snapshot_number, snapshot_index,
-                    snapshot_number_kind, Snapshot[snapshot_number_kind][snapshot_index]))
+            snapshot_time_kind = snapshot_number_kind
+            snapshot_time_value = Snapshot[snapshot_number_kind][snapshot_index]
+            self.say('input {} = {:.3f}'.format(snapshot_number_kind, snapshot_number))
         else:
             snapshot_index = snapshot_number
+            snapshot_time_kind = 'redshift'
+            snapshot_time_value = Snapshot['redshift'][snapshot_index]
+        self.say(
+            'reading snapshot index = {}, {} = {:.3f}\n'.format(
+                snapshot_index, snapshot_time_kind, snapshot_time_value))
 
         return Snapshot, snapshot_index
 
@@ -839,21 +808,21 @@ class ReadClass(ut.io.SayClass):
             self.say('! catalog not contain star or dark particles, skipping center finding')
             return
 
-        self.say('assigning center:')
+        self.say('assigning galaxy/halo center:')
 
         if 'position' in part[spec_name]:
             part.center_position = ut.particle.get_center_position(
                 part, spec_name, method, compare_centers=compare_centers)
-            print('    position: ', end='')
+            print('    position = [', end='')
             ut.io.print_array(part.center_position, '{:.3f}', end='')
-            print(' kpc comoving')
+            print('] kpc comoving')
 
         if 'velocity' in part[spec_name]:
             part.center_velocity = ut.particle.get_center_velocity(
                 part, spec_name, velocity_radius_max, part.center_position)
-            print('    velocity: ', end='')
+            print('    velocity = [', end='')
             ut.io.print_array(part.center_velocity, '{:.1f}', end='')
-            print(' km / sec')
+            print('] km / sec')
 
         print()
 
