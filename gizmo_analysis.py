@@ -637,20 +637,20 @@ def plot_mass_contamination(
     print('* {} {} particles within R_halo'.format(
           profile_number[spec_name]['cum'][dist_i_halo], spec_name))
     dist_i = np.where(profile_number[spec_name]['cum'] > 0)[0][0]
-    print('* {} closest d = {:.2f} kpc, {:.2f} R_halo'.format(
+    print('* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
           spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.001)[0][0]
-    print('* {} mass_fraction = 0.1% at d < {:.2f} kpc, {:.2f} R_halo'.format(
+    print('* {} mass_fraction = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.01)[0][0]
-    print('* {} mass_fraction = 1% at d < {:.2f} kpc, {:.2f} R_halo'.format(
+    print('* {} mass_fraction = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     for spec_name in species_dark:
         if spec_name != 'dark.2' and profile_number[spec_name]['cum'][dist_i_halo] > 0:
             print('! {} {} particles within R_halo'.format(
                   profile_number[spec_name]['cum'][dist_i_halo], spec_name))
             dist_i = np.where(profile_number[spec_name]['cum'] > 0)[0][0]
-            print('! {} closest d = {:.2f} kpc, {:.2f} R_halo'.format(
+            print('! {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
                   spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     print()
 

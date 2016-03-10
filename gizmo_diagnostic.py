@@ -307,7 +307,7 @@ def plot_halo_contamination(directory='.', redshift=0):
     directory : string : directory of simulation (one level above directory of snapshot file)
     redshift : float : redshift of snapshot
     '''
-    distance_bin_width = 0.02
+    distance_bin_width = 0.01
     distance_limits_phys = [1, 4000]  # {kpc physical}
     distance_limits_halo = [0.01, 10]  # {units of R_halo}
     virial_kind = '200m'
