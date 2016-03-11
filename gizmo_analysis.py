@@ -640,10 +640,10 @@ def plot_mass_contamination(
     print('* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
           spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.001)[0][0]
-    print('* {} mass_fraction = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
+    print('* {} mass_ratio = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.01)[0][0]
-    print('* {} mass_fraction = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
+    print('* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           spec_name, distances_phys[dist_i], distances_halo[dist_i]))
     for spec_name in species_dark:
         if spec_name != 'dark.2' and profile_number[spec_name]['cum'][dist_i_halo] > 0:
@@ -914,8 +914,6 @@ def plot_image(
         hal_positions = hal_positions
 
     # plot ----------
-    fig, subplot = ut.plot.make_figure(figure_index)
-
     BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
     plt.register_cmap(cmap=BYW)
     BBW = colors.LinearSegmentedColormap('bbw', ut.plot.cmap_dict['BlackBlueWhite'])
@@ -931,8 +929,9 @@ def plot_image(
         #color_map = plt.cm.Greys_r,  # @UndefinedVariable
 
     if len(dimen_indices_plot) == 2:
-        subplot = fig.add_subplot(111, axisbg=background_color)
-        fig.subplots_adjust(left=0.17, right=0.96, top=0.96, bottom=0.14)
+        fig, subplot = ut.plot.make_figure(
+            figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14,
+            background_color=background_color)
 
         subplot.set_xlim(position_limits[0])
         subplot.set_ylim(position_limits[1])
@@ -1007,6 +1006,8 @@ def plot_image(
         )
         """
 
+        fig.gca().set_aspect('equal')
+
         #fig.colorbar(_Image)
 
         # plot halos
@@ -1018,18 +1019,14 @@ def plot_image(
                     fill=False)
                 subplot.add_artist(circle)
 
-        fig.gca().set_aspect('equal')
-
     elif len(dimen_indices_plot) == 3:
         #position_limits *= 0.999  # ensure that tick labels do not overlap
-        position_limits[0, 0] *= 0.994
-        position_limits[1, 0] *= 0.994
+        position_limits[0, 0] *= 0.99
+        position_limits[1, 0] *= 0.99
 
-        fig, subplots = plt.subplots(2, 2, num=figure_index, sharex=True, sharey=True,
-                                     axisbg=background_color)
-        fig.subplots_adjust(left=0.17, right=0.96, top=0.97, bottom=0.13)
-
-        fig.gca().set_aspect('equal')
+        fig, subplots = ut.plot.make_figure(
+            figure_index, [2, 2], left=0.17, right=0.96, top=0.97, bottom=0.13,
+            background_color=background_color)
 
         plot_dimen_iss = [
             [dimen_indices_plot[0], dimen_indices_plot[1]],
@@ -1110,7 +1107,7 @@ def plot_image(
                         hal_position[plot_dimen_is], hal_radius, linewidth=1, fill=False)
                     subplot.add_artist(circle)
 
-                circle = plt.Circle((0, 0), 10, color='b', fill=False)
+                circle = plt.Circle((0, 0), 10, color='black', fill=False)
                 subplot.add_artist(circle)
 
             subplot.axis('equal')
@@ -2817,8 +2814,9 @@ class CompareSimulationsClass(ut.io.SayClass):
     def plot_images(
         self, parts=None,
         distance_max=15, distance_bin_width=0.05, image_limits=[10 ** 7, 10 ** 10],
-        align_principal_axes=True,
-        simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        align_principal_axes=True, simulation_names=None,
+        redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.45, 0.4, 0.35, 0.3,
+                   0.25, 0.2, 0.18, 0.16, 0.14, 0.12, 0.1, 0.08, 0.06, 0.04, 0.03, 0.02, 0.01, 0],
         species=['star', 'gas'], property_names=['mass', 'position'], force_float32=True):
         '''
         Plot images of simulations at each snapshot.
