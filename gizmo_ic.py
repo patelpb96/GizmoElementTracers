@@ -478,7 +478,7 @@ def generate_initial_condition_points(
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
     halo_radius : float : radius of halo {kpc physical}
     virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
-    region_kind : string : method to identify zoom-in regon at initial time:
+    region_kind : string : method to determine zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:

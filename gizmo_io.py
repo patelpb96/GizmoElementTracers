@@ -495,7 +495,7 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
         # initial particle indices[s] to assign to each species from each file
-        part_indices_lo = np.zeros(len(species_names))
+        part_indices_lo = np.zeros(len(species_names), dtype=np.int64)
 
         ## start reading properties for each species ##
         # loop over all files at given snapshot
@@ -510,7 +510,7 @@ class ReadClass(ut.io.SayClass):
 
             self.say('reading properties from: ' + file_name_i.split('/')[-1])
 
-            part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
+            part_numbers_in_file = np.int(file_in['Header'].attrs['NumPart_ThisFile'])
 
             # read particle properties
             for spec_i, spec_name in enumerate(species_names):

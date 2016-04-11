@@ -1503,6 +1503,7 @@ def plot_property_v_distance(
         linewidth = 2.5
 
     for part_i, pro in enumerate(pros):
+        print(pro[species][prop_statistic])
         subplot.plot(pro[species]['distance'], pro[species][prop_statistic], color=colors[part_i],
                      linestyle='-', alpha=alpha, linewidth=linewidth,
                      label=parts[part_i].info['simulation.name'])
@@ -2273,6 +2274,244 @@ def plot_star_form_history_galaxies(
         plot_name += '_d.{:.0f}-{:.0f}'.format(
             other_prop_limits['host.distance'][0], other_prop_limits['host.distance'][1])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
+
+
+#===================================================================================================
+# use halo catalog
+#===================================================================================================
+def explore_galaxy(
+    hal, hal_index=None, part=None, species_plot=['star'],
+    distance_max=None, distance_bin_width=0.25, distance_bin_number=None, plot_only_members=False,
+    write_plot=False, plot_directory='.'):
+    '''
+    Print and plot several properties of galaxies in list.
+
+    Parameters
+    ----------
+    hal : dict : catalog of halos at snapshot
+    part : dict : catalog of particles at snapshot
+    distance_max : float : max distance (radius) for galaxy image
+    distance_bin_width : float : length of pixel for galaxy image
+    distance_bin_number : int : number of pixels for galaxy image
+    plot_only_members : boolean : whether to plat only particles that are members of halo
+    write_plot : boolean : whether to write figure to file
+    plot_directory : string : directory to write figure file
+    '''
+    from rockstar import rockstar_analysis
+
+    rockstar_analysis.print_properties_halo(part, hal, hal_index)
+
+    hi = hal_index
+
+    if part is not None:
+        if not distance_max and 'star.radius.50' in hal:
+            distance_max = 4 * hal.prop('star.radius.50', hi)
+
+        if 'star' in species_plot and 'star' in part and 'star.indices' in hal:
+            if plot_only_members:
+                part_indices = hal.prop('star.indices', hi)
+            else:
+                part_indices = None
+
+            plot_image(
+                part, 'star', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                distance_bin_number, hal.prop('star.position', hi), 'mass',
+                part_indices=part_indices,
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=1)
+
+            plot_property_distribution(
+                part, 'star', 'velocity.tot', [0, None], 2, None, 'linear', 'histogram',
+                [], hal.prop('star.position', hi), hal.prop('star.velocity', hi), {}, part_indices,
+                [0, None], 'linear', write_plot, plot_directory, figure_index=2)
+
+            try:
+                element_name = 'metallicity.iron'
+                hal.prop(element_name)
+            except:
+                element_name = 'metallicity.metals'
+
+            plot_property_distribution(
+                part, 'star', element_name, [1e-4, 1], 0.1, None, 'log', 'histogram',
+                [], None, None, {}, part_indices,
+                [0, None], 'linear', write_plot, plot_directory, figure_index=3)
+
+            plot_property_v_distance(
+                part, 'star', 'mass', 'density', 'log', False, None,
+                [0.1, distance_max], 0.1, None, 'log', 3,
+                center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
+                distance_reference=hal.prop('star.radius.50', hi),
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=4)
+
+            plot_property_v_distance(
+                part, 'star', 'mass', 'sum.cum', 'log', False, None,
+                [0.1, distance_max], 0.1, None, 'log', 3,
+                center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
+                distance_reference=hal.prop('star.radius.50', hi),
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=5)
+
+            plot_property_v_distance(
+                part, 'star', 'velocity.tot', 'std.cum', 'linear', True, None,
+                [0.1, distance_max], 0.1, None, 'log', 3,
+                center_positions=hal.prop('star.position', hi),
+                center_velocities=hal.prop('star.velocity', hi),
+                part_indicess=part_indices,
+                distance_reference=hal.prop('star.radius.50', hi),
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=6)
+
+            plot_property_v_distance(
+                part, 'star', element_name, 'median', 'linear', True, None,
+                [0.1, distance_max], 0.2, None, 'log', 3,
+                center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
+                distance_reference=hal.prop('star.radius.50', hi),
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=7)
+
+            plot_star_form_history(
+                part, 'mass.normalized', 'time.lookback', [13.6, 0], 0.2, 'linear', [], None, {},
+                part_indices, [0, 1], 'linear', write_plot, plot_directory, figure_index=8)
+
+        if 'dark' in species_plot and 'dark' in part and 'dark.indices' in hal:
+            if plot_only_members:
+                part_indices = hal.prop('dark.indices', hi)
+            else:
+                part_indices = None
+
+            if 'star.position' in hal:
+                center_position = hal.prop('star.position', hi)
+                center_velocity = hal.prop('star.velocity', hi)
+            elif 'star.position' in hal:
+                center_position = hal.prop('dark.position', hi)
+                center_velocity = hal.prop('dark.velocity', hi)
+            else:
+                center_position = hal.prop('position', hi)
+                center_velocity = hal.prop('velocity', hi)
+
+            if 'star.radius.50' in hal:
+                distance_reference = hal.prop('star.radius.50', hi)
+            else:
+                distance_reference = None
+
+            plot_property_v_distance(
+                part, 'dark', 'mass', 'density', 'log', False, None,
+                [0.1, distance_max], 0.1, None, 'log', 3,
+                center_positions=center_position, part_indicess=part_indices,
+                distance_reference=distance_reference,
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=10)
+
+            plot_property_v_distance(
+                part, 'dark', 'velocity.tot', 'std.cum', 'linear', True, None,
+                [0.1, distance_max], 0.1, None, 'log', 3,
+                center_positions=center_position, center_velocities=center_velocity,
+                part_indicess=part_indices,
+                distance_reference=distance_reference,
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=11)
+
+            plot_property_v_distance(
+                part, 'dark', 'mass', 'vel.circ', 'linear', True, None,
+                [0.1, distance_max], 0.1, None, 'log', 3,
+                center_positions=center_position, part_indicess=part_indices,
+                distance_reference=distance_reference,
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=12)
+
+        if 'gas' in species_plot and 'gas' in part and 'gas.indices' in hal:
+            part_indices = None
+            if plot_only_members:
+                part_indices = hal.prop('gas.indices', hi)
+
+            if part_indices is None or len(part_indices) >= 3:
+                plot_image(
+                    part, 'gas', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                    distance_bin_number, hal.prop('star.position', hi), 'mass',
+                    part_indices=part_indices,
+                    write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
+
+                plot_image(
+                    part, 'gas', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                    distance_bin_number, hal.prop('star.position', hi), 'mass.neutral',
+                    part_indices=part_indices,
+                    write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
+            else:
+                fig = plt.figure(10)
+                fig.clf()
+                fig = plt.figure(11)
+                fig.clf()
+
+
+def plot_density_profile_halo(
+    part,
+    hal=None, hal_index=None, center_position=None,
+    species='star',
+    distance_limits=[0.1, 2], distance_bin_width=0.1, distance_bin_number=None,
+    plot_only_members=False,
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    Plot density profile for single halo/center.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    hal : dict : catalog of halos at snapshot
+    hal_index : int : index of halo in catalog
+    center_position : array : position to center profile (to use instead of halo position)
+    distance_max : float : max distance (radius) for galaxy image
+    distance_bin_width : float : length of pixel for galaxy image
+    distance_bin_number : int : number of pixels for galaxy image
+    plot_only_members : boolean : whether to plat only particles that are members of halo
+    write_plot : boolean : whether to write figure to file
+    plot_directory : string : directory to write figure file
+    '''
+    distance_scaling = 'log'
+    dimension_number = 3
+
+    if center_position is None:
+        center_positions = []
+        center_positions.append(hal['position'][hal_index])
+        if 'star.position' in hal and hal['star.position'][hal_index][0] > 0:
+            center_positions.append(hal['star.position'][hal_index])
+    else:
+        center_positions = [center_position]
+
+    parts = [part]
+    if len(center_positions) == 2:
+        parts = [part, part]
+
+    if 'star.radius.50' in hal and hal['star.radius.50'][hal_index] > 0:
+        distance_reference = hal['star.radius.50'][hal_index]
+
+    #if plot_only_members:
+
+    plot_property_v_distance(
+        parts, species, 'mass', 'density', 'log', False, None,
+        distance_limits, distance_bin_width, distance_bin_number, distance_scaling,
+        dimension_number,
+        center_positions=center_positions, part_indicess=None,
+        distance_reference=distance_reference,
+        write_plot=write_plot, plot_directory=plot_directory, figure_index=figure_index)
+
+
+def plot_density_profiles_halos(
+    part, hal, hal_indices,
+    species='dark',
+    distance_limits=[0.05, 1], distance_bin_width=0.2, distance_bin_number=None,
+    plot_only_members=False, write_plot=False, plot_directory='.', figure_index=0):
+    '''
+    write_plot : boolean : whether to write figure to file
+    plot_directory : string : directory to write figure file
+    figure_index : int : index of figure for matplotlib
+    '''
+    from gizmo import gizmo_analysis
+
+    center_positions = []
+    part_indicess = []
+    for hal_i in hal_indices:
+        center_positions.append(hal.prop('star.position', hal_i))
+        if plot_only_members:
+            part_indicess.append(hal.prop('star.indices', hal_i))
+
+    gizmo_analysis.plot_property_v_distance(
+        part, species, 'mass', 'density', 'log', False, None,
+        distance_limits, distance_bin_width, distance_bin_number, 'log', 3,
+        center_positions=center_positions, part_indicess=part_indicess,
+        write_plot=write_plot, plot_directory=plot_directory, figure_index=figure_index)
 
 
 #===================================================================================================
