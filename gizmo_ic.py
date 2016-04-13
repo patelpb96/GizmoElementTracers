@@ -439,11 +439,13 @@ def write_initial_condition_points(
     Write.write('  volume = {:.1f} Mpc ^ 3 comoving'.format(
                 volume_ini_cube * ut.const.mega_per_kilo ** 3))
 
+    Write.write('# initial position range')
     for dimen_i in range(positions_ini.shape[1]):
-        Write.write('# initial position-{} [min, max] = {} kpc comoving, {} box units'.format(
-                    dimen_i, ut.array.get_limits(poss_ini_limits[dimen_i], digit_number=3),
-                    ut.array.get_limits(poss_ini_limits[dimen_i] / part_ini.info['box.length'],
-                                        digit_number=8)))
+        Write.write(
+            '  {} [min, max] = [{:.3f}, {:.3f}] kpc comoving, [{:.9f}, {:.9f}] box units'.format(
+                dimen_i, np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]),
+                np.min(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
+                np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length']))
 
     positions_ini /= part_ini.info['box.length']  # renormalize to box units
 
