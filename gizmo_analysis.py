@@ -618,7 +618,7 @@ def plot_mass_contamination(
                     distance_1 = distances_phys[dist_i]
                 else:
                     distance_0 = distances_phys[dist_i]
-                    distance_1 = distances_halo[dist_i] / halo_radius
+                    distance_1 = distances_halo[dist_i]
 
                 Say.say(print_string.format(
                         distance_0, distance_1,
