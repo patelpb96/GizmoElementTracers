@@ -510,7 +510,7 @@ class ReadClass(ut.io.SayClass):
 
             self.say('reading properties from: ' + file_name_i.split('/')[-1])
 
-            part_numbers_in_file = np.int(file_in['Header'].attrs['NumPart_ThisFile'])
+            part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
             # read particle properties
             for spec_i, spec_name in enumerate(species_names):
