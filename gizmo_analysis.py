@@ -2880,18 +2880,21 @@ class CompareSimulationsClass(ut.io.SayClass):
             # original FIRE
             ['/work/02769/arwetzel/fire/m12i_ref12', 'r12 FIRE n100'],
 
-            # first ref13
-            ['fb-aniso-angle-max/m12i_ref13', 'r13 aniso anglemax n100'],
-
-            # anisotropic
-            ['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
-            ['fb-aniso/m12i_ref12', 'r12 aniso'],
-            ['fb-aniso/m12i_ref13', 'r13 aniso'],
-
             # symmetric
-            ['/scratch/01799/phopkins/m12i_hybrid_test/quadratic_test', 'r12 sym'],
             ['fb-sym/m12i_ref12', 'r12 sym'],
             ['fb-sym/m12i_ref13', 'r13 sym'],
+
+            # different halos
+            ['m12i/fb-sym/m12i_ref12', 'm12i r12'],
+            ['m12b/m12b_ref12_fb-sym', 'm12b r12'],
+            ['m12m/m12m_ref12_fb-sym', 'm12m r12'],
+            ['m12c/m12c_ref12_fb-sym', 'm12c r12'],
+            ['m12f/m12f_ref12_fb-sym', 'm12f r12'],
+            ['m12q/m12q_ref12_fb-sym', 'm12q r12'],
+
+            # adaptive resolution
+            #['fb-sym/m12i_ref12_res-adapt', 'r12 sym res-adapt'],
+            #['fb-iso/m12i_ref13_res-adapt', 'r13 sym res-adapt'],
 
             # isotropic
             ['fb-iso/m12i_ref11', 'r11 iso'],
@@ -2901,22 +2904,10 @@ class CompareSimulationsClass(ut.io.SayClass):
             ['fb-iso/m12i_ref12_sfn100', 'r12 iso n100'],
             ['fb-iso/m12i_ref13_sfn100', 'r13 iso n100'],
 
-            # adaptive resolution
-            #['fb-iso/m12i_ref12_res-adapt', 'r12 iso res-adapt'],
-            #['fb-iso/m12i_ref13_res-adapt', 'r13 iso res-adapt'],
-
-            # maximum radius of coupling
-            #['fb-iso-radius-max/m12i_ref12_rmax1kpc', 'r12 iso rmax1kpc'],
-            #['fb-iso-radius-max/m12i_ref13_rmax1kpc', 'r13 iso rmax1kpc'],
-            #['fb-iso-radius-max/m12i_ref12_rmax10h', 'r12 iso rmax10h'],
-            #['fb-iso-radius-max/m12i_ref13_rmax10h', 'r13 iso rmax10h'],
-
-            # different halos
-            ['m12i/fb-sym/m12i_ref12', 'latte r12'],
-            ['m12b/m12b_ref12_fb-sym', 'breve r12'],
-            ['m12m/m12m_ref12_fb-sym', 'macchiato r12'],
-            ['m12c/m12c_ref12_fb-sym', 'cappuccino r12'],
-            ['m12f/m12f_ref12_fb-sym', 'flatwhite r12'],
+            # anisotropic
+            ['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
+            ['fb-aniso/m12i_ref12', 'r12 aniso'],
+            ['fb-aniso/m12i_ref13', 'r13 aniso'],
 
         ]
 

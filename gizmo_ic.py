@@ -491,7 +491,7 @@ def generate_initial_condition_points(
     parts = Read.read_particles()
 
     center_position = ut.particle.get_center_position(
-        parts[0], 'all', 'center-of-mass', compare_centers=True)
+        parts[0], 'dark', 'center-of-mass', compare_centers=True)
 
     write_initial_condition_points(
         parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,

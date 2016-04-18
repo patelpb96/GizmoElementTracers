@@ -487,7 +487,11 @@ class ReadClass(ut.io.SayClass):
                         # initialize so calling an un-itialized value leads to error
                         part[spec_name][prop_name] -= part_number_tot
                 else:
-                    self.say('not reading {:6} {}'.format(spec_name, prop_name_in))
+                    if prop_name_in in property_dict:
+                        prop_name_print = property_dict[prop_name_in]
+                    else:
+                        prop_name_print = prop_name_in
+                    self.say('not reading: {:4} {}'.format(spec_name, prop_name_print))
 
             # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
