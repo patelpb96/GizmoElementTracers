@@ -368,11 +368,13 @@ def plot_scaling(
     write_plot=False, plot_directory='.'):
     '''
     Print simulation run times (all or CPU).
+    'speedup' := WT(1 CPU) / WT(N CPU) =
+    'efficiency' := WT(1 CPU) / WT(N CPU) / N = CT(1 CPU) / CT(N CPU)
 
     Parameters
     ----------
     scaling_kind : string : 'strong', 'weak'
-    time_kind : string : 'cpu', 'wall'
+    time_kind : string : 'cpu', 'wall', 'speedup', 'efficiency'
     axis_x_scaling : string : scaling along x-axis: 'log', 'linear'
     axis_y_scaling : string : scaling along y-axis: 'log', 'linear'
     write_plot : boolean : whether to write plot to file
@@ -414,12 +416,20 @@ def plot_scaling(
     _fig, subplot = ut.plot.make_figure(1, left=0.21, right=0.95, top=0.96, bottom=0.16)
 
     if scaling_kind == 'strong':
-        cpu_numbers = [k for k in baryon_ref14]
-        # 2x == convert from a = 0.068 to a = 0.1
+        cpu_numbers = [cpu_num for cpu_num in baryon_ref14]
+        # 2x comes from conversion from extrapolating scale-factor = 0.068 to 0.1
+        wall_time_ref = baryon_ref14[2048]['wall.time'] * 2 * 2048
+
         if time_kind == 'cpu':
-            times = [baryon_ref14[k]['cpu.time'] * 2 for k in baryon_ref14]
+            times = [baryon_ref14[cpu_num]['cpu.time'] * 2 for cpu_num in baryon_ref14]
         elif time_kind == 'wall':
-            times = [baryon_ref14[k]['wall.time'] * 2 for k in baryon_ref14]
+            times = [baryon_ref14[cpu_num]['wall.time'] * 2 for cpu_num in baryon_ref14]
+        elif time_kind == 'speedup':
+            times = [wall_time_ref / (baryon_ref14[cpu_num]['wall.time'] * 2)
+                     for cpu_num in baryon_ref14]
+        elif time_kind == 'efficiency':
+            times = [wall_time_ref / (baryon_ref14[cpu_num]['wall.time'] * 2) / cpu_num
+                     for cpu_num in baryon_ref14]
 
         subplot.set_xlabel('core number')
 
@@ -429,32 +439,43 @@ def plot_scaling(
         elif time_kind == 'wall':
             axis_y_limits = [0, 35]
             subplot.set_ylabel('wall time to $z = 9$ [hr]')
+        elif time_kind == 'speedup':
+            axis_y_limits = [0, 9000]
+            subplot.set_ylabel('parallel speedup $T(1)/T(N)$')
+        elif time_kind == 'efficiency':
+            axis_y_limits = [0, 1.05]
+            subplot.set_ylabel('parallel efficiency $T(1)/T(N)/N$')
 
         ut.plot.set_axes_scaling_limits(
-            subplot, axis_x_scaling, [1e3, 2.5e4], None, axis_y_scaling, axis_y_limits)
+            subplot, axis_x_scaling, [1e2, 1.9e4], None, axis_y_scaling, axis_y_limits)
 
         subplot.plot(cpu_numbers, times, '*-', linewidth=2.0, color='blue')
 
-        subplot.text(0.05, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
+        if time_kind == 'speedup':
+            subplot.plot([0, 3e4], [0, 3e4], '--', linewidth=1.5, color='black')
+
+        subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                      transform=subplot.transAxes)
 
     elif scaling_kind == 'weak':
-        dm_particle_numbers = np.array([dark[k]['particle.number'] for k in sorted(dark.keys())])
-        mfm_particle_numbers = np.array([baryon[k]['particle.number']
-                                         for k in sorted(baryon.keys())])
+        dm_particle_numbers = np.array(
+            [dark[cpu_num]['particle.number'] for cpu_num in sorted(dark.keys())])
+        mfm_particle_numbers = np.array([baryon[cpu_num]['particle.number']
+                                         for cpu_num in sorted(baryon.keys())])
 
         if time_kind == 'cpu':
-            dm_times = np.array([dark[k]['cpu.time'] for k in sorted(dark.keys())])
-            mfm_times = np.array([baryon[k]['cpu.time'] for k in sorted(baryon.keys())])
+            dm_times = np.array([dark[cpu_num]['cpu.time'] for cpu_num in sorted(dark.keys())])
+            mfm_times = np.array([baryon[cpu_num]['cpu.time'] for cpu_num in sorted(baryon.keys())])
         elif time_kind == 'wall':
             ratio_ref = baryon['ref14']['particle.number'] / baryon['ref14']['cpu.number']
-            dm_times = np.array([dark[k]['wall.time'] *
-                                 ratio_ref / (dark[k]['particle.number'] / dark[k]['cpu.number'])
-                                 for k in sorted(dark.keys())])
+            dm_times = np.array(
+                [dark[cpu_num]['wall.time'] * ratio_ref /
+                 (dark[cpu_num]['particle.number'] / dark[cpu_num]['cpu.number'])
+                 for cpu_num in sorted(dark.keys())])
             mfm_times = np.array(
-                [baryon[k]['wall.time'] *
-                 ratio_ref / (baryon[k]['particle.number'] / baryon[k]['cpu.number'])
-                 for k in sorted(baryon.keys())])
+                [baryon[cpu_num]['wall.time'] *
+                 ratio_ref / (baryon[cpu_num]['particle.number'] / baryon[cpu_num]['cpu.number'])
+                 for cpu_num in sorted(baryon.keys())])
 
         subplot.set_xlabel('particle number')
 

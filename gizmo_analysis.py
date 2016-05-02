@@ -709,7 +709,7 @@ def plot_metal_v_distance(
     ----------
     part : dict : catalog of particles at snapshot
     spec_name : string : particle species
-    plot_kind : string : 'metallicity' or 'metal.mass.cum'
+    plot_kind : string : 'metallicity' or 'metals.mass.cum'
     axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
@@ -744,7 +744,7 @@ def plot_metal_v_distance(
         pro_mass = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
         ys = pro_metal['sum'] / pro_mass['sum']
         axis_y_limits = np.clip(ut.plot.get_axis_limits(ys), 0.0001, 10)
-    elif 'metal.mass.cum' in plot_kind:
+    elif 'metals.mass.cum' in plot_kind:
         ys = pro_metal['fraction.cum']
         axis_y_limits = [0.001, 1]
 
@@ -756,7 +756,7 @@ def plot_metal_v_distance(
 
     if 'metallicity' in plot_kind:
         subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=30)
-    elif 'metal.mass.cum' in plot_kind:
+    elif 'metals.mass.cum' in plot_kind:
         subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=30)
 
     if scale_to_halo_radius:
@@ -1565,8 +1565,7 @@ def assign_vel_circ_at_radius(
             ut.io.print_flush(hii)
         pis = ut.particle.get_indices_within_distances(
             part, 'dark', [0, radius], hal['position'][hi], scalarize=True)
-        hal[mass_key][hi] = ut.halo_property.get_circular_velocity(
-            pis.size * dark_mass, radius)
+        hal[mass_key][hi] = ut.halo_property.get_circular_velocity(pis.size * dark_mass, radius)
 
 
 def plot_vel_circ_v_radius_halos(
@@ -1706,19 +1705,25 @@ def plot_property_v_distance_halos(
                 part = parts[cat_i]
                 hal_indices = hal_indicess[cat_i]
 
-                position_kind = 'position'
-                velocity_kind = 'velocity'
-                if 'star' in part:
+                if species == 'star' and 'star' in part:
                     position_kind = 'star.position'
                     velocity_kind = 'star.velocity'
+                elif species == 'dark' and 'dark' in part:
+                    position_kind = 'dark.position'
+                    velocity_kind = 'dark.velocity'
+                else:
+                    position_kind = 'position'
+                    velocity_kind = 'velocity'
 
                 pros_cat = []
 
                 for hal_i in hal_indices:
                     if part_indicesss is not None:
                         part_indices = part_indicesss[cat_i][hal_i]
-                    elif 'star.indices' in hal:
+                    elif species == 'star' and 'star.indices' in hal:
                         part_indices = hal['star.indices'][hal_i]
+                    elif species == 'dark' and 'dark.indices' in hal:
+                        part_indices = hal['dark.indices'][hal_i]
                     else:
                         part_indices = None
 
@@ -1750,7 +1755,7 @@ def plot_property_v_distance_halos(
     #subplot.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
-    if prop_statistic == 'vel.circ':
+    if prop_statistic in ['vel.circ']:
         label_prop_name = prop_statistic
     else:
         label_prop_name = prop_name
@@ -1784,10 +1789,18 @@ def plot_property_v_distance_halos(
                 color = colors[cat_i]
                 linewidth = 1.9
                 alpha = 0.5
-                if pros[cat_i][hal_ii][species][prop_statistic][0] > 12:
+                if pros[cat_i][hal_ii][species][prop_statistic][0] > 12:  # dark vel.circ
                     color = ut.plot.get_color('blue.lite')
                     linewidth = 3.0
                     alpha = 0.8
+                if species == 'star':
+                    linewidth = 2.0
+                    alpha = 0.6
+                    color = ut.plot.get_color('orange.mid')
+                    if pros[cat_i][hal_ii][species][prop_statistic][0] > 27:
+                        color = ut.plot.get_color('orange.lite')
+                        linewidth = 3.5
+                        alpha = 0.9
 
                 subplot.plot(
                     pros[cat_i][hal_ii][species]['distance'],
@@ -1802,9 +1815,12 @@ def plot_property_v_distance_halos(
         alpha = 0.7
         linewidth = 2.0
         gis = ut.array.get_indices(gal['star.radius.50'], distance_limits, gal_indices)
+        gis = gis[gal['host.name'][gis] == 'MW'.encode()]
+        print(gal['vel.circ.50'][gis] / gal['star.vel.std'][gis])
         for gal_i in gis:
             subplot.errorbar(
-                gal['star.radius.50'][gal_i], gal['vel.circ.50'][gal_i],
+                gal['star.radius.50'][gal_i],
+                gal['vel.circ.50'][gal_i],
                 [[gal['vel.circ.50.err.lo'][gal_i]], [gal['vel.circ.50.err.hi'][gal_i]]],
                 color='black', marker='s', markersize=10, alpha=alpha,
                 linewidth=2.5, capthick=2.5,
