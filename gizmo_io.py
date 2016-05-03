@@ -840,7 +840,7 @@ class ReadClass(ut.io.SayClass):
 
     def rewrite_snapshot(
         self, species_names_delete='gas', snapshot_number_kind='redshift', snapshot_number=0,
-        simulation_directory='.', snapshot_directory='output_test/'):
+        simulation_directory='.', snapshot_directory='output/'):
         '''
         Read snapshot file[s].
         Rewrite, deleting given species.
@@ -891,11 +891,18 @@ class ReadClass(ut.io.SayClass):
 
             self.say('reading and deleting properties from: ' + file_name_i.split('/')[-1])
 
+            part_number_in_file = header['NumPart_ThisFile']
+            part_number = header['NumPart_Total']
+
             # read and delete particle properties
             for _spec_i, spec_name in enumerate(species_names_delete):
                 spec_id = self.species_dict[spec_name]
                 spec_name_in = 'PartType' + str(spec_id)
                 self.say('  deleting species = {}'.format(spec_name))
+
+                # adjust header
+                part_number_in_file[spec_id] = 0
+                part_number[spec_id] = 0
 
                 #for prop_name in file_in[spec_name_in]:
                 #    file_in.__delitem__(spec_name_in + '/' + prop_name)
@@ -903,6 +910,9 @@ class ReadClass(ut.io.SayClass):
 
                 del(file_in[spec_name_in])
                 print()
+
+            header['NumPart_ThisFile'] = part_number_in_file
+            header['NumPart_Total'] = part_number
 
             file_in.close()
 
