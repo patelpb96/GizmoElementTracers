@@ -18,7 +18,7 @@ import utilities as ut
 
 
 #===================================================================================================
-# utility
+# particle dictionary class
 #===================================================================================================
 class ParticleDictionaryClass(dict):
     '''
@@ -176,7 +176,7 @@ class ParticleDictionaryClass(dict):
 
 
 #===================================================================================================
-# read class
+# read
 #===================================================================================================
 class ReadClass(ut.io.SayClass):
     '''
@@ -284,18 +284,13 @@ class ReadClass(ut.io.SayClass):
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
             'StarFormationRate': 'sfr',  # {M_sun / yr}
 
-            ## star/gas - mass fraction of individual elements ##
+            ## star/gas particles ##
+            'ParticleChildIDsNumber': 'id.child',
+            'ParticleIDGenerationNumber': 'id.generation',
+
+            ## mass fraction of individual elements ##
             ## 0 = all metals (everything not H, He)
-            ## 1 = He
-            ## 2 = C
-            ## 3 = N
-            ## 4 = O
-            ## 5 = Ne
-            ## 6 = Mg
-            ## 7 = Si
-            ## 8 = S
-            ## 9 = Ca
-            ## 10 = Fe
+            ## 1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
             'Metallicity': 'massfraction',
 
             ## star particles ##
@@ -839,7 +834,8 @@ class ReadClass(ut.io.SayClass):
         print()
 
     def rewrite_snapshot(
-        self, species_names_delete='gas', snapshot_number_kind='redshift', snapshot_number=0,
+        self, species_names='gas', action='delete', value_adjust=None,
+        snapshot_number_kind='redshift', snapshot_number=0,
         simulation_directory='.', snapshot_directory='output/'):
         '''
         Read snapshot file[s].
@@ -847,20 +843,22 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        species_names_delete : string or list : name[s] of particle species to delete:
+        species_names : string or list : name[s] of particle species to delete:
             'gas' = gas
             'dark' = dark matter at highest resolution
             'dark.2' = dark matter at lower resolution
             'star' = stars
             'blackhole' = black holes
             'bulge' or 'disk' = stars for non-cosmological run
+        action : string : what to do to snapshot file: 'delete', 'velocity'
+        value_adjust : float : value by which to adjust property (if not deleting)
         snapshot_number_kind : string : input snapshot number kind: index, redshift
         snapshot_number : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
         '''
-        if np.isscalar(species_names_delete):
-            species_names_delete = [species_names_delete]  # ensure is list
+        if np.isscalar(species_names):
+            species_names = [species_names]  # ensure is list
 
         ## read information about snapshot times ##
         simulation_directory = ut.io.get_path(simulation_directory)
@@ -889,30 +887,46 @@ class ReadClass(ut.io.SayClass):
                 file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
                 file_in = h5py.File(file_name_i, 'r+')
 
-            self.say('reading and deleting properties from: ' + file_name_i.split('/')[-1])
+            self.say('reading properties from: ' + file_name_i.split('/')[-1])
 
-            part_number_in_file = header['NumPart_ThisFile']
-            part_number = header['NumPart_Total']
+            if 'delete' in action:
+                part_number_in_file = header['NumPart_ThisFile']
+                part_number = header['NumPart_Total']
 
             # read and delete particle properties
-            for _spec_i, spec_name in enumerate(species_names_delete):
+            for _spec_i, spec_name in enumerate(species_names):
                 spec_id = self.species_dict[spec_name]
                 spec_name_in = 'PartType' + str(spec_id)
-                self.say('  deleting species = {}'.format(spec_name))
+                self.say('  adjusting species = {}'.format(spec_name))
 
-                # adjust header
-                part_number_in_file[spec_id] = 0
-                part_number[spec_id] = 0
+                if 'delete' in action:
+                    self.say('  deleting species = {}'.format(spec_name))
 
-                #for prop_name in file_in[spec_name_in]:
-                #    file_in.__delitem__(spec_name_in + '/' + prop_name)
-                #    self.say('  deleting {}'.format(prop_name))
+                    # zero numbers in header
+                    part_number_in_file[spec_id] = 0
+                    part_number[spec_id] = 0
 
-                del(file_in[spec_name_in])
+                    # delete properties
+                    #for prop_name in file_in[spec_name_in]:
+                    #    del(file_in[spec_name_in + '/' + prop_name])
+                    #    self.say('  deleting {}'.format(prop_name))
+
+                    del(file_in[spec_name_in])
+
+                elif 'velocity' in action and value_adjust:
+                    dimen_index = 2  # boost velocity along z-axis
+                    self.say('  boosting velocity along axis.{} by {:.1f} km/s'.format(
+                             dimen_index, value_adjust))
+                    velocities = file_in[spec_name_in + '/' + 'Velocities']
+                    scalefactor = 1 / (1 + header['Redshift'])
+                    velocities[:, 2] += value_adjust / np.sqrt(scalefactor)
+                    #file_in[spec_name_in + '/' + 'Velocities'] = velocities
+
                 print()
 
-            header['NumPart_ThisFile'] = part_number_in_file
-            header['NumPart_Total'] = part_number
+            if 'delete' in action:
+                header['NumPart_ThisFile'] = part_number_in_file
+                header['NumPart_Total'] = part_number
 
             file_in.close()
 
@@ -920,6 +934,9 @@ class ReadClass(ut.io.SayClass):
 Read = ReadClass()
 
 
+#===================================================================================================
+# assign additional properties
+#===================================================================================================
 def assign_orbit(
     part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True):
     '''
