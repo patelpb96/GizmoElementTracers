@@ -1395,7 +1395,7 @@ def plot_property_v_distance(
     dimension_number=3, rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_max=None,
     center_positions=None, center_velocities=None,
     other_prop_limits={}, part_indicess=None,
-    distance_reference=None, label_redshift=True,
+    distance_reference=None, plot_nfw=False, label_redshift=True,
     get_values=False, write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
@@ -1423,6 +1423,7 @@ def plot_property_v_distance(
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     distance_reference : float : reference distance at which to draw vertical line
+    plot_nfw : boolean : whether to overplot NFW profile: density ~ 1 / r
     label_redshift : boolean : whether to label redshift
     get_values : boolean : whether to return values plotted
     write_plot : boolean : whether to write figure to file
@@ -1492,6 +1493,14 @@ def plot_property_v_distance(
             distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
 
     if distance_reference is not None:
+        subplot.plot([distance_reference, distance_reference], axis_y_limits,
+                     color='black', linestyle=':', alpha=0.6)
+
+    if plot_nfw is not None:
+        distances_nfw = pro[species]['distance']
+        densities_nfw = np.ones(pro[species]['distance'].size)  # normalize to outermost distance
+        densities_nfw[:] = pro[species][prop_statistic][-1]
+        densities_nfw *= pro[species]['distance'] / pro[species]['distance'][-1]
         subplot.plot([distance_reference, distance_reference], axis_y_limits,
                      color='black', linestyle=':', alpha=0.6)
 
@@ -2703,7 +2712,8 @@ def plot_galaxy_property_v_time(
 
 
 #===================================================================================================
-# disk mass and radius over time, for shea
+# disk mass and radius over time, for
+
 #===================================================================================================
 def get_galaxy_mass_profiles_v_redshift(
     directory='.', redshifts=[3, 2.75, 2.5, 2.25, 2, 1.75, 1.5, 1.25, 1, 0.75, 0.5, 0.25, 0],
