@@ -1501,7 +1501,7 @@ def plot_property_v_distance(
         distances_nfw = pro[species]['distance']
         # normalize to outermost distance bin
         densities_nfw = np.ones(pro[species]['distance'].size) * pro[species][prop_statistic][-1]
-        densities_nfw *= pro[species]['distance'] / pro[species]['distance'][-1]
+        densities_nfw *= pro[species]['distance'][-1] / pro[species]['distance']
         subplot.plot(distances_nfw, densities_nfw, color='black', linestyle=':', alpha=0.6)
 
     if len(pros) == 1:
