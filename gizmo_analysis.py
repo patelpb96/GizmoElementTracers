@@ -1496,13 +1496,13 @@ def plot_property_v_distance(
         subplot.plot([distance_reference, distance_reference], axis_y_limits,
                      color='black', linestyle=':', alpha=0.6)
 
-    if plot_nfw is not None:
+    if plot_nfw:
+        pro = pros[0]
         distances_nfw = pro[species]['distance']
-        densities_nfw = np.ones(pro[species]['distance'].size)  # normalize to outermost distance
-        densities_nfw[:] = pro[species][prop_statistic][-1]
+        # normalize to outermost distance bin
+        densities_nfw = np.ones(pro[species]['distance'].size) * pro[species][prop_statistic][-1]
         densities_nfw *= pro[species]['distance'] / pro[species]['distance'][-1]
-        subplot.plot([distance_reference, distance_reference], axis_y_limits,
-                     color='black', linestyle=':', alpha=0.6)
+        subplot.plot(distances_nfw, densities_nfw, color='black', linestyle=':', alpha=0.6)
 
     if len(pros) == 1:
         alpha = 1.0
