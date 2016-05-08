@@ -227,7 +227,7 @@ class SpeciesProfileClass(ut.io.SayClass):
     def get_profiles(
         self, part, species=['all'], prop_name='', prop_statistic='sum', weight_by_mass=False,
         DistanceBin=None, center_position=None, center_velocity=None, rotation_vectors=None,
-        axis_distance_max=Inf, other_axis_distance_max=None, other_prop_limits={},
+        axis_distance_max=Inf, other_axis_distance_limits=None, other_prop_limits={},
         part_indicess=None):
         '''
         Parameters
@@ -242,8 +242,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         center_velocity : array : velocity of center
         axis_distance_max : float : maximum distance to use to define principal axes {kpc physical}
         rotation_vectors : array : eigen-vectors to define rotation
-        other_axis_distance_max : float :
-            maximum distance along other axis[s] to keep particles {kpc physical}
+        other_axis_distance_limits : float :
+            min and max distances along other axis[s] to keep particles {kpc physical}
         other_prop_limits : dict : dictionary with properties as keys and limits as values
         part_indicess : array (species number x particle number) :
             indices of particles from which to select
@@ -253,18 +253,28 @@ class SpeciesProfileClass(ut.io.SayClass):
         pros : dict : dictionary of profiles for each particle species
         '''
         if ('sum' in prop_statistic or 'vel.circ' in prop_statistic or 'density' in prop_statistic):
-            return self.get_sum_profiles(
+            pros = self.get_sum_profiles(
                 part, species, prop_name, DistanceBin, center_position, rotation_vectors,
-                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+                axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
         else:
-            return self.get_statistics_profiles(
+            pros = self.get_statistics_profiles(
                 part, species, prop_name, weight_by_mass, DistanceBin, center_position,
-                center_velocity, rotation_vectors, axis_distance_max, other_axis_distance_max,
+                center_velocity, rotation_vectors, axis_distance_max, other_axis_distance_limits,
                 other_prop_limits, part_indicess)
+
+        for k in pros:
+            if '.cum' in prop_statistic or 'vel.circ' in prop_statistic:
+                pros[k]['distance'] = pros[k]['distance.cum']
+                pros[k]['log distance'] = pros[k]['log distance.cum']
+            else:
+                pros[k]['distance'] = pros[k]['distance.mid']
+                pros[k]['log distance'] = pros[k]['log distance.mid']
+
+        return pros
 
     def get_sum_profiles(
         self, part, species=['all'], prop_name='mass', DistanceBin=None, center_position=None,
-        rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_max=None,
+        rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_limits=None,
         other_prop_limits={}, part_indicess=None):
         '''
         Get profiles of summed quantity (such as mass or density) for given property for each
@@ -279,8 +289,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         center_position : list : center position
         rotation_vectors : array : eigen-vectors to define rotation
         axis_distance_max : float : maximum distance to use to define principal axes {kpc physical}
-        other_axis_distance_max : float :
-            maximum distance along other axis[s] to keep particles {kpc physical}
+        other_axis_distance_limits : float :
+            min and max distances along other axis[s] to keep particles {kpc physical}
         other_prop_limits : dict : dictionary with properties as keys and limits as values
         part_indicess : array (species number x particle number) :
             indices of particles from which to select
@@ -292,11 +302,11 @@ class SpeciesProfileClass(ut.io.SayClass):
         if 'gas' in species and 'consume.time' in prop_name:
             pros_mass = self.get_sum_profiles(
                 part, species, 'mass', DistanceBin, center_position, rotation_vectors,
-                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+                axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
 
             pros_sfr = self.get_sum_profiles(
                 part, species, 'sfr', DistanceBin, center_position, rotation_vectors,
-                axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess)
+                axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
 
             pros = pros_sfr
             for k in pros_sfr['gas']:
@@ -342,14 +352,17 @@ class SpeciesProfileClass(ut.io.SayClass):
                     part_indices, scalarize=True)
 
                 if DistanceBin.dimension_number == 1:
-                    distances = distancess[0]
-                    other_distances = distancess[1]
-                elif DistanceBin.dimension_number == 2:
                     distances = distancess[1]
                     other_distances = distancess[0]
+                elif DistanceBin.dimension_number == 2:
+                    distances = distancess[0]
+                    other_distances = distancess[1]
 
-                if 0 < other_axis_distance_max < Inf:
-                    masks = (other_distances < other_axis_distance_max)
+                if (other_axis_distance_limits is not None and
+                        (min(other_axis_distance_limits) > 0 or
+                         max(other_axis_distance_limits) < Inf)):
+                    masks = ((other_distances >= min(other_axis_distance_limits)) *
+                             (other_distances < max(other_axis_distance_limits)))
                     distances = distances[masks]
                     prop_values = prop_values[masks]
 
@@ -418,7 +431,7 @@ class SpeciesProfileClass(ut.io.SayClass):
     def get_statistics_profiles(
         self, part, species=['all'], prop_name='', weight_by_mass=True, DistanceBin=None,
         center_position=None, center_velocity=None, rotation_vectors=None, axis_distance_max=Inf,
-        other_axis_distance_max=None, other_prop_limits={}, part_indicess=None):
+        other_axis_distance_limits=None, other_prop_limits={}, part_indicess=None):
         '''
         Get profiles of statistics (such as median, average) for given property for each
         particle species.
@@ -434,8 +447,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         center_velocity : array : velocity of center
         axis_distance_max : float : maximum distance to use to define principal axes {kpc physical}
         rotation_vectors : array : eigen-vectors to define rotation
-        other_axis_distance_max : float :
-            maximum distance along other axis[s] to keep particles {kpc physical}
+        other_axis_distance_limits : float :
+            min and max distances along other axis[s] to keep particles {kpc physical}
         other_prop_limits : dict : dictionary with properties as keys and limits as values
         part_indicess : array or list : indices of particles from which to select
 
@@ -507,8 +520,11 @@ class SpeciesProfileClass(ut.io.SayClass):
                         distances = distancess[1]
                         other_distances = distancess[0]
 
-                    if 0 < other_axis_distance_max < Inf:
-                        masks = (other_distances < other_axis_distance_max)
+                    if (other_axis_distance_limits is not None and
+                            min(other_axis_distance_limits) > 0 and
+                            max(other_axis_distance_limits) < Inf):
+                        masks = ((other_distances >= min(other_axis_distance_limits)) *
+                                 (other_distances < max(other_axis_distance_limits)))
                         distances = distances[masks]
                         masses = masses[masks]
                         prop_values = prop_values[masks]
@@ -794,7 +810,7 @@ def plot_metal_v_distance(
 # visualize
 #===================================================================================================
 def plot_image(
-    part, spec_name='dark', dimen_indices_plot=[0, 1], dimen_indices_select=[0, 1, 2],
+    part, spec_name='dark', dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
     distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
     align_principal_axes=False, image_limits=[None, None], background_color='white',
@@ -1392,7 +1408,8 @@ def plot_property_v_distance(
     prop_limits=[],
     distance_limits=[0.1, 300], distance_bin_width=0.02, distance_bin_number=None,
     distance_scaling='log',
-    dimension_number=3, rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_max=None,
+    dimension_number=3, rotation_vectors=None,
+    axis_distance_max=Inf, other_axis_distance_limits=None,
     center_positions=None, center_velocities=None,
     other_prop_limits={}, part_indicess=None,
     distance_reference=None, plot_nfw=False, label_redshift=True,
@@ -1416,8 +1433,8 @@ def plot_property_v_distance(
         note : if 1, get profile along minor axis, if 2, get profile along 2 major axes
     rotation_vectors : array : eigen-vectors to define rotation
     axis_distance_max : float : maximum distance to use in defining principal axes {kpc physical}
-    other_axis_distance_max : float :
-        maximum distance along other axis[s] to keep particles {kpc physical}
+    other_axis_distance_limits : float :
+        min and max distances along other axis[s] to keep particles {kpc physical}
     center_positions : array or list of arrays : position of center for each particle catalog
     center_velocities : array or list of arrays : velocity of center for each particle catalog
     other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -1451,7 +1468,7 @@ def plot_property_v_distance(
         pros_part = SpeciesProfile.get_profiles(
             part, species, prop_name, prop_statistic, weight_by_mass, DistanceBin,
             center_positions[part_i], center_velocities[part_i], rotation_vectors,
-            axis_distance_max, other_axis_distance_max, other_prop_limits, part_indicess[part_i])
+            axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess[part_i])
 
         pros.append(pros_part)
 
@@ -1513,8 +1530,8 @@ def plot_property_v_distance(
 
     for part_i, pro in enumerate(pros):
         print(pro[species][prop_statistic])
-        subplot.plot(pro[species]['distance'], pro[species][prop_statistic], color=colors[part_i],
-                     linestyle='-', alpha=alpha, linewidth=linewidth,
+        subplot.plot(pro[species]['distance'], pro[species][prop_statistic],
+                     color=colors[part_i], linestyle='-', alpha=alpha, linewidth=linewidth,
                      label=parts[part_i].info['simulation.name'])
 
     # redshift legend
@@ -2743,41 +2760,44 @@ def get_galaxy_mass_profiles_v_redshift(
     profile_mass_percents = [50, 90]
 
     gal = {
-        'index': [],
-        'redshift': [],
-        'scalefactor': [],
-        'time': [],
-        'time.lookback': [],
+        'index': [],  # snapshot index
+        'redshift': [],  # snapshot redshift
+        'scalefactor': [],  # snapshot scale-factor
+        'time': [],  # snapshot time [Gyr]
+        'time.lookback': [],  # snapshot lookback time [Gyr]
 
-        'star.position': [],
-        'star.velocity': [],
-        'dark.position': [],
-        'dark.velocity': [],
+        'star.position': [],  # position of galaxy (star) center [kpc comoving]
+        'star.velocity': [],  # center-of-mass velocity of stars within R_50 [km/s physical]
+        'dark.position': [],  # position of DM center [kpc comoving]
+        'dark.velocity': [],  # center-of-mass velocity of DM within 0.5 * R_200m [km/s physical]
 
-        'rotation.tensor': [],
-        'axis.ratio': [],
+        'rotation.tensor': [],  # rotation tensor of disk
+        'axis.ratio': [],  # axis ratios of disk
 
-        'profile.3d.distance': [],
-        'profile.3d.density': [],
+        'profile.3d.distance': [],  # distance bins in 3-D [kpc physical]
+        'profile.3d.density': [],  # density, in 3-D [M_sun / kpc ^ 3]
 
-        'profile.minor.distance': [],
-        'profile.minor.density': [],
+        'profile.major.distance': [],  # distance bins along major (R) axis [kpc physical]
+        'profile.major.density': [],  # surface density, in 2-D [M_sun / kpc ^ 2]
 
-        'profile.major.distance': [],
-        'profile.major.density': [],
+        'profile.minor.bulge.distance': [],  # distance bins along minor (z) axis [kpc physical]
+        'profile.minor.bulge.density': [],  # density, in 1-D [M_sun / kpc]
+
+        'profile.minor.disk.distance': [],  # distance bins along minor (z) axis [kpc physical]
+        'profile.minor.disk.density': [],  # density, in 1-D [M_sun / kpc]
     }
 
     for mass_percent in profile_mass_percents:
         mass_percent_name = '{:.0f}'.format(mass_percent)
 
-        gal['radius.3d.' + mass_percent_name] = []
-        gal['mass.3d.' + mass_percent_name] = []
+        gal['radius.3d.' + mass_percent_name] = []  # stellar R_{50,90} in 3-D [kpc physical]
+        gal['mass.3d.' + mass_percent_name] = []  # associated stellar mass [M_sun}
 
-        gal['radius.major.' + mass_percent_name] = []
-        gal['mass.major.' + mass_percent_name] = []
+        gal['radius.major.' + mass_percent_name] = []  # stellar R_{50,90} along major axis
+        gal['mass.major.' + mass_percent_name] = []  # associated stellar mass [M_sun]
 
-        gal['radius.minor.' + mass_percent_name] = []
-        gal['mass.minor.' + mass_percent_name] = []
+        gal['radius.minor.' + mass_percent_name] = []  # stellar R_{50,90} along minor axis
+        gal['mass.minor.' + mass_percent_name] = []  # associated stellar mass [M_sun]
 
     for zi, redshift in enumerate(redshifts):
         if parts is not None and len(parts):
@@ -2819,37 +2839,44 @@ def get_galaxy_mass_profiles_v_redshift(
             gal_radius_minor, gal_mass_minor = ut.particle.get_galaxy_radius_mass(
                 part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='minor', rotation_vectors=rotation_vectors,
-                other_axis_distance_max=gal_radius_90)
+                other_axis_distance_limits=[0, gal_radius_90])
             gal['radius.minor.' + mass_percent_name].append(gal_radius_minor)
             gal['mass.minor.' + mass_percent_name].append(gal_mass_minor)
 
             gal_radius_major, gal_mass_major = ut.particle.get_galaxy_radius_mass(
                 part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='major', rotation_vectors=rotation_vectors,
-                other_axis_distance_max=gal_radius_minor)
+                other_axis_distance_limits=[0, gal_radius_minor])
             gal['radius.major.' + mass_percent_name].append(gal_radius_major)
             gal['mass.major.' + mass_percent_name].append(gal_mass_major)
 
         pro = plot_property_v_distance(
             part, profile_spec_name, 'mass', 'density', 'log', False, None,
-            [0.1, 20], 0.1, None, 'log', 3,
-            rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
+            [0.05, 20], 0.1, None, 'log', 3, get_values=True)
         for k in ['distance', 'density']:
             gal['profile.3d.' + k].append(pro[profile_spec_name][k])
 
         pro = plot_property_v_distance(
             part, profile_spec_name, 'mass', 'density', 'log', False, None,
-            [0.1, 20], 0.1, None, 'log', 2,
-            rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
+            [0.05, 20], 0.1, None, 'log', 2,
+            rotation_vectors=rotation_vectors, other_axis_distance_limits=[0, 1], get_values=True)
         for k in ['distance', 'density']:
             gal['profile.major.' + k].append(pro[profile_spec_name][k])
 
         pro = plot_property_v_distance(
             part, profile_spec_name, 'mass', 'density', 'log', False, None,
-            [0.1, 20], 0.1, None, 'log', 1,
-            rotation_vectors=rotation_vectors, other_axis_distance_max=1, get_values=True)
+            [0.05, 20], 0.1, None, 'log', 1,
+            rotation_vectors=rotation_vectors, other_axis_distance_limits=[0, 0.05],
+            get_values=True)
         for k in ['distance', 'density']:
-            gal['profile.minor.' + k].append(pro[profile_spec_name][k])
+            gal['profile.minor.bulge.' + k].append(pro[profile_spec_name][k])
+
+        pro = plot_property_v_distance(
+            part, profile_spec_name, 'mass', 'density', 'log', False, None,
+            [0.05, 20], 0.1, None, 'log', 1,
+            rotation_vectors=rotation_vectors, other_axis_distance_limits=[1, 10], get_values=True)
+        for k in ['distance', 'density']:
+            gal['profile.minor.disk.' + k].append(pro[profile_spec_name][k])
 
     for prop in gal:
         gal[prop] = np.array(gal[prop])
