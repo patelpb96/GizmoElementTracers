@@ -1530,8 +1530,13 @@ def plot_property_v_distance(
 
     for part_i, pro in enumerate(pros):
         print(pro[species][prop_statistic])
+        linestyle = '-'
+        color = colors[part_i]
+        if 'res-adapt' in parts[part_i].info['simulation.name']:
+            linestyle = '--'
+            color = colors[part_i - 1]
         subplot.plot(pro[species]['distance'], pro[species][prop_statistic],
-                     color=colors[part_i], linestyle='-', alpha=alpha, linewidth=linewidth,
+                     color=color, linestyle=linestyle, alpha=alpha, linewidth=linewidth,
                      label=parts[part_i].info['simulation.name'])
 
     # redshift legend
