@@ -3161,9 +3161,9 @@ def test_adaptive_resolution(redshift=0, distance_limits=[0.01, 20], distance_bi
     from . import gizmo_io
 
     simulation_directories = [
-        'm12i_r11_dm', 'm12i_r11_dm_res-adapt',
-        'm12i_r12_dm', 'm12i_r12_dm_res-adapt',
-        'm12i_r13_dm_new', 'm12i_r13_dm_res-adapt',
+        'm12i_ref11_dm', 'm12i_ref11_dm_res-adapt',
+        'm12i_ref12_dm', 'm12i_ref12_dm_res-adapt',
+        'm12i_ref13_dm_new', 'm12i_ref13_dm_res-adapt',
         '/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low'
     ]
 
