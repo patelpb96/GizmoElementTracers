@@ -3154,25 +3154,36 @@ class CompareSimulationsClass(ut.io.SayClass):
 CompareSimulations = CompareSimulationsClass()
 
 
-def test_adaptive_resolution(redshift=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
+def test_adaptive_resolution(
+    parts=None, redshift=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
     '''
     .
     '''
     from . import gizmo_io
 
     simulation_directories = [
-        'm12i_ref11_dm', 'm12i_ref11_dm_res-adapt',
-        'm12i_ref12_dm', 'm12i_ref12_dm_res-adapt',
-        'm12i_ref13_dm_new', 'm12i_ref13_dm_res-adapt',
-        '/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low'
+        ['m12i_ref11_dm', 'm12i r11 dm'],
+        ['m12i_ref11_dm_res-adapt', 'm12i r11 dm res-adapt'],
+        ['m12i_ref12_dm', 'm12i r12 dm'],
+        ['m12i_ref12_dm_res-adapt', 'm12i r12 dm res-adapt'],
+        ['m12i_ref13_dm_new', 'm12i r13 dm'],
+        ['m12i_ref13_dm_res-adapt', 'm12i r13 dm res-adapt'],
+        ['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
     ]
 
-    parts = []
-    for simulation_dir in simulation_directories:
-        parts.append(
-            gizmo_io.Read.read_snapshot(
-                'dark', 'redshift', redshift, simulation_dir, property_names=['position', 'mass'],
-                force_float32=True))
+    if parts is None:
+        parts = []
+        for simulation_dir in simulation_directories:
+            assign_center = True
+            if 'ref14' in simulation_dir:
+                assign_center = False
+            part = gizmo_io.Read.read_snapshot(
+                'dark', 'redshift', redshift, simulation_dir[0], simulation_name=simulation_dir[1],
+                property_names=['position', 'mass'], assign_center=assign_center,
+                force_float32=True)
+            if 'ref14' in simulation_dir:
+                part.center_position = np.array([41820.015, 44151.745, 46272.818], dtype=np.float32)
+            parts.append(part)
 
     plot_property_v_distance(
         parts, 'dark', 'mass', 'vel.circ', 'log', False, [None, None],
@@ -3185,3 +3196,5 @@ def test_adaptive_resolution(redshift=0, distance_limits=[0.01, 20], distance_bi
     plot_property_v_distance(
         parts, 'dark', 'mass', 'density', 'log', False, [None, None],
         distance_limits, distance_bin_width, write_plot=True)
+
+    return parts
