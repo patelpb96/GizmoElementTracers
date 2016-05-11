@@ -1548,14 +1548,13 @@ def plot_property_v_distance(
             loc='lower left', prop=FontProperties(size=16))
         legend_z.get_frame().set_alpha(0.5)
 
-    """
     if len(parts) > 1 and parts[0].info['simulation.name']:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
         if legend_z:
             subplot.add_artist(legend_z)
-    """
+
     plot_name = (species + '.' + prop_name + '.' + prop_statistic + '_v_dist_z.{:.2f}'.format(
                  part.info['redshift']))
     plot_name = plot_name.replace('.sum', '')
