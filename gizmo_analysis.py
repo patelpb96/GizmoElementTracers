@@ -1548,13 +1548,14 @@ def plot_property_v_distance(
             loc='lower left', prop=FontProperties(size=16))
         legend_z.get_frame().set_alpha(0.5)
 
+    """
     if len(parts) > 1 and parts[0].info['simulation.name']:
         # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
         if legend_z:
             subplot.add_artist(legend_z)
-
+    """
     plot_name = (species + '.' + prop_name + '.' + prop_statistic + '_v_dist_z.{:.2f}'.format(
                  part.info['redshift']))
     plot_name = plot_name.replace('.sum', '')
@@ -2511,7 +2512,7 @@ def plot_density_profile_halo(
 
     if center_position is None:
         center_positions = []
-        center_positions.append(hal['position'][hal_index])
+        #center_positions.append(hal['position'][hal_index])
         if 'star.position' in hal and hal['star.position'][hal_index][0] > 0:
             center_positions.append(hal['star.position'][hal_index])
     else:
@@ -2523,8 +2524,8 @@ def plot_density_profile_halo(
 
     if 'star.radius.50' in hal and hal['star.radius.50'][hal_index] > 0:
         distance_reference = hal['star.radius.50'][hal_index]
-
-    #if plot_only_members:
+    else:
+        distance_reference = None
 
     plot_property_v_distance(
         parts, species, 'mass', 'density', 'log', False, None,
@@ -2537,25 +2538,31 @@ def plot_density_profile_halo(
 
 def plot_density_profiles_halos(
     part, hal, hal_indices,
-    species='dark',
+    species='dark', density_limits=None,
     distance_limits=[0.05, 1], distance_bin_width=0.2, distance_bin_number=None,
-    plot_only_members=False, write_plot=False, plot_directory='.', figure_index=0):
+    plot_only_members=False,
+    write_plot=False, plot_directory='.', figure_index=0):
     '''
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
-    from gizmo import gizmo_analysis
-
+    parts = []
     center_positions = []
-    part_indicess = []
+    part_indicess = None
     for hal_i in hal_indices:
-        center_positions.append(hal.prop('star.position', hal_i))
-        if plot_only_members:
-            part_indicess.append(hal.prop('star.indices', hal_i))
+        parts.append(part)
+        if 'star.position' in hal:
+            center_positions.append(hal.prop('star.position', hal_i))
+            if plot_only_members:
+                part_indicess.append(hal.prop(species + '.indices', hal_i))
+        else:
+            center_positions.append(hal.prop('position', hal_i))
+            if plot_only_members:
+                part_indicess.append(hal.prop(species + '.indices', hal_i))
 
-    gizmo_analysis.plot_property_v_distance(
-        part, species, 'mass', 'density', 'log', False, None,
+    plot_property_v_distance(
+        parts, species, 'mass', 'density', 'log', False, density_limits,
         distance_limits, distance_bin_width, distance_bin_number, 'log', 3,
         center_positions=center_positions, part_indicess=part_indicess,
         write_plot=write_plot, plot_directory=plot_directory, figure_index=figure_index)
@@ -3019,7 +3026,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         return parts
 
     def plot_profiles(
-        self, parts=None, simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        self, parts=None, distance_bin_width=0.1,
+        simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
         species='all', property_names=['mass', 'position', 'form.time'], force_float32=True):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
@@ -3027,6 +3035,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
+        distance_bin_width : float : width of distance bin
         simulation_names : list : list of simulation directories and name/label for figure.
         redshifts : float or list
         species : string or list : particle species to read
@@ -3047,37 +3056,37 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             plot_property_v_distance(
                 parts, 'total', 'mass', 'vel.circ', 'linear', False, [0, None],
-                [0.1, 300], 0.1, write_plot=True)
+                [0.1, 300], distance_bin_width, write_plot=True)
 
             plot_property_v_distance(
                 parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
-                [1, 300], 0.1, write_plot=True)
+                [1, 300], distance_bin_width, write_plot=True)
 
             plot_property_v_distance(
                 parts, 'dark', 'mass', 'sum.cum', 'log', False, [None, None],
-                [1, 300], 0.1, write_plot=True)
+                [1, 300], distance_bin_width, write_plot=True)
 
             plot_property_v_distance(
                 parts, 'dark', 'mass', 'density', 'log', False, [None, None],
-                [0.1, 30], 0.1, write_plot=True)
+                [0.1, 30], distance_bin_width, write_plot=True)
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
                     parts, 'baryon', 'mass', 'sum.cum.fraction', 'linear', False, [0, 2],
-                    [10, 2000], 0.1, write_plot=True)
+                    [10, 2000], distance_bin_width, write_plot=True)
 
                 plot_property_v_distance(
                     parts, 'gas', 'mass', 'sum.cum', 'log', False, [None, None],
-                    [1, 300], 0.1, write_plot=True)
+                    [1, 300], distance_bin_width, write_plot=True)
 
             if 'star' in parts[0]:
                 plot_property_v_distance(
                     parts, 'star', 'mass', 'sum.cum', 'log', False, [None, None],
-                    [1, 300], 0.1, write_plot=True)
+                    [1, 300], distance_bin_width, write_plot=True)
 
                 plot_property_v_distance(
                     parts, 'star', 'mass', 'density', 'log', False, [None, None],
-                    [0.1, 30], 0.1, write_plot=True)
+                    [0.1, 30], distance_bin_width, write_plot=True)
 
             if 'velocity' in property_names:
                 plot_property_v_distance(
@@ -3143,3 +3152,36 @@ class CompareSimulationsClass(ut.io.SayClass):
                             write_plot=True, add_simulation_name=True)
 
 CompareSimulations = CompareSimulationsClass()
+
+
+def test_adaptive_resolution(redshift=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
+    '''
+    .
+    '''
+    from . import gizmo_io
+
+    simulation_directories = [
+        'part_r11_dm', 'part_r11_dm_res-adapt',
+        'part_r12_dm', 'part_r12_dm_res-adapt',
+        'part_r13_dm_new', 'part_r13_dm_res-adapt',
+        '/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low'
+    ]
+
+    parts = []
+    for simulation_dir in simulation_directories:
+        parts.append(
+            gizmo_io.Read.read_snapshot(
+                'dark', 'redshift', redshift, simulation_dir, property_names=['position', 'mass'],
+                force_float32=True))
+
+    plot_property_v_distance(
+        parts, 'dark', 'mass', 'vel.circ', 'log', False, [None, None],
+        distance_limits, distance_bin_width, write_plot=True)
+
+    plot_property_v_distance(
+        parts, 'dark', 'mass', 'sum', 'log', False, [None, None],
+        distance_limits, distance_bin_width, write_plot=True)
+
+    plot_property_v_distance(
+        parts, 'dark', 'mass', 'density', 'log', False, [None, None],
+        distance_limits, distance_bin_width, write_plot=True)
