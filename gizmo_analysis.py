@@ -252,7 +252,7 @@ class SpeciesProfileClass(ut.io.SayClass):
         -------
         pros : dict : dictionary of profiles for each particle species
         '''
-        if ('sum' in prop_statistic or 'vel.circ' in prop_statistic or 'density' in prop_statistic):
+        if 'sum' in prop_statistic or 'vel.circ' in prop_statistic or 'density' in prop_statistic:
             pros = self.get_sum_profiles(
                 part, species, prop_name, DistanceBin, center_position, rotation_vectors,
                 axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
@@ -3161,7 +3161,7 @@ def test_adaptive_resolution(
     '''
     from . import gizmo_io
 
-    simulation_directories = [
+    simulation_names = [
         ['m12i_ref11_dm', 'm12i r11 dm'],
         ['m12i_ref11_dm_res-adapt', 'm12i r11 dm res-adapt'],
         ['m12i_ref12_dm', 'm12i r12 dm'],
@@ -3173,12 +3173,12 @@ def test_adaptive_resolution(
 
     if parts is None:
         parts = []
-        for simulation_dir in simulation_directories:
+        for simulation_dir, simulation_name in simulation_names:
             assign_center = True
             if 'ref14' in simulation_dir:
                 assign_center = False
             part = gizmo_io.Read.read_snapshot(
-                'dark', 'redshift', redshift, simulation_dir[0], simulation_name=simulation_dir[1],
+                'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
                 property_names=['position', 'mass'], assign_center=assign_center,
                 force_float32=True)
             if 'ref14' in simulation_dir:
@@ -3190,11 +3190,11 @@ def test_adaptive_resolution(
         distance_limits, distance_bin_width, write_plot=True)
 
     plot_property_v_distance(
-        parts, 'dark', 'mass', 'sum', 'log', False, [None, None],
+        parts, 'dark', 'mass', 'density', 'log', False, [None, None],
         distance_limits, distance_bin_width, write_plot=True)
 
     plot_property_v_distance(
-        parts, 'dark', 'mass', 'density', 'log', False, [None, None],
+        parts, 'dark', 'mass', 'density.r2', 'log', False, [None, None],
         distance_limits, distance_bin_width, write_plot=True)
 
     return parts
