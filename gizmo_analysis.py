@@ -1521,6 +1521,7 @@ def plot_property_v_distance(
         densities_nfw *= pro[species]['distance'][-1] / pro[species]['distance']
         subplot.plot(distances_nfw, densities_nfw, color='black', linestyle=':', alpha=0.6)
 
+    # plot profiles of objects
     if len(pros) == 1:
         alpha = 1.0
         linewidth = 3.5
@@ -1535,7 +1536,8 @@ def plot_property_v_distance(
         if 'res-adapt' in parts[part_i].info['simulation.name']:
             linestyle = '--'
             color = colors[part_i - 1]
-        subplot.plot(pro[species]['distance'], pro[species][prop_statistic],
+        masks = pro[species][prop_statistic] > 0  # plot only non-zero values
+        subplot.plot(pro[species]['distance'][masks], pro[species][prop_statistic][masks],
                      color=color, linestyle=linestyle, alpha=alpha, linewidth=linewidth,
                      label=parts[part_i].info['simulation.name'])
 
@@ -1548,8 +1550,8 @@ def plot_property_v_distance(
             loc='lower left', prop=FontProperties(size=16))
         legend_z.get_frame().set_alpha(0.5)
 
+    # property legend
     if len(parts) > 1 and parts[0].info['simulation.name']:
-        # property legend
         legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
         legend_prop.get_frame().set_alpha(0.5)
         if legend_z:
@@ -3193,7 +3195,7 @@ def test_adaptive_resolution(
         distance_limits, distance_bin_width, write_plot=True)
 
     plot_property_v_distance(
-        parts, 'dark', 'mass', 'density.r2', 'log', False, [None, None],
+        parts, 'dark', 'mass', 'density*r', 'log', False, [None, None],
         distance_limits, distance_bin_width, write_plot=True)
 
     return parts
