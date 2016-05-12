@@ -3169,7 +3169,7 @@ def test_adaptive_resolution(
         ['m12i_ref12_dm_res-adapt', 'm12i r12 dm res-adapt'],
         ['m12i_ref13_dm_new', 'm12i r13 dm'],
         ['m12i_ref13_dm_res-adapt', 'm12i r13 dm res-adapt'],
-        ['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
+        #['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
     ]
 
     if parts is None:
