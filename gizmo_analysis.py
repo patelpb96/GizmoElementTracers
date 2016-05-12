@@ -1536,7 +1536,7 @@ def plot_property_v_distance(
         if 'res-adapt' in parts[part_i].info['simulation.name']:
             linestyle = '--'
             color = colors[part_i - 1]
-        masks = pro[species][prop_statistic] > 0  # plot only non-zero values
+        masks = pro[species][prop_statistic] != 0  # plot only non-zero values
         subplot.plot(pro[species]['distance'][masks], pro[species][prop_statistic][masks],
                      color=color, linestyle=linestyle, alpha=alpha, linewidth=linewidth,
                      label=parts[part_i].info['simulation.name'])
@@ -3156,21 +3156,23 @@ CompareSimulations = CompareSimulationsClass()
 
 
 def test_adaptive_resolution(
-    parts=None, redshift=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
+    parts=None, simulation_names=[],
+    redshift=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
     '''
     .
     '''
     from . import gizmo_io
 
-    simulation_names = [
-        ['m12i_ref11_dm', 'm12i r11 dm'],
-        ['m12i_ref11_dm_res-adapt', 'm12i r11 dm res-adapt'],
-        ['m12i_ref12_dm', 'm12i r12 dm'],
-        ['m12i_ref12_dm_res-adapt', 'm12i r12 dm res-adapt'],
-        ['m12i_ref13_dm_new', 'm12i r13 dm'],
-        ['m12i_ref13_dm_res-adapt', 'm12i r13 dm res-adapt'],
-        #['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
-    ]
+    if not simulation_names:
+        simulation_names = [
+            ['m12i_ref11_dm', 'm12i r11 dm'],
+            ['m12i_ref11_dm_res-adapt', 'm12i r11 dm res-adapt'],
+            ['m12i_ref12_dm', 'm12i r12 dm'],
+            ['m12i_ref12_dm_res-adapt', 'm12i r12 dm res-adapt'],
+            ['m12i_ref13_dm', 'm12i r13 dm'],
+            ['m12i_ref13_dm_res-adapt', 'm12i r13 dm res-adapt'],
+            #['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
+        ]
 
     if parts is None:
         parts = []
