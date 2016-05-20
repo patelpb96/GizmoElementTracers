@@ -813,7 +813,8 @@ def plot_image(
     part, spec_name='dark', dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
     distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
-    align_principal_axes=False, image_limits=[None, None], background_color='white',
+    align_principal_axes=False, use_column_units=None, image_limits=[None, None],
+    background_color='white',
     hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
     write_plot=False, plot_directory='.', add_image_limits=True, add_simulation_name=False,
     figure_index=1):
@@ -838,6 +839,7 @@ def plot_image(
     part_indices : array : input selection indices for particles
     subsample_factor : int : factor by which periodically to sub-sample particles
     align_principal_axes : boolean : whether to align positions with principal axes
+    use_column_units : boolean : whether to convert to particle number / cm ^ 2
     image_limits : list : min and max limits to impose on image dynamic range (exposure)
     background_color : string : name of color for background: 'white', 'black'
     hal : dict : catalog of halos at snapshot
@@ -966,6 +968,10 @@ def plot_image(
         # convert to surface density
         histogramss /= np.diff(xs)[0] * np.diff(ys)[0]
 
+        # convert to column density
+        if use_column_units:
+            histogramss *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
+
         masks = (histogramss > 0)
         Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
                 histogramss[masks].min(), np.median(histogramss[masks]), histogramss[masks].max()))
@@ -977,12 +983,13 @@ def plot_image(
             if image_limits[1] is not None:
                 image_limits_use[1] = image_limits[1]
 
-        subplot.imshow(
+        _Image = subplot.imshow(
             histogramss.transpose(),
             norm=colors.LogNorm(),
             cmap=color_map,
             aspect='auto',
-            interpolation='none',
+            #interpolation='none',
+            interpolation='nearest',
             #interpolation='bilinear',
             #interpolation='bicubic',
             #interpolation='gaussian',
@@ -1024,7 +1031,7 @@ def plot_image(
 
         fig.gca().set_aspect('equal')
 
-        #fig.colorbar(_Image)
+        fig.colorbar(_Image)
 
         # plot halos
         if hal is not None:
@@ -1128,7 +1135,11 @@ def plot_image(
 
             subplot.axis('equal')
 
-    plot_name = spec_name + '.position'
+    plot_name = spec_name
+    if weight_prop_name:
+        plot_name += '.{}'.format(weight_prop_name)
+    plot_name += '.position'
+
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
     plot_name += '_d.{:.0f}'.format(distance_max)
@@ -2944,11 +2955,11 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         self.simulation_names = [
             # original FIRE
-            ['/work/02769/arwetzel/fire/m12i_ref12', 'r12 FIRE n100'],
+            ['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE'],
 
             # symmetric
-            ['fb-sym/m12i_ref12', 'r12 sym'],
-            ['fb-sym/m12i_ref13', 'r13 sym'],
+            ['fb-sym/m12i_ref12', 'm12i r12 sym'],
+            ['fb-sym/m12i_ref13', 'm12i r13 sym'],
 
             # different halos
             ['m12i/fb-sym/m12i_ref12', 'm12i r12'],
@@ -2969,11 +2980,6 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             ['fb-iso/m12i_ref12_sfn100', 'r12 iso n100'],
             ['fb-iso/m12i_ref13_sfn100', 'r13 iso n100'],
-
-            # anisotropic
-            ['fb-aniso/m12i_ref12_fb-volume', 'r12 aniso volume'],
-            ['fb-aniso/m12i_ref12', 'r12 aniso'],
-            ['fb-aniso/m12i_ref13', 'r13 aniso'],
 
         ]
 
@@ -3155,9 +3161,9 @@ class CompareSimulationsClass(ut.io.SayClass):
 CompareSimulations = CompareSimulationsClass()
 
 
-def test_adaptive_resolution(
+def compare_resolution(
     parts=None, simulation_names=[],
-    redshift=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
+    redshifts=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
     '''
     .
     '''
@@ -3177,16 +3183,21 @@ def test_adaptive_resolution(
     if parts is None:
         parts = []
         for simulation_dir, simulation_name in simulation_names:
-            assign_center = True
-            if 'ref14' in simulation_dir:
-                assign_center = False
-            part = gizmo_io.Read.read_snapshot(
-                'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
-                property_names=['position', 'mass'], assign_center=assign_center,
-                force_float32=True)
-            if 'ref14' in simulation_dir:
-                part.center_position = np.array([41820.015, 44151.745, 46272.818], dtype=np.float32)
-            parts.append(part)
+            for redshift in redshifts:
+                assign_center = True
+                if 'ref14' in simulation_dir:
+                    assign_center = False
+                part = gizmo_io.Read.read_snapshot(
+                    'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
+                    property_names=['position', 'mass'], assign_center=assign_center,
+                    force_float32=True)
+                if 'ref14' in simulation_dir:
+                    part.center_position = np.array([41820.015, 44151.745, 46272.818],
+                                                    dtype=np.float32)
+                if len(redshifts) > 1:
+                    part.info['simulation.name'] += ' z=%.1f'.format(redshift)
+
+                parts.append(part)
 
     plot_property_v_distance(
         parts, 'dark', 'mass', 'vel.circ', 'log', False, [None, None],
