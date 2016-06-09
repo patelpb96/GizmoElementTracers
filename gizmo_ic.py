@@ -194,7 +194,7 @@ def write_initial_condition_points(
     region_kind : string : method to identify zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
     '''
-    file_name = 'ic_agora_mX_points.txt'
+    file_name = 'ic_agora_mX_rad{:.0f}_points.txt'.format(distance_max)
 
     Say = ut.io.SayClass(write_initial_condition_points)
 
@@ -328,14 +328,14 @@ def write_initial_condition_points(
 
 
 def generate_initial_condition_points(
-    snapshot_indices=[14, 0], simulation_directory='.', distance_max=7, scale_to_halo_radius=True,
+    snapshot_redshifts=[0, 99], simulation_directory='.', distance_max=7, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
     '''
     Catch-all function: read particles, identify center, and write points for initial conditions.
 
     Parameters
     ----------
-    snapshot_redshifts : list : indices of final and initial snapshots
+    snapshot_redshifts : list : redshifts of final and initial snapshots
     simulation_directory : string : directory of simulation
     distance_max : float : distance from center to select particles at final time
         {kpc physical, or in units of R_halo}
@@ -348,7 +348,7 @@ def generate_initial_condition_points(
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
         print('! selection radius = {} looks odd. are you sure aboutg this?'.format(distance_max))
 
-    Read = ReadClass(snapshot_indices, simulation_directory)
+    Read = ReadClass(snapshot_redshifts, simulation_directory)
 
     parts = Read.read_particles()
 
