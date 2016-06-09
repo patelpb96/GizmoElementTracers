@@ -20,224 +20,8 @@ from . import gizmo_io
 
 
 #===================================================================================================
-# read data
-#===================================================================================================
-class ReadClass():
-    '''
-    Read particles and halo catalog.
-    '''
-    def __init__(self, snapshot_indices=[14, 0], simulation_directory='.'):
-        '''
-        Read particles from final and initial snapshot and halos from final snapshot.
-
-        Parameters
-        ----------
-        snapshot_indices : list : indices of initial and final snapshots to read
-        simulation_directory : string : root directory of simulation
-        '''
-        # ensure lowest-redshift snapshot is first
-        self.snapshot_indices = np.sort(snapshot_indices)[::-1]
-        self.simulation_directory = simulation_directory
-
-    def read_all(self, mass_limits=[1e11, Inf]):
-        '''
-        Read particles from final and initial snapshot and halos from final snapshot.
-
-        Returns
-        -------
-        parts : list : catalogs of particles at initial and final snapshots
-        hal : list : catalog of halos at final snapshot
-        '''
-        from rockstar import rockstar_io
-
-        parts = self.read_particles()
-        hal = self.read_halos(mass_limits)
-
-        rockstar_io.assign_lowres_mass(hal, parts[0], mass_limits)
-
-        return parts, hal
-
-    def read_particles(self):
-        '''
-        Read particles from final and initial snapshots.
-
-        Returns
-        -------
-        parts : list : catalogs of particles at initial and final snapshots
-        '''
-        parts = []
-
-        for snapshot_index in self.snapshot_indices:
-            part = gizmo_io.Read.read_snapshot(
-                'all', 'index', snapshot_index, self.simulation_directory,
-                property_names=['position', 'mass', 'id'], assign_center=False,
-                sort_dark_by_id=True, force_float32=False)
-            parts.append(part)
-
-        return parts
-
-    def read_halos(self, mass_limits=[1e11, Inf]):
-        '''
-        Read halos from final snapshot.
-
-        Returns
-        -------
-        hal : list : catalog of halos at final snapshot
-        '''
-        from rockstar import rockstar_io
-
-        hal = rockstar_io.Read.read_catalog(
-            'index', self.snapshot_indices[0], self.simulation_directory, sort_by_mass=True,
-            sort_host_first=False)
-
-        rockstar_io.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
-
-        return hal
-
-Read = ReadClass()
-
-
-#===================================================================================================
 # analysis
 #===================================================================================================
-def get_indices(
-    hal, mass_limits=[1.1e12, 1.8e12], distance_halo_min=6, contaminate_mass_frac_max=0.01):
-    '''
-    Get distances {kpc physical} and indices of halos that are within distance_max of center of
-    input halo.
-
-    Parameters
-    ----------
-    hal : dict : catalog of halos
-    mass_limits : list : min and max limits of mass
-    distance_halo_min : float : minimum d/R_{halo,nearest}
-    contaminate_mass_frac_max : float : maximum contamination by mass from low-res dark particles
-
-    Returns
-    -------
-    his_iso : array : distances of neighboring halos {kpc physical}
-    neig_indices : array : indices of neighboring halos
-    '''
-    Say = ut.io.SayClass(get_indices)
-
-    his = ut.array.get_indices(hal['lowres.mass.frac'], [0, contaminate_mass_frac_max])
-    Say.say('{} with low contamination'.format(his.size))
-
-    his = ut.array.get_indices(hal['total.mass'], mass_limits, his)
-    Say.say('{} within mass limits = [{:.3e}, {:.3e}]'.format(
-            his.size, mass_limits[0], mass_limits[1]))
-
-    his = ut.array.get_indices(hal['near.halo.distance.halo'], [distance_halo_min, Inf], his)
-    Say.say('{} with nearest more massive halo >{} d/R_halo,neig away'.format(
-            his.size, distance_halo_min))
-
-    return his
-
-
-def print_properties(hal, hal_index, digits_after_period=3):
-    '''
-    Parameters
-    ----------
-    hal : dict : catalog of halos
-    hal_index : int : index of halo
-    digits_after_period : int
-    '''
-    prop_names = [
-        'id', 'mass.200m', 'mass.vir', 'mass.200c', 'vel.circ.max',
-        'spin.bullock', 'spin.peebles', 'position',
-    ]
-
-    print('halo index = {}'.format(hal_index))
-    for prop_name in prop_names:
-        string = ut.io.get_string_for_value(hal[prop_name][hal_index], digits_after_period)
-        print('{} = {}'.format(prop_name, string))
-
-
-def get_neighbors(
-    hal, hal_index, distance_max=50, scale_to_halo_radius=True, neig_mass_frac_min=0.25):
-    '''
-    Get distances {kpc physical} and indices of halos that are within distance_max of center of
-    input halo.
-
-    Parameters
-    ----------
-    hal : dict : catalog of halos
-    hal_index : int : index of center halo
-    distance_max : float : maximum distance {kpc physical or d/R_halo}
-    neig_mass_frac_min : float : minimum mass (relative to central) to select neighboring halos
-
-    Returns
-    -------
-    neig_distances : array : distances of neighboring halos {kpc physical}
-    neig_indices : array : indices of neighboring halos
-    '''
-    Say = ut.io.SayClass(get_neighbors)
-
-    Neighbor = ut.neighbor.NeighborClass()
-
-    if scale_to_halo_radius:
-        distance_max *= hal['radius'][hal_index]
-        Say.say('halo radius = {:.3f} kpc'.format(hal['radius'][hal_index]))
-
-    mass_min = neig_mass_frac_min * hal['total.mass'][hal_index]
-    his_m = ut.array.get_indices(hal['total.mass'], [mass_min, Inf])
-
-    neig_distances, neig_indices = Neighbor.get_neighbors(
-        hal['position'][[hal_index]], hal['position'][his_m], 2000, [1e-6, distance_max],
-        hal.info['box.length'], hal.snapshot['scalefactor'], neig_ids=his_m)
-
-    neig_distances = neig_distances[0]
-    neig_indices = neig_indices[0]
-
-    if scale_to_halo_radius:
-        neig_distances /= hal['radius'][hal_index]
-
-    if neig_distances.size:
-        nearest_nii = np.argmin(neig_distances)
-        nearest_distance = neig_distances[nearest_nii]
-        nearest_mass = hal['total.mass'][neig_indices[nearest_nii]]
-    else:
-        nearest_distance = Inf
-        nearest_mass = 0
-
-    Say.say('nearest neighbor: distance = {:.3f}, mass = {:.2e}'.format(
-            nearest_distance, nearest_mass))
-
-    return neig_distances, neig_indices
-
-
-def print_contamination_v_distance(
-    part, hal, hal_index, distance_max=7, distance_bin_width=0.5, scale_to_halo_radius=True):
-    '''
-    Print information on contamination from lower-resolution particles around halo as a function of
-    distance.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    hal : dict : catalog of halos at snapshot
-    hal_index: int : index of halo
-    distance_max : float : maximum distance from halo center to check
-    distance_bin_width : float : width of distance bin for printing
-    scale_to_halo_radius : boolean : whether to scale distances by virial radius
-    '''
-    from . import gizmo_analysis
-
-    distance_scaling = 'linear'
-    distance_limits = [0, distance_max]
-    axis_y_scaling = 'log'
-
-    Say = ut.io.SayClass(print_contamination_v_distance)
-
-    Say.say('halo radius = {:.3f} kpc'.format(hal['radius'][hal_index]))
-
-    halo_radius = hal['radius'][hal_index]
-
-    gizmo_analysis.plot_mass_contamination(
-        part, distance_limits, distance_bin_width, None, distance_scaling, halo_radius,
-        scale_to_halo_radius, hal['position'][hal_index], axis_y_scaling, write_plot=None)
-
-
 def print_contamination_in_box(
     part, center_position=None, distance_limits=None, distance_bin_number=20,
     distance_scaling='linear', geometry='cube'):
@@ -301,6 +85,84 @@ def print_contamination_in_box(
 
         if frac >= 1:
             break
+
+
+#===================================================================================================
+# read data
+#===================================================================================================
+class ReadClass():
+    '''
+    Read particles and halo catalog.
+    '''
+    def __init__(self, snapshot_redshifts=[0, 99], simulation_directory='.'):
+        '''
+        Read particles from final and initial snapshot and halos from final snapshot.
+
+        Parameters
+        ----------
+        snapshot_redshifts : list : redshifts of initial and final snapshots to read
+        simulation_directory : string : root directory of simulation
+        '''
+        # ensure lowest-redshift snapshot is first
+        self.snapshot_redshifts = np.sort(snapshot_redshifts)
+        self.simulation_directory = simulation_directory
+
+    def read_all(self, mass_limits=[1e11, Inf]):
+        '''
+        Read particles from final and initial snapshot and halos from final snapshot.
+
+        Returns
+        -------
+        parts : list : catalogs of particles at initial and final snapshots
+        hal : list : catalog of halos at final snapshot
+        '''
+        from rockstar import rockstar_io
+
+        parts = self.read_particles()
+        hal = self.read_halos(mass_limits)
+
+        rockstar_io.assign_lowres_mass(hal, parts[0], mass_limits)
+
+        return parts, hal
+
+    def read_particles(self):
+        '''
+        Read particles from final and initial snapshots.
+
+        Returns
+        -------
+        parts : list : catalogs of particles at initial and final snapshots
+        '''
+        parts = []
+
+        for snapshot_redshift in self.snapshot_redshifts:
+            part = gizmo_io.Read.read_snapshot(
+                'all', 'redshift', snapshot_redshift, self.simulation_directory,
+                property_names=['position', 'mass', 'id'], assign_center=False,
+                sort_dark_by_id=True, force_float32=False)
+            parts.append(part)
+
+        return parts
+
+    def read_halos(self, mass_limits=[1e11, Inf]):
+        '''
+        Read halos from final snapshot.
+
+        Returns
+        -------
+        hal : list : catalog of halos at final snapshot
+        '''
+        from rockstar import rockstar_io
+
+        hal = rockstar_io.Read.read_catalog(
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=True,
+            sort_host_first=False)
+
+        rockstar_io.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
+
+        return hal
+
+Read = ReadClass()
 
 
 #===================================================================================================
@@ -473,7 +335,7 @@ def generate_initial_condition_points(
 
     Parameters
     ----------
-    snapshot_indices : list : indices of final and initial snapshots
+    snapshot_redshifts : list : indices of final and initial snapshots
     simulation_directory : string : directory of simulation
     distance_max : float : distance from center to select particles at final time
         {kpc physical, or in units of R_halo}

@@ -712,20 +712,20 @@ def plot_mass_contamination(
 
 
 def plot_metal_v_distance(
-    part, spec_name='gas',
-    plot_kind='metallicity', axis_y_scaling='log',
+    parts, spec_name='gas',
+    metal_kind='massfraction.metals', axis_y_scaling='log', axis_y_limits=[None, None],
     distance_limits=[10, 3000], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log',
-    halo_radius=None, scale_to_halo_radius=False, center_position=None,
+    halo_radius=None, scale_to_halo_radius=False, center_positions=None,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot metallicity (in bin or cumulative) of gas or stars v distance from galaxy.
 
     Parameters
     ----------
-    part : dict : catalog of particles at snapshot
+    part : dict or list : catalog[s] of particles at snapshot
     spec_name : string : particle species
-    plot_kind : string : 'metallicity' or 'metals.mass.cum'
+    metal_kind : string : 'massfraction.X' or 'mass.X'
     axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
@@ -733,14 +733,17 @@ def plot_metal_v_distance(
     distance_scaling : string : scaling of distance: 'log', 'linear'
     halo_radius : float : radius of halo {kpc physical}
     scale_to_halo_radius : boolean : whether to scale distance to halo_radius
-    center_position : array : position of galaxy center {kpc comoving}
+    center_positions : array : position[s] of galaxy center[s] {kpc comoving}
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     virial_kind = '200m'
 
-    center_position = ut.particle.parse_property(part, 'position', center_position)
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
 
     distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
@@ -749,40 +752,58 @@ def plot_metal_v_distance(
     DistanceBin = ut.binning.DistanceBinClass(
         distance_scaling, distance_limits_use, distance_bin_width, distance_bin_number)
 
-    distances = ut.coordinate.get_distances(
-        'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
-    distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
+    metal_values = []
+    for part_i, part in enumerate(parts):
+        distances = ut.coordinate.get_distances(
+            'scalar', part[spec_name]['position'], center_positions[part_i],
+            part.info['box.length'])
+        distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
 
-    metal_masses = part[spec_name].prop('metallicity.metals') * part[spec_name]['mass']
+        metal_mass_kind = metal_kind.replace('massfraction.', 'mass.')
+        metal_masses = part[spec_name].prop(metal_mass_kind)
 
-    pro_metal = DistanceBin.get_sum_profile(distances, metal_masses, get_fraction=True)
-    if 'metallicity' in plot_kind:
-        pro_mass = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
-        ys = pro_metal['sum'] / pro_mass['sum']
-        axis_y_limits = np.clip(ut.plot.get_axis_limits(ys), 0.0001, 10)
-    elif 'metals.mass.cum' in plot_kind:
-        ys = pro_metal['fraction.cum']
-        axis_y_limits = [0.001, 1]
+        pro_metal = DistanceBin.get_sum_profile(distances, metal_masses, get_fraction=True)
+
+        if 'massfraction' in metal_kind:
+            pro_mass = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
+            if '.cum' in metal_kind:
+                metal_values.append(pro_metal['sum.cum'] / pro_mass['sum.cum'])
+            else:
+                metal_values.append(pro_metal['sum'] / pro_mass['sum'])
+        elif 'mass' in metal_kind:
+            if '.cum' in metal_kind:
+                metal_values.append(pro_metal['sum.cum'])
+            else:
+                metal_values.append(pro_metal['sum'])
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14)
 
     ut.plot.set_axes_scaling_limits(
-        subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits)
+        subplot, distance_scaling, distance_limits, None,
+        axis_y_scaling, axis_y_limits, metal_values)
 
-    if 'metallicity' in plot_kind:
-        subplot.set_ylabel('$Z \, / \, Z_\odot$', fontsize=30)
-    elif 'metals.mass.cum' in plot_kind:
-        subplot.set_ylabel('$M_{\\rm Z}(< r) \, / \, M_{\\rm Z,tot}$', fontsize=30)
+    metal_mass_label = 'M_{{\\rm Z,{}}}'.format(spec_name)
+    radius_label = '(r)'
+    if '.cum' in metal_kind:
+        radius_label = '(< r)'
+    if 'massfraction' in metal_kind:
+        axis_y_label = '${}{} \, / \, M_{{\\rm {}}}{}$'.format(
+            metal_mass_label, radius_label, spec_name, radius_label)
+    elif 'mass' in metal_kind:
+        # axis_y_label = '${}(< r) \, / \, M_{{\\rm Z,tot}}$'.format(metal_mass_label)
+        axis_y_label = '${}{} \, [M_\odot]$'.format(metal_mass_label, radius_label)
+    #axis_y_label = '$Z \, / \, Z_\odot$'
+    subplot.set_ylabel(axis_y_label, fontsize=30)
 
     if scale_to_halo_radius:
         axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
     else:
-        #axis_x_label = 'distance $[\\rm kpc\,physical]$'
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
     subplot.set_xlabel(axis_x_label, fontsize=26)
 
-    # colors = ut.plot.get_colors(len(species_test), use_black=False)
+    colors = ut.plot.get_colors(len(parts), use_black=False)
+
     xs = DistanceBin.mids
     if halo_radius and scale_to_halo_radius:
         xs /= halo_radius
@@ -794,15 +815,20 @@ def plot_metal_v_distance(
             x_ref = halo_radius
         subplot.plot([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-    subplot.plot(xs, ys, color='blue', alpha=0.6)
+    for part_i, part in enumerate(parts):
+        subplot.plot(
+            xs, metal_values[part_i], color=colors[part_i], alpha=0.8,
+            label=part.info['simulation.name'])
 
-    # legend = subplot.legend(loc='best', prop=FontProperties(size=12))
-    # legend.get_frame().set_alpha(0.7)
+    if len(parts):
+        legend = subplot.legend(loc='best', prop=FontProperties(size=16))
+        legend.get_frame().set_alpha(0.7)
 
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
         distance_name += '.' + virial_kind
-    plot_name = plot_kind + '_v_' + distance_name + '_z.{:.2f}'.format(part.info['redshift'])
+    plot_name = '{}.{}_v_{}_z.{:.2f}'.format(spec_name, metal_kind, distance_name,
+                                             part.info['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -3049,6 +3075,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         property_names : string or list : names of properties to read
         force_float32 : boolean : whether to force positions to be 32-bit
         '''
+        if isinstance(parts, dict):
+            parts = [parts]
+
         if np.isscalar(redshifts):
             redshifts = [redshifts]
 
@@ -3163,7 +3192,7 @@ CompareSimulations = CompareSimulationsClass()
 
 def compare_resolution(
     parts=None, simulation_names=[],
-    redshifts=0, distance_limits=[0.01, 20], distance_bin_width=0.1):
+    redshifts=[0], distance_limits=[0.01, 20], distance_bin_width=0.1):
     '''
     .
     '''
@@ -3179,6 +3208,9 @@ def compare_resolution(
             ['m12i_ref13_dm_res-adapt', 'm12i r13 dm res-adapt'],
             #['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
         ]
+
+    if np.isscalar(redshifts):
+        redshifts = [redshifts]
 
     if parts is None:
         parts = []
