@@ -19,7 +19,7 @@ import utilities as ut
 
 def sync_snapshots(
     machine_name='stampede', from_directory='$STAMPEDE_SCRATCH/m12i_ref13/output',
-    snapshot_kind='file', snapshot_indices=400, to_directory='.'):
+    snapshot_kind='file', snapshot_indices=600, to_directory='.'):
     '''
     Transfer snapshot file[s] or directory[s] from remote machine to local.
 
