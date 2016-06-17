@@ -80,7 +80,7 @@ def print_run_times(
     scale_factors=[
         0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
         0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
-    print_lines=False, get_values=False):
+    wall_time_restart=0, print_lines=False, get_values=False):
     '''
     Print wall [and CPU] times (average per MPI task) at input scale-factors from cpu.txt for
     Gizmo simulation.
@@ -91,6 +91,7 @@ def print_run_times(
     output_directory : string : directory of output files within simulation directory
     runtime_file_name : string : name of run-time file name (set in submission script)
     scale_factors : array-like : list of scale-factors at which to print run times
+    wall_time_restart : float : wall time [sec] of previous run (if restarted from a snapshot)
     print_lines : boolean : whether to print lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale-factors, redshifts, run times
 
@@ -133,7 +134,15 @@ def print_run_times(
             else:
                 a_i = scale_factors[t_i]
 
-    wall_times = np.array(wall_times) / 3600  # convert to {hr}
+    wall_times = np.array(wall_times)
+
+    if wall_time_restart:
+        for i in range(1, len(wall_times)):
+            if wall_times[i] < wall_times[i - 1]:
+                break
+        wall_times[i:] += wall_time_restart
+
+    wall_times /= 3600  # convert to {hr}
 
     # get cpu number from run-time file
     mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)

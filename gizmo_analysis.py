@@ -2527,7 +2527,7 @@ def plot_density_profile_halo(
     hal=None, hal_index=None, center_position=None,
     species='star',
     distance_limits=[0.1, 2], distance_bin_width=0.1, distance_bin_number=None,
-    plot_only_members=False,
+    #plot_only_members=False,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot density profile for single halo/center.
