@@ -122,10 +122,18 @@ class ParticleDictionaryClass(dict):
                 return self.Cosmology.convert_time('scalefactor', 'time',
                                                    self.prop('form.time', indices))
 
-        if property_name in ['number.density', 'density.number']:
-            # number density of hydrogen {cm ^ -3}
-            return (self.prop('density', indices) * self.prop('massfraction.hydrogen', indices) *
-                    ut.const.proton_per_sun * ut.const.kpc_per_cm ** 3)
+        if 'number.density' in property_name or 'density.number' in property_name:
+            values = (self.prop('density', indices) * ut.const.proton_per_sun *
+                      ut.const.kpc_per_cm ** 3)
+
+            if '.hydrogen' in property_name:
+                # number density of hydrogen, using actual hydrogen mass of particle {cm ^ -3}
+                values *= self.prop('massfraction.hydrogen', indices)
+            else:
+                # number density of 'hydrogen', assuming solar metallicity of particle {cm ^ -3}
+                values *= ut.const.sun_hydrogen_mass_fraction
+
+            return values
 
         if 'mass.' in property_name:
             # mass of individual element

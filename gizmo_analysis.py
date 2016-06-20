@@ -1207,7 +1207,8 @@ def plot_property_distribution(
     prop_bin_width : float : width of property bin (use this or prop_bin_number)
     prop_bin_number : int : number of property bins within limits (use this or prop_bin_width)
     prop_scaling : string : scaling of property: 'log', 'linear'
-    prop_statistic : string : statistic to plot: 'probability', 'histogram'
+    prop_statistic : string : statistic to plot:
+        'probability', 'probability.cum', 'histogram', 'histogram.cum'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
     center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
@@ -2527,7 +2528,6 @@ def plot_density_profile_halo(
     hal=None, hal_index=None, center_position=None,
     species='star',
     distance_limits=[0.1, 2], distance_bin_width=0.1, distance_bin_number=None,
-    #plot_only_members=False,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot density profile for single halo/center.
@@ -2981,31 +2981,19 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         self.simulation_names = [
             # original FIRE
-            ['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE'],
+            ['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 fire1'],
 
             # symmetric
-            ['fb-sym/m12i_ref12', 'm12i r12 sym'],
-            ['fb-sym/m12i_ref13', 'm12i r13 sym'],
+            ['m12i/m12i_ref12', 'm12i r12'],
+            ['fb-sym/m12i_ref13', 'm12i r13'],
 
             # different halos
-            ['m12i/fb-sym/m12i_ref12', 'm12i r12'],
-            ['m12b/m12b_ref12_fb-sym', 'm12b r12'],
-            ['m12m/m12m_ref12_fb-sym', 'm12m r12'],
-            ['m12c/m12c_ref12_fb-sym', 'm12c r12'],
-            ['m12f/m12f_ref12_fb-sym', 'm12f r12'],
-            ['m12q/m12q_ref12_fb-sym', 'm12q r12'],
-
-            # adaptive resolution
-            #['fb-sym/m12i_ref12_res-adapt', 'r12 sym res-adapt'],
-            #['fb-iso/m12i_ref13_res-adapt', 'r13 sym res-adapt'],
-
-            # isotropic
-            ['fb-iso/m12i_ref11', 'r11 iso'],
-            ['fb-iso/m12i_ref12', 'r12 iso'],
-            ['fb-iso/m12i_ref13', 'r13 iso'],
-
-            ['fb-iso/m12i_ref12_sfn100', 'r12 iso n100'],
-            ['fb-iso/m12i_ref13_sfn100', 'r13 iso n100'],
+            ['m12i/m12i_ref12', 'm12i r12'],
+            ['m12b/m12b_ref12', 'm12b r12'],
+            ['m12m/m12m_ref12', 'm12m r12'],
+            ['m12c/m12c_ref12', 'm12c r12'],
+            ['m12f/m12f_ref12', 'm12f r12'],
+            ['m12q/m12q_ref12', 'm12q r12'],
 
         ]
 

@@ -91,7 +91,7 @@ def print_run_times(
     output_directory : string : directory of output files within simulation directory
     runtime_file_name : string : name of run-time file name (set in submission script)
     scale_factors : array-like : list of scale-factors at which to print run times
-    wall_time_restart : float : wall time [sec] of previous run (if restarted from a snapshot)
+    wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
     print_lines : boolean : whether to print lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale-factors, redshifts, run times
 
@@ -174,9 +174,10 @@ def print_run_times(
 
 
 def print_run_time_ratios(
-    simulation_directories='.', output_directory='output/', runtime_file_name='gizmo.out',
+    simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out',
     scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
+                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
+    wall_times_restart=[0]):
     '''
     Print ratios of wall times and CPU times (average per MPI taks) for input simulation directories
     at input scale-factors from cpu.txt for Gizmo run.
@@ -188,6 +189,7 @@ def print_run_time_ratios(
     output_directory : string : directory of output files within simulation directory
     runtime_file_name : string : name of run-time file name (set in submission script)
     scale_factors : array-like : list of scale-factors at which to print run times
+    wall_times_restart : float or list : wall time[s] [sec] of previous run[s] (snapshot restart)
     '''
     wall_timess = []
     cpu_timess = []
@@ -197,7 +199,8 @@ def print_run_time_ratios(
 
     for d_i, directory in enumerate(simulation_directories):
         scale_factors, redshifts, wall_times, cpu_times = print_run_times(
-            directory, output_directory, runtime_file_name, scale_factors, get_values=True)
+            directory, output_directory, runtime_file_name, scale_factors, wall_times_restart[d_i],
+            get_values=True)
         wall_timess.append(wall_times)
         cpu_timess.append(cpu_times)
 
@@ -528,7 +531,11 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        print_run_times(directory)
+        wall_time_restart = 0
+        if len(sys.argv) > 3:
+            wall_time_restart = float(sys.argv[3])
+
+        print_run_times(directory, wall_time_restart=wall_time_restart)
 
     elif 'extreme' in function_kind:
         if len(sys.argv) > 2:
@@ -542,7 +549,7 @@ if __name__ == '__main__':
 
         snapshot_redshift = 0
         if len(sys.argv) > 3:
-            snapshot_redshift = float(sys.argv[2])
+            snapshot_redshift = float(sys.argv[3])
 
         plot_halo_contamination(directory, snapshot_redshift)
 
