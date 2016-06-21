@@ -964,7 +964,7 @@ def plot_image(
     plt.register_cmap(cmap=BBW)
 
     if background_color == 'black':
-        if 'dark' in spec_name:
+        if 'dark' in spec_name or 'gas' in spec_name:
             color_map = plt.get_cmap('bbw')
         elif spec_name == 'star':
             color_map = plt.get_cmap('byw')
@@ -1308,7 +1308,7 @@ def plot_property_v_property(
     x_prop_name='density', x_prop_limits=[], x_prop_scaling='log',
     y_prop_name='temperature', y_prop_limits=[], y_prop_scaling='log',
     prop_bin_number=300, weight_by_mass=True, cut_percent=0,
-    host_distance_limitss=[20, 300], center_position=None,
+    host_distance_limits=[0, 300], center_position=None,
     other_prop_limits={}, part_indices=None,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -1326,7 +1326,7 @@ def plot_property_v_property(
     y_prop_scaling : string : 'log', 'linear'
     prop_bin_number : int : number of bins for histogram along each axis
     weight_by_mass : boolean : whether to weight property by particle mass
-    host_distance_limitss : list : min and max limits for distance from galaxy
+    host_distance_limits : list : min and max limits for distance from galaxy
     center_position : array : position of galaxy center
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indices : array : indices of particles from which to select
@@ -1343,11 +1343,11 @@ def plot_property_v_property(
         part_indices = ut.catalog.get_indices_catalog(
             part[spec_name], other_prop_limits, part_indices)
 
-    if len(center_position) and len(host_distance_limitss):
+    if len(center_position) and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scalefactor']
-        part_indices = part_indices[ut.array.get_indices(distances, host_distance_limitss)]
+        part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
 
     x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
     y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
@@ -1422,10 +1422,10 @@ def plot_property_v_property(
         label=label,
     )
     """
-    plt.colorbar()
+    #plt.colorbar()
 
-    if host_distance_limitss is not None and len(host_distance_limitss):
-        label = ut.plot.get_label_distance('host.distance', host_distance_limitss)
+    if host_distance_limits is not None and len(host_distance_limits):
+        label = ut.plot.get_label_distance('host.distance', host_distance_limits)
 
         # distance legend
         legend = subplot.legend(
@@ -1435,8 +1435,8 @@ def plot_property_v_property(
 
     plot_name = (spec_name + '.' + y_prop_name + '_v_' + x_prop_name + '_z.{:.2f}'.format(
                  part.info['redshift']))
-    if host_distance_limitss is not None and len(host_distance_limitss):
-        plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limitss[0], host_distance_limitss[1])
+    if host_distance_limits is not None and len(host_distance_limits):
+        plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limits[0], host_distance_limits[1])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 

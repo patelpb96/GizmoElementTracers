@@ -127,10 +127,10 @@ class ParticleDictionaryClass(dict):
                       ut.const.kpc_per_cm ** 3)
 
             if '.hydrogen' in property_name:
-                # number density of hydrogen, using actual hydrogen mass of particle {cm ^ -3}
+                # number density of hydrogen, using actual hydrogen mass of each particle {cm ^ -3}
                 values *= self.prop('massfraction.hydrogen', indices)
             else:
-                # number density of 'hydrogen', assuming solar metallicity of particle {cm ^ -3}
+                # number density of 'hydrogen', assuming solar metallicity for particles {cm ^ -3}
                 values *= ut.const.sun_hydrogen_mass_fraction
 
             return values

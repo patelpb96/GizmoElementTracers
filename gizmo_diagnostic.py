@@ -196,6 +196,10 @@ def print_run_time_ratios(
 
     if np.isscalar(simulation_directories):
         simulation_directories = [simulation_directories]
+    if np.isscalar(wall_times_restart):
+        wall_times_restart = [wall_times_restart]
+        if len(wall_times_restart) != len(simulation_directories):
+            wall_times_restart = np.zeros(len(simulation_directories))
 
     for d_i, directory in enumerate(simulation_directories):
         scale_factors, redshifts, wall_times, cpu_times = print_run_times(
