@@ -109,6 +109,8 @@ def print_run_times(
                       file_name)
     file_in = open(file_path_name, 'r')
 
+    if np.isscalar(scale_factors):
+        scale_factors = [scale_factors]
     scale_factors = np.array(scale_factors)
     wall_times = []
 

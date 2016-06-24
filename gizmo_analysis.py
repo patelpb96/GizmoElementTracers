@@ -955,7 +955,6 @@ def plot_image(
 
         hal_radiuss = hal_radiuss[masks]
         hal_positions = hal_positions[masks]
-        hal_positions = hal_positions
 
     # plot ----------
     BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
@@ -3136,8 +3135,11 @@ class CompareSimulationsClass(ut.io.SayClass):
         self, parts=None,
         distance_max=15, distance_bin_width=0.05, image_limits=[10 ** 7, 10 ** 10],
         align_principal_axes=True, simulation_names=None,
-        redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.45, 0.4, 0.35, 0.3,
-                   0.25, 0.2, 0.18, 0.16, 0.14, 0.12, 0.1, 0.08, 0.06, 0.04, 0.03, 0.02, 0.01, 0],
+        redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
+                   0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
+                   0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
+                   0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
+                   0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
         species=['star', 'gas'], property_names=['mass', 'position'], force_float32=True):
         '''
         Plot images of simulations at each snapshot.
