@@ -2979,10 +2979,10 @@ class CompareSimulationsClass(ut.io.SayClass):
         Set directories and names of simulations to read.
         '''
         self.simulation_names = [
-            # original FIRE
-            ['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 fire1'],
+            # FIRE-1
+            ['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE1'],
 
-            # symmetric
+            # FIRE-2
             ['m12i/m12i_ref12', 'm12i r12'],
             ['fb-sym/m12i_ref13', 'm12i r13'],
 
@@ -3077,21 +3077,23 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts = self.read_simulations(
                     simulation_names, redshift, species, property_names, force_float32)
 
-            plot_property_v_distance(
-                parts, 'total', 'mass', 'vel.circ', 'linear', False, [0, None],
-                [0.1, 300], distance_bin_width, write_plot=True)
+            if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
+                plot_property_v_distance(
+                    parts, 'total', 'mass', 'vel.circ', 'linear', False, [0, None],
+                    [0.1, 300], distance_bin_width, write_plot=True)
 
-            plot_property_v_distance(
-                parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
-                [1, 300], distance_bin_width, write_plot=True)
+                plot_property_v_distance(
+                    parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
+                    [1, 300], distance_bin_width, write_plot=True)
 
-            plot_property_v_distance(
-                parts, 'dark', 'mass', 'sum.cum', 'log', False, [None, None],
-                [1, 300], distance_bin_width, write_plot=True)
+            if 'dark' in parts[0]:
+                plot_property_v_distance(
+                    parts, 'dark', 'mass', 'sum.cum', 'log', False, [None, None],
+                    [1, 300], distance_bin_width, write_plot=True)
 
-            plot_property_v_distance(
-                parts, 'dark', 'mass', 'density', 'log', False, [None, None],
-                [0.1, 30], distance_bin_width, write_plot=True)
+                plot_property_v_distance(
+                    parts, 'dark', 'mass', 'density', 'log', False, [None, None],
+                    [0.1, 30], distance_bin_width, write_plot=True)
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
@@ -3102,6 +3104,11 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'gas', 'mass', 'sum.cum', 'log', False, [None, None],
                     [1, 300], distance_bin_width, write_plot=True)
 
+                if 'velocity' in property_names:
+                    plot_property_v_distance(
+                        parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
+                        [1, 300], 0.25, write_plot=True)
+
             if 'star' in parts[0]:
                 plot_property_v_distance(
                     parts, 'star', 'mass', 'sum.cum', 'log', False, [None, None],
@@ -3111,23 +3118,18 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'star', 'mass', 'density', 'log', False, [None, None],
                     [0.1, 30], distance_bin_width, write_plot=True)
 
-            if 'velocity' in property_names:
-                plot_property_v_distance(
-                    parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
-                    [1, 300], 0.25, write_plot=True)
+                if 'form.time' in property_names and redshift <= 5:
+                    plot_star_form_history(
+                        parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
+                        distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
 
-            if 'form.time' in property_names and redshift <= 4:
-                plot_star_form_history(
-                    parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
-                    distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+                    plot_star_form_history(
+                        parts, 'form.rate', 'time.lookback', [0, 13], 0.5, 'linear',
+                        distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
 
-                plot_star_form_history(
-                    parts, 'form.rate', 'time.lookback', [0, 13], 0.5, 'linear',
-                    distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
-
-                plot_star_form_history(
-                    parts, 'form.rate.specific', 'time.lookback', [0, 13], 0.5, 'linear',
-                    distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+                    plot_star_form_history(
+                        parts, 'form.rate.specific', 'time.lookback', [0, 13], 0.5, 'linear',
+                        distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
 
             self.plot_images(parts, redshifts=redshift)
 
