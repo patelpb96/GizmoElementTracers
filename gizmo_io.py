@@ -458,7 +458,7 @@ class ReadClass(ut.io.SayClass):
                 self.omega_baryon, self.sigma_8, self.n_s, self.w)
 
         ## initialize arrays to store each property for each species ##
-        part_numbers_in_file = header_in.attrs['NumPart_ThisFile']
+        part_numbers_in_file = header_in['NumPart_ThisFile']
 
         for spec_name in species_names:
             spec_id = self.species_dict[spec_name]
