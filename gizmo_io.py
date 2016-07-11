@@ -458,9 +458,10 @@ class ReadClass(ut.io.SayClass):
                 self.omega_baryon, self.sigma_8, self.n_s, self.w)
 
         ## initialize arrays to store each property for each species ##
+        part_numbers_in_file = header_in.attrs['NumPart_ThisFile']
+
         for spec_name in species_names:
             spec_id = self.species_dict[spec_name]
-            part_in = file_in['PartType' + str(spec_id)]
             part_number_tot = header['particle.numbers.total'][spec_id]
 
             # add species to particle dictionary
@@ -472,6 +473,29 @@ class ReadClass(ut.io.SayClass):
                     element_indices = [element_indices]
                 for element_i, element_index in enumerate(element_indices):
                     part[spec_name].element_pointer[element_index] = element_i
+
+            # check if snapshot file happens not to have particles of this species
+            if part_numbers_in_file[spec_id] <= 0:
+                # this scenario should occur only for multi-file snapshot
+                if header['file.number.per.snapshot'] == 1:
+                    raise ValueError(
+                        '! no {} particles in snapshot file, which is only file'.format(spec_name))
+                # need to read in other snapshot files until find one with particles of species
+                for file_i in range(1, header['file.number.per.snapshot']):
+                    file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+                    file_in_i = h5py.File(file_name_i, 'r')
+                    part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
+                    if part_numbers_in_file_i[spec_id] <= 0:
+                        # try next file
+                        file_in_i.close()
+                        continue
+                else:
+                    # tried all files and still did not find particles of species
+                    raise ValueError('! no {} particles in any snapshot files'.format(spec_name))
+                part_in = file_in_i['PartType' + str(spec_id)]
+                file_in_i.close()
+            else:
+                part_in = file_in['PartType' + str(spec_id)]
 
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
@@ -509,7 +533,7 @@ class ReadClass(ut.io.SayClass):
                 prop_name = property_dict['Masses']
                 part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
-        # initial particle indices[s] to assign to each species from each file
+        # initial particle indices to assign to each species from each file
         part_indices_lo = np.zeros(len(species_names), dtype=np.int64)
 
         ## start reading properties for each species ##
