@@ -488,7 +488,6 @@ class ReadClass(ut.io.SayClass):
                     if part_numbers_in_file_i[spec_id] > 0:
                         # found one!
                         part_in = file_in_i['PartType' + str(spec_id)]
-                        file_in_i.close()
                         break
                     file_in_i.close()
                 else:
@@ -527,6 +526,12 @@ class ReadClass(ut.io.SayClass):
                     else:
                         prop_name_print = prop_name_in
                     self.say('not reading: {:4} {}'.format(spec_name, prop_name_print))
+
+            # might have opened extra file if using multi-file snapshot
+            try:
+                file_in_i.close()
+            except:
+                pass
 
             # special case: particle mass is fixed and given in mass array in header
             if 'Masses' in property_names and 'Masses' not in part_in:
