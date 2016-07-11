@@ -529,8 +529,8 @@ class ReadClass(ut.io.SayClass):
 
             # read particle properties
             for spec_i, spec_name in enumerate(species_names):
+                spec_id = self.species_dict[spec_name]
                 if part_numbers_in_file[spec_id] > 0:
-                    spec_id = self.species_dict[spec_name]
                     part_in = file_in['PartType' + str(spec_id)]
 
                     part_index_lo = part_indices_lo[spec_i]
