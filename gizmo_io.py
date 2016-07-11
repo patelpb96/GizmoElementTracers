@@ -74,10 +74,8 @@ class ParticleDictionaryClass(dict):
                 raise ValueError(
                     'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
-            prop_values = self.prop(prop_names[0], indices)
-            if not np.isscalar(indices):
-                # make copy so not change values in input catalog
-                prop_values = np.array(prop_values)
+            # make copy so not change values in input catalog
+            prop_values = np.array(self.prop(prop_names[0], indices))
 
             for prop_name in prop_names[1:]:
                 if '/' in property_name:
@@ -88,18 +86,19 @@ class ParticleDictionaryClass(dict):
                             prop_values = prop_values / self.prop(prop_name, indices)
                     else:
                         masks = self.prop(prop_name, indices) != 0
-                        prop_values[masks] /= self.prop(prop_name, indices)[masks]
+                        prop_values[masks] = (prop_values[masks] /
+                                              self.prop(prop_name, indices)[masks])
                         masks = self.prop(prop_name, indices) == 0
                         prop_values[masks] = np.nan
                 if '*' in property_name:
-                    prop_values *= self.prop(prop_name, indices)
+                    prop_values = prop_values * self.prop(prop_name, indices)
                 if '+' in property_name:
-                    prop_values += self.prop(prop_name, indices)
+                    prop_values = prop_values + self.prop(prop_name, indices)
                 if '-' in property_name:
-                    prop_values -= self.prop(prop_name, indices)
+                    prop_values = prop_values / self.prop(prop_name, indices)
 
-            #if prop_values.size == 1:
-            #    prop_values = np.float(prop_values, dtype=prop_values.dtype)
+            if prop_values.size == 1:
+                prop_values = np.float(prop_values, dtype=prop_values.dtype)
 
             return prop_values
 
@@ -128,10 +127,10 @@ class ParticleDictionaryClass(dict):
 
             if '.hydrogen' in property_name:
                 # number density of hydrogen, using actual hydrogen mass of each particle {cm ^ -3}
-                values *= self.prop('massfraction.hydrogen', indices)
+                values = values * self.prop('massfraction.hydrogen', indices)
             else:
                 # number density of 'hydrogen', assuming solar metallicity for particles {cm ^ -3}
-                values *= ut.const.sun_hydrogen_mass_fraction
+                values = values * ut.const.sun_hydrogen_mass_fraction
 
             return values
 
@@ -180,6 +179,7 @@ class ParticleDictionaryClass(dict):
 
             return values
 
+        # problem if get this far without return
         raise ValueError(
             'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
@@ -467,7 +467,7 @@ class ReadClass(ut.io.SayClass):
             part[spec_name] = ParticleDictionaryClass()
 
             # set element pointers if reading only subset of elements
-            if element_indices is not None and element_indices != 'all':
+            if element_indices is not None and element_indices != [] and element_indices != 'all':
                 if np.isscalar(element_indices):
                     element_indices = [element_indices]
                 for element_i, element_index in enumerate(element_indices):
@@ -529,7 +529,7 @@ class ReadClass(ut.io.SayClass):
 
             # read particle properties
             for spec_i, spec_name in enumerate(species_names):
-                if part_numbers_in_file[spec_id]:
+                if part_numbers_in_file[spec_id] > 0:
                     spec_id = self.species_dict[spec_name]
                     part_in = file_in['PartType' + str(spec_id)]
 

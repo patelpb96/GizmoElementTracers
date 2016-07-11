@@ -837,11 +837,12 @@ def plot_metal_v_distance(
 #===================================================================================================
 def plot_image(
     part, spec_name='dark', dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
-    distance_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
+    distances_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
     weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
     align_principal_axes=False, use_column_units=None, image_limits=[None, None],
     background_color='white',
     hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
+    get_values=False,
     write_plot=False, plot_directory='.', add_image_limits=True, add_simulation_name=False,
     figure_index=1):
     '''
@@ -856,7 +857,7 @@ def plot_image(
         if length 2, plot one v other, if length 3, plot all via 3 panels
     dimen_indices_select : list : which dimensions to use to select particles
         note : use this to set selection 'depth' of an image
-    distance_max : float : distance from center to plot
+    distances_max : float or array : distance[s] from center to plot and/or cut
     distance_bin_width : float : length pixel
     distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
     center_position : array-like : position of center
@@ -872,6 +873,7 @@ def plot_image(
     hal_indices : array : indices of halos to plot
     hal_position_kind : string : name of position to use for center of halo
     hal_radius_kind : string : name of radius to use for size of halo
+    get_values : boolean : whether to return values
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     add_image_limits : boolean : add range of image to file name
@@ -885,7 +887,9 @@ def plot_image(
     if dimen_indices_select is None or not len(dimen_indices_select):
         dimen_indices_select = dimen_indices_plot
 
-    distance_max *= 1.0
+    if np.isscalar(distances_max):
+        distances_max = [distances_max for dimen_i in dimen_indices_select]
+    distances_max = np.array(distances_max, dtype=np.float64)
 
     if part_indices is None or not len(part_indices):
         part_indices = ut.array.arange_length(part[spec_name]['position'].shape[0])
@@ -910,10 +914,10 @@ def plot_image(
         positions -= center_position
         positions *= part.snapshot['scalefactor']
 
-        masks = (positions[:, dimen_indices_select[0]] <= distance_max)  # initialize masks
+        masks = (positions[:, dimen_indices_select[0]] <= distances_max[0])  # initialize masks
         for dimen_i in dimen_indices_select:
-            masks *= ((positions[:, dimen_i] <= distance_max) *
-                      (positions[:, dimen_i] >= -distance_max))
+            masks *= ((positions[:, dimen_i] <= distances_max[dimen_i]) *
+                      (positions[:, dimen_i] >= -distances_max[dimen_i]))
 
         positions = positions[masks]
         if weights is not None:
@@ -923,16 +927,16 @@ def plot_image(
             eigen_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
             positions = ut.coordinate.get_coordinates_rotated(positions, eigen_vectors)
     else:
-        distance_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
+        raise ValueError('need to input center position')
+        #distances_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
 
     if distance_bin_width is not None and distance_bin_width > 0:
-        position_bin_number = int(np.round(2 * distance_max / distance_bin_width))
+        position_bin_number = int(np.round(2 * np.max(distances_max[dimen_indices_plot]) /
+                                           distance_bin_width))
     elif distance_bin_number is not None and distance_bin_number > 0:
         position_bin_number = 2 * distance_bin_number
     else:
         raise ValueError('need to input either distance bin width or bin number')
-
-    position_limits = np.array([[-distance_max, distance_max], [-distance_max, distance_max]])
 
     if hal is not None:
         # compile halos
@@ -948,10 +952,10 @@ def plot_image(
         hal_positions *= hal.snapshot['scalefactor']
         hal_radiuss = hal[hal_radius_kind][hal_indices]
 
-        masks = (hal_positions[:, dimen_indices_select[0]] <= distance_max)  # initialize masks
+        masks = (hal_positions[:, dimen_indices_select[0]] <= distances_max[0])  # initialize masks
         for dimen_i in dimen_indices_select:
-            masks *= ((hal_positions[:, dimen_i] <= distance_max) *
-                      (hal_positions[:, dimen_i] >= -distance_max))
+            masks *= ((hal_positions[:, dimen_i] <= distances_max[dimen_i]) *
+                      (hal_positions[:, dimen_i] >= -distances_max[dimen_i]))
 
         hal_radiuss = hal_radiuss[masks]
         hal_positions = hal_positions[masks]
@@ -976,6 +980,11 @@ def plot_image(
             figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14,
             background_color=background_color)
 
+        position_limits = []
+        for dimen_i in dimen_indices_plot:
+            position_limits.append([-distances_max[dimen_i], distances_max[dimen_i]])
+        position_limits = np.array(position_limits)
+
         subplot.set_xlim(position_limits[0])
         subplot.set_ylim(position_limits[1])
 
@@ -983,7 +992,7 @@ def plot_image(
         subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
 
         # smooth image
-        histogramss, xs, ys = np.histogram2d(
+        histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             position_bin_number, position_limits,
             normed=False,
@@ -991,17 +1000,23 @@ def plot_image(
         )
 
         # convert to surface density
-        histogramss /= np.diff(xs)[0] * np.diff(ys)[0]
+        histogram_valuess /= np.diff(histogram_xs)[0] * np.diff(histogram_ys)[0]
 
         # convert to column density
         if use_column_units:
-            histogramss *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
+            histogram_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
+            grid_number = histogram_valuess.size
+            lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
+            dla_number = np.sum(histogram_valuess > 2e20)
+            Say.say('covering fraction: LLS = {:.4f}, DLA = {:.4f}'.format(
+                    lls_number / grid_number, dla_number / grid_number))
 
-        masks = (histogramss > 0)
+        masks = (histogram_valuess > 0)
         Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
-                histogramss[masks].min(), np.median(histogramss[masks]), histogramss[masks].max()))
+                histogram_valuess[masks].min(), np.median(histogram_valuess[masks]),
+                histogram_valuess[masks].max()))
 
-        image_limits_use = [histogramss[masks].min(), histogramss[masks].max()]
+        image_limits_use = [histogram_valuess[masks].min(), histogram_valuess[masks].max()]
         if image_limits is not None and len(image_limits):
             if image_limits[0] is not None:
                 image_limits_use[0] = image_limits[0]
@@ -1009,7 +1024,7 @@ def plot_image(
                 image_limits_use[1] = image_limits[1]
 
         _Image = subplot.imshow(
-            histogramss.transpose(),
+            histogram_valuess.transpose(),
             norm=colors.LogNorm(),
             cmap=color_map,
             aspect='auto',
@@ -1024,7 +1039,7 @@ def plot_image(
 
         # standard method
         """
-        _histogramss, _xs, _ys, _Image = subplot.hist2d(
+        histogram_valuess, histogram_xs, histogram_ys, _Image = subplot.hist2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             weights=weights, range=position_limits, bins=position_bin_number,
             norm=colors.LogNorm(),
@@ -1036,14 +1051,14 @@ def plot_image(
 
         # plot average of property
         """
-        histogramss, xs, ys = np.histogram2d(
+        histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
             positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
             position_bin_number, position_limits, weights=None,
             normed=False)
 
-        #histogramss = ut.math.Fraction.get_fraction(weight_grid, grid_number)
+        #histogram_valuess = ut.math.Fraction.get_fraction(weight_grid, grid_number)
         subplot.imshow(
-            histogramss.transpose(),
+            histogram_valuess.transpose(),
             #norm=colors.LogNorm(),
             cmap=plt.cm.YlOrBr,  # @UndefinedVariable
             aspect='auto',
@@ -1068,10 +1083,6 @@ def plot_image(
                 subplot.add_artist(circle)
 
     elif len(dimen_indices_plot) == 3:
-        #position_limits *= 0.999  # ensure that tick labels do not overlap
-        position_limits[0, 0] *= 0.99
-        position_limits[1, 0] *= 0.99
-
         fig, subplots = ut.plot.make_figure(
             figure_index, [2, 2], left=0.17, right=0.96, top=0.97, bottom=0.13,
             background_color=background_color)
@@ -1088,9 +1099,20 @@ def plot_image(
             [1, 1],
         ]
 
+        histogram_valuesss = []
         for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
             subplot_is = subplot_iss[plot_i]
             subplot = subplots[subplot_is[0], subplot_is[1]]
+
+            position_limits = []
+            for dimen_i in subplot_is:
+                position_limits.append([-distances_max[dimen_i], distances_max[dimen_i]])
+            position_limits = np.array(position_limits)
+
+            # ensure that tick labels do not overlap
+            #position_limits *= 0.999
+            position_limits[0, 0] *= 0.99
+            position_limits[1, 0] *= 0.99
 
             subplot.set_xlim(position_limits[0])
             subplot.set_ylim(position_limits[1])
@@ -1103,7 +1125,7 @@ def plot_image(
             elif subplot_is == [1, 1]:
                 subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
 
-            histogramss, xs, ys = np.histogram2d(
+            histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
                 positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]],
                 position_bin_number, position_limits,
                 normed=False,
@@ -1111,22 +1133,34 @@ def plot_image(
             )
 
             # convert to surface density
-            histogramss /= np.diff(xs)[0] * np.diff(ys)[0]
+            histogram_valuess /= np.diff(histogram_xs)[0] * np.diff(histogram_ys)[0]
 
-            masks = (histogramss > 0)
+            # convert to column density
+            if use_column_units:
+                histogram_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
+                grid_number = histogram_valuess.size
+                lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
+                dla_number = np.sum(histogram_valuess > 2e20)
+                Say.say('covering fraction: LLS = {:.4f}, DLA = {:.4f}'.format(
+                        lls_number / grid_number, dla_number / grid_number))
+
+            histogram_valuesss.append(histogram_valuess)
+
+            masks = (histogram_valuess > 0)
             Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
-                    histogramss[masks].min(), np.median(histogramss[masks]),
-                    histogramss[masks].max()))
+                    histogram_valuess[masks].min(), np.median(histogram_valuess[masks]),
+                    histogram_valuess[masks].max()))
 
-            image_limits_use = np.array([histogramss[masks].min(), histogramss[masks].max()])
+            image_limits_use = np.array([histogram_valuess[masks].min(),
+                                         histogram_valuess[masks].max()])
             if image_limits is not None and len(image_limits):
                 if image_limits[0] is not None:
                     image_limits_use[0] = image_limits[0]
                 if image_limits[1] is not None:
                     image_limits_use[1] = image_limits[1]
 
-            subplot.imshow(
-                histogramss.transpose(),
+            _Image = subplot.imshow(
+                histogram_valuess.transpose(),
                 norm=colors.LogNorm(),
                 cmap=plt.cm.YlOrBr,  # @UndefinedVariable
                 #aspect='auto',
@@ -1140,7 +1174,7 @@ def plot_image(
 
             # default method
             """
-            histogramss, _xs, _ys, _Image = subplot.hist2d(
+            histogram_valuess, histogram_xs, histogram_ys, _Image = subplot.hist2d(
                 positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
                 range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
                 cmap=plt.cm.YlOrBr)  # @UndefinedVariable
@@ -1160,6 +1194,8 @@ def plot_image(
 
             subplot.axis('equal')
 
+        histogram_valuess = np.array(histogram_valuesss)
+
     plot_name = spec_name
     if weight_prop_name:
         plot_name += '.{}'.format(weight_prop_name)
@@ -1167,7 +1203,7 @@ def plot_image(
 
     for dimen_i in dimen_indices_plot:
         plot_name += '.' + dimen_label[dimen_i]
-    plot_name += '_d.{:.0f}'.format(distance_max)
+    plot_name += '_d.{:.0f}'.format(np.max(distances_max[dimen_indices_plot]))
     plot_name += '_z.{:.2f}'.format(part.snapshot['redshift'])
 
     if add_image_limits:
@@ -1181,6 +1217,15 @@ def plot_image(
         plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
 
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
+
+    if get_values:
+        return histogram_valuess, histogram_xs, histogram_ys
+
+
+def write_image():
+    '''
+    .
+    '''
 
 
 #===================================================================================================
@@ -1268,9 +1313,11 @@ def plot_property_distribution(
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
+    ut.plot.set_axes_scaling_limits(
+        subplot, prop_scaling, prop_limits, prop_values)
     y_values = np.array([Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))])
     ut.plot.set_axes_scaling_limits(
-        subplot, prop_scaling, prop_limits, prop_values, axis_y_scaling, axis_y_limits, y_values)
+        subplot, None, None, None, axis_y_scaling, axis_y_limits, y_values)
 
     subplot.set_xlabel(ut.plot.get_label(prop_name, species=spec_name, get_units=True))
     subplot.set_ylabel(
@@ -1611,7 +1658,7 @@ def plot_property_v_distance(
 # properties of halos
 #===================================================================================================
 def assign_vel_circ_at_radius(
-    hal, part, radius=0.4, sort_prop_name='vel.circ.max', sort_prop_value_min=20,
+    part, hal, radius=0.6, sort_prop_name='vel.circ.max', sort_prop_value_min=20,
     halo_number_max=100, host_distance_limits=[1, 310]):
     '''
     .
@@ -1639,12 +1686,12 @@ def assign_vel_circ_at_radius(
 
 
 def plot_vel_circ_v_radius_halos(
-    parts=None, hals=None, hal_indicess=None, part_indicesss=None,
+    parts=None, hals=None, part_indicesss=None, hal_indicess=None,
+    pros=None,
     gal=None,
     total_mass_limits=None, star_mass_limits=[1e5, Inf], host_distance_limits=[1, 310],
     sort_prop_name='vel.circ.max', sort_prop_value_min=15, halo_number_max=20,
     vel_circ_limits=[0, 50], vel_circ_scaling='linear',
-    pros=None,
     radius_limits=[0.1, 3], radius_bin_width=0.1, radius_bin_number=None, radius_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -1672,7 +1719,7 @@ def plot_vel_circ_v_radius_halos(
             his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
 
             if 'star.indices' in hal:
-                his = ut.array.get_indices(hal['star.mass.part'], star_mass_limits, his)
+                his = ut.array.get_indices(hal['star.mass'], star_mass_limits, his)
             else:
                 his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_value_min, Inf], his)
                 his = his[np.argsort(hal[sort_prop_name][his])[::-1]]
@@ -1691,17 +1738,18 @@ def plot_vel_circ_v_radius_halos(
         gal_indices = gal_indices[gal['host.name'][gal_indices] == 'MW'.encode()]
 
     pros = plot_property_v_distance_halos(
-        parts, hals, hiss, part_indicesss,
+        parts, hals, part_indicesss, hiss,
+        pros,
         gal, gal_indices,
         'total', 'mass', 'vel.circ', vel_circ_scaling, False, vel_circ_limits,
         radius_limits, radius_bin_width, radius_bin_number, radius_scaling, 3,
-        pros,
         None, False,
         write_plot, plot_directory, figure_index)
 
     """
     plot_property_v_distance_halos(
-        parts, hals, hiss, part_indicesss
+        parts, hals, part_indicesss, hiss,
+        None,
         gal, gal_indices,
         'star', 'velocity.tot', 'std.cum', vel_circ_scaling, True, vel_circ_limits,
         radius_limits, radius_bin_width, radius_bin_number, radius_scaling, 3, None, False,
@@ -1712,14 +1760,14 @@ def plot_vel_circ_v_radius_halos(
 
 
 def plot_property_v_distance_halos(
-    parts=None, hals=None, hal_indicess=None, part_indicesss=None,
+    parts=None, hals=None, part_indicesss=None, hal_indicess=None,
+    pros=None,
     gal=None, gal_indices=None,
     species='total',
     prop_name='mass', prop_statistic='vel.circ', prop_scaling='linear', weight_by_mass=False,
     prop_limits=[],
     distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log', dimension_number=3,
-    pros=None,
     distance_reference=None, label_redshift=True,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -1775,15 +1823,17 @@ def plot_property_v_distance_halos(
                 part = parts[cat_i]
                 hal_indices = hal_indicess[cat_i]
 
-                if species == 'star' and 'star' in part:
+                if species == 'star' and hal['star.position'].max() > 0:
                     position_kind = 'star.position'
                     velocity_kind = 'star.velocity'
-                elif species == 'dark' and 'dark' in part:
+                elif species == 'dark' and hal['dark.position'].max() > 0:
                     position_kind = 'dark.position'
                     velocity_kind = 'dark.velocity'
                 else:
-                    position_kind = 'position'
-                    velocity_kind = 'velocity'
+                    #position_kind = 'position'
+                    #velocity_kind = 'velocity'
+                    position_kind = 'dark.position'
+                    velocity_kind = 'dark.velocity'
 
                 pros_cat = []
 
@@ -1792,8 +1842,8 @@ def plot_property_v_distance_halos(
                         part_indices = part_indicesss[cat_i][hal_i]
                     elif species == 'star' and 'star.indices' in hal:
                         part_indices = hal['star.indices'][hal_i]
-                    elif species == 'dark' and 'dark.indices' in hal:
-                        part_indices = hal['dark.indices'][hal_i]
+                    #elif species == 'dark' and 'dark.indices' in hal:
+                    #    part_indices = hal['dark.indices'][hal_i]
                     else:
                         part_indices = None
 
@@ -1850,7 +1900,7 @@ def plot_property_v_distance_halos(
         subplot.plot([distance_reference, distance_reference], prop_limits,
                      color='black', linestyle=':', alpha=0.6)
 
-    # draw simulation halos
+    # draw halos
     if hals is not None:
         colors = ut.plot.get_colors(len(hals))
         for cat_i, hal in enumerate(hals):
@@ -1859,7 +1909,7 @@ def plot_property_v_distance_halos(
                 color = colors[cat_i]
                 linewidth = 1.9
                 alpha = 0.5
-                if pros[cat_i][hal_ii][species][prop_statistic][0] > 12:  # dark vel.circ
+                if pros[cat_i][hal_ii][species][prop_statistic][0] > 12.5:  # dark vel.circ
                     color = ut.plot.get_color('blue.lite')
                     linewidth = 3.0
                     alpha = 0.8
@@ -1867,7 +1917,7 @@ def plot_property_v_distance_halos(
                     linewidth = 2.0
                     alpha = 0.6
                     color = ut.plot.get_color('orange.mid')
-                    if pros[cat_i][hal_ii][species][prop_statistic][0] > 27:
+                    if pros[cat_i][hal_ii][species][prop_statistic][-1] > 27:
                         color = ut.plot.get_color('orange.lite')
                         linewidth = 3.5
                         alpha = 0.9
@@ -2321,11 +2371,14 @@ def plot_star_form_history_galaxies(
                          label=label)
 
     # draw simulated galaxies
+    label = '$M_{{\\rm star}}=$'
+    subplot.plot(-1, -1, label=label)
     if hal is not None:
         for hal_ii, hal_i in enumerate(hal_indices):
             linewidth = 2.5 + 0.1 * hal_ii
             #linewidth = 3.0
-            label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
+            #label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
+            label = '${}\,M_\odot$'.format(
                 ut.io.get_string_for_exponential(sfh['mass'][hal_ii][-1], 0))
             subplot.plot(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                          linewidth=linewidth, color=colors[hal_ii], alpha=0.55, label=label)
@@ -2345,7 +2398,7 @@ def plot_star_form_history_galaxies(
     # property legend
     if label is not None:
         legend_prop = subplot.legend(
-            loc='best', prop=FontProperties(size=15), handlelength=1.3, labelspacing=0.1)
+            loc='best', prop=FontProperties(size=13.2), handlelength=0.8, labelspacing=0.0)
         legend_prop.get_frame().set_alpha(0.5)
         if legend_z:
             subplot.add_artist(legend_z)
@@ -2390,25 +2443,29 @@ def explore_galaxy(
     hi = hal_index
 
     if part is not None:
-        if not distance_max and 'star.radius.50' in hal:
-            distance_max = 4 * hal.prop('star.radius.50', hi)
+        if not distance_max and 'star.radius.90' in hal:
+            distance_max = 3 * hal.prop('star.radius.90', hi)
 
         if 'star' in species_plot and 'star' in part and 'star.indices' in hal:
+            part_indices = None
             if plot_only_members:
                 part_indices = hal.prop('star.indices', hi)
-            else:
-                part_indices = None
 
             plot_image(
                 part, 'star', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                 distance_bin_number, hal.prop('star.position', hi), 'mass',
                 part_indices=part_indices,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=1)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=10)
+
+            plot_image(
+                part, 'star', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                distance_bin_number, hal.prop('star.position', hi), 'mass',
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=11)
 
             plot_property_distribution(
                 part, 'star', 'velocity.tot', [0, None], 2, None, 'linear', 'histogram',
                 [], hal.prop('star.position', hi), hal.prop('star.velocity', hi), {}, part_indices,
-                [0, None], 'linear', write_plot, plot_directory, figure_index=2)
+                [0, None], 'linear', write_plot, plot_directory, figure_index=12)
 
             try:
                 element_name = 'metallicity.iron'
@@ -2419,21 +2476,23 @@ def explore_galaxy(
             plot_property_distribution(
                 part, 'star', element_name, [1e-4, 1], 0.1, None, 'log', 'histogram',
                 [], None, None, {}, part_indices,
-                [0, None], 'linear', write_plot, plot_directory, figure_index=3)
+                [0, None], 'linear', write_plot, plot_directory, figure_index=13)
 
             plot_property_v_distance(
                 part, 'star', 'mass', 'density', 'log', False, None,
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=4)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=14)
 
+            """
             plot_property_v_distance(
                 part, 'star', 'mass', 'sum.cum', 'log', False, None,
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=5)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=15)
+            """
 
             plot_property_v_distance(
                 part, 'star', 'velocity.tot', 'std.cum', 'linear', True, None,
@@ -2442,61 +2501,64 @@ def explore_galaxy(
                 center_velocities=hal.prop('star.velocity', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=6)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=16)
 
             plot_property_v_distance(
                 part, 'star', element_name, 'median', 'linear', True, None,
                 [0.1, distance_max], 0.2, None, 'log', 3,
                 center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=7)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=17)
 
             plot_star_form_history(
                 part, 'mass.normalized', 'time.lookback', [13.6, 0], 0.2, 'linear', [], None, {},
-                part_indices, [0, 1], 'linear', write_plot, plot_directory, figure_index=8)
+                part_indices, [0, 1], 'linear', write_plot, plot_directory, figure_index=18)
 
-        if 'dark' in species_plot and 'dark' in part and 'dark.indices' in hal:
-            if plot_only_members:
-                part_indices = hal.prop('dark.indices', hi)
-            else:
-                part_indices = None
+        if 'dark' in species_plot and 'dark' in part:  # and 'dark.indices' in hal:
+            part_indices = None
+            #if plot_only_members:
+            #    part_indices = hal.prop('dark.indices', hi)
 
+            center_position = hal.prop('position', hi)
+            #center_velocity = hal.prop('velocity', hi)
             if 'star.position' in hal:
                 center_position = hal.prop('star.position', hi)
-                center_velocity = hal.prop('star.velocity', hi)
-            elif 'star.position' in hal:
-                center_position = hal.prop('dark.position', hi)
-                center_velocity = hal.prop('dark.velocity', hi)
-            else:
-                center_position = hal.prop('position', hi)
-                center_velocity = hal.prop('velocity', hi)
+            #    center_velocity = hal.prop('star.velocity', hi)
 
             if 'star.radius.50' in hal:
                 distance_reference = hal.prop('star.radius.50', hi)
             else:
                 distance_reference = None
 
+            plot_image(
+                part, 'dark', [0, 1], [0, 1, 2], distance_max, distance_bin_width,
+                distance_bin_number, hal.prop('star.position', hi), 'mass',
+                background_color='black',
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=1)
+
             plot_property_v_distance(
                 part, 'dark', 'mass', 'density', 'log', False, None,
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=center_position, part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=10)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
 
+            """
             plot_property_v_distance(
                 part, 'dark', 'velocity.tot', 'std.cum', 'linear', True, None,
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=center_position, center_velocities=center_velocity,
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=11)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
+            """
 
             plot_property_v_distance(
                 part, 'dark', 'mass', 'vel.circ', 'linear', True, None,
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=center_position, part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=12)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=22)
 
         if 'gas' in species_plot and 'gas' in part and 'gas.indices' in hal:
             part_indices = None
@@ -2508,13 +2570,13 @@ def explore_galaxy(
                     part, 'gas', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                     distance_bin_number, hal.prop('star.position', hi), 'mass',
                     part_indices=part_indices,
-                    write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
+                    write_plot=write_plot, plot_directory=plot_directory, figure_index=30)
 
                 plot_image(
                     part, 'gas', [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                     distance_bin_number, hal.prop('star.position', hi), 'mass.neutral',
                     part_indices=part_indices,
-                    write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
+                    write_plot=write_plot, plot_directory=plot_directory, figure_index=31)
             else:
                 fig = plt.figure(10)
                 fig.clf()
