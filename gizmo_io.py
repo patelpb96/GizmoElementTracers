@@ -43,12 +43,17 @@ class ParticleDictionaryClass(dict):
     def prop(self, property_name='', indices=None):
         '''
         Get property, either from self dictionary or derive.
-        If several properties, need to provide mathematical relationship.
+        If several properties, need to provide mathematical relationship, for example:
+        'log temperature', 'temperature / density', 'abs position'
 
         Parameters
         ----------
         property_name : string : name of property
         indices : array : indices to select on
+
+        Returns
+        -------
+        values : float or array : convertes values as float (for scalar) or numpy array
         '''
         ## parsing general to all catalogs ##
         property_name = property_name.strip()  # strip white space
@@ -189,18 +194,16 @@ class ParticleDictionaryClass(dict):
 #===================================================================================================
 class ReadClass(ut.io.SayClass):
     '''
-    Read Read snapshot.
+    Read Gizmo snapshot.
     '''
-    def __init__(
-        self, snapshot_name_base='snap*', file_extension='.hdf5'):
+    def __init__(self, snapshot_name_base='snap*'):
         '''
         Set properties for snapshot file names.
 
         snapshot_name_base : string : name base of snapshot file/directory
-        file_extension : string : snapshot file extension
         '''
         self.snapshot_name_base = snapshot_name_base
-        self.file_extension = file_extension
+        self.file_extension = '.hdf5'
 
         self.eos = 5 / 3  # gas equation of state
 
