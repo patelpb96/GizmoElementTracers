@@ -270,11 +270,12 @@ class ReadClass(ut.io.SayClass):
         -------
         dictionary class, with keys for each particle species
         '''
-        ## parse input species list ##
-        # if input 'all' for species, read all species in snapshot
+        # parse input species list
         if species_names == 'all' or species_names == ['all'] or not species_names:
+            # read all species in snapshot
             species_names = list(self.species_dict.keys())
         else:
+            # read subsample of species in snapshot
             if np.isscalar(species_names):
                 species_names = [species_names]  # ensure is list
             # check if input species names are valid
@@ -284,7 +285,7 @@ class ReadClass(ut.io.SayClass):
                     self.say('! not recognize input species = {}'.format(spec_name))
         self.species_names = species_names
 
-        ## read information about snapshot times ##
+        # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
@@ -312,16 +313,16 @@ class ReadClass(ut.io.SayClass):
             part, header, Cosmology, particle_subsample_factor, separate_dark_lowres,
             sort_dark_by_id)
 
-        # assign auxilliary information
-        # store cosmology class
-        part.Cosmology = Cosmology
-        for spec_name in self.species_names:
-            part[spec_name].Cosmology = part.Cosmology
-
+        # assign auxilliary information to particle dictionary class
         # store header dictionary
         part.info = header
         for spec_name in self.species_names:
             part[spec_name].info = part.info
+
+        # store cosmology class
+        part.Cosmology = Cosmology
+        for spec_name in self.species_names:
+            part[spec_name].Cosmology = part.Cosmology
 
         # store information about snapshot time
         time = Cosmology.get_time_from_redshift(header['redshift'])
@@ -404,7 +405,8 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        dictionary class of snapshot information
+        Snapshot : dictionary class of snapshot information
+        snapshot_index : int : index number of snapshot file
         '''
         directory = ut.io.get_path(directory)
 
@@ -442,7 +444,19 @@ class ReadClass(ut.io.SayClass):
         self, snapshot_number_kind='index', snapshot_number=600, simulation_directory='.',
         snapshot_directory='output/', simulation_name=''):
         '''
-        .
+        Read header from snapshot file.
+
+        Parameters
+        ----------
+        snapshot_number_kind : string : input snapshot number kind: index, redshift
+        snapshot_number : int or float : index (number) of snapshot file
+        simulation_directory : root directory of simulation
+        snapshot_directory: string : directory of snapshot files within simulation_directory
+        simulation_name : string : name to store for future identification
+
+        Returns
+        -------
+        header : dict : header dictionary
         '''
         # convert name in snapshot's header dictionary to custom name preference
         header_dict = {
@@ -553,7 +567,24 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory='output/', property_names='all', element_indices=None,
         force_float32=False, header=None):
         '''
-        .
+        Read particles from snapshot file[s].
+
+        Parameters
+        ----------
+        snapshot_number_kind : string : input snapshot number kind: index, redshift
+        snapshot_number : int or float : index (number) of snapshot file
+        simulation_directory : root directory of simulation
+        snapshot_directory: string : directory of snapshot files within simulation_directory
+        property_names : string or list : name[s] of particle properties to read - options:
+            'all' = all species in file
+            otherwise, choose subset from among property_dict
+        element_indices : int or list : indices of elements to keep
+            note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
+        force_float32 : boolean : whether to force all floats to 32-bit, to save memory
+
+        Returns
+        -------
+        part : dict : particle dictionary class
         '''
         # convert name in snapshot's particle dictionary to custon name preference
         # if comment out any property, will not read it
@@ -783,7 +814,18 @@ class ReadClass(ut.io.SayClass):
         self, part, header, Cosmology,
         particle_subsample_factor=None, separate_dark_lowres=True, sort_dark_by_id=False):
         '''
-        .
+        Adjust properties for each species, including unit conversions, separating dark species by
+        mass, sorting by id, and subsampling.
+
+        Parameters
+        ----------
+        part : dict : particle dictionary class
+        header : dict : header dictionary
+        Cosmology : class : information on cosmology
+        particle_subsample_factor : int : factor to periodically subsample particles, to save memory
+        separate_dark_lowres : boolean :
+            whether to separate low-resolution dark matter into separate dicts according to mass
+        sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         '''
         # if dark.2 contains different masses (refinements), split into separate dicts
         spec_name = 'dark.2'
