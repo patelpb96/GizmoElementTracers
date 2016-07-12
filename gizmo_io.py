@@ -767,10 +767,10 @@ class ReadClass(ut.io.SayClass):
         # loop over all files at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
-            file_name = file_name.replace('.0.', '.{}.'.format(file_i))
-            file_in = h5py.File(file_name, 'r')
+            file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+            file_in = h5py.File(file_name_i, 'r')
 
-            self.say('reading properties from: ' + file_name.split('/')[-1])
+            self.say('reading properties from: ' + file_name_i.split('/')[-1])
 
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
@@ -937,9 +937,8 @@ class ReadClass(ut.io.SayClass):
             for spec_name in part:
                 if spec_name in spec_names:
                     for prop_name in part[spec_name]:
-                        part[spec_name][prop_name] = \
-                            part[spec_name][prop_name][::particle_subsample_factor]
-            print()
+                        part[spec_name][prop_name] = (
+                            part[spec_name][prop_name][::particle_subsample_factor])
 
     def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''
@@ -1024,15 +1023,10 @@ class ReadClass(ut.io.SayClass):
         header = file_in['Header'].attrs  # load header dictionary
 
         ## read and delete input species ##
-        # loop over all files at given snapshot
         for file_i in range(header['NumFilesPerSnapshot']):
-            if file_i == 0:
-                file_name_i = file_name
-            else:
-                # open i'th of multiple files for snapshot
-                file_in.close()
-                file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
-                file_in = h5py.File(file_name_i, 'r+')
+            # open i'th of multiple files for snapshot
+            file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+            file_in = h5py.File(file_name_i, 'r+')
 
             self.say('reading properties from: ' + file_name_i.split('/')[-1])
 
