@@ -1,5 +1,5 @@
 '''
-Read Read snapshot files.
+Read Gizmo snapshots.
 
 Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
 
@@ -38,6 +38,7 @@ class ParticleDictionaryClass(dict):
     element_dict['sulphur'] = 8
     element_dict['calcium'] = 9
     element_dict['iron'] = 10
+
     element_pointer = np.arange(len(element_dict))  # use if read only subset of elements
 
     def prop(self, property_name='', indices=None):
@@ -296,13 +297,12 @@ class ReadClass(ut.io.SayClass):
             simulation_directory, snapshot_number_kind, snapshot_number)
 
         # read header from snapshot file
-        header = self.read_header(
-            'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name)
+        header = self.read_header('index', snapshot_index, '.', snapshot_directory, simulation_name)
 
         # read particles from snapshot file[s]
         part = self.read_particles(
-            'index', snapshot_index, simulation_directory, snapshot_directory, property_names,
-            element_indices, force_float32, header)
+            'index', snapshot_index, '.', snapshot_directory, property_names, element_indices,
+            force_float32, header)
 
         # assign cosmological parameters
         if header['is.cosmological']:
@@ -856,8 +856,8 @@ class ReadClass(ut.io.SayClass):
                 del(spec_indices)
                 print()
 
-        # order dark-matter particles by id - should be conserved across snapshots
         if sort_dark_by_id:
+            # order dark-matter particles by id - should be conserved across snapshots
             for spec_name in self.species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
                     self.say('sorting {:6} particles by id'.format(spec_name))
@@ -930,7 +930,7 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name]['potential'] -= potential_max
 
         if particle_subsample_factor > 1:
-            # sub-sample highest-resolution particles for smaller memory
+            # sub-sample highest-resolution particles, for smaller memory
             spec_names = ['dark', 'gas', 'star']
             self.say('subsampling (periodically) {} particles by factor = {}'.format(
                      spec_names, particle_subsample_factor), end='\n\n')
