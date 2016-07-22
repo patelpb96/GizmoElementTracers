@@ -81,7 +81,7 @@ def print_run_times(
     scale_factors=[
         0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
         0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
-    wall_time_restart=0, print_lines=False, get_values=False):
+    wall_time_restart=0, get_values=False):
     '''
     Print wall [and CPU] times (average per MPI task) at input scale-factors from cpu.txt for
     Gizmo simulation.
@@ -93,7 +93,6 @@ def print_run_times(
     runtime_file_name : string : name of run-time file name (set in submission script)
     scale_factors : array-like : list of scale-factors at which to print run times
     wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
-    print_lines : boolean : whether to print lines from cpu.txt as get them
     get_values : boolean : whether to return arrays of scale-factors, redshifts, run times
 
     Returns
@@ -104,38 +103,61 @@ def print_run_times(
         # for some reason, python's mod function is funky with fractional values, so do by hand
         return x1 - np.floor(x1 / x2) * x2
 
+    def get_scale_factor_string(scale_factor):
+        if scale_factor == 1:
+            scale_factor_string = '1'
+        else:
+            scale_factor_string = '{}'.format(scale_factor)
+        return scale_factor_string
+
     file_name = 'cpu.txt'
 
     file_path_name = (ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) +
                       file_name)
     file_in = open(file_path_name, 'r')
 
-    if np.isscalar(scale_factors):
-        scale_factors = [scale_factors]
-    scale_factors = np.array(scale_factors)
+    scale_factors = ut.array.arrayize(scale_factors)
     wall_times = []
 
-    t_i = 0
-    a_i = scale_factors[t_i]
+    """
+    # conceptually simpler but appears slower
+    for i, a in enumerate(scale_factors):
+        a_string = 'Time: {}'.format(get_scale_factor_string(a))  #.encode()
+        line = file_in.readline()
+        while line:
+            if a_string in line:
+                line = file_in.readline()  # read next line to get wall time
+                wall_times.append(float(line.split()[1]))
+                break
+            line = file_in.readline()
+
+    # archive
+        if ('Time: 1,'.encode() in line or
+                ('Time: {:.1f},'.format(a).encode() in line and get_mod(a, 0.1) == 0) or
+                ('Time: {:.2f},'.format(a).encode() in line and get_mod(a, 0.01) == 0) or
+                ('Time: {:.3f}'.format(a).encode() in line)):
+
+    for scale_factor in scale_factors:
+        os.system('grep "Time: {:.2f}" {} --after-context=1 --max-count=2'.format(
+                  scale_factor, file_path_name))
+    """
+
+    i = 0
+    a = scale_factors[i]
+    a_string = 'Time: {}'.format(get_scale_factor_string(a))
     print_next_line = False
     for line in file_in:
-        if ('Time: 1,' in line or
-                ('Time: {:.1f},'.format(a_i) in line and get_mod(a_i, 0.1) == 0) or
-                ('Time: {:.2f},'.format(a_i) in line and get_mod(a_i, 0.01) == 0) or
-                ('Time: {:.3f}'.format(a_i) in line)):
-            if print_lines:
-                print(line, end='')
+        if a_string in line:
             print_next_line = True
         elif print_next_line:
-            if print_lines:
-                print(line)
             wall_times.append(float(line.split()[1]))
             print_next_line = False
-            t_i += 1
-            if t_i >= len(scale_factors):
+            i += 1
+            if i >= len(scale_factors):
                 break
             else:
-                a_i = scale_factors[t_i]
+                a = scale_factors[i]
+                a_string = 'Time: {}'.format(get_scale_factor_string(a))
 
     wall_times = np.array(wall_times)
 
@@ -167,10 +189,6 @@ def print_run_times(
         if cpu_number:
             print(' {:7.0f}'.format(cpu_times[t_i]), end='')
         print()
-
-    #for scale_factor in scale_factors:
-    #    os.system('grep "Time: {:.2f}" {} --after-context=1 --max-count=2'.format(
-    #              scale_factor, file_path_name))
 
     if get_values:
         return scale_factors, redshifts, wall_times, cpu_times
