@@ -745,7 +745,7 @@ class ReadClass(ut.io.SayClass):
                         prop_name_print = property_dict[prop_name_in]
                     else:
                         prop_name_print = prop_name_in
-                    self.say('not reading: {:4} {}'.format(spec_name, prop_name_print))
+                    self.say('not reading:  {:6} {}'.format(spec_name, prop_name_print))
 
             # might have opened extra file if using multi-file snapshot
             try:

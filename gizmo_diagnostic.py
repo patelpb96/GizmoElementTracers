@@ -298,7 +298,8 @@ def print_properties(
         for prop_name in species_property_dict[spec_name]:
             prop_values = part[spec_name].prop(prop_name)
             if prop_name in ['position', 'velocity']:
-                prop_values = np.concatenate(prop_values)
+                prop_values = np.array(
+                    [prop_values.min(), np.median(prop_values), prop_values.max()])
 
             #Statistic.stat = Statistic.get_statistic_dict(prop_values)
             #Statistic.print_statistics()
