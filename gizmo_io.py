@@ -238,7 +238,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_number_kind='index', snapshot_number=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         property_names='all', element_indices=[0, 1], particle_subsample_factor=0,
-        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False, assign_center=True):
+        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False, assign_center=True,
+        check_sanity=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary class.
@@ -269,6 +270,7 @@ class ReadClass(ut.io.SayClass):
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
+        check_sanity : boolean : whether to check sanity of particle properties after read in
 
         Returns
         -------
@@ -315,6 +317,9 @@ class ReadClass(ut.io.SayClass):
         self.adjust_particles(
             part, header, Cosmology, particle_subsample_factor, separate_dark_lowres,
             sort_dark_by_id)
+
+        if check_sanity:
+            self.check_sanity(part)
 
         # assign auxilliary information to particle dictionary class
         # store header dictionary
@@ -587,7 +592,7 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        part : dict : particle dictionary class
+        part : dict : catalog of particles
         '''
         # convert name in snapshot's particle dictionary to custon name preference
         # if comment out any property, will not read it
@@ -834,6 +839,11 @@ class ReadClass(ut.io.SayClass):
         spec_name = 'dark.2'
         if spec_name in part and 'mass' in part[spec_name]:
             dark_lowres_masses = np.unique(part[spec_name]['mass'])
+            if dark_lowres_masses.size > 9:
+                self.say(
+                    '! warning: {} different masses of low-resolution dark matter'.format(
+                        dark_lowres_masses.size))
+
             if separate_dark_lowres and dark_lowres_masses.size > 1:
                 self.say('separating low-resolution dark-matter by mass into separate dictionaries')
                 dark_lowres = {}
@@ -875,10 +885,6 @@ class ReadClass(ut.io.SayClass):
             if 'mass' in part[spec_name]:
                 # convert to {M_sun}
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
-                if np.min(part[spec_name]['mass']) < 1 or np.max(part[spec_name]['mass']) > 2e10:
-                    self.say(
-                        '! unsure about masses: read [min, max] = [{:.3e}, {:.3e}] M_sun'.format(
-                            np.min(part[spec_name]['mass']), np.max(part[spec_name]['mass'])))
 
             if 'bh.mass' in part[spec_name]:
                 # convert to {M_sun}
@@ -939,6 +945,45 @@ class ReadClass(ut.io.SayClass):
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = (
                             part[spec_name][prop_name][::particle_subsample_factor])
+
+    def check_sanity(self, part):
+        '''
+        Checks sanity of particle properties, print warning if they are outside given limits.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        '''
+        # limits of sanity
+        prop_limit_dict = {
+            'id': [0, 4e9],
+            'id.child': [0, 4e9],
+            'id.generation': [0, 4e9],
+            'position': [0, 1e6],  # kpc comoving
+            'velocity': [-1e5, 1e5],  # km/sec
+            'mass': [10, 3e10],  # M_sun
+            'potential': [-1e9, 0],  # M_sun
+            'temperature': [3, 1e9],  # K
+            'density': [0, 1e14],  # M_sun/kpc^3
+            'smooth.length': [0, 1e9],  # kpc physical
+            'hydrogen.neutral.fraction': [0, 1],
+            'sfr': [0, 1000],  # M_sun/yr
+            'massfraction': [0, 1],
+            'form.time': [0, 15],  # Gyr
+        }
+
+        self.say('checking sanity of particle properties')
+
+        for spec_name in self.species_names:
+            for prop_name in part[spec_name]:
+                if prop_name in prop_limit_dict:
+                    if (part[spec_name][prop_name].min() < prop_limit_dict[prop_name][0] or
+                            part[spec_name][prop_name].max() > prop_limit_dict[prop_name][1]):
+                        self.say(
+                            '! warning: {} {} [min, max] = [{:.3f}, {:.3f}]'.format(
+                                spec_name, prop_name, part[spec_name][prop_name].min(),
+                                part[spec_name][prop_name].max()))
+        print()
 
     def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''

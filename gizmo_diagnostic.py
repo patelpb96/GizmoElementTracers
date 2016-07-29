@@ -297,9 +297,6 @@ def print_properties(
         Say.say('\n* {}'.format(spec_name))
         for prop_name in species_property_dict[spec_name]:
             prop_values = part[spec_name].prop(prop_name)
-            if prop_name in ['position', 'velocity']:
-                prop_values = np.array(
-                    [prop_values.min(), np.median(prop_values), prop_values.max()])
 
             #Statistic.stat = Statistic.get_statistic_dict(prop_values)
             #Statistic.print_statistics()
@@ -310,6 +307,7 @@ def print_properties(
                 number_format = '{:.4f}'
             else:
                 number_format = '{:.1e}'
+
             print_string = '{}:  {},  {},  {}'.format(
                 prop_name, number_format, number_format, number_format)
 
