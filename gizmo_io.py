@@ -542,7 +542,7 @@ class ReadClass(ut.io.SayClass):
         particle_number_min = 0
         for spec_name in list(self.species_names):
             spec_id = self.species_dict[spec_name]
-            self.say('species = {:9s} (id = {}): {} particles'.format(
+            self.say('species = {:7s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
             if header['particle.numbers.total'][spec_id] > 0:
                 particle_number_min = header['particle.numbers.total'][spec_id]

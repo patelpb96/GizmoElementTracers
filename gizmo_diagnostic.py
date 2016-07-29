@@ -237,7 +237,7 @@ def print_run_times_ratios(
 
 def print_properties(
     species_names='all', snapshot_number_kind='index', snapshot_number=600,
-    simulation_directory='.', snapshot_directory='output/'):
+    simulation_directory='.', snapshot_directory='output/', part=None):
     '''
     For each input property, get its extremum at each snapshot.
     Print statistics of this across all snapshots.
@@ -246,6 +246,7 @@ def print_properties(
     snapshot_number : int or float : index (number) of snapshot file
     simulation_directory : root directory of simulation
     snapshot_directory: string : directory of snapshot files within simulation_directory
+    part : dict : catalog of particles (use this instead of reading in)
 
     Returns
     -------
@@ -285,10 +286,11 @@ def print_properties(
             if prop_name not in properties_read:
                 properties_read.append(prop_name)
 
-    part = gizmo_io.Read.read_snapshot(
-        species_names, snapshot_number_kind, snapshot_number, simulation_directory,
-        snapshot_directory, '', properties_read, None, assign_center=False,
-        separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
+    if part is None:
+        part = gizmo_io.Read.read_snapshot(
+            species_names, snapshot_number_kind, snapshot_number, simulation_directory,
+            snapshot_directory, '', properties_read, None, assign_center=False,
+            separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
 
     #Statistic = ut.statistic.StatisticClass()
 
@@ -303,7 +305,7 @@ def print_properties(
 
             if 'int' in str(prop_values.dtype):
                 number_format = '{:.0f}'
-            elif max(np.abs(prop_values)) < 1e5:
+            elif np.abs(prop_values).max() < 1e5:
                 number_format = '{:.4f}'
             else:
                 number_format = '{:.1e}'
