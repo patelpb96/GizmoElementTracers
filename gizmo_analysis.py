@@ -529,7 +529,8 @@ class SpeciesProfileClass(ut.io.SayClass):
                         masses = masses[masks]
                         prop_values = prop_values[masks]
 
-                pros[spec_name] = DistanceBin.get_statistics_profile(distances, prop_values, masses)
+                pros[spec_name] = DistanceBin.get_statistics_profile(
+                    distances, prop_values, masses)
 
         return pros
 
@@ -592,7 +593,8 @@ def plot_mass_contamination(
         distances *= part.snapshot['scalefactor']  # convert to {kpc physical}
         if scale_to_halo_radius:
             distances /= halo_radius
-        profile_mass[spec_name] = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
+        profile_mass[spec_name] = DistanceBin.get_sum_profile(
+            distances, part[spec_name]['mass'])
 
     for spec_name in species_test:
         mass_ratio_bin = profile_mass[spec_name]['sum'] / profile_mass[species_reference]['sum']
@@ -709,6 +711,36 @@ def plot_mass_contamination(
         distance_name += '.' + virial_kind
     plot_name = 'mass.ratio_v_{}_z.{:.2f}'.format(distance_name, part.snapshot['redshift'])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
+
+
+def plot_mass_contamination_halo(
+    part, hal, hal_index, distance_max=7, distance_bin_width=0.5, scale_to_halo_radius=True):
+    '''
+    Print information on contamination from lower-resolution particles around halo as a function of
+    distance.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    hal : dict : catalog of halos at snapshot
+    hal_index: int : index of halo
+    distance_max : float : maximum distance from halo center to check
+    distance_bin_width : float : width of distance bin for printing
+    scale_to_halo_radius : boolean : whether to scale distances by virial radius
+    '''
+    distance_scaling = 'linear'
+    distance_limits = [0, distance_max]
+    axis_y_scaling = 'log'
+
+    Say = ut.io.SayClass(plot_mass_contamination_halo)
+
+    Say.say('halo radius = {:.3f} kpc'.format(hal['radius'][hal_index]))
+
+    halo_radius = hal['radius'][hal_index]
+
+    plot_mass_contamination(
+        part, distance_limits, distance_bin_width, None, distance_scaling, halo_radius,
+        scale_to_halo_radius, hal['position'][hal_index], axis_y_scaling, write_plot=None)
 
 
 def plot_metal_v_distance(
@@ -2438,7 +2470,7 @@ def explore_galaxy(
     '''
     from rockstar import rockstar_analysis
 
-    rockstar_analysis.print_properties_halo(part, hal, hal_index)
+    rockstar_analysis.print_properties(part, hal, hal_index)
 
     hi = hal_index
 

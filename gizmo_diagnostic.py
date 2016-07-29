@@ -34,6 +34,11 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
     ----------
     simulation_directory : string : directory of simulation
     runtime_file_name : string : name of run-time file name (set in submission script)
+
+    Returns
+    -------
+    mpi_number : int : number of MPI tasks
+    omp_number : int : number of OpenMP threads per MPI task
     '''
     loop_number_max = 1000
 
@@ -99,10 +104,6 @@ def print_run_times(
     -------
     scale_factors, redshifts, wall_times, cpu_times : arrays : return these if get_values is True
     '''
-    def get_mod(x1, x2):
-        # for some reason, python's mod function is funky with fractional values, so do by hand
-        return x1 - np.floor(x1 / x2) * x2
-
     def get_scale_factor_string(scale_factor):
         if scale_factor == 1:
             scale_factor_string = '1'
@@ -119,45 +120,27 @@ def print_run_times(
     scale_factors = ut.array.arrayize(scale_factors)
     wall_times = []
 
-    """
-    # conceptually simpler but appears slower
-    for i, a in enumerate(scale_factors):
-        a_string = 'Time: {}'.format(get_scale_factor_string(a))  #.encode()
-        line = file_in.readline()
-        while line:
-            if a_string in line:
-                line = file_in.readline()  # read next line to get wall time
-                wall_times.append(float(line.split()[1]))
-                break
-            line = file_in.readline()
-
-    # archive
-        if ('Time: 1,'.encode() in line or
-                ('Time: {:.1f},'.format(a).encode() in line and get_mod(a, 0.1) == 0) or
-                ('Time: {:.2f},'.format(a).encode() in line and get_mod(a, 0.01) == 0) or
-                ('Time: {:.3f}'.format(a).encode() in line)):
-
-    for scale_factor in scale_factors:
-        os.system('grep "Time: {:.2f}" {} --after-context=1 --max-count=2'.format(
-                  scale_factor, file_path_name))
-    """
-
     i = 0
-    a = scale_factors[i]
-    a_string = 'Time: {}'.format(get_scale_factor_string(a))
+    scale_factor = 'Time: {}'.format(get_scale_factor_string(scale_factors[i]))
     print_next_line = False
     for line in file_in:
-        if a_string in line:
-            print_next_line = True
-        elif print_next_line:
+        if print_next_line:
             wall_times.append(float(line.split()[1]))
             print_next_line = False
             i += 1
             if i >= len(scale_factors):
                 break
             else:
-                a = scale_factors[i]
-                a_string = 'Time: {}'.format(get_scale_factor_string(a))
+                scale_factor = 'Time: {}'.format(get_scale_factor_string(scale_factors[i]))
+        elif scale_factor in line:
+            print_next_line = True
+
+    """
+    for i, a in enumerate(scale_factors):
+        scale_factor = 'Time: {}'.format(get_scale_factor_string(a))
+        os.system('grep "{}" {} --after-context=1 --max-count=1'.format(
+                  scale_factor, file_path_name))
+    """
 
     wall_times = np.array(wall_times)
 
@@ -194,7 +177,7 @@ def print_run_times(
         return scale_factors, redshifts, wall_times, cpu_times
 
 
-def print_run_time_ratios(
+def print_run_times_ratios(
     simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out',
     scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
                    0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
@@ -252,7 +235,90 @@ def print_run_time_ratios(
         print()
 
 
-def print_properties_extrema_all_snapshots(
+def print_properties(
+    species_names='all', snapshot_number_kind='index', snapshot_number=600,
+    simulation_directory='.', snapshot_directory='output/'):
+    '''
+    For each input property, get its extremum at each snapshot.
+    Print statistics of this across all snapshots.
+
+    snapshot_number_kind : string : input snapshot number kind: index, redshift
+    snapshot_number : int or float : index (number) of snapshot file
+    simulation_directory : root directory of simulation
+    snapshot_directory: string : directory of snapshot files within simulation_directory
+
+    Returns
+    -------
+    part : dict : catalog of particles
+    '''
+    Say = ut.io.SayClass(print_properties)
+
+    species_names = ut.array.arrayize(species_names)
+    if 'all' in species_names:
+        species_names = ['dark.2', 'dark', 'star', 'gas']
+
+    species_property_dict = collections.OrderedDict()
+
+    if 'dark.2' in species_names:
+        species_property_dict['dark.2'] = ['id', 'position', 'velocity', 'mass']
+    if 'dark' in species_names:
+        species_property_dict['dark'] = ['id', 'position', 'velocity', 'mass']
+    if 'star' in species_names:
+        species_property_dict['star'] = [
+            'id', 'position', 'velocity', 'mass', 'form.time',
+            'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
+    if 'gas' in species_names:
+        species_property_dict['gas'] = [
+            'id', 'position', 'velocity', 'mass', 'number.density', 'smooth.length', 'temperature',
+            'hydrogen.neutral.fraction', 'sfr',
+            'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
+
+    species_names = list(species_property_dict.keys())
+    properties_read = []
+    for spec_name in species_property_dict:
+        for prop_name in species_property_dict[spec_name]:
+            if 'massfraction' in prop_name or 'metallicity' in prop_name:
+                prop_name = 'massfraction'
+            elif 'density' in prop_name and 'number' in prop_name:
+                prop_name = 'density'
+
+            if prop_name not in properties_read:
+                properties_read.append(prop_name)
+
+    part = gizmo_io.Read.read_snapshot(
+        species_names, snapshot_number_kind, snapshot_number, simulation_directory,
+        snapshot_directory, '', properties_read, None, assign_center=False,
+        separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
+
+    #Statistic = ut.statistic.StatisticClass()
+
+    Say.say('printing minimum, median, maximum'.format(spec_name))
+    for spec_name in species_property_dict:
+        Say.say('\n* {}'.format(spec_name))
+        for prop_name in species_property_dict[spec_name]:
+            prop_values = part[spec_name].prop(prop_name)
+            if prop_name in ['position', 'velocity']:
+                prop_values = np.concatenate(prop_values)
+
+            #Statistic.stat = Statistic.get_statistic_dict(prop_values)
+            #Statistic.print_statistics()
+
+            if 'int' in str(prop_values.dtype):
+                number_format = '{:.0f}'
+            elif max(np.abs(prop_values)) < 1e5:
+                number_format = '{:.4f}'
+            else:
+                number_format = '{:.1e}'
+            print_string = '{}:  {},  {},  {}'.format(
+                prop_name, number_format, number_format, number_format)
+
+            Say.say(
+                print_string.format(prop_values.min(), np.median(prop_values), prop_values.max()))
+
+    return part
+
+
+def print_properties_snapshots(
     simulation_directory='.', snapshot_directory='output',
     species_property_dict={'gas': ['smooth.length', 'density.number']}):
     '''
@@ -271,7 +337,7 @@ def print_properties_extrema_all_snapshots(
         'density.number': {'function.name': 'max', 'function': np.max},
     }
 
-    Say = ut.io.SayClass(print_properties_extrema_all_snapshots)
+    Say = ut.io.SayClass(print_properties_snapshots)
 
     simulation_directory = ut.io.get_path(simulation_directory)
 
@@ -568,7 +634,7 @@ def plot_scaling(
         ut.plot.set_axes_scaling_limits(
             subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits)
 
-        #subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
+        subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
         #subplot.plot(mfm_particle_numbers[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
         #subplot.plot(mfm_particle_numbers[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
         #             alpha=0.7)
@@ -606,7 +672,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        print_properties_extrema_all_snapshots(directory)
+        print_properties_snapshots(directory)
 
     elif 'contamination' in function_kind:
         if len(sys.argv) > 2:
