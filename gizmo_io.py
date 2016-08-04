@@ -1,7 +1,7 @@
 '''
 Read Gizmo snapshots.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
+Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 @author: Andrew Wetzel
 '''
@@ -959,17 +959,17 @@ class ReadClass(ut.io.SayClass):
             'id': [0, 4e9],
             'id.child': [0, 4e9],
             'id.generation': [0, 4e9],
-            'position': [0, 1e6],  # kpc comoving
-            'velocity': [-1e5, 1e5],  # km/sec
-            'mass': [10, 3e10],  # M_sun
-            'potential': [-1e9, 0],  # M_sun
-            'temperature': [3, 1e9],  # K
-            'density': [0, 1e14],  # M_sun/kpc^3
-            'smooth.length': [0, 1e9],  # kpc physical
+            'position': [0, 1e6],  # [kpc comoving]
+            'velocity': [-1e5, 1e5],  # [km/sec]
+            'mass': [10, 3e10],  # [M_sun]
+            'potential': [-1e9, 0],  # [M_sun]
+            'temperature': [3, 1e9],  # [K]
+            'density': [0, 1e14],  # [M_sun/kpc^3]
+            'smooth.length': [0, 1e9],  # [kpc physical]
             'hydrogen.neutral.fraction': [0, 1],
-            'sfr': [0, 1000],  # M_sun/yr
+            'sfr': [0, 1000],  # [M_sun/yr]
             'massfraction': [0, 1],
-            'form.time': [0, 15],  # Gyr
+            'form.time': [0, 15],  # [Gyr]
         }
 
         self.say('checking sanity of particle properties')

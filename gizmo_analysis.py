@@ -1,7 +1,7 @@
 '''
 Analyze Gizmo simulations.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
+Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 @author: Andrew Wetzel
 '''

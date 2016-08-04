@@ -236,17 +236,19 @@ def print_run_times_ratios(
 
 
 def print_properties(
-    species_names='all', snapshot_number_kind='index', snapshot_number=600,
-    simulation_directory='.', snapshot_directory='output/', part=None):
+    part=None, species_names='all', snapshot_number_kind='index', snapshot_number=600,
+    simulation_directory='.', snapshot_directory='output/'):
     '''
     For each input property, get its extremum at each snapshot.
     Print statistics of this across all snapshots.
 
+    Parameters
+    ----------
+    part : dict : catalog of particles (use this instead of reading in)
     snapshot_number_kind : string : input snapshot number kind: index, redshift
     snapshot_number : int or float : index (number) of snapshot file
     simulation_directory : root directory of simulation
     snapshot_directory: string : directory of snapshot files within simulation_directory
-    part : dict : catalog of particles (use this instead of reading in)
 
     Returns
     -------
@@ -291,6 +293,9 @@ def print_properties(
             species_names, snapshot_number_kind, snapshot_number, simulation_directory,
             snapshot_directory, '', properties_read, None, assign_center=False,
             separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
+        return_part = True
+    else:
+        return_part = False
 
     #Statistic = ut.statistic.StatisticClass()
 
@@ -316,7 +321,8 @@ def print_properties(
             Say.say(
                 print_string.format(prop_values.min(), np.median(prop_values), prop_values.max()))
 
-    return part
+    if return_part:
+        return part
 
 
 def print_properties_snapshots(
