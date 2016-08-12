@@ -1,7 +1,7 @@
 '''
 Generate initial conditions for MUSIC using AGORA.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
+Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 @author: Andrew Wetzel
 '''
@@ -101,10 +101,10 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             self.hal['radius'][hi] = self.hal_yt[hi].maximum_radius()
             self.hal['position'][hi] = self.hal_yt[hi].center_of_mass()
             self.hal['particle.number'][hi] = self.hal_yt[hi].get_size()
-        self.hal['mass'] = self.hal['mass']  # {M_sun}
-        # {kpc physical}
+        self.hal['mass'] = self.hal['mass']  # [M_sun]
+        # [kpc physical]
         self.hal['radius'] *= self.hal.info['box.length'] * self.hal.snapshot['scalefactor']
-        self.hal['position'] *= self.hal.info['box.length']  # {kpc comoving}
+        self.hal['position'] *= self.hal.info['box.length']  # [kpc comoving]
 
         NearestNeighbor = ut.catalog.NearestNeighborClass()
         NearestNeighbor.assign_to_self(
@@ -156,13 +156,13 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
             ut.catalog.assign_id_to_index_species(self.part[ti], 'id', 0)
 
             self.part[ti]['mass'] = np.array(
-                self.data[ti]['particle_mass'].in_units('Msun'), dtype=np.float32)  # {M_sun}
+                self.data[ti]['particle_mass'].in_units('Msun'), dtype=np.float32)  # [M_sun]
             del(self.data[ti]['particle_mass'])
 
             self.part[ti]['position'] = np.zeros(
                 (self.part[ti]['id'].size, len(dimension_names)), dtype=np.float32)
             for dimension_i, dimension_name in enumerate(dimension_names):
-                # {kpc comoving}
+                # [kpc comoving]
                 self.part[ti]['position'][:, dimension_i] = (
                     self.data[ti]['particle_position_' + dimension_name] *
                     self.hal.info['box.length'])
@@ -239,7 +239,7 @@ class IOClass(ut.array.DictClass, ut.io.SayClass):
 def get_halos_around_halo(
     hal, hal_index, distance_max, scale_to_halo_radius=True, neig_mass_frac_min=0.5):
     '''
-    Get distances {kpc physical} and indices of halos that are within distance_max of center of
+    Get distances [kpc physical] and indices of halos that are within distance_max of center of
     given halo.
 
     Parameters
@@ -348,8 +348,8 @@ def print_contamination_in_box(
     Parameters
     ----------
     part : dict : catalog of particles
-    center_position : array : 3-d position of center {kpc comoving}
-    distance_limits : float : maximum distance from center to check {kpc physical}
+    center_position : array : 3-d position of center [kpc comoving]
+    distance_limits : float : maximum distance from center to check [kpc physical]
     distance_bin_number : int : number of distance bins
     distance_scaling : string : 'log', 'linear'
     geometry : string : geometry of region: 'cube', 'sphere'
@@ -414,7 +414,7 @@ def print_initial_condition_region(
     ----------
     hal_index : int : index of halo
     refinement_number : int : number of refinement levels beyond current level for zoom-in region
-    distance_max : float : maximum distance want to be uncontaminated {kpc comoving}
+    distance_max : float : maximum distance want to be uncontaminated [kpc comoving]
         if None, use R_halo
     geometry : string : geometry of zoom-in lagrangian regon in initial conditions:
         'cube', 'ellipsoid'

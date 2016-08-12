@@ -2,7 +2,7 @@
 Generate initial condition points by selecting particles at final time and tracing them back
 to initial time.
 
-Masses in {M_sun}, positions in {kpc comoving}, distances in {kpc physical}.
+Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 @author: awetzel
 '''
@@ -26,13 +26,13 @@ def print_contamination_in_box(
     part, center_position=None, distance_limits=None, distance_bin_number=20,
     distance_scaling='linear', geometry='cube'):
     '''
-    Test lower resolution particle contamination around center.
+    Test contamination from low-resolution particles around center.
 
     Parameters
     ----------
     part : dict : catalog of particles
-    center_position : array : 3-d position of center {kpc comoving}
-    distance_limits : float : maximum distance from center to check {kpc physical}
+    center_position : array : 3-d position of center [kpc comoving]
+    distance_limits : float : maximum distance from center to check [kpc physical]
     distance_bin_number : int : number of distance bins
     distance_scaling : string : 'log', 'linear'
     geometry : string : geometry of region: 'cube', 'sphere'
@@ -187,9 +187,9 @@ def write_initial_condition_points(
     parts : list of dicts : catalogs of particles at final and initial snapshots
     center_position : list : center position at final time
     distance_max : float : distance from center to select particles at final time
-        {kpc physical, or in units of R_halo}
+        [kpc physical, or in units of R_halo]
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
-    halo_radius : float : radius of halo {kpc physical}
+    halo_radius : float : radius of halo [kpc physical]
     virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
     region_kind : string : method to identify zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
@@ -234,7 +234,7 @@ def write_initial_condition_points(
 
         distances = ut.coordinate.get_distances(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
-        distances *= part_fin.snapshot['scalefactor']  # convert to {kpc physical}
+        distances *= part_fin.snapshot['scalefactor']  # convert to [kpc physical]
 
         select_indices = ut.array.get_indices(distances, [0, distance_max])
 
@@ -338,9 +338,9 @@ def generate_initial_condition_points(
     snapshot_redshifts : list : redshifts of final and initial snapshots
     simulation_directory : string : directory of simulation
     distance_max : float : distance from center to select particles at final time
-        {kpc physical, or in units of R_halo}
+        [kpc physical, or in units of R_halo]
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
-    halo_radius : float : radius of halo {kpc physical}
+    halo_radius : float : radius of halo [kpc physical]
     virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
     region_kind : string : method to determine zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'

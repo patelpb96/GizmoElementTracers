@@ -28,6 +28,7 @@ class ParticleDictionaryClass(dict):
     # use to translate between element name and index in element table
     element_dict = collections.OrderedDict()
     element_dict['metals'] = 0
+    element_dict['total'] = 0
     element_dict['helium'] = 1
     element_dict['carbon'] = 2
     element_dict['nitrogen'] = 3
@@ -116,10 +117,9 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ##
-        if 'form.' in property_name:
-            if 'time' in property_name and 'lookback' in property_name:
-                prop_name = property_name.replace('.lookback', '')
-                return self.snapshot['time'] - self.prop(prop_name, indices)
+        if 'form.' in property_name or property_name == 'age':
+            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
+                return self.snapshot['time'] - self.prop('form.time', indices)
             elif 'redshift' in property_name:
                 return self.Cosmology.convert_time('redshift', 'time',
                                                    self.prop('form.time', indices))
@@ -132,10 +132,10 @@ class ParticleDictionaryClass(dict):
                       ut.const.kpc_per_cm ** 3)
 
             if '.hydrogen' in property_name:
-                # number density of hydrogen, using actual hydrogen mass of each particle {cm ^ -3}
+                # number density of hydrogen, using actual hydrogen mass of each particle [cm ^ -3]
                 values = values * self.prop('massfraction.hydrogen', indices)
             else:
-                # number density of 'hydrogen', assuming solar metallicity for particles {cm ^ -3}
+                # number density of 'hydrogen', assuming solar metallicity for particles [cm ^ -3]
                 values = values * ut.const.sun_hydrogen_mass_fraction
 
             return values
@@ -181,7 +181,8 @@ class ParticleDictionaryClass(dict):
                 values = self['massfraction'][indices, element_index]
 
             if 'metallicity.' in property_name:
-                values = values / ut.const.sun_composition[element_name + '.massfraction']
+                values = ut.math.get_log(values /
+                                         ut.const.sun_composition[element_name + '.massfraction'])
 
             return values
 
@@ -476,8 +477,8 @@ class ReadClass(ut.io.SayClass):
             # mass of each particle species, if all particles are same
             # (= 0 if they are different, which is usually true)
             'MassTable': 'particle.masses',
-            'Time': 'time',  # {Gyr / h}
-            'BoxSize': 'box.length',  # {kpc / h comoving}
+            'Time': 'time',  # [Gyr / h]
+            'BoxSize': 'box.length',  # [kpc / h comoving]
             'Redshift': 'redshift',
             # number of output files per snapshot
             'NumFilesPerSnapshot': 'file.number.per.snapshot',
@@ -534,9 +535,9 @@ class ReadClass(ut.io.SayClass):
             header['scalefactor'] = float(header['time'])
             del(header['time'])
             header['box.length/h'] = float(header['box.length'])
-            header['box.length'] /= header['hubble']  # convert to {kpc comoving}
+            header['box.length'] /= header['hubble']  # convert to [kpc comoving]
         else:
-            header['time'] /= header['hubble']  # convert to {Gyr}
+            header['time'] /= header['hubble']  # convert to [Gyr]
 
         # keep only species that have any particles
         particle_number_min = 0
@@ -615,7 +616,7 @@ class ReadClass(ut.io.SayClass):
             'ElectronAbundance': 'electron.fraction',
             # fraction of hydrogen that is neutral (not ionized)
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
-            'StarFormationRate': 'sfr',  # {M_sun / yr}
+            'StarFormationRate': 'sfr',  # [M_sun / yr]
 
             ## star/gas particles ##
             'ParticleChildIDsNumber': 'id.child',
@@ -628,7 +629,7 @@ class ReadClass(ut.io.SayClass):
 
             ## star particles ##
             ## 'time' when star particle formed
-            ## for cosmological runs, = scale-factor; for non-cosmological runs, = time {Gyr / h}
+            ## for cosmological runs, = scale-factor; for non-cosmological runs, = time {Gyr/h}
             'StellarFormationTime': 'form.time',
 
             ## black hole particles ##
@@ -879,44 +880,44 @@ class ReadClass(ut.io.SayClass):
         # apply unit conversions
         for spec_name in self.species_names:
             if 'position' in part[spec_name]:
-                # convert to {kpc comoving}
+                # convert to [kpc comoving]
                 part[spec_name]['position'] /= header['hubble']
 
             if 'mass' in part[spec_name]:
-                # convert to {M_sun}
+                # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
             if 'bh.mass' in part[spec_name]:
-                # convert to {M_sun}
+                # convert to [M_sun]
                 part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
 
             if 'velocity' in part[spec_name]:
-                # convert to {km / sec physical}
+                # convert to [km / s physical]
                 part[spec_name]['velocity'] *= np.sqrt(header['scalefactor'])
 
             if 'density' in part[spec_name]:
-                # convert to {M_sun / kpc ^ 3 physical}
+                # convert to [M_sun / kpc^3 physical]
                 part[spec_name]['density'] *= (1e10 / header['hubble'] /
                                                (header['scalefactor'] / header['hubble']) ** 3)
 
             if 'smooth.length' in part[spec_name]:
-                # convert to {pc physical}
+                # convert to [pc physical]
                 part[spec_name]['smooth.length'] *= 1000 * header['scalefactor'] / header['hubble']
                 # convert to Plummer softening. this value should be valid for most simulations
                 part[spec_name]['smooth.length'] /= 2.8
 
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
-                    # convert from units of scale-factor to {Gyr}
+                    # convert from units of scale-factor to [Gyr]
                     part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
                         1 / part[spec_name]['form.time'] - 1).astype(
                             part[spec_name]['form.time'].dtype)
                 else:
-                    # convert to {Gyr}
+                    # convert to [Gyr]
                     part[spec_name]['form.time'] /= header['hubble']
 
             if 'temperature' in part[spec_name]:
-                # convert from {(km / s) ^ 2} to {Kelvin}
+                # convert from [(km / s) ^ 2] to [Kelvin]
                 # ignore small corrections from elements beyond He
                 helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
@@ -987,7 +988,7 @@ class ReadClass(ut.io.SayClass):
 
     def assign_center(self, part, method='center-of-mass', compare_centers=True):
         '''
-        Assign center position {kpc comoving} and velocity {km / sec physical} to galaxy/halo,
+        Assign center position [kpc comoving] and velocity [km / s physical] to galaxy/halo,
         using stars for hydro simulation or dark matter for dark matter simulation.
 
         Parameters

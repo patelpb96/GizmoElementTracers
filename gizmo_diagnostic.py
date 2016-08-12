@@ -150,7 +150,7 @@ def print_run_times(
                 break
         wall_times[i:] += wall_time_restart
 
-    wall_times /= 3600  # convert to {hr}
+    wall_times /= 3600  # convert to [hr]
 
     # get cpu number from run-time file
     mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
@@ -235,16 +235,15 @@ def print_run_times_ratios(
         print()
 
 
-def print_properties(
-    part=None, species_names='all', snapshot_number_kind='index', snapshot_number=600,
+def print_properties_statistics(
+    species_names='all', snapshot_number_kind='index', snapshot_number=600,
     simulation_directory='.', snapshot_directory='output/'):
     '''
-    For each input property, get its extremum at each snapshot.
-    Print statistics of this across all snapshots.
+    For each property of each species in particle catalog, print range and median.
 
     Parameters
     ----------
-    part : dict : catalog of particles (use this instead of reading in)
+    species_names : string or list : species to print
     snapshot_number_kind : string : input snapshot number kind: index, redshift
     snapshot_number : int or float : index (number) of snapshot file
     simulation_directory : root directory of simulation
@@ -254,75 +253,16 @@ def print_properties(
     -------
     part : dict : catalog of particles
     '''
-    Say = ut.io.SayClass(print_properties)
-
     species_names = ut.array.arrayize(species_names)
     if 'all' in species_names:
         species_names = ['dark.2', 'dark', 'star', 'gas']
 
-    species_property_dict = collections.OrderedDict()
+    part = gizmo_io.Read.read_snapshot(
+        species_names, snapshot_number_kind, snapshot_number, simulation_directory,
+        snapshot_directory, '', None, None, assign_center=False,
+        separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
 
-    if 'dark.2' in species_names:
-        species_property_dict['dark.2'] = ['id', 'position', 'velocity', 'mass']
-    if 'dark' in species_names:
-        species_property_dict['dark'] = ['id', 'position', 'velocity', 'mass']
-    if 'star' in species_names:
-        species_property_dict['star'] = [
-            'id', 'position', 'velocity', 'mass', 'form.time',
-            'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
-    if 'gas' in species_names:
-        species_property_dict['gas'] = [
-            'id', 'position', 'velocity', 'mass', 'number.density', 'smooth.length', 'temperature',
-            'hydrogen.neutral.fraction', 'sfr',
-            'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
-
-    species_names = list(species_property_dict.keys())
-    properties_read = []
-    for spec_name in species_property_dict:
-        for prop_name in species_property_dict[spec_name]:
-            if 'massfraction' in prop_name or 'metallicity' in prop_name:
-                prop_name = 'massfraction'
-            elif 'density' in prop_name and 'number' in prop_name:
-                prop_name = 'density'
-
-            if prop_name not in properties_read:
-                properties_read.append(prop_name)
-
-    if part is None:
-        part = gizmo_io.Read.read_snapshot(
-            species_names, snapshot_number_kind, snapshot_number, simulation_directory,
-            snapshot_directory, '', properties_read, None, assign_center=False,
-            separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
-        return_part = True
-    else:
-        return_part = False
-
-    #Statistic = ut.statistic.StatisticClass()
-
-    Say.say('printing minimum, median, maximum'.format(spec_name))
-    for spec_name in species_property_dict:
-        Say.say('\n* {}'.format(spec_name))
-        for prop_name in species_property_dict[spec_name]:
-            prop_values = part[spec_name].prop(prop_name)
-
-            #Statistic.stat = Statistic.get_statistic_dict(prop_values)
-            #Statistic.print_statistics()
-
-            if 'int' in str(prop_values.dtype):
-                number_format = '{:.0f}'
-            elif np.abs(prop_values).max() < 1e5:
-                number_format = '{:.4f}'
-            else:
-                number_format = '{:.1e}'
-
-            print_string = '{}:  {},  {},  {}'.format(
-                prop_name, number_format, number_format, number_format)
-
-            Say.say(
-                print_string.format(prop_values.min(), np.median(prop_values), prop_values.max()))
-
-    if return_part:
-        return part
+    gizmo_analysis.print_properties_statistics(part, species_names)
 
 
 def print_properties_snapshots(
@@ -330,8 +270,10 @@ def print_properties_snapshots(
     species_property_dict={'gas': ['smooth.length', 'density.number']}):
     '''
     For each input property, get its extremum at each snapshot.
-    Print statistics of this across all snapshots.
+    Print statistics of property across all snapshots.
 
+    Parameters
+    ----------
     simulation_directory : string : directory of simulation
     snapshot_directory : string : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
@@ -408,7 +350,7 @@ def print_properties_snapshots(
             #Statistic.print_statistics()
 
 
-def plot_halo_contamination(directory='.', redshift=0):
+def plot_contamination(directory='.', redshift=0):
     '''
     Plot contamination from lower-resolution particles around halo as a function of distance.
 
@@ -418,8 +360,8 @@ def plot_halo_contamination(directory='.', redshift=0):
     redshift : float : redshift of snapshot
     '''
     distance_bin_width = 0.01
-    distance_limits_phys = [1, 4000]  # {kpc physical}
-    distance_limits_halo = [0.01, 10]  # {units of R_halo}
+    distance_limits_phys = [1, 4000]  # [kpc physical]
+    distance_limits_halo = [0.01, 10]  # [units of R_halo]
     virial_kind = '200m'
 
     os.chdir(directory)
@@ -657,11 +599,12 @@ def plot_scaling(
 if __name__ == '__main__':
 
     if len(sys.argv) <= 1:
-        raise ValueError('must specify function: runtime, extreme, contamination, delete')
+        raise ValueError('specify function: runtime, properties, extrema, contamination, delete')
 
     function_kind = str(sys.argv[1])
-    assert ('runtime' in function_kind or 'extreme' in function_kind or
-            'contamination' in function_kind or 'delete' in function_kind)
+    assert ('runtime' in function_kind or 'properties' in function_kind or
+            'extrema' in function_kind or 'contamination' in function_kind or
+            'delete' in function_kind)
 
     directory = '.'
 
@@ -675,7 +618,13 @@ if __name__ == '__main__':
 
         print_run_times(directory, wall_time_restart=wall_time_restart)
 
-    elif 'extreme' in function_kind:
+    elif 'properties' in function_kind:
+        if len(sys.argv) > 2:
+            directory = str(sys.argv[2])
+
+        print_properties_statistics('all', directory)
+
+    elif 'extrema' in function_kind:
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
@@ -689,7 +638,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 3:
             snapshot_redshift = float(sys.argv[3])
 
-        plot_halo_contamination(directory, snapshot_redshift)
+        plot_contamination(directory, snapshot_redshift)
 
     elif 'delete' in function_kind:
         if len(sys.argv) > 2:
