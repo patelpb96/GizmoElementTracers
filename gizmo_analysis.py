@@ -3249,6 +3249,10 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
                     [1, 300], distance_bin_width, write_plot=True)
 
+                plot_property_v_distance(
+                    parts, 'baryon', 'mass', 'sum.cum.fraction', 'linear', False, [0, 2],
+                    [10, 2000], distance_bin_width, write_plot=True)
+
             if 'dark' in parts[0]:
                 plot_property_v_distance(
                     parts, 'dark', 'mass', 'sum.cum', 'log', False, [None, None],
@@ -3260,12 +3264,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
-                    parts, 'baryon', 'mass', 'sum.cum.fraction', 'linear', False, [0, 2],
-                    [10, 2000], distance_bin_width, write_plot=True)
-
-                plot_property_v_distance(
                     parts, 'gas', 'mass', 'sum.cum', 'log', False, [None, None],
                     [1, 300], distance_bin_width, write_plot=True)
+
+                plot_property_v_distance(
+                    parts, 'star', 'metallicity.total', 'median', 'linear', True, [None, None],
+                    [0.1, 30], distance_bin_width, write_plot=True)
 
                 if 'velocity' in property_names:
                     plot_property_v_distance(
@@ -3284,6 +3288,10 @@ class CompareSimulationsClass(ut.io.SayClass):
                 if 'form.time' in property_names and redshift <= 5:
                     plot_property_v_distance(
                         parts, 'star', 'age', 'average', 'linear', True,
+                        [None, None], [0.1, 30], distance_bin_width, write_plot=True)
+
+                    plot_property_v_distance(
+                        parts, 'star', 'metallicity.total', 'median', 'linear', True,
                         [None, None], [0.1, 30], distance_bin_width, write_plot=True)
 
                     plot_star_form_history(
