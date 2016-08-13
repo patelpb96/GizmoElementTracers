@@ -54,7 +54,7 @@ def print_contamination_in_box(
         distance_scaling, distance_limits, number=distance_bin_number)
 
     masses_unique = np.unique(part['mass'])
-    pis_all = ut.array.arange_length(part['mass'])
+    pis_all = ut.array.get_arange(part['mass'])
     pis_contam = pis_all[part['mass'] != masses_unique.min()]
 
     if geometry == 'sphere':

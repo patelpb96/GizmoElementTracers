@@ -102,7 +102,7 @@ class ParticleDictionaryClass(dict):
                 if '+' in property_name:
                     prop_values = prop_values + self.prop(prop_name, indices)
                 if '-' in property_name:
-                    prop_values = prop_values / self.prop(prop_name, indices)
+                    prop_values = prop_values - self.prop(prop_name, indices)
 
             if prop_values.size == 1:
                 prop_values = np.float(prop_values, dtype=prop_values.dtype)
@@ -294,18 +294,19 @@ class ReadClass(ut.io.SayClass):
 
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
-        snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
+        snapshot_directory = ut.io.get_path(snapshot_directory)
 
         Snapshot, snapshot_index = self.read_snapshot_times(
             simulation_directory, snapshot_number_kind, snapshot_number)
 
         # read header from snapshot file
-        header = self.read_header('index', snapshot_index, '.', snapshot_directory, simulation_name)
+        header = self.read_header(
+            'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name)
 
         # read particles from snapshot file[s]
         part = self.read_particles(
-            'index', snapshot_index, '.', snapshot_directory, property_names, element_indices,
-            force_float32, header)
+            'index', snapshot_index, simulation_directory, snapshot_directory, property_names,
+            element_indices, force_float32, header)
 
         # assign cosmological parameters
         if header['is.cosmological']:
@@ -429,8 +430,8 @@ class ReadClass(ut.io.SayClass):
         except:
             if snapshot_number_kind in ['redshift', 'scalefactor', 'time']:
                 raise ValueError(
-                    'input {} for snapshot, but cannot find snapshot time file in ' +
-                    snapshot_number_kind, directory)
+                    'input {} for snapshot, but cannot find snapshot time file in {}'.format(
+                        snapshot_number_kind, directory))
 
         self.is_first_print = True
 
@@ -477,8 +478,8 @@ class ReadClass(ut.io.SayClass):
             # mass of each particle species, if all particles are same
             # (= 0 if they are different, which is usually true)
             'MassTable': 'particle.masses',
-            'Time': 'time',  # [Gyr / h]
-            'BoxSize': 'box.length',  # [kpc / h comoving]
+            'Time': 'time',  # [Gyr/h]
+            'BoxSize': 'box.length',  # [kpc/h comoving]
             'Redshift': 'redshift',
             # number of output files per snapshot
             'NumFilesPerSnapshot': 'file.number.per.snapshot',

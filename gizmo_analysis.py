@@ -337,7 +337,7 @@ class SpeciesProfileClass(ut.io.SayClass):
         for spec_i, spec_name in enumerate(species):
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
-                part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
+                part_indices = ut.array.get_arange(part[spec_name].prop(prop_name))
 
             if other_prop_limits:
                 part_indices = ut.catalog.get_indices_catalog(
@@ -474,9 +474,9 @@ class SpeciesProfileClass(ut.io.SayClass):
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
                 try:
-                    part_indices = ut.array.arange_length(part[spec_name].prop(prop_name))
+                    part_indices = ut.array.get_arange(part[spec_name].prop(prop_name))
                 except:
-                    part_indices = ut.array.arange_length(part[spec_name].prop('mass'))
+                    part_indices = ut.array.get_arange(part[spec_name].prop('mass'))
 
             if other_prop_limits:
                 part_indices = ut.catalog.get_indices_catalog(
@@ -986,7 +986,7 @@ def plot_image(
     distances_max = np.array(distances_max, dtype=np.float64)
 
     if part_indices is None or not len(part_indices):
-        part_indices = ut.array.arange_length(part[spec_name]['position'].shape[0])
+        part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
 
     if other_prop_limits:
         part_indices = ut.catalog.get_indices_catalog(
@@ -1035,7 +1035,7 @@ def plot_image(
     if hal is not None:
         # compile halos
         if hal_indices is None or not len(hal_indices):
-            hal_indices = ut.array.arange_length(hal['total.mass'])
+            hal_indices = ut.array.get_arange(hal['total.mass'])
 
         if 0 not in hal_indices:
             hal_indices = np.concatenate([[0], hal_indices])
@@ -1368,7 +1368,7 @@ def plot_property_distribution(
         if part_indicess[part_i] is not None and len(part_indicess[part_i]):
             part_indices = part_indicess[part_i]
         else:
-            part_indices = ut.array.arange_length(part[spec_name]['position'].shape[0])
+            part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
 
         if other_prop_limits:
             part_indices = ut.catalog.get_indices_catalog(
@@ -1442,9 +1442,9 @@ def plot_property_v_property(
     part, spec_name='gas',
     x_prop_name='density', x_prop_limits=[], x_prop_scaling='log',
     y_prop_name='temperature', y_prop_limits=[], y_prop_scaling='log',
-    prop_bin_number=300, weight_by_mass=True, cut_percent=0,
+    prop_bin_number=150, weight_by_mass=True, cut_percent=0,
     host_distance_limits=[0, 300], center_position=None,
-    other_prop_limits={}, part_indices=None,
+    other_prop_limits={}, part_indices=None, draw_statistics=False,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     Plot property v property.
@@ -1465,6 +1465,7 @@ def plot_property_v_property(
     center_position : array : position of galaxy center
     other_prop_limits : dict : dictionary with properties as keys and limits as values
     part_indices : array : indices of particles from which to select
+    draw_statistics : boolean : whether to draw statistics (such as median) on figure
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -1472,13 +1473,13 @@ def plot_property_v_property(
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
     if part_indices is None or not len(part_indices):
-        part_indices = ut.array.arange_length(part[spec_name].prop(x_prop_name))
+        part_indices = ut.array.get_arange(part[spec_name].prop(x_prop_name))
 
     if other_prop_limits:
         part_indices = ut.catalog.get_indices_catalog(
             part[spec_name], other_prop_limits, part_indices)
 
-    if len(center_position) and len(host_distance_limits):
+    if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scalefactor']
@@ -1490,7 +1491,7 @@ def plot_property_v_property(
     if weight_by_mass:
         masses = part[spec_name].prop('mass', part_indices)
 
-    part_indices = ut.array.arange_length(part_indices)
+    part_indices = ut.array.get_arange(part_indices)
 
     if x_prop_limits:
         part_indices = ut.array.get_indices(x_prop_values, x_prop_limits, part_indices)
@@ -1516,6 +1517,11 @@ def plot_property_v_property(
         y_prop_values = ut.math.get_log(y_prop_values)
 
     print(x_prop_values.size, y_prop_values.size)
+
+    if draw_statistics:
+        stat_bin_number = int(np.round(prop_bin_number / 10))
+        Bin = ut.binning.BinClass(x_prop_limits, None, stat_bin_number, False, x_prop_scaling)
+        stat = Bin.get_statistics_of_array(x_prop_values, y_prop_values)
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index, left=0.18, right=0.95, top=0.96, bottom=0.16)
@@ -1559,17 +1565,23 @@ def plot_property_v_property(
     """
     #plt.colorbar()
 
+    if draw_statistics:
+        print(stat['bin.mid'])
+        subplot.plot(stat['bin.mid'], stat['median'], color='black', linestyle='-', alpha=0.5)
+        subplot.plot(stat['bin.mid'], stat['percent.16'], color='black', linestyle='--', alpha=0.4)
+        subplot.plot(stat['bin.mid'], stat['percent.84'], color='black', linestyle='--', alpha=0.4)
+
     if host_distance_limits is not None and len(host_distance_limits):
         label = ut.plot.get_label_distance('host.distance', host_distance_limits)
 
         # distance legend
         legend = subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle=':')], [label],
+            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label],
             loc='best', prop=FontProperties(size=18))
         legend.get_frame().set_alpha(0.5)
 
-    plot_name = (spec_name + '.' + y_prop_name + '_v_' + x_prop_name +
-                 ut.plot.get_time_name_file('redshift', part.snapshot))
+    plot_name = spec_name + '.' + y_prop_name + '_v_' + x_prop_name
+    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
     if host_distance_limits is not None and len(host_distance_limits):
         plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limits[0], host_distance_limits[1])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
@@ -2160,7 +2172,7 @@ def get_star_form_history(
     species = 'star'
 
     if part_indices is None:
-        part_indices = ut.array.arange_length(part[species]['mass'])
+        part_indices = ut.array.get_arange(part[species]['mass'])
 
     if other_prop_limits:
         part_indices = ut.catalog.get_indices_catalog(
@@ -3224,6 +3236,9 @@ class CompareSimulationsClass(ut.io.SayClass):
             note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
         force_float32 : boolean : whether to force positions to be 32-bit
         '''
+        distance_limits_galaxy = [0.1, 30]
+        distance_limits_halo = [0.5, 300]
+
         if isinstance(parts, dict):
             parts = [parts]
 
@@ -3247,7 +3262,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
                 plot_property_v_distance(
                     parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
-                    [1, 300], distance_bin_width, write_plot=True)
+                    distance_limits_halo, distance_bin_width, write_plot=True)
 
                 plot_property_v_distance(
                     parts, 'baryon', 'mass', 'sum.cum.fraction', 'linear', False, [0, 2],
@@ -3256,43 +3271,43 @@ class CompareSimulationsClass(ut.io.SayClass):
             if 'dark' in parts[0]:
                 plot_property_v_distance(
                     parts, 'dark', 'mass', 'sum.cum', 'log', False, [None, None],
-                    [1, 300], distance_bin_width, write_plot=True)
+                    distance_limits_halo, distance_bin_width, write_plot=True)
 
                 plot_property_v_distance(
                     parts, 'dark', 'mass', 'density', 'log', False, [None, None],
-                    [0.1, 30], distance_bin_width, write_plot=True)
+                    distance_limits_galaxy, distance_bin_width, write_plot=True)
 
             if 'gas' in parts[0]:
                 plot_property_v_distance(
                     parts, 'gas', 'mass', 'sum.cum', 'log', False, [None, None],
-                    [1, 300], distance_bin_width, write_plot=True)
+                    distance_limits_halo, distance_bin_width, write_plot=True)
 
                 plot_property_v_distance(
                     parts, 'star', 'metallicity.total', 'median', 'linear', True, [None, None],
-                    [0.1, 30], distance_bin_width, write_plot=True)
+                    distance_limits_galaxy, distance_bin_width, write_plot=True)
 
                 if 'velocity' in property_names:
                     plot_property_v_distance(
                         parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
-                        [1, 300], 0.25, write_plot=True)
+                        distance_limits_halo, 0.25, write_plot=True)
 
             if 'star' in parts[0]:
                 plot_property_v_distance(
                     parts, 'star', 'mass', 'sum.cum', 'log', False, [None, None],
-                    [1, 300], distance_bin_width, write_plot=True)
+                    distance_limits_halo, distance_bin_width, write_plot=True)
 
                 plot_property_v_distance(
                     parts, 'star', 'mass', 'density', 'log', False, [None, None],
-                    [0.1, 30], distance_bin_width, write_plot=True)
+                    distance_limits_galaxy, distance_bin_width, write_plot=True)
 
                 if 'form.time' in property_names and redshift <= 5:
                     plot_property_v_distance(
                         parts, 'star', 'age', 'average', 'linear', True,
-                        [None, None], [0.1, 30], distance_bin_width, write_plot=True)
+                        [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)
 
                     plot_property_v_distance(
                         parts, 'star', 'metallicity.total', 'median', 'linear', True,
-                        [None, None], [0.1, 30], distance_bin_width, write_plot=True)
+                        [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)
 
                     plot_star_form_history(
                         parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
