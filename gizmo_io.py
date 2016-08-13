@@ -234,9 +234,11 @@ class ReadClass(ut.io.SayClass):
 
         self.species_names = list(self.species_dict.keys())
 
-    def read_snapshot(
+        self.read_snapshot = self.read_snapshots  # alias for backwards compatability
+
+    def read_snapshots(
         self, species_names='all',
-        snapshot_number_kind='index', snapshot_number=600,
+        snapshot_number_kind='index', snapshot_numbers=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         property_names='all', element_indices=[0, 1], particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False, assign_center=True,
@@ -256,7 +258,8 @@ class ReadClass(ut.io.SayClass):
             'blackhole' = black holes, if run contains them
             'bulge' or 'disk' = stars for non-cosmological run
         snapshot_number_kind : string : input snapshot number kind: index, redshift
-        snapshot_number : int or float : index (number) of snapshot file
+        snapshot_numbers : int or float or list thereof :
+            index[s] or redshifts[s] or scale-factor[s] of snapshot file[s]
         simulation_directory : root directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
         simulation_name : string : name to store for future identification
@@ -275,7 +278,8 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        dictionary class, with keys for each particle species
+        parts : dictionary or list thereof :
+            if single snapshot, return as dictionary, else if multiple snapshots, return as list
         '''
         # parse input species list
         if species_names == 'all' or species_names == ['all'] or not species_names:
@@ -296,67 +300,81 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
 
-        Snapshot, snapshot_index = self.read_snapshot_times(
-            simulation_directory, snapshot_number_kind, snapshot_number)
+        Snapshot = self.read_snapshot_times(simulation_directory)
 
-        # read header from snapshot file
-        header = self.read_header(
-            'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name)
+        snapshot_numbers = ut.array.arrayize(snapshot_numbers)
 
-        # read particles from snapshot file[s]
-        part = self.read_particles(
-            'index', snapshot_index, simulation_directory, snapshot_directory, property_names,
-            element_indices, force_float32, header)
+        parts = []  # list to store particle dictionaries
 
-        # assign cosmological parameters
-        if header['is.cosmological']:
-            # for cosmological parameters not in header, use values set above
-            Cosmology = ut.cosmology.CosmologyClass(
-                header['hubble'], header['omega_matter'], header['omega_lambda'],
-                self.omega_baryon, self.sigma_8, self.n_s, self.w)
+        # read all input snapshot numbers of simulation
+        for snapshot_number in snapshot_numbers:
+            snapshot_index = Snapshot.parse_snapshot_number(snapshot_number_kind, snapshot_number)
 
-        # adjust properties for each species
-        self.adjust_particles(
-            part, header, Cosmology, particle_subsample_factor, separate_dark_lowres,
-            sort_dark_by_id)
+            # read header from snapshot file
+            header = self.read_header(
+                'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name)
 
-        if check_sanity:
-            self.check_sanity(part)
+            # read particles from snapshot file[s]
+            part = self.read_particles(
+                'index', snapshot_index, simulation_directory, snapshot_directory, property_names,
+                element_indices, force_float32, header)
 
-        # assign auxilliary information to particle dictionary class
-        # store header dictionary
-        part.info = header
-        for spec_name in self.species_names:
-            part[spec_name].info = part.info
+            # assign cosmological parameters
+            if header['is.cosmological']:
+                # for cosmological parameters not in header, use values set above
+                Cosmology = ut.cosmology.CosmologyClass(
+                    header['hubble'], header['omega_matter'], header['omega_lambda'],
+                    self.omega_baryon, self.sigma_8, self.n_s, self.w)
 
-        # store cosmology class
-        part.Cosmology = Cosmology
-        for spec_name in self.species_names:
-            part[spec_name].Cosmology = part.Cosmology
+            # adjust properties for each species
+            self.adjust_particles(
+                part, header, Cosmology, particle_subsample_factor, separate_dark_lowres,
+                sort_dark_by_id)
 
-        # store information about snapshot time
-        time = Cosmology.get_time_from_redshift(header['redshift'])
-        part.snapshot = {
-            'index': snapshot_index,
-            'redshift': header['redshift'],
-            'scalefactor': header['scalefactor'],
-            'time': time,
-            'time.lookback': Cosmology.get_time_from_redshift(0) - time,
-            'time.hubble': ut.const.Gyr_per_sec / Cosmology.get_hubble_parameter(0),
-        }
-        for spec_name in self.species_names:
-            part[spec_name].snapshot = part.snapshot
+            if check_sanity:
+                self.check_sanity(part)
 
-        # store information on all snapshot times - may or may not be initialized
-        part.Snapshot = Snapshot
+            # assign auxilliary information to particle dictionary class
+            # store header dictionary
+            part.info = header
+            for spec_name in self.species_names:
+                part[spec_name].info = part.info
 
-        # arrays to store center position and velocity
-        part.center_position = []
-        part.center_velocity = []
-        if assign_center:
-            self.assign_center(part)
+            # store cosmology class
+            part.Cosmology = Cosmology
+            for spec_name in self.species_names:
+                part[spec_name].Cosmology = part.Cosmology
 
-        return part
+            # store information about snapshot time
+            time = Cosmology.get_time_from_redshift(header['redshift'])
+            part.snapshot = {
+                'index': snapshot_index,
+                'redshift': header['redshift'],
+                'scalefactor': header['scalefactor'],
+                'time': time,
+                'time.lookback': Cosmology.get_time_from_redshift(0) - time,
+                'time.hubble': ut.const.Gyr_per_sec / Cosmology.get_hubble_parameter(0),
+            }
+            for spec_name in self.species_names:
+                part[spec_name].snapshot = part.snapshot
+
+            # store information on all snapshot times - may or may not be initialized
+            part.Snapshot = Snapshot
+
+            # arrays to store center position and velocity
+            part.center_position = []
+            part.center_velocity = []
+            if assign_center:
+                self.assign_center(part)
+
+            # if read only 1 snapshot, return as particle dictionary instead of list
+            if len(snapshot_numbers) == 1:
+                parts = part
+            else:
+                parts.append(part)
+                print()
+
+        return parts
 
     def get_file_name(self, directory, snapshot_index):
         '''
@@ -402,21 +420,18 @@ class ReadClass(ut.io.SayClass):
 
         return path_file_name
 
-    def read_snapshot_times(self, directory, snapshot_number_kind, snapshot_number):
+    def read_snapshot_times(self, directory):
         '''
         Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
-        Return as dictionary class.
+        Return as dictionary.
 
         Parameters
         ----------
         directory : string : directory of snapshot file
-        snapshot_number_kind : string : kind of number that am supplying: 'redshift', 'index'
-        snapshot_number : int or float : corresponding number
 
         Returns
         -------
-        Snapshot : dictionary class of snapshot information
-        snapshot_index : int : index number of snapshot file
+        Snapshot : dictionary of snapshot information
         '''
         directory = ut.io.get_path(directory)
 
@@ -428,27 +443,11 @@ class ReadClass(ut.io.SayClass):
             except:
                 Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
         except:
-            if snapshot_number_kind in ['redshift', 'scalefactor', 'time']:
-                raise ValueError(
-                    'input {} for snapshot, but cannot find snapshot time file in {}'.format(
-                        snapshot_number_kind, directory))
+            raise ValueError('cannot find file of snapshot times in {}'.format(directory))
 
         self.is_first_print = True
 
-        if snapshot_number_kind in ['redshift', 'scalefactor', 'time']:
-            snapshot_index = Snapshot.get_index(snapshot_number, time_kind=snapshot_number_kind)
-            snapshot_time_kind = snapshot_number_kind
-            snapshot_time_value = Snapshot[snapshot_number_kind][snapshot_index]
-            self.say('input {} = {:.3f}'.format(snapshot_number_kind, snapshot_number))
-        else:
-            snapshot_index = snapshot_number
-            snapshot_time_kind = 'redshift'
-            snapshot_time_value = Snapshot['redshift'][snapshot_index]
-        self.say(
-            'reading snapshot index = {}, {} = {:.3f}\n'.format(
-                snapshot_index, snapshot_time_kind, snapshot_time_value))
-
-        return Snapshot, snapshot_index
+        return Snapshot
 
     def read_header(
         self, snapshot_number_kind='index', snapshot_number=600, simulation_directory='.',
@@ -502,8 +501,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_number_kind != 'index':
-            _Snapshot, snapshot_index = self.read_snapshot_times(
-                simulation_directory, snapshot_number_kind, snapshot_number)
+            Snapshot = self.read_snapshot_times(simulation_directory)
+            snapshot_index = Snapshot.part_snapshot_number(snapshot_number_kind, snapshot_number)
         else:
             snapshot_index = snapshot_number
 
@@ -668,8 +667,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_number_kind != 'index':
-            _Snapshot, snapshot_index = self.read_snapshot_times(
-                simulation_directory, snapshot_number_kind, snapshot_number)
+            Snapshot = self.read_snapshot_times(simulation_directory)
+            snapshot_index = Snapshot.parse_snapshot_number(snapshot_number_kind, snapshot_number)
         else:
             snapshot_index = snapshot_number
 
@@ -1057,8 +1056,8 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        _Snapshot, snapshot_index = self.read_snapshot_times(
-            simulation_directory, snapshot_number_kind, snapshot_number)
+        Snapshot = self.read_snapshot_times(simulation_directory)
+        snapshot_index = Snapshot.part_snapshot_number(snapshot_number_kind, snapshot_number)
 
         # get file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
