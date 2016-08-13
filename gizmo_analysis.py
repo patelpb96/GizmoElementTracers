@@ -1706,7 +1706,7 @@ def plot_property_v_distance(
         densities_nfw *= pro[species]['distance'][-1] / pro[species]['distance']
         subplot.plot(distances_nfw, densities_nfw, color='black', linestyle=':', alpha=0.6)
 
-    # plot profiles of objects
+    # plot profiles
     if len(pros) == 1:
         alpha = 1.0
         linewidth = 3.5
@@ -1721,10 +1721,16 @@ def plot_property_v_distance(
         if 'res-adapt' in parts[part_i].info['simulation.name']:
             linestyle = '--'
             color = colors[part_i - 1]
+
+        label = parts[part_i].info['simulation.name']
+        if len(pros) > 1 and parts[0].info['simulation.name'] == parts[1].info['simulation.name']:
+            label = '$z={:.1f}$'.format(parts[part_i].snapshot['redshift'])
+            label_redshift = False
+
         masks = pro[species][prop_statistic] != 0  # plot only non-zero values
         subplot.plot(pro[species]['distance'][masks], pro[species][prop_statistic][masks],
                      color=color, linestyle=linestyle, alpha=alpha, linewidth=linewidth,
-                     label=parts[part_i].info['simulation.name'])
+                     label=label)
 
     # redshift legend
     legend_z = None
@@ -2828,7 +2834,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     redshifts = np.sort(redshifts)
 
     for _zi, redshift in enumerate(redshifts):
-        part = gizmo_io.Read.read_snapshot(
+        part = gizmo_io.Read.read_snapshots(
             species, 'redshift', redshift, simulation_directory, property_names=properties_read,
             force_float32=True)
 
@@ -3021,7 +3027,7 @@ def get_galaxy_mass_profiles_v_redshift(
         if parts is not None and len(parts):
             part = parts[zi]
         else:
-            part = gizmo_io.Read.read_snapshot(
+            part = gizmo_io.Read.read_snapshots(
                 species_read, 'redshift', redshift, directory, property_names=properties_read,
                 force_float32=True)
 
@@ -3192,7 +3198,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         directories = []
         for directory in simulation_names:
             try:
-                part = gizmo_io.Read.read_snapshot(
+                part = gizmo_io.Read.read_snapshots(
                     species, 'redshift', redshift, directory, 'output/',
                     simulation_names[directory], property_names, element_indices,
                     force_float32=force_float32)
@@ -3405,7 +3411,7 @@ def compare_resolution(
                 assign_center = True
                 if 'ref14' in simulation_dir:
                     assign_center = False
-                part = gizmo_io.Read.read_snapshot(
+                part = gizmo_io.Read.read_snapshots(
                     'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
                     property_names=['position', 'mass'], assign_center=assign_center,
                     force_float32=True)

@@ -136,7 +136,7 @@ class ReadClass():
         parts = []
 
         for snapshot_redshift in self.snapshot_redshifts:
-            part = gizmo_io.Read.read_snapshot(
+            part = gizmo_io.Read.read_snapshots(
                 'all', 'redshift', snapshot_redshift, self.simulation_directory,
                 property_names=['position', 'mass', 'id'], assign_center=False,
                 sort_dark_by_id=True, force_float32=False)
