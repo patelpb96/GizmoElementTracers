@@ -270,7 +270,7 @@ def write_initial_condition_points(
     log_file_name = file_name.replace('.txt', '_log.txt')
     file_out = open(log_file_name, 'w')
 
-    Write = ut.io.WriteClass(file_out=file_out, print_stdout=True)
+    Write = ut.io.WriteClass(file_out, print_stdout=True)
 
     Write.write('# redshift: final = {:.3f}, initial = {:.3f}'.format(
                 part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))

@@ -936,7 +936,7 @@ def plot_image(
     align_principal_axes=False, use_column_units=None, image_limits=[None, None],
     background_color='white',
     hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-    get_values=False,
+    get_values=False, print_values=False,
     write_plot=False, plot_directory='.', add_image_limits=True, add_simulation_name=False,
     figure_index=1):
     '''
@@ -960,7 +960,7 @@ def plot_image(
     part_indices : array : input selection indices for particles
     subsample_factor : int : factor by which periodically to sub-sample particles
     align_principal_axes : boolean : whether to align positions with principal axes
-    use_column_units : boolean : whether to convert to particle number / cm ^ 2
+    use_column_units : boolean : whether to convert to particle number / cm^2
     image_limits : list : min and max limits to impose on image dynamic range (exposure)
     background_color : string : name of color for background: 'white', 'black'
     hal : dict : catalog of halos at snapshot
@@ -968,6 +968,7 @@ def plot_image(
     hal_position_kind : string : name of position to use for center of halo
     hal_radius_kind : string : name of radius to use for size of halo
     get_values : boolean : whether to return values
+    print_values : boolean : whether to print values to file
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     add_image_limits : boolean : add range of image to file name
@@ -1102,7 +1103,7 @@ def plot_image(
             grid_number = histogram_valuess.size
             lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
             dla_number = np.sum(histogram_valuess > 2e20)
-            Say.say('covering fraction: LLS = {:.4f}, DLA = {:.4f}'.format(
+            Say.say('covering fraction: LLS = {:.2e}, DLA = {:.2e}'.format(
                     lls_number / grid_number, dla_number / grid_number))
 
         masks = (histogram_valuess > 0)
@@ -1235,8 +1236,8 @@ def plot_image(
                 grid_number = histogram_valuess.size
                 lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
                 dla_number = np.sum(histogram_valuess > 2e20)
-                Say.say('covering fraction: LLS = {:.4f}, DLA = {:.4f}'.format(
-                        lls_number / grid_number, dla_number / grid_number))
+                Say.say('covering fraction [{}]: LLS = {:.2e}, DLA = {:.2e}'.format(
+                        plot_i, lls_number / grid_number, dla_number / grid_number))
 
             histogram_valuesss.append(histogram_valuess)
 
@@ -1314,6 +1315,20 @@ def plot_image(
 
     if get_values:
         return histogram_valuess, histogram_xs, histogram_ys
+
+    if print_values:
+        plot_name = plot_name + '.txt'
+        file_out = open(plot_name, 'w')
+        Write = ut.io.WriteClass(file_out, print_stdout=False)
+        Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(distance_bin_width))
+        for ix in range(histogram_xs.size - 1):
+            x = histogram_xs[ix] + 0.5 * (histogram_xs[ix + 1] - histogram_xs[ix])
+            for iy in range(histogram_ys.size - 1):
+                y = histogram_ys[iy] + 0.5 * (histogram_ys[iy + 1] - histogram_ys[iy])
+                Write.write('{:.3f} {:.3f} {:.3e} {:.3e} {:.3e}'.format(
+                            x, y, histogram_valuess[0, ix, iy], histogram_valuess[1, ix, iy],
+                            histogram_valuess[2, ix, iy]))
+        file_out.close()
 
 
 #===================================================================================================
