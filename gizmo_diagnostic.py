@@ -392,7 +392,15 @@ def delete_snapshots(directory='.'):
     ----------
     directory : string : directory of snapshots
     '''
-    snapshot_indices = [0, 1, 2, 20, 26, 33, 41, 52, 67, 88, 120, 142, 172, 214, 277, 382, 590, 600]
+    snapshot_indices = [
+        0, 1, 2,
+        11, 20, 26, 33, 41, 52, 59, 67, 77, 88,
+        102, 120, 142, 172,
+        214, 242, 277,
+        322, 382,
+        412, 446, 486,
+        534, 561, 585, 590, 600
+    ]
 
     snapshot_name_bases = ['snapshot_*.hdf5', 'snapdir_*']
 

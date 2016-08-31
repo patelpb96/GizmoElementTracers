@@ -1146,3 +1146,56 @@ def assign_orbit(
     for spec_name in species:
         for prop in orb[spec_name]:
             part[spec_name]['host.' + prop] = orb[spec_name][prop]
+
+
+#===================================================================================================
+# write Efficient Binary Format (EBF) file for Galaxia
+#===================================================================================================
+def write_ebf_file(part=None, distance_limits=[0, 300]):
+    '''
+    Take Gizmo snapshot, write stars to Efficient Binary Format (EBF) file to use in Galaxia.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    distance_limits : list : min and max distance from center to keep particles [kpc physical]
+    '''
+    import ebf  # @UnresolvedImport
+
+    if part is None:
+        part = Read.read_snapshots('star', 'redshift', 0, element_indices=None, assign_center=True)
+
+    assign_orbit(part, 'star')
+
+    # get particles within the selection region
+    part_indices = ut.particle.get_indices_within_distances(part, 'star', distance_limits)
+
+    # determine the plane of the stellar disk
+    distance_max = 12  # [kpc physical]
+    eigen_vectors, _eigen_values, _axis_ratios = ut.coordinate.get_principal_axes(
+        part['star']['host.distance.vector'][part['star']['host.distance'] < distance_max])
+
+    # rotate/shift phase-space coordinates to be wrt galaxy center
+    positions = ut.coordinate.get_coordinates_rotated(
+        part['star']['host.distance.vector'][part_indices], eigen_vectors)
+    velocities = ut.coordinate.get_coordinates_rotated(
+        part['star']['host.velocity.vector'][part_indices], eigen_vectors)
+
+    file_name = 'galaxia_stars_{}.ebf'.format(part.snapshot['index'])
+
+    # phase-space coordinates
+    ebf.write(file_name, '/pos3', positions, 'w')  # [kpc comoving}
+    ebf.write(file_name, '/vel3', velocities, 'a')  # [km/s]
+
+    # stellar age (time since formation) [Gyr]
+    ebf.write(file_name, '/age', part['star'].prop('age', part_indices), 'a')
+    ebf.write(file_name, '/mass', part['star'].prop('mass', part_indices), 'a')  # [Msun]
+
+    # TODO: store vector with all metallicities (10xN array)
+    ebf.write(file_name, '/feh', part['star'].prop('metallicity.iron', part_indices), 'a')
+    ebf.write(
+        file_name, '/alpha',
+        part['star'].prop('metallicity.magnesium - metallicity.iron', part_indices), 'a')
+
+    # id of star particles
+    ebf.write(file_name, '/parentid', part['star']['id'][part_indices], 'a')
