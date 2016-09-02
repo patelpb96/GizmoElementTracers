@@ -181,8 +181,8 @@ class ParticleDictionaryClass(dict):
                 values = self['massfraction'][indices, element_index]
 
             if 'metallicity.' in property_name:
-                values = ut.math.get_log(values /
-                                         ut.const.sun_composition[element_name + '.massfraction'])
+                values = ut.math.get_log(
+                    values / ut.const.sun_composition[element_name]['massfraction'])
 
             return values
 

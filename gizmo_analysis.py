@@ -929,827 +929,425 @@ def plot_metal_v_distance(
 #===================================================================================================
 # visualize
 #===================================================================================================
-def plot_image(
-    part, spec_name='dark', weight_prop_name='mass', image_kind='histogram',
-    dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
-    distances_max=1000, distance_bin_width=1, distance_bin_number=None,
-    center_position=None, align_principal_axes=False,
-    other_prop_limits={}, part_indices=None, subsample_factor=None,
-    use_column_units=None, image_limits=[None, None],
-    background_color='white',
-    hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-    get_values=False, print_values=False,
-    write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
+class ImageClass(ut.io.SayClass):
     '''
-    Visualize the positions of given partcle species, using either a single panel for 2 axes or
-    3 panels for all axes.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    spec_name : string : particle species to plot
-    weight_prop_name : string : property to weight positions by
-    image_kind : string : 'histogram', 'points'
-    dimen_indices_plot : list : which dimensions to plot
-        if length 2, plot one v other, if length 3, plot all via 3 panels
-    dimen_indices_select : list : which dimensions to use to select particles
-        note : use this to set selection 'depth' of an image
-    distances_max : float or array : distance[s] from center to plot and/or cut
-    distance_bin_width : float : length pixel
-    distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
-    center_position : array-like : position of center
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indices : array : input selection indices for particles
-    subsample_factor : int : factor by which periodically to sub-sample particles
-    align_principal_axes : boolean : whether to align positions with principal axes
-    use_column_units : boolean : whether to convert to particle number / cm^2
-    image_limits : list : min and max limits to impose on image dynamic range (exposure)
-    background_color : string : name of color for background: 'white', 'black'
-    hal : dict : catalog of halos at snapshot
-    hal_indices : array : indices of halos to plot
-    hal_position_kind : string : name of position to use for center of halo
-    hal_radius_kind : string : name of radius to use for size of halo
-    get_values : boolean : whether to return values
-    print_values : boolean : whether to print values to file
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
-    add_simulation_name : boolean : whether to add name of simulation to figure name
-    figure_index : int : index of figure for matplotlib
+    Plot 2-D image[s], save values, write to file.
     '''
-    Say = ut.io.SayClass(plot_image)
+    def plot_image(
+        self, part, spec_name='dark', weight_prop_name='mass', image_kind='histogram',
+        dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
+        distances_max=1000, distance_bin_width=1, distance_bin_number=None,
+        center_position=None, align_principal_axes=False, rotation_vectors=None,
+        other_prop_limits={}, part_indices=None, subsample_factor=None,
+        use_column_units=None, image_limits=[None, None],
+        background_color='white',
+        hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
+        write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
+        '''
+        Visualize the positions of given partcle species, using either a single panel for 2 axes or
+        3 panels for all axes.
 
-    dimen_label = {0: 'x', 1: 'y', 2: 'z'}
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        spec_name : string : particle species to plot
+        weight_prop_name : string : property to weight positions by
+        image_kind : string : 'histogram', 'points'
+        dimen_indices_plot : list : which dimensions to plot
+            if length 2, plot one v other, if length 3, plot all via 3 panels
+        dimen_indices_select : list : which dimensions to use to select particles
+            note : use this to set selection 'depth' of an image
+        distances_max : float or array : distance[s] from center to plot and/or cut
+        distance_bin_width : float : length pixel
+        distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
+        center_position : array-like : position of center
+        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        part_indices : array : input selection indices for particles
+        subsample_factor : int : factor by which periodically to sub-sample particles
+        align_principal_axes : boolean : whether to align positions with principal axes
+        rotation_vectors : array : eigen-vectors to define rotation axes
+        use_column_units : boolean : whether to convert to particle number / cm^2
+        image_limits : list : min and max limits to impose on image dynamic range (exposure)
+        background_color : string : name of color for background: 'white', 'black'
+        hal : dict : catalog of halos at snapshot
+        hal_indices : array : indices of halos to plot
+        hal_position_kind : string : name of position to use for center of halo
+        hal_radius_kind : string : name of radius to use for size of halo
+        write_plot : boolean : whether to write figure to file
+        plot_directory : string : directory to write figure file
+        add_simulation_name : boolean : whether to add name of simulation to figure name
+        figure_index : int : index of figure for matplotlib
+        '''
+        dimen_label = {0: 'x', 1: 'y', 2: 'z'}
 
-    if dimen_indices_select is None or not len(dimen_indices_select):
-        dimen_indices_select = dimen_indices_plot
+        if dimen_indices_select is None or not len(dimen_indices_select):
+            dimen_indices_select = dimen_indices_plot
 
-    if np.isscalar(distances_max):
-        distances_max = [distances_max for dimen_i in range(part[spec_name]['position'].shape[1])]
-    distances_max = np.array(distances_max, dtype=np.float64)
-
-    if part_indices is None or not len(part_indices):
-        part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
-
-    if other_prop_limits:
-        part_indices = ut.catalog.get_indices_catalog(
-            part[spec_name], other_prop_limits, part_indices)
-
-    if subsample_factor is not None and subsample_factor > 1:
-        part_indices = part_indices[::subsample_factor]
-
-    positions = np.array(part[spec_name]['position'][part_indices])
-    if weight_prop_name:
-        weights = part[spec_name].prop(weight_prop_name, part_indices)
-    else:
-        weights = None
-
-    center_position = ut.particle.parse_property(part, 'position', center_position)
-
-    if center_position is not None and len(center_position):
-        # re-orient to input center
-        positions -= center_position
-        positions *= part.snapshot['scalefactor']
-
-        # initialize masks
-        masks = (positions[:, dimen_indices_select[0]] <= distances_max[0])
-        for dimen_i in dimen_indices_select:
-            masks *= (
-                (positions[:, dimen_i] >= -distances_max[dimen_i]) *
-                (positions[:, dimen_i] <= distances_max[dimen_i])
-            )
-
-        positions = positions[masks]
-        if weights is not None:
-            weights = weights[masks]
-
-        if align_principal_axes:
-            eigen_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
-            positions = ut.coordinate.get_coordinates_rotated(positions, eigen_vectors)
-    else:
-        raise ValueError('need to input center position')
-        #distances_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
-
-    if distance_bin_width is not None and distance_bin_width > 0:
-        position_bin_number = int(
-            np.round(2 * np.max(distances_max[dimen_indices_plot]) / distance_bin_width))
-    elif distance_bin_number is not None and distance_bin_number > 0:
-        position_bin_number = 2 * distance_bin_number
-    else:
-        raise ValueError('need to input either distance bin width or bin number')
-
-    if hal is not None:
-        # compile halos
-        if hal_indices is None or not len(hal_indices):
-            hal_indices = ut.array.get_arange(hal['total.mass'])
-
-        if 0 not in hal_indices:
-            hal_indices = np.concatenate([[0], hal_indices])
-
-        hal_positions = np.array(hal[hal_position_kind][hal_indices])
-        if center_position is not None and len(center_position):
-            hal_positions -= center_position
-        hal_positions *= hal.snapshot['scalefactor']
-        hal_radiuss = hal[hal_radius_kind][hal_indices]
-
-        # initialize masks
-        masks = (hal_positions[:, dimen_indices_select[0]] <= distances_max[0])
-        for dimen_i in dimen_indices_select:
-            masks *= (
-                (hal_positions[:, dimen_i] >= -distances_max[dimen_i]) *
-                (hal_positions[:, dimen_i] <= distances_max[dimen_i])
-            )
-
-        hal_radiuss = hal_radiuss[masks]
-        hal_positions = hal_positions[masks]
-
-    # plot ----------
-    BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
-    plt.register_cmap(cmap=BYW)
-    BBW = colors.LinearSegmentedColormap('bbw', ut.plot.cmap_dict['BlackBlueWhite'])
-    plt.register_cmap(cmap=BBW)
-
-    if background_color == 'black':
-        if 'dark' in spec_name or 'gas' in spec_name:
-            color_map = plt.get_cmap('bbw')
-        elif spec_name == 'star':
-            color_map = plt.get_cmap('byw')
-    elif background_color == 'white':
-        color_map = plt.cm.YlOrBr  # @UndefinedVariable
-        #color_map = plt.cm.Greys_r,  # @UndefinedVariable
-
-    if len(dimen_indices_plot) == 2:
-        fig, subplot = ut.plot.make_figure(
-            figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14,
-            background_color=background_color)
+        if np.isscalar(distances_max):
+            distances_max = [distances_max for dimen_i in
+                             range(part[spec_name]['position'].shape[1])]
+        distances_max = np.array(distances_max, dtype=np.float64)
 
         position_limits = []
-        for dimen_i in dimen_indices_plot:
+        for dimen_i in range(distances_max.shape[0]):
             position_limits.append([-distances_max[dimen_i], distances_max[dimen_i]])
         position_limits = np.array(position_limits)
 
-        subplot.set_xlim(position_limits[0])
-        subplot.set_ylim(position_limits[1])
+        if part_indices is None or not len(part_indices):
+            part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
 
-        subplot.set_xlabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[0]]))
-        subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
+        if other_prop_limits:
+            part_indices = ut.catalog.get_indices_catalog(
+                part[spec_name], other_prop_limits, part_indices)
 
-        if image_kind == 'histogram':
-            # smooth image
-            histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
-                positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-                position_bin_number, position_limits,
-                weights=weights,
-                normed=False,
-            )
+        if subsample_factor is not None and subsample_factor > 1:
+            part_indices = part_indices[::subsample_factor]
 
-            # smooth image
-            histogram_valuess, (histogram_xs, histogram_ys, histogram_zs) = np.histogramdd(
-                positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-                position_bin_number, position_limits,
-                weights=weights,
-                normed=False,
-            )
+        positions = np.array(part[spec_name]['position'][part_indices])
+        weights = None
+        if weight_prop_name:
+            weights = part[spec_name].prop(weight_prop_name, part_indices)
 
-            # convert to surface density
-            histogram_valuess /= np.diff(histogram_xs)[0] * np.diff(histogram_ys)[0]
+        center_position = ut.particle.parse_property(part, 'position', center_position)
 
-            # convert to column density
-            if use_column_units:
-                histogram_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
-                grid_number = histogram_valuess.size
-                lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
-                dla_number = np.sum(histogram_valuess > 2e20)
-                Say.say('covering fraction: LLS = {:.2e}, DLA = {:.2e}'.format(
-                        lls_number / grid_number, dla_number / grid_number))
+        if center_position is not None and len(center_position):
+            # re-orient to input center
+            positions -= center_position
+            positions *= part.snapshot['scalefactor']
 
-            masks = (histogram_valuess > 0)
-            Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
-                    histogram_valuess[masks].min(), np.median(histogram_valuess[masks]),
-                    histogram_valuess[masks].max()))
+            # initialize masks
+            masks = (positions[:, dimen_indices_select[0]] <= distances_max[0])
+            for dimen_i in dimen_indices_select:
+                masks *= (
+                    (positions[:, dimen_i] >= -distances_max[dimen_i]) *
+                    (positions[:, dimen_i] <= distances_max[dimen_i])
+                )
 
-            image_limits_use = [histogram_valuess[masks].min(), histogram_valuess[masks].max()]
-            if image_limits is not None and len(image_limits):
-                if image_limits[0] is not None:
-                    image_limits_use[0] = image_limits[0]
-                if image_limits[1] is not None:
-                    image_limits_use[1] = image_limits[1]
+            positions = positions[masks]
+            if weights is not None:
+                weights = weights[masks]
 
-            #"""
-            _Image = subplot.imshow(
-                histogram_valuess.transpose(),
-                norm=colors.LogNorm(),
-                cmap=color_map,
-                aspect='auto',
-                #interpolation='none',
-                #interpolation='nearest',
-                interpolation='bilinear',
-                #interpolation='bicubic',
-                #interpolation='gaussian',
-                extent=np.concatenate(position_limits),
-                vmin=image_limits[0], vmax=image_limits[1],
-            )
-            #"""
+            if align_principal_axes:
+                if rotation_vectors is None:
+                    rotation_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
+                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
+        else:
+            raise ValueError('need to input center position')
 
-            # standard method
-            """
-            histogram_valuess, histogram_xs, histogram_ys, _Image = subplot.hist2d(
-                positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-                weights=weights, range=position_limits, bins=position_bin_number,
-                norm=colors.LogNorm(),
-                #cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-                cmap=plt.get_cmap('test'),
-                vmin=image_limits[0], vmax=image_limits[1],
-            )
-            """
+        if distance_bin_width is not None and distance_bin_width > 0:
+            position_bin_number = int(
+                np.round(2 * np.max(distances_max[dimen_indices_plot]) / distance_bin_width))
+        elif distance_bin_number is not None and distance_bin_number > 0:
+            position_bin_number = 2 * distance_bin_number
+        else:
+            raise ValueError('need to input either distance bin width or bin number')
 
-            # plot average of property
-            """
-            histogram_valuess = ut.math.Fraction.get_fraction(histogram_valuess, grid_number)
-
-            subplot.imshow(
-                histogram_valuess.transpose(),
-                #norm=colors.LogNorm(),
-                cmap=color_map,  # @UndefinedVariable
-                aspect='auto',
-                #interpolation='nearest',
-                interpolation='none',
-                extent=np.concatenate(position_limits),
-                vmin=np.min(weights), vmax=np.max(weights),
-            )
-            """
-
-            fig.colorbar(_Image)
-
-        elif image_kind == 'points':
-            subplot.scatter(
-                positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-                marker='o', c=weights)  #, markersize=2.0, markeredgecolor='red', markeredgewidth=0,
-                #color='red', alpha=0.02)
-
-        fig.gca().set_aspect('equal')
-
-        # plot halos
         if hal is not None:
-            for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
-                print(hal_position, hal_radius)
-                circle = plt.Circle(
-                    hal_position[dimen_indices_plot], hal_radius, color='w', linewidth=1,
-                    fill=False)
-                subplot.add_artist(circle)
+            # compile halos
+            if hal_indices is None or not len(hal_indices):
+                hal_indices = ut.array.get_arange(hal['total.mass'])
 
-    elif len(dimen_indices_plot) == 3:
-        fig, subplots = ut.plot.make_figure(
-            figure_index, [2, 2], left=0.17, right=0.96, top=0.97, bottom=0.13,
-            background_color=background_color)
+            if 0 not in hal_indices:
+                hal_indices = np.concatenate([[0], hal_indices])
 
-        plot_dimen_iss = [
-            [dimen_indices_plot[0], dimen_indices_plot[1]],
-            [dimen_indices_plot[0], dimen_indices_plot[2]],
-            [dimen_indices_plot[1], dimen_indices_plot[2]],
-        ]
+            hal_positions = np.array(hal[hal_position_kind][hal_indices])
+            if center_position is not None and len(center_position):
+                hal_positions -= center_position
+            hal_positions *= hal.snapshot['scalefactor']
+            hal_radiuss = hal[hal_radius_kind][hal_indices]
 
-        subplot_iss = [
-            [0, 0],
-            [1, 0],
-            [1, 1],
-        ]
+            # initialize masks
+            masks = (hal_positions[:, dimen_indices_select[0]] <= distances_max[0])
+            for dimen_i in dimen_indices_select:
+                masks *= (
+                    (hal_positions[:, dimen_i] >= -distances_max[dimen_i]) *
+                    (hal_positions[:, dimen_i] <= distances_max[dimen_i])
+                )
 
-        histogram_valuesss = []
-        for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
-            subplot_is = subplot_iss[plot_i]
-            subplot = subplots[subplot_is[0], subplot_is[1]]
+            hal_radiuss = hal_radiuss[masks]
+            hal_positions = hal_positions[masks]
 
-            position_limits = []
-            for dimen_i in subplot_is:
-                position_limits.append([-distances_max[dimen_i], distances_max[dimen_i]])
-            position_limits = np.array(position_limits)
+        # plot ----------
+        BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
+        plt.register_cmap(cmap=BYW)
+        BBW = colors.LinearSegmentedColormap('bbw', ut.plot.cmap_dict['BlackBlueWhite'])
+        plt.register_cmap(cmap=BBW)
 
-            # ensure that tick labels do not overlap
-            #position_limits *= 0.999
-            position_limits[0, 0] *= 0.99
-            position_limits[1, 0] *= 0.99
+        if background_color == 'black':
+            if 'dark' in spec_name or 'gas' in spec_name:
+                color_map = plt.get_cmap('bbw')
+            elif spec_name == 'star':
+                color_map = plt.get_cmap('byw')
+        elif background_color == 'white':
+            #color_map = plt.cm.YlOrBr  # @UndefinedVariable
+            #color_map = plt.cm.Greys_r,  # @UndefinedVariable
+            color_map = plt.cm.afmhot  # @UndefinedVariable
+        #color_map = plt.cm.afmhot  # @UndefinedVariable
+        #color_map = None
 
-            subplot.set_xlim(position_limits[0])
-            subplot.set_ylim(position_limits[1])
+        if len(dimen_indices_plot) == 2:
+            fig, subplot = ut.plot.make_figure(
+                figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14,
+                background_color=background_color)
 
-            if subplot_is == [0, 0]:
-                subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
-            elif subplot_is == [1, 0]:
-                subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
-                subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
-            elif subplot_is == [1, 1]:
-                subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
+            subplot.set_xlim(position_limits[dimen_indices_plot[0]])
+            subplot.set_ylim(position_limits[dimen_indices_plot[1]])
 
-            histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
-                positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]],
-                position_bin_number, position_limits,
-                normed=False,
-                weights=weights,
-            )
+            subplot.set_xlabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[0]]))
+            subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
 
-            # convert to surface density
-            histogram_valuess /= np.diff(histogram_xs)[0] * np.diff(histogram_ys)[0]
+            if 'histogram' in image_kind:
+                hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
+                    image_kind, dimen_indices_plot, position_bin_number, position_limits, positions,
+                    weights, use_column_units)
 
-            # convert to column density
-            if use_column_units:
-                histogram_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
-                grid_number = histogram_valuess.size
-                lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
-                dla_number = np.sum(histogram_valuess > 2e20)
-                Say.say('covering fraction [{}]: LLS = {:.2e}, DLA = {:.2e}'.format(
-                        plot_i, lls_number / grid_number, dla_number / grid_number))
+                image_limits_use = hist_limits
+                if image_limits is not None and len(image_limits):
+                    if image_limits[0] is not None:
+                        image_limits_use[0] = image_limits[0]
+                    if image_limits[1] is not None:
+                        image_limits_use[1] = image_limits[1]
 
-            histogram_valuesss.append(histogram_valuess)
+                #"""
+                _Image = subplot.imshow(
+                    hist_valuess.transpose(),
+                    norm=colors.LogNorm(),
+                    cmap=color_map,
+                    aspect='auto',
+                    #interpolation='nearest',
+                    interpolation='bilinear',
+                    #interpolation='bicubic',
+                    #interpolation='gaussian',
+                    extent=np.concatenate(position_limits[dimen_indices_plot]),
+                    vmin=image_limits[0], vmax=image_limits[1],
+                )
+                #"""
 
-            masks = (histogram_valuess > 0)
-            Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
-                    histogram_valuess[masks].min(), np.median(histogram_valuess[masks]),
-                    histogram_valuess[masks].max()))
+                # standard method
+                """
+                hist_valuess, hist_xs, hist_ys, _Image = subplot.hist2d(
+                    positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+                    weights=weights, range=position_limits, bins=position_bin_number,
+                    norm=colors.LogNorm(),
+                    #cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+                    cmap=plt.get_cmap('test'),
+                    vmin=image_limits[0], vmax=image_limits[1],
+                )
+                """
 
-            image_limits_use = np.array([histogram_valuess[masks].min(),
-                                         histogram_valuess[masks].max()])
-            if image_limits is not None and len(image_limits):
-                if image_limits[0] is not None:
-                    image_limits_use[0] = image_limits[0]
-                if image_limits[1] is not None:
-                    image_limits_use[1] = image_limits[1]
+                # plot average of property
+                """
+                hist_valuess = ut.math.Fraction.get_fraction(hist_valuess, grid_number)
 
-            _Image = subplot.imshow(
-                histogram_valuess.transpose(),
-                norm=colors.LogNorm(),
-                cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-                #aspect='auto',
-                interpolation='nearest',
-                #interpolation='bilinear',
-                #interpolation='bicubic',
-                #interpolation='gaussian',
-                extent=np.concatenate(position_limits),
-                vmin=image_limits[0], vmax=image_limits[1],
-            )
+                subplot.imshow(
+                    hist_valuess.transpose(),
+                    #norm=colors.LogNorm(),
+                    cmap=color_map,  # @UndefinedVariable
+                    aspect='auto',
+                    #interpolation='nearest',
+                    interpolation='none',
+                    extent=np.concatenate(position_limits),
+                    vmin=np.min(weights), vmax=np.max(weights),
+                )
+                """
 
-            # default method
-            """
-            histogram_valuess, histogram_xs, histogram_ys, _Image = subplot.hist2d(
-                positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
-                range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
-                cmap=plt.cm.YlOrBr)  # @UndefinedVariable
-            """
+                fig.colorbar(_Image)
 
-            #fig.colorbar(_Image)  # , ax=subplot)
+            elif image_kind == 'points':
+                subplot.scatter(
+                    positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+                    marker='o', c=weights)
+                    #, markersize=2.0, markeredgecolor='red', markeredgewidth=0,
+                    #color='red', alpha=0.02)
+
+            fig.gca().set_aspect('equal')
 
             # plot halos
             if hal is not None:
                 for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
+                    print(hal_position, hal_radius)
                     circle = plt.Circle(
-                        hal_position[plot_dimen_is], hal_radius, linewidth=1, fill=False)
+                        hal_position[dimen_indices_plot], hal_radius, color='w', linewidth=1,
+                        fill=False)
                     subplot.add_artist(circle)
 
-                circle = plt.Circle((0, 0), 10, color='black', fill=False)
-                subplot.add_artist(circle)
+        elif len(dimen_indices_plot) == 3:
+            fig, subplots = ut.plot.make_figure(
+                figure_index, [2, 2], left=0.17, right=0.96, top=0.97, bottom=0.13,
+                background_color=background_color)
 
-            subplot.axis('equal')
+            plot_dimen_iss = [
+                [dimen_indices_plot[0], dimen_indices_plot[1]],
+                [dimen_indices_plot[0], dimen_indices_plot[2]],
+                [dimen_indices_plot[1], dimen_indices_plot[2]],
+            ]
 
-        histogram_valuess = np.array(histogram_valuesss)
+            subplot_iss = [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+            ]
 
-    plot_name = spec_name
-    if weight_prop_name:
-        plot_name += '.{}'.format(weight_prop_name)
-    plot_name += '.position'
+            histogram_valuesss = []
+            for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
+                subplot_is = subplot_iss[plot_i]
+                subplot = subplots[subplot_is[0], subplot_is[1]]
 
-    for dimen_i in dimen_indices_plot:
-        plot_name += '.' + dimen_label[dimen_i]
-    plot_name += '_d.{:.0f}'.format(np.max(distances_max[dimen_indices_plot]))
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+                hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
+                    image_kind, plot_dimen_is, position_bin_number, position_limits, positions,
+                    weights, use_column_units)
 
-    if image_kind == 'histogram':
-        plot_name += '_i.{:.1f}-{:.1f}'.format(
-            log10(image_limits_use[0]), log10(image_limits_use[1]))
+                histogram_valuesss.append(hist_valuess)
 
-    if add_simulation_name:
-        plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
+                image_limits_use = hist_limits
+                if image_limits is not None and len(image_limits):
+                    if image_limits[0] is not None:
+                        image_limits_use[0] = image_limits[0]
+                    if image_limits[1] is not None:
+                        image_limits_use[1] = image_limits[1]
 
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+                # ensure that tick labels do not overlap
+                subplot.set_xlim(position_limits[plot_dimen_is[0]] * 0.99)
+                subplot.set_ylim(position_limits[plot_dimen_is[1]] * 0.99)
 
-    if get_values:
-        return histogram_valuess, histogram_xs, histogram_ys
+                if subplot_is == [0, 0]:
+                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
+                elif subplot_is == [1, 0]:
+                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
+                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
+                elif subplot_is == [1, 1]:
+                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
 
-    if print_values:
-        plot_name = plot_name + '.txt'
-        file_out = open(plot_name, 'w')
-        Write = ut.io.WriteClass(file_out, print_stdout=False)
-        Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(distance_bin_width))
-        for ix in range(histogram_xs.size - 1):
-            x = histogram_xs[ix] + 0.5 * (histogram_xs[ix + 1] - histogram_xs[ix])
-            for iy in range(histogram_ys.size - 1):
-                y = histogram_ys[iy] + 0.5 * (histogram_ys[iy + 1] - histogram_ys[iy])
-                Write.write('{:.3f} {:.3f} {:.3e} {:.3e} {:.3e}'.format(
-                            x, y, histogram_valuess[0, ix, iy], histogram_valuess[1, ix, iy],
-                            histogram_valuess[2, ix, iy]))
-        file_out.close()
+                _Image = subplot.imshow(
+                    hist_valuess.transpose(),
+                    norm=colors.LogNorm(),
+                    cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+                    #aspect='auto',
+                    #interpolation='nearest',
+                    interpolation='bilinear',
+                    #interpolation='bicubic',
+                    #interpolation='gaussian',
+                    extent=np.concatenate(position_limits[plot_dimen_is]),
+                    vmin=image_limits[0], vmax=image_limits[1],
+                )
 
+                # default method
+                """
+                hist_valuess, hist_xs, hist_ys, _Image = subplot.hist2d(
+                    positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
+                    range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
+                    cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+                """
 
-def plot_positions(
-    part, spec_name='dark', dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
-    distances_max=1000, distance_bin_width=1, distance_bin_number=None, center_position=None,
-    weight_prop_name='mass', other_prop_limits={}, part_indices=None, subsample_factor=None,
-    align_principal_axes=False, use_column_units=None, image_limits=[None, None],
-    background_color='white',
-    hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-    get_values=False, print_values=False,
-    write_plot=False, plot_directory='.', add_image_limits=True, add_simulation_name=False,
-    figure_index=1):
-    '''
-    Visualize the positions of given partcle species, using either a single panel for 2 axes or
-    3 panels for all axes.
+                #fig.colorbar(_Image)  # , ax=subplot)
 
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    spec_name : string : particle species to plot
-    dimen_indices_plot : list : which dimensions to plot
-        if length 2, plot one v other, if length 3, plot all via 3 panels
-    dimen_indices_select : list : which dimensions to use to select particles
-        note : use this to set selection 'depth' of an image
-    distances_max : float or array : distance[s] from center to plot and/or cut
-    distance_bin_width : float : length pixel
-    distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
-    center_position : array-like : position of center
-    weight_prop_name : string : property to weight positions by
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indices : array : input selection indices for particles
-    subsample_factor : int : factor by which periodically to sub-sample particles
-    align_principal_axes : boolean : whether to align positions with principal axes
-    use_column_units : boolean : whether to convert to particle number / cm^2
-    image_limits : list : min and max limits to impose on image dynamic range (exposure)
-    background_color : string : name of color for background: 'white', 'black'
-    hal : dict : catalog of halos at snapshot
-    hal_indices : array : indices of halos to plot
-    hal_position_kind : string : name of position to use for center of halo
-    hal_radius_kind : string : name of radius to use for size of halo
-    get_values : boolean : whether to return values
-    print_values : boolean : whether to print values to file
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
-    add_image_limits : boolean : add range of image to file name
-    add_simulation_name : boolean : whether to add name of simulation to figure name
-    figure_index : int : index of figure for matplotlib
-    '''
-    Say = ut.io.SayClass(plot_image)
+                # plot halos
+                if hal is not None:
+                    for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
+                        circle = plt.Circle(
+                            hal_position[plot_dimen_is], hal_radius, linewidth=1, fill=False)
+                        subplot.add_artist(circle)
 
-    dimen_label = {0: 'x', 1: 'y', 2: 'z'}
+                    circle = plt.Circle((0, 0), 10, color='black', fill=False)
+                    subplot.add_artist(circle)
 
-    if dimen_indices_select is None or not len(dimen_indices_select):
-        dimen_indices_select = dimen_indices_plot
+                subplot.axis('equal')
 
-    if np.isscalar(distances_max):
-        distances_max = [distances_max for dimen_i in range(part[spec_name]['position'].shape[1])]
-    distances_max = np.array(distances_max, dtype=np.float64)
+            hist_valuess = np.array(histogram_valuesss)
 
-    if part_indices is None or not len(part_indices):
-        part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
+        plot_name = spec_name
+        if weight_prop_name:
+            plot_name += '.{}'.format(weight_prop_name)
+        plot_name += '.position'
 
-    if other_prop_limits:
-        part_indices = ut.catalog.get_indices_catalog(
-            part[spec_name], other_prop_limits, part_indices)
-
-    if subsample_factor is not None and subsample_factor > 1:
-        part_indices = part_indices[::subsample_factor]
-
-    positions = np.array(part[spec_name]['position'][part_indices])
-    if weight_prop_name:
-        weights = part[spec_name].prop(weight_prop_name, part_indices)
-    else:
-        weights = None
-
-    center_position = ut.particle.parse_property(part, 'position', center_position)
-
-    if center_position is not None and len(center_position):
-        # re-orient to input center
-        positions -= center_position
-        positions *= part.snapshot['scalefactor']
-
-        masks = (positions[:, dimen_indices_select[0]] <= distances_max[0])  # initialize masks
-        for dimen_i in dimen_indices_select:
-            masks *= ((positions[:, dimen_i] <= distances_max[dimen_i]) *
-                      (positions[:, dimen_i] >= -distances_max[dimen_i]))
-
-        positions = positions[masks]
-        if weights is not None:
-            weights = weights[masks]
-
-        if align_principal_axes:
-            eigen_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
-            positions = ut.coordinate.get_coordinates_rotated(positions, eigen_vectors)
-    else:
-        raise ValueError('need to input center position')
-        #distances_max = 0.5 * np.max(np.max(positions, 0) - np.min(positions, 0))
-
-    if distance_bin_width is not None and distance_bin_width > 0:
-        position_bin_number = int(np.round(2 * np.max(distances_max[dimen_indices_plot]) /
-                                           distance_bin_width))
-    elif distance_bin_number is not None and distance_bin_number > 0:
-        position_bin_number = 2 * distance_bin_number
-    else:
-        raise ValueError('need to input either distance bin width or bin number')
-
-    if hal is not None:
-        # compile halos
-        if hal_indices is None or not len(hal_indices):
-            hal_indices = ut.array.get_arange(hal['total.mass'])
-
-        if 0 not in hal_indices:
-            hal_indices = np.concatenate([[0], hal_indices])
-
-        hal_positions = np.array(hal[hal_position_kind][hal_indices])
-        if center_position is not None and len(center_position):
-            hal_positions -= center_position
-        hal_positions *= hal.snapshot['scalefactor']
-        hal_radiuss = hal[hal_radius_kind][hal_indices]
-
-        masks = (hal_positions[:, dimen_indices_select[0]] <= distances_max[0])  # initialize masks
-        for dimen_i in dimen_indices_select:
-            masks *= ((hal_positions[:, dimen_i] <= distances_max[dimen_i]) *
-                      (hal_positions[:, dimen_i] >= -distances_max[dimen_i]))
-
-        hal_radiuss = hal_radiuss[masks]
-        hal_positions = hal_positions[masks]
-
-    # plot ----------
-    BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
-    plt.register_cmap(cmap=BYW)
-    BBW = colors.LinearSegmentedColormap('bbw', ut.plot.cmap_dict['BlackBlueWhite'])
-    plt.register_cmap(cmap=BBW)
-
-    if background_color == 'black':
-        if 'dark' in spec_name or 'gas' in spec_name:
-            color_map = plt.get_cmap('bbw')
-        elif spec_name == 'star':
-            color_map = plt.get_cmap('byw')
-    elif background_color == 'white':
-        color_map = plt.cm.YlOrBr  # @UndefinedVariable
-        #color_map = plt.cm.Greys_r,  # @UndefinedVariable
-
-    if len(dimen_indices_plot) == 2:
-        fig, subplot = ut.plot.make_figure(
-            figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14,
-            background_color=background_color)
-
-        position_limits = []
         for dimen_i in dimen_indices_plot:
-            position_limits.append([-distances_max[dimen_i], distances_max[dimen_i]])
-        position_limits = np.array(position_limits)
+            plot_name += '.' + dimen_label[dimen_i]
+        plot_name += '_d.{:.0f}'.format(np.max(distances_max[dimen_indices_plot]))
+        plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
 
-        subplot.set_xlim(position_limits[0])
-        subplot.set_ylim(position_limits[1])
+        if 'histogram' in image_kind:
+            plot_name += '_i.{:.1f}-{:.1f}'.format(
+                log10(image_limits_use[0]), log10(image_limits_use[1]))
 
-        subplot.set_xlabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[0]]))
-        subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
+        if add_simulation_name:
+            plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
 
-        # smooth image
-        histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
-            positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-            position_bin_number, position_limits,
-            normed=False,
-            weights=weights,
-        )
+        ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
-        # convert to surface density
-        histogram_valuess /= np.diff(histogram_xs)[0] * np.diff(histogram_ys)[0]
+        self.histogram_valuess = hist_valuess
+        self.histogram_xs = hist_xs
+        self.histogram_ys = hist_ys
+        self.plot_name = plot_name
 
-        # convert to column density
-        if use_column_units:
-            histogram_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
-            grid_number = histogram_valuess.size
-            lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
-            dla_number = np.sum(histogram_valuess > 2e20)
-            Say.say('covering fraction: LLS = {:.2e}, DLA = {:.2e}'.format(
-                    lls_number / grid_number, dla_number / grid_number))
+    def get_histogram(
+        self, image_kind, dimen_indices_plot, position_bin_number, position_limits, positions,
+        weights, use_column_units):
+        '''
+        .
+        '''
+        if '3d' in image_kind:
+            # calculate maximum local density along projected dimension
+            hist_valuess, (hist_xs, hist_ys, hist_zs) = np.histogramdd(
+                positions, position_bin_number, position_limits, weights=weights, normed=False,
+            )
+            # convert to 3-d density
+            hist_valuess /= (
+                np.diff(hist_xs)[0] * np.diff(hist_ys)[0] * np.diff(hist_zs)[0])
 
-        masks = (histogram_valuess > 0)
-        Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
-                histogram_valuess[masks].min(), np.median(histogram_valuess[masks]),
-                histogram_valuess[masks].max()))
+            dimen_project = np.setdiff1d([0, 1, 2], dimen_indices_plot)
 
-        image_limits_use = [histogram_valuess[masks].min(), histogram_valuess[masks].max()]
-        if image_limits is not None and len(image_limits):
-            if image_limits[0] is not None:
-                image_limits_use[0] = image_limits[0]
-            if image_limits[1] is not None:
-                image_limits_use[1] = image_limits[1]
+            # compute maximum density
+            hist_valuess = np.max(hist_valuess, dimen_project)
 
-        #"""
-        _Image = subplot.imshow(
-            histogram_valuess.transpose(),
-            norm=colors.LogNorm(),
-            cmap=color_map,
-            aspect='auto',
-            #interpolation='none',
-            interpolation='nearest',
-            #interpolation='bilinear',
-            #interpolation='bicubic',
-            #interpolation='gaussian',
-            extent=np.concatenate(position_limits),
-            vmin=image_limits[0], vmax=image_limits[1],
-        )
-        #"""
-
-        # standard method
-        """
-        histogram_valuess, histogram_xs, histogram_ys, _Image = subplot.hist2d(
-            positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-            weights=weights, range=position_limits, bins=position_bin_number,
-            norm=colors.LogNorm(),
-            #cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-            cmap=plt.get_cmap('test'),
-            vmin=image_limits[0], vmax=image_limits[1],
-        )
-        """
-
-        # plot average of property
-        """
-        histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
-            positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-            position_bin_number, position_limits, weights=None,
-            normed=False)
-
-        #histogram_valuess = ut.math.Fraction.get_fraction(weight_grid, grid_number)
-        subplot.imshow(
-            histogram_valuess.transpose(),
-            #norm=colors.LogNorm(),
-            cmap=color_map,  # @UndefinedVariable
-            aspect='auto',
-            #interpolation='nearest',
-            interpolation='none',
-            extent=np.concatenate(position_limits),
-            vmin=np.min(weights), vmax=np.max(weights),
-        )
-        """
-
-        fig.gca().set_aspect('equal')
-
-        fig.colorbar(_Image)
-
-        # plot halos
-        if hal is not None:
-            for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
-                print(hal_position, hal_radius)
-                circle = plt.Circle(
-                    hal_position[dimen_indices_plot], hal_radius, color='w', linewidth=1,
-                    fill=False)
-                subplot.add_artist(circle)
-
-    elif len(dimen_indices_plot) == 3:
-        fig, subplots = ut.plot.make_figure(
-            figure_index, [2, 2], left=0.17, right=0.96, top=0.97, bottom=0.13,
-            background_color=background_color)
-
-        plot_dimen_iss = [
-            [dimen_indices_plot[0], dimen_indices_plot[1]],
-            [dimen_indices_plot[0], dimen_indices_plot[2]],
-            [dimen_indices_plot[1], dimen_indices_plot[2]],
-        ]
-
-        subplot_iss = [
-            [0, 0],
-            [1, 0],
-            [1, 1],
-        ]
-
-        histogram_valuesss = []
-        for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
-            subplot_is = subplot_iss[plot_i]
-            subplot = subplots[subplot_is[0], subplot_is[1]]
-
-            position_limits = []
-            for dimen_i in subplot_is:
-                position_limits.append([-distances_max[dimen_i], distances_max[dimen_i]])
-            position_limits = np.array(position_limits)
-
-            # ensure that tick labels do not overlap
-            #position_limits *= 0.999
-            position_limits[0, 0] *= 0.99
-            position_limits[1, 0] *= 0.99
-
-            subplot.set_xlim(position_limits[0])
-            subplot.set_ylim(position_limits[1])
-
-            if subplot_is == [0, 0]:
-                subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
-            elif subplot_is == [1, 0]:
-                subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
-                subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
-            elif subplot_is == [1, 1]:
-                subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
-
-            histogram_valuess, histogram_xs, histogram_ys = np.histogram2d(
-                positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]],
-                position_bin_number, position_limits,
-                normed=False,
-                weights=weights,
+        else:
+            # project along single dimension
+            hist_valuess, hist_xs, hist_ys = np.histogram2d(
+                positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+                position_bin_number, position_limits[dimen_indices_plot],
+                weights=weights, normed=False,
             )
 
             # convert to surface density
-            histogram_valuess /= np.diff(histogram_xs)[0] * np.diff(histogram_ys)[0]
+            hist_valuess /= np.diff(hist_xs)[0] * np.diff(hist_ys)[0]
 
-            # convert to column density
+            # convert to number density
             if use_column_units:
-                histogram_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
-                grid_number = histogram_valuess.size
-                lls_number = np.sum((histogram_valuess > 1e17) * (histogram_valuess < 2e20))
-                dla_number = np.sum(histogram_valuess > 2e20)
-                Say.say('covering fraction [{}]: LLS = {:.2e}, DLA = {:.2e}'.format(
-                        plot_i, lls_number / grid_number, dla_number / grid_number))
+                hist_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
+                grid_number = hist_valuess.size
+                lls_number = np.sum((hist_valuess > 1e17) * (hist_valuess < 2e20))
+                dla_number = np.sum(hist_valuess > 2e20)
+                self.say('covering fraction: LLS = {:.2e}, DLA = {:.2e}'.format(
+                         lls_number / grid_number, dla_number / grid_number))
 
-            histogram_valuesss.append(histogram_valuess)
+        masks = (hist_valuess > 0)
+        self.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
+                 hist_valuess[masks].min(), np.median(hist_valuess[masks]),
+                 hist_valuess[masks].max()))
 
-            masks = (histogram_valuess > 0)
-            Say.say('histogram min, med, max = {:.3e}, {:.3e}, {:.3e}'.format(
-                    histogram_valuess[masks].min(), np.median(histogram_valuess[masks]),
-                    histogram_valuess[masks].max()))
+        hist_limits = np.array([hist_valuess[masks].min(), hist_valuess[masks].max()])
 
-            image_limits_use = np.array([histogram_valuess[masks].min(),
-                                         histogram_valuess[masks].max()])
-            if image_limits is not None and len(image_limits):
-                if image_limits[0] is not None:
-                    image_limits_use[0] = image_limits[0]
-                if image_limits[1] is not None:
-                    image_limits_use[1] = image_limits[1]
+        return hist_valuess, hist_xs, hist_ys, hist_limits
 
-            _Image = subplot.imshow(
-                histogram_valuess.transpose(),
-                norm=colors.LogNorm(),
-                cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-                #aspect='auto',
-                interpolation='nearest',
-                #interpolation='bilinear',
-                #interpolation='bicubic',
-                #interpolation='gaussian',
-                extent=np.concatenate(position_limits),
-                vmin=image_limits[0], vmax=image_limits[1],
-            )
-
-            # default method
-            """
-            histogram_valuess, histogram_xs, histogram_ys, _Image = subplot.hist2d(
-                positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
-                range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
-                cmap=plt.cm.YlOrBr)  # @UndefinedVariable
-            """
-
-            #fig.colorbar(_Image)  # , ax=subplot)
-
-            # plot halos
-            if hal is not None:
-                for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
-                    circle = plt.Circle(
-                        hal_position[plot_dimen_is], hal_radius, linewidth=1, fill=False)
-                    subplot.add_artist(circle)
-
-                circle = plt.Circle((0, 0), 10, color='black', fill=False)
-                subplot.add_artist(circle)
-
-            subplot.axis('equal')
-
-        histogram_valuess = np.array(histogram_valuesss)
-
-    plot_name = spec_name
-    if weight_prop_name:
-        plot_name += '.{}'.format(weight_prop_name)
-    plot_name += '.position'
-
-    for dimen_i in dimen_indices_plot:
-        plot_name += '.' + dimen_label[dimen_i]
-    plot_name += '_d.{:.0f}'.format(np.max(distances_max[dimen_indices_plot]))
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
-
-    if add_image_limits:
-        plot_name += '_i.{:.1f}-{:.1f}'.format(
-            log10(image_limits_use[0]), log10(image_limits_use[1]))
-        #plot_name += '_i.{}-{}'.format(
-        #    ut.io.get_string_for_exponential(image_limits_use[0], 0),
-        #    ut.io.get_string_for_exponential(image_limits_use[1], 0))
-
-    if add_simulation_name:
-        plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
-
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
-
-    if get_values:
-        return histogram_valuess, histogram_xs, histogram_ys
-
-    if print_values:
-        plot_name = plot_name + '.txt'
+    def print_values(self):
+        '''
+        .
+        '''
+        plot_name = self.plot_name + '.txt'
         file_out = open(plot_name, 'w')
         Write = ut.io.WriteClass(file_out, print_stdout=False)
-        Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(distance_bin_width))
-        for ix in range(histogram_xs.size - 1):
-            x = histogram_xs[ix] + 0.5 * (histogram_xs[ix + 1] - histogram_xs[ix])
-            for iy in range(histogram_ys.size - 1):
-                y = histogram_ys[iy] + 0.5 * (histogram_ys[iy + 1] - histogram_ys[iy])
+        Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(
+                    self.histogram_xs[1] - self.histogram_xs[0]))
+        for ix in range(self.histogram_xs.size - 1):
+            x = self.histogram_xs[ix] + 0.5 * (self.histogram_xs[ix + 1] - self.histogram_xs[ix])
+            for iy in range(self.histogram_ys.size - 1):
+                y = self.histogram_ys[iy] + 0.5 * (self.histogram_ys[iy + 1] -
+                                                   self.histogram_ys[iy])
                 Write.write('{:.3f} {:.3f} {:.3e} {:.3e} {:.3e}'.format(
-                            x, y, histogram_valuess[0, ix, iy], histogram_valuess[1, ix, iy],
-                            histogram_valuess[2, ix, iy]))
+                            x, y, self.histogram_valuess[0, ix, iy],
+                            self.histogram_valuess[1, ix, iy], self.histogram_valuess[2, ix, iy]))
         file_out.close()
+
+Image = ImageClass()
 
 
 #===================================================================================================
@@ -2017,6 +1615,9 @@ def plot_property_v_property(
         legend.get_frame().set_alpha(0.5)
 
     plot_name = spec_name + '.' + y_prop_name + '_v_' + x_prop_name
+    for name in ut.const.element_symbol_from_name:
+        if name in plot_name:
+            plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
     plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
     if host_distance_limits is not None and len(host_distance_limits):
         plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limits[0], host_distance_limits[1])
@@ -3000,13 +2601,13 @@ def explore_galaxy(
             if plot_only_members:
                 part_indices = hal.prop('star.indices', hi)
 
-            plot_image(
+            Image.plot_image(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), part_indices=part_indices,
                 write_plot=write_plot, plot_directory=plot_directory, figure_index=10)
 
-            plot_image(
+            Image.plot_image(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi),
@@ -3080,7 +2681,7 @@ def explore_galaxy(
             else:
                 distance_reference = None
 
-            plot_image(
+            Image.plot_image(
                 part, 'dark', 'mass', 'histogram',
                 [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), background_color='black',
@@ -3116,13 +2717,13 @@ def explore_galaxy(
                 part_indices = hal.prop('gas.indices', hi)
 
             if part_indices is None or len(part_indices) >= 3:
-                plot_image(
+                Image.plot_image(
                     part, 'gas', 'mass', 'histogram',
                     [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                     hal.prop('star.position', hi), part_indices=part_indices,
                     write_plot=write_plot, plot_directory=plot_directory, figure_index=30)
 
-                plot_image(
+                Image.plot_image(
                     part, 'gas', 'mass.neutral', 'histogram',
                     [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                     hal.prop('star.position', hi), part_indices=part_indices,
@@ -3661,8 +3262,8 @@ class CompareSimulationsClass(ut.io.SayClass):
     def plot_profiles(
         self, parts=None, distance_bin_width=0.1,
         simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', property_names=['mass', 'position', 'form.time'], element_indices=[0, 1],
-        force_float32=True):
+        species='all', property_names=['mass', 'position', 'form.time', 'massfraction'],
+        element_indices=[0, 1], force_float32=True):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
@@ -3810,11 +3411,12 @@ class CompareSimulationsClass(ut.io.SayClass):
             for part in parts:
                 for spec_name in ['star', 'gas']:
                     if spec_name in part:
-                        plot_image(
+                        Image.plot_image(
                             part, spec_name, 'mass', 'histogram',
                             [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                             image_limits=image_limits, align_principal_axes=align_principal_axes,
-                            write_plot=True, plot_directory='image', add_simulation_name=True)
+                            write_plot=True, plot_directory='image', add_simulation_name=True,
+                        )
 
 CompareSimulations = CompareSimulationsClass()
 
