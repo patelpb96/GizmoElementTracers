@@ -1,27 +1,27 @@
 # Description
 
-Python package for running and analyzing Gizmo cosmological simulations.
+Python package for running and analyzing Gizmo simulations.
 
 
 # Contents
 
 ## gizmo_io.py
-* routines to read in Gizmo snapshot file in HDF5 format.
+* functions to read in Gizmo snapshot files, which are in HDF5 format.
 
 ## gizmo_analysis.py
-* routines for analyzing particle data from a Gizmo simulation snapshot.
+* functions for analyzing Gizmo particle data.
 
-## agora.py
-* ARCHIVE routines for analyzing AGORA simulation box with yt.
+## gizmo_diagnostic.py
+* functions for diagnosing Gizmo simulations.
+
+## gizmo_file.py
+* functions for deleting snapshot files or transferring them across machines.
 
 ## gizmo_ic.py
-* routines for generating cosmological zoom-in initial conditions.
-
-## gizmo_transfer.py
-* routines for transferring files/snapshots across machines.
+* functions for generating cosmological zoom-in initial conditions.
 
 ## tutorial.ipynb
-* ipython notebook tutorial for using this package and reading in Gizmo particle data from a snapshot.
+* ipython notebook tutorial for using this package and reading in particle data from a snapshot.
 
 
 # Requirements
