@@ -413,8 +413,8 @@ def delete_snapshots(directory='.', snapshot_index_limits=[2, 300]):
         for snapshot_name in snapshot_names:
             snapshot_index = ut.io.get_numbers_in_string(snapshot_name)[0]
             if (snapshot_index not in snapshot_indices and
-                    snapshot_index >= snapshot_index_limits.min() and
-                    snapshot_index <= snapshot_index_limits.max()):
+                    snapshot_index >= min(snapshot_index_limits) and
+                    snapshot_index <= max(snapshot_index_limits)):
                 print(snapshot_name)
                 #os.system('rm -rf ' + snapshot_name)
 
