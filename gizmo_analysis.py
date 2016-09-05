@@ -1467,8 +1467,12 @@ def plot_property_distribution(
         if legend_z:
             subplot.add_artist(legend_z)
 
-    plot_name = (spec_name + '.' + prop_name + '_distr' +
-                 ut.plot.get_time_name_file('redshift', part.snapshot))
+    plot_name = spec_name + '.' + prop_name + '_distr'
+    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+    for name in ut.const.element_symbol_from_name:
+        if name in plot_name:
+            plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
+    plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -1618,6 +1622,7 @@ def plot_property_v_property(
     for name in ut.const.element_symbol_from_name:
         if name in plot_name:
             plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
+    plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
     plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
     if host_distance_limits is not None and len(host_distance_limits):
         plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limits[0], host_distance_limits[1])
@@ -1791,6 +1796,10 @@ def plot_property_v_distance(
     elif dimension_number == 1:
         plot_name += '.1d'
     plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+    for name in ut.const.element_symbol_from_name:
+        if name in plot_name:
+            plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
+    plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('.average', '.ave')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
@@ -3368,7 +3377,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def plot_images(
         self, parts=None,
-        distance_max=15, distance_bin_width=0.05, image_limits=[10 ** 7, 10 ** 10],
+        distance_max=15, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 9.5],
         align_principal_axes=True, simulation_names=None,
         redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
                    0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
