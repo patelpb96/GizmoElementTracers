@@ -403,6 +403,9 @@ def delete_snapshots(directory='.', snapshot_index_limits=[2, 300]):
         534, 561, 585, 590, 600
     ]
 
+    if snapshot_index_limits is None or not len(snapshot_index_limits):
+        snapshot_index_limits = [1, Inf]
+
     snapshot_name_bases = ['snapshot_*.hdf5', 'snapdir_*']
 
     os.chdir(directory)
@@ -652,7 +655,11 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        delete_snapshots(directory)
+        snapshot_index_limits = None
+        if len(sys.argv) > 4:
+            snapshot_index_limits = [int(sys.argv[3]), int(sys.argv[4])]
+
+        delete_snapshots(directory, snapshot_index_limits)
 
     else:
         print('! not recognize function')
