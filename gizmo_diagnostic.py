@@ -384,13 +384,14 @@ def plot_contamination(directory='.', redshift=0):
 #===================================================================================================
 # simulation utility
 #===================================================================================================
-def delete_snapshots(directory='.'):
+def delete_snapshots(directory='.', snapshot_index_limits=[2, 300]):
     '''
     Delete all snapshots in given directory, except for those given below.
 
     Parameters
     ----------
     directory : string : directory of snapshots
+    snapshot_index_limits : list : min and max snapshot indices to consider deleting
     '''
     snapshot_indices = [
         0, 1, 2,
@@ -410,14 +411,12 @@ def delete_snapshots(directory='.'):
         snapshot_names = glob.glob(snapshot_name_base)
 
         for snapshot_name in snapshot_names:
-            keep = False
-            for snapshot_index in snapshot_indices:
-                if snapshot_name in ['snapshot_{:03d}.hdf5'.format(snapshot_index),
-                                     'snapdir_{:03d}'.format(snapshot_index)]:
-                    keep = True
-
-            if not keep:
-                os.system('rm -rf ' + snapshot_name)
+            snapshot_index = ut.io.get_numbers_in_string(snapshot_name)[0]
+            if (snapshot_index not in snapshot_indices and
+                    snapshot_index >= snapshot_index_limits.min() and
+                    snapshot_index <= snapshot_index_limits.max()):
+                print(snapshot_name)
+                #os.system('rm -rf ' + snapshot_name)
 
 
 #===================================================================================================

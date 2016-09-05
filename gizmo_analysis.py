@@ -3272,7 +3272,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         self, parts=None, distance_bin_width=0.1,
         simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
         species='all', property_names=['mass', 'position', 'form.time', 'massfraction'],
-        element_indices=[0, 1], force_float32=True):
+        element_indices=[0, 1, 6, 10], force_float32=True):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
@@ -3343,6 +3343,10 @@ class CompareSimulationsClass(ut.io.SayClass):
                         parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
                         distance_limits_halo, 0.25, write_plot=True)
 
+                plot_property_distribution(
+                    parts, 'gas', 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
+                    'probability', distance_limits_halo, write_plot=True)
+
             if 'star' in parts[0]:
                 plot_property_v_distance(
                     parts, 'star', 'mass', 'sum.cum', 'log', False, [None, None],
@@ -3360,6 +3364,18 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_property_v_distance(
                         parts, 'star', 'metallicity.total', 'median', 'linear', True,
                         [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)
+
+                    plot_property_distribution(
+                        parts, 'star', 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
+                        'probability', [0, 15], write_plot=True)
+
+                    plot_property_distribution(
+                        parts, 'star', 'metallicity.iron', [-4, 1.3], 0.1, None, 'linear',
+                        'probability', [0, 15], write_plot=True)
+
+                    plot_property_distribution(
+                        parts, 'star', 'metallicity.magnesium-metallicity.iron', [-1.8, 0.8], 0.1,
+                        None, 'linear', 'probability', [0, 15], write_plot=True)
 
                     plot_star_form_history(
                         parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
