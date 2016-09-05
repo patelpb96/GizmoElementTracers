@@ -2,7 +2,7 @@
 
 
 '''
-Diagnostic and utility functions for Gizmo simulations.
+Diagnose Gizmo simulations.
 
 @author: Andrew Wetzel
 '''
@@ -13,7 +13,6 @@ from __future__ import absolute_import, division, print_function
 import collections
 import os
 import sys
-import glob
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
@@ -382,48 +381,6 @@ def plot_contamination(directory='.', redshift=0):
 
 
 #===================================================================================================
-# simulation utility
-#===================================================================================================
-def delete_snapshots(directory='.', snapshot_index_limits=[2, 300]):
-    '''
-    Delete all snapshots in given directory, except for those given below.
-
-    Parameters
-    ----------
-    directory : string : directory of snapshots
-    snapshot_index_limits : list : min and max snapshot indices to consider deleting
-    '''
-    snapshot_indices = [
-        0, 1, 2,
-        11, 20, 26, 33, 41, 52, 59, 67, 77, 88,
-        102, 120, 142, 172,
-        214, 242, 277,
-        322, 382,
-        412, 446, 486,
-        534, 561, 585, 590, 600
-    ]
-
-    if snapshot_index_limits is None or not len(snapshot_index_limits):
-        snapshot_index_limits = [1, Inf]
-
-    snapshot_name_bases = ['snapshot_*.hdf5', 'snapdir_*']
-
-    os.chdir(directory)
-
-    for snapshot_name_base in snapshot_name_bases:
-        snapshot_names = glob.glob(snapshot_name_base)
-        snapshot_names.sort()
-
-        for snapshot_name in snapshot_names:
-            snapshot_index = ut.io.get_numbers_in_string(snapshot_name)[0]
-            if (snapshot_index not in snapshot_indices and
-                    snapshot_index >= min(snapshot_index_limits) and
-                    snapshot_index <= max(snapshot_index_limits)):
-                print('deleting {}'.format(snapshot_name))
-                os.system('rm -rf ' + snapshot_name)
-
-
-#===================================================================================================
 # simulation performance and scaling
 #===================================================================================================
 def plot_scaling(
@@ -614,8 +571,7 @@ if __name__ == '__main__':
 
     function_kind = str(sys.argv[1])
     assert ('runtime' in function_kind or 'properties' in function_kind or
-            'extrema' in function_kind or 'contamination' in function_kind or
-            'delete' in function_kind)
+            'extrema' in function_kind or 'contamination' in function_kind)
 
     directory = '.'
 
@@ -650,16 +606,6 @@ if __name__ == '__main__':
             snapshot_redshift = float(sys.argv[3])
 
         plot_contamination(directory, snapshot_redshift)
-
-    elif 'delete' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
-        snapshot_index_limits = None
-        if len(sys.argv) > 4:
-            snapshot_index_limits = [int(sys.argv[3]), int(sys.argv[4])]
-
-        delete_snapshots(directory, snapshot_index_limits)
 
     else:
         print('! not recognize function')
