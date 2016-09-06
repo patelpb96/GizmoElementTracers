@@ -29,16 +29,16 @@ class ParticleDictionaryClass(dict):
     element_dict = collections.OrderedDict()
     element_dict['metals'] = 0
     element_dict['total'] = 0
-    element_dict['helium'] = 1
-    element_dict['carbon'] = 2
-    element_dict['nitrogen'] = 3
-    element_dict['oxygen'] = 4
-    element_dict['neon'] = 5
-    element_dict['magnesium'] = 6
-    element_dict['silicon'] = 7
-    element_dict['sulphur'] = 8
-    element_dict['calcium'] = 9
-    element_dict['iron'] = 10
+    element_dict['helium'] = element_dict['he'] = 1
+    element_dict['carbon'] = element_dict['c'] = 2
+    element_dict['nitrogen'] = element_dict['n'] = 3
+    element_dict['oxygen'] = element_dict['o'] = 4
+    element_dict['neon'] = element_dict['ne'] = 5
+    element_dict['magnesium'] = element_dict['mg'] = 6
+    element_dict['silicon'] = element_dict['si'] = 7
+    element_dict['sulphur'] = element_dict['s'] = 8
+    element_dict['calcium'] = element_dict['ca'] = 9
+    element_dict['iron'] = element_dict['fe'] = 10
 
     element_pointer = np.arange(len(element_dict))  # use if read only subset of elements
 
