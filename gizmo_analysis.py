@@ -876,8 +876,10 @@ class ImageClass(ut.io.SayClass):
         plt.register_cmap(cmap=BBW)
 
         if background_color == 'black':
-            if 'dark' in spec_name or 'gas' in spec_name:
+            if 'dark' in spec_name:
                 color_map = plt.get_cmap('bbw')
+            elif spec_name == 'gas':
+                color_map = plt.cm.afmhot  # @UndefinedVariable
             elif spec_name == 'star':
                 color_map = plt.get_cmap('byw')
         elif background_color == 'white':
@@ -2399,7 +2401,7 @@ def explore_galaxy(
     '''
     from rockstar import rockstar_analysis
 
-    rockstar_analysis.print_properties(part, hal, hal_index)
+    rockstar_analysis.print_properties(hal, hal_index)
 
     hi = hal_index
 
@@ -2433,7 +2435,7 @@ def explore_galaxy(
                 element_name = 'metallicity.iron'
                 hal.prop(element_name)
             except:
-                element_name = 'metallicity.metals'
+                element_name = 'metallicity.total'
 
             plot_property_distribution(
                 part, 'star', element_name, [1e-4, 1], 0.1, None, 'log', 'histogram',

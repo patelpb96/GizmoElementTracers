@@ -27,8 +27,7 @@ class ParticleDictionaryClass(dict):
     '''
     # use to translate between element name and index in element table
     element_dict = collections.OrderedDict()
-    element_dict['metals'] = 0
-    element_dict['total'] = 0
+    element_dict['metals'] = element_dict['total'] = 0
     element_dict['helium'] = element_dict['he'] = 1
     element_dict['carbon'] = element_dict['c'] = 2
     element_dict['nitrogen'] = element_dict['n'] = 3
@@ -121,11 +120,11 @@ class ParticleDictionaryClass(dict):
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 return self.snapshot['time'] - self.prop('form.time', indices)
             elif 'redshift' in property_name:
-                return self.Cosmology.convert_time('redshift', 'time',
-                                                   self.prop('form.time', indices))
+                return self.Cosmology.convert_time(
+                    'redshift', 'time', self.prop('form.time', indices))
             elif 'scalefactor' in property_name:
-                return self.Cosmology.convert_time('scalefactor', 'time',
-                                                   self.prop('form.time', indices))
+                return self.Cosmology.convert_time(
+                    'scalefactor', 'time', self.prop('form.time', indices))
 
         if 'number.density' in property_name or 'density.number' in property_name:
             values = (self.prop('density', indices) * ut.const.proton_per_sun *
@@ -186,7 +185,7 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        # problem if get this far without return
+        # should not get this far without a return
         raise ValueError(
             'property = {} is not valid input to {}'.format(property_name, self.__class__))
 
