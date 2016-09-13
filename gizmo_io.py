@@ -874,6 +874,7 @@ class ReadClass(ut.io.SayClass):
                     indices_sorted = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted]
+                    del(indices_sorted)
             print()
 
         # apply unit conversions
@@ -896,8 +897,8 @@ class ReadClass(ut.io.SayClass):
 
             if 'density' in part[spec_name]:
                 # convert to [M_sun / kpc^3 physical]
-                part[spec_name]['density'] *= (1e10 / header['hubble'] /
-                                               (header['scalefactor'] / header['hubble']) ** 3)
+                part[spec_name]['density'] *= (
+                    1e10 / header['hubble'] / (header['scalefactor'] / header['hubble']) ** 3)
 
             if 'smooth.length' in part[spec_name]:
                 # convert to [pc physical]

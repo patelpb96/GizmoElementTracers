@@ -125,9 +125,14 @@ class ReadClass():
 
         return parts, hal
 
-    def read_particles(self):
+    def read_particles(self, sort_dark_by_id=True, force_float32=False):
         '''
         Read particles from final and initial snapshots.
+
+        Parameters
+        ----------
+        sort_dark_by_id : boolean : whether to sort dark-matter particles by id
+        force_float32 : boolean : whether to force all floats to 32-bit, to save memory
 
         Returns
         -------
@@ -139,7 +144,13 @@ class ReadClass():
             part = gizmo_io.Read.read_snapshots(
                 'all', 'redshift', snapshot_redshift, self.simulation_directory,
                 property_names=['position', 'mass', 'id'], assign_center=False,
-                sort_dark_by_id=True, force_float32=False)
+                sort_dark_by_id=sort_dark_by_id, force_float32=force_float32)
+
+            # if not sort dark particles, assign id-to-index coversion to track across snapshots
+            if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
+                for spec_name in part:
+                    ut.catalog.assign_id_to_index(part[spec_name], 'id', 0)
+
             parts.append(part)
 
         return parts
@@ -235,12 +246,18 @@ def write_initial_condition_points(
             'scalar', positions_fin, center_position, part_fin.info['box.length'])
         distances *= part_fin.snapshot['scalefactor']  # convert to [kpc physical]
 
-        select_indices = ut.array.get_indices(distances, [0, distance_max])
+        indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
-        positions_ini.extend(part_ini[spec_name]['position'][select_indices])
+        if 'id.to.index' in part_ini[spec_name]:
+            ids = part_fin[spec_name]['id'][indices_fin]
+            indices_ini = part_ini[spec_name]['id.to.index'][ids]
+        else:
+            indices_ini = indices_fin
 
-        mass_select += part_ini[spec_name]['mass'][select_indices].sum()
-        spec_select_number.append(select_indices.size)
+        positions_ini.extend(part_ini[spec_name]['position'][indices_ini])
+
+        mass_select += part_ini[spec_name]['mass'][indices_ini].sum()
+        spec_select_number.append(indices_ini.size)
 
     positions_ini = np.array(positions_ini)
     poss_ini_limits = np.array([[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
