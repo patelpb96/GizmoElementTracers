@@ -180,7 +180,7 @@ def print_run_times_ratios(
     simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out',
     scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
                    0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
-    wall_times_restart=[0]):
+    wall_times_restart=[]):
     '''
     Print ratios of wall times and CPU times (average per MPI taks) for input simulation directories
     at input scale-factors from cpu.txt for Gizmo run.
@@ -199,10 +199,11 @@ def print_run_times_ratios(
 
     if np.isscalar(simulation_directories):
         simulation_directories = [simulation_directories]
-    if np.isscalar(wall_times_restart):
+
+    if not wall_times_restart:
+        wall_times_restart = np.zeros(len(simulation_directories))
+    elif np.isscalar(wall_times_restart):
         wall_times_restart = [wall_times_restart]
-        if len(wall_times_restart) != len(simulation_directories):
-            wall_times_restart = np.zeros(len(simulation_directories))
 
     for d_i, directory in enumerate(simulation_directories):
         scale_factors, redshifts, wall_times, cpu_times = print_run_times(
