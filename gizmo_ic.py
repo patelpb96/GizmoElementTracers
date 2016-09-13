@@ -248,6 +248,8 @@ def write_initial_condition_points(
 
         indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
+        # id-to-index array is in species dictionary
+        # assume ids not sorted so have to convert between id and index
         if 'id.to.index' in part_ini[spec_name]:
             ids = part_fin[spec_name]['id'][indices_fin]
             indices_ini = part_ini[spec_name]['id.to.index'][ids]
