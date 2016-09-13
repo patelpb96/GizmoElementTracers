@@ -155,7 +155,7 @@ class ReadClass():
         from rockstar import rockstar_io
 
         hal = rockstar_io.Read.read_catalog(
-            'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=True,
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=False,
             sort_host_first=False)
 
         rockstar_io.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
@@ -173,7 +173,6 @@ def write_initial_condition_points(
     halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
     '''
     Select dark matter particles at final snapshot and print their positions at initial snapshot.
-    Can use rules of thumb from Onorbe et al.
 
     Rule of thumb from Onorbe et al:
         given distance_pure
@@ -293,12 +292,12 @@ def write_initial_condition_points(
 
     Write.write('# within convex hull at initial time')
     Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
-    Write.write('  volume = {:.1f} Mpc ^ 3 comoving'.format(
+    Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                 volume_ini_chull * ut.const.mega_per_kilo ** 3))
 
     Write.write('# within encompasing cube at initial time')
     Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
-    Write.write('  volume = {:.1f} Mpc ^ 3 comoving'.format(
+    Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                 volume_ini_cube * ut.const.mega_per_kilo ** 3))
 
     Write.write('# initial position range')
@@ -346,7 +345,7 @@ def generate_initial_condition_points(
         'particles', 'convex-hull', 'cube'
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
-        print('! selection radius = {} looks odd. are you sure aboutg this?'.format(distance_max))
+        print('! selection radius = {} looks odd. are you sure about this?'.format(distance_max))
 
     Read = ReadClass(snapshot_redshifts, simulation_directory)
 
