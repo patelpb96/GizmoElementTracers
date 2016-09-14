@@ -125,12 +125,14 @@ class ReadClass():
 
         return parts, hal
 
-    def read_particles(self, sort_dark_by_id=True, force_float32=False):
+    def read_particles(
+        self, property_names=['position', 'mass', 'id'], sort_dark_by_id=True, force_float32=False):
         '''
         Read particles from final and initial snapshots.
 
         Parameters
         ----------
+        property_names : string or list : name[s] of particle properties to read
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
 
@@ -143,7 +145,7 @@ class ReadClass():
         for snapshot_redshift in self.snapshot_redshifts:
             part = gizmo_io.Read.read_snapshots(
                 'all', 'redshift', snapshot_redshift, self.simulation_directory,
-                property_names=['position', 'mass', 'id'], assign_center=False,
+                property_names=property_names, assign_center=False,
                 sort_dark_by_id=sort_dark_by_id, force_float32=force_float32)
 
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
@@ -237,7 +239,7 @@ def write_initial_points(
             raise ValueError(
                 'input dark_mass = {:.3e} Msun, but catalog contains species = {}'.format(
                     dark_mass, spec_names))
-        if not halo_radius:
+        if scale_to_halo_radius and not halo_radius:
             raise ValueError('cannot determine halo_radius without mass in particle catalog')
 
     Say.say('using species: {}'.format(spec_names))
@@ -246,7 +248,6 @@ def write_initial_points(
 
     if scale_to_halo_radius:
         if not halo_radius:
-            assert not dark_mass
             halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(
                 part_fin, 'all', virial_kind, center_position=center_position)
         distance_max *= halo_radius
@@ -296,7 +297,7 @@ def write_initial_points(
     volume_ini_chull = ut.coordinate.get_volume_of_convex_hull(positions_ini)
     mass_ini_chull = volume_ini_chull * density_ini  # assume cosmic density within volume
 
-    # encompasing cube (relevant for MUSIC FFT)
+    # encompassing cube (relevant for MUSIC FFT)
     position_dif_max = 0
     for dimen_i in range(positions_ini.shape[1]):
         if poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min() > position_dif_max:
@@ -337,7 +338,7 @@ def write_initial_points(
     Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                 volume_ini_chull * ut.const.mega_per_kilo ** 3))
 
-    Write.write('# within encompasing cube at initial time')
+    Write.write('# within encompassing cube at initial time')
     Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
     Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                 volume_ini_cube * ut.const.mega_per_kilo ** 3))
@@ -369,7 +370,7 @@ def write_initial_points(
 
 
 def write_initial_points_from_uniform(
-    parts, hal, hal_index, distance_max=7, scale_to_halo_radius=True, virial_kind='200m',
+    parts, hal, hal_index, distance_max=10, scale_to_halo_radius=True, virial_kind='200m',
     region_kind='convex-hull', dark_mass=None):
     '''
     Pipeline to generate and write initial condition points
