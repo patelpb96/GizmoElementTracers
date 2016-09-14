@@ -368,42 +368,46 @@ def write_initial_points(
     file_out.close()
 
 
-def write_initial_points_from_uniform_box(
-    parts, hal, hal_index, virial_kind='200m', halo_radius_factor=7, region_kind='convex-hull',
-    dark_mass=None):
+def write_initial_points_from_uniform(
+    parts, hal, hal_index, distance_max=7, scale_to_halo_radius=True, virial_kind='200m',
+    region_kind='convex-hull', dark_mass=None):
     '''
-    Complete pipeline for generating initial conditions *from an existing zoom-in simulation*:
-        read particles, identify halo center, write points for initial conditions.
+    Pipeline to generate and write initial condition points
+    *from a uniform-resolution DM-only simulation with a halo catalog*.
 
     Parameters
     ----------
-    snapshot_redshifts : list : redshifts of final and initial snapshots
-    simulation_directory : string : directory of simulation
+    parts : list of dicts : catalogs of particles at final and initial snapshots
+    hal : dict : halo catalog at final snapshot
+    hal_index : int : index of halo in catalog
+    virial_kind : string : virial kind to use to define halo radius in catalog
     distance_max : float : distance from center to select particles at final time
         [kpc physical, or in units of R_halo]
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
     halo_radius : float : radius of halo [kpc physical]
-    virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
-    region_kind : string : method to determine zoom-in regon at initial time:
+    region_kind : string : method to identify zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
+    dark_mass : float : dark-matter particle mass (if simulation has only DM, at single resolution)
     '''
-    if halo_radius_factor < 1 or halo_radius_factor > 100:
-        print('! selection halo radius factor = {} looks odd. are you sure?'.format(distance_max))
+    if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
+        print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
 
     center_position = hal['position'][hal_index]
     halo_radius = hal['radius.' + virial_kind][hal_index]
 
     write_initial_points(
-        parts, center_position, halo_radius_factor, True, halo_radius, virial_kind, region_kind,
-        dark_mass)
+        parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
+        region_kind, dark_mass)
 
 
 def read_write_initial_points_from_zoom(
     snapshot_redshifts=[0, 99], simulation_directory='.', distance_max=7, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
     '''
-    Complete pipeline for generating initial conditions *from an existing zoom-in simulation*:
-        read particles, identify halo center, write points for initial conditions.
+    Complete pipeline to generate and write initial condition points
+    *from an existing zoom-in simulation*:
+        (1) read particles, (2) identify halo center, (3) identify zoom-in region around center,
+        (4) write positions of particles at initial redshift
 
     Parameters
     ----------
