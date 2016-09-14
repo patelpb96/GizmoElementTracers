@@ -221,10 +221,11 @@ def write_initial_condition_points(
             spec_names.remove(spec_name)
             continue
 
-        if np.min(part_fin[spec_name]['id'] == part_ini[spec_name]['id']) == False:
-            Say.say('! species = {}: ids in final and initial catalogs not match'.format(
-                    spec_name))
-            return
+        if 'id.to.index' not in part_ini[spec_name]:
+            if np.min(part_fin[spec_name]['id'] == part_ini[spec_name]['id']) == False:
+                Say.say('! species = {}: ids in final and initial catalogs not match'.format(
+                        spec_name))
+                return
 
     Say.say('using species: {}'.format(spec_names))
 
@@ -240,16 +241,14 @@ def write_initial_condition_points(
     positions_ini = []
     spec_select_number = []
     for spec_name in spec_names:
-        positions_fin = part_fin[spec_name]['position']
-
         distances = ut.coordinate.get_distances(
-            'scalar', positions_fin, center_position, part_fin.info['box.length'])
-        distances *= part_fin.snapshot['scalefactor']  # convert to [kpc physical]
+            'scalar', part_fin[spec_name]['position'], center_position,
+            part_fin.info['box.length']) * part_fin.snapshot['scalefactor']  # [kpc physical]
 
         indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
-        # id-to-index array is in species dictionary
-        # assume ids not sorted so have to convert between id and index
+        # if id-to-index array is in species dictionary
+        # assume ids not sorted, so have to convert between id and index
         if 'id.to.index' in part_ini[spec_name]:
             ids = part_fin[spec_name]['id'][indices_fin]
             indices_ini = part_ini[spec_name]['id.to.index'][ids]
