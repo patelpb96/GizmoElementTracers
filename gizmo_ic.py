@@ -149,6 +149,7 @@ class ReadClass():
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
                 for spec_name in part:
+                    self.say('assigning id-to-index for species {}'.format(spec_name))
                     ut.catalog.assign_id_to_index(part[spec_name], 'id', 0)
 
             parts.append(part)
@@ -179,9 +180,9 @@ Read = ReadClass()
 #===================================================================================================
 # generate region for initial conditions
 #===================================================================================================
-def write_initial_condition_points(
+def write_initial_points(
     parts, center_position=None, distance_max=7, scale_to_halo_radius=True,
-    halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
+    halo_radius=None, virial_kind='200m', region_kind='convex-hull', dark_mass=None):
     '''
     Select dark matter particles at final snapshot and print their positions at initial snapshot.
 
@@ -203,29 +204,41 @@ def write_initial_condition_points(
     virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
     region_kind : string : method to identify zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
+    dark_mass : float : dark-matter particle mass (if simulation has only DM, at single resolution)
     '''
     file_name = 'ic_agora_mX_rad{:.0f}_points.txt'.format(distance_max)
 
-    Say = ut.io.SayClass(write_initial_condition_points)
+    Say = ut.io.SayClass(write_initial_points)
 
     assert region_kind in ['particles', 'convex-hull', 'cube']
 
+    # ensure 'final' is lowest redshift
     part_fin, part_ini = parts
     if part_fin.snapshot['redshift'] > part_ini.snapshot['redshift']:
         part_fin, part_ini = part_ini, part_fin
 
-    # sanity check
+    # determine which species are in catalog
     spec_names = ['dark', 'dark.2', 'dark.3', 'dark.4', 'dark.5', 'dark.6']
     for spec_name in list(spec_names):
         if spec_name not in part_fin:
             spec_names.remove(spec_name)
             continue
 
+        # sanity check
         if 'id.to.index' not in part_ini[spec_name]:
             if np.min(part_fin[spec_name]['id'] == part_ini[spec_name]['id']) == False:
                 Say.say('! species = {}: ids in final and initial catalogs not match'.format(
                         spec_name))
                 return
+
+    # sanity check
+    if dark_mass:
+        if spec_names != ['dark']:
+            raise ValueError(
+                'input dark_mass = {:.3e} Msun, but catalog contains species = {}'.format(
+                    dark_mass, spec_names))
+        if not halo_radius:
+            raise ValueError('cannot determine halo_radius without mass in particle catalog')
 
     Say.say('using species: {}'.format(spec_names))
 
@@ -233,6 +246,7 @@ def write_initial_condition_points(
 
     if scale_to_halo_radius:
         if not halo_radius:
+            assert not dark_mass
             halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(
                 part_fin, 'all', virial_kind, center_position=center_position)
         distance_max *= halo_radius
@@ -248,7 +262,7 @@ def write_initial_condition_points(
         indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
         # if id-to-index array is in species dictionary
-        # assume ids not sorted, so have to convert between id and index
+        # assume id not sorted, so have to convert between id and index
         if 'id.to.index' in part_ini[spec_name]:
             ids = part_fin[spec_name]['id'][indices_fin]
             indices_ini = part_ini[spec_name]['id.to.index'][ids]
@@ -257,7 +271,14 @@ def write_initial_condition_points(
 
         positions_ini.extend(part_ini[spec_name]['position'][indices_ini])
 
-        mass_select += part_ini[spec_name]['mass'][indices_ini].sum()
+        if 'mass' in part_ini[spec_name]:
+            mass_select += part_ini[spec_name]['mass'][indices_ini].sum()
+        elif dark_mass:
+            mass_select += dark_mass * indices_ini.size
+        else:
+            raise ValueError(
+                'no mass for species = {} but also no input dark_mass'.format(spec_name))
+
         spec_select_number.append(indices_ini.size)
 
     positions_ini = np.array(positions_ini)
@@ -304,8 +325,11 @@ def write_initial_condition_points(
         spec_name = spec_names[spec_i]
         Write.write('  species {:6}: number = {}'.format(spec_name, spec_select_number[spec_i]))
     Write.write('# mass of all dark-matter particles:')
-    Write.write('  at highest-resolution in input catalog = {:.2e} M_sun'.format(
-                part_ini['dark']['mass'].sum()))
+    if 'mass' in part_ini['dark']:
+        mass_dark_all = part_ini['dark']['mass'].sum()
+    else:
+        mass_dark_all = dark_mass * part_ini['dark']['id'].size
+    Write.write('  at highest-resolution in input catalog = {:.2e} M_sun'.format(mass_dark_all))
     Write.write('  in selection region at final time = {:.2e} M_sun'.format(mass_select))
 
     Write.write('# within convex hull at initial time')
@@ -344,11 +368,42 @@ def write_initial_condition_points(
     file_out.close()
 
 
-def generate_initial_condition_points(
+def write_initial_points_from_uniform_box(
+    parts, hal, hal_index, virial_kind='200m', halo_radius_factor=7, region_kind='convex-hull',
+    dark_mass=None):
+    '''
+    Complete pipeline for generating initial conditions *from an existing zoom-in simulation*:
+        read particles, identify halo center, write points for initial conditions.
+
+    Parameters
+    ----------
+    snapshot_redshifts : list : redshifts of final and initial snapshots
+    simulation_directory : string : directory of simulation
+    distance_max : float : distance from center to select particles at final time
+        [kpc physical, or in units of R_halo]
+    scale_to_halo_radius : boolean : whether to scale distance to halo radius
+    halo_radius : float : radius of halo [kpc physical]
+    virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
+    region_kind : string : method to determine zoom-in regon at initial time:
+        'particles', 'convex-hull', 'cube'
+    '''
+    if halo_radius_factor < 1 or halo_radius_factor > 100:
+        print('! selection halo radius factor = {} looks odd. are you sure?'.format(distance_max))
+
+    center_position = hal['position'][hal_index]
+    halo_radius = hal['radius.' + virial_kind][hal_index]
+
+    write_initial_points(
+        parts, center_position, halo_radius_factor, True, halo_radius, virial_kind, region_kind,
+        dark_mass)
+
+
+def read_write_initial_points_from_zoom(
     snapshot_redshifts=[0, 99], simulation_directory='.', distance_max=7, scale_to_halo_radius=True,
     halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
     '''
-    Catch-all function: read particles, identify center, and write points for initial conditions.
+    Complete pipeline for generating initial conditions *from an existing zoom-in simulation*:
+        read particles, identify halo center, write points for initial conditions.
 
     Parameters
     ----------
@@ -363,7 +418,7 @@ def generate_initial_condition_points(
         'particles', 'convex-hull', 'cube'
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
-        print('! selection radius = {} looks odd. are you sure about this?'.format(distance_max))
+        print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
 
     Read = ReadClass(snapshot_redshifts, simulation_directory)
 
@@ -372,7 +427,7 @@ def generate_initial_condition_points(
     center_position = ut.particle.get_center_position(
         parts[0], 'dark', 'center-of-mass', compare_centers=True)
 
-    write_initial_condition_points(
+    write_initial_points(
         parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
         region_kind)
 
@@ -386,4 +441,4 @@ if __name__ == '__main__':
 
     distance_max = float(sys.argv[1])
 
-    generate_initial_condition_points(distance_max=distance_max)
+    read_write_initial_points_from_zoom(distance_max=distance_max)
