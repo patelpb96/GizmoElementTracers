@@ -83,8 +83,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
 def print_run_times(
     simulation_directory='.', output_directory='output/', runtime_file_name='gizmo.out',
     scale_factors=[
-        0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-        0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
+        0.1, 0.2, 0.25, 0.3, 0.333, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0],
     wall_time_restart=0, get_values=False):
     '''
     Print wall [and CPU] times (average per MPI task) at input scale-factors from cpu.txt for
@@ -350,14 +349,14 @@ def print_properties_snapshots(
             #Statistic.print_statistics()
 
 
-def plot_contamination(directory='.', redshift=0):
+def plot_contamination(redshift=0, directory='.'):
     '''
     Plot contamination from lower-resolution particles around halo as a function of distance.
 
     Parameters
     ----------
-    directory : string : directory of simulation (one level above directory of snapshot file)
     redshift : float : redshift of snapshot
+    directory : string : directory of simulation (one level above directory of snapshot file)
     '''
     distance_bin_width = 0.01
     distance_limits_phys = [1, 4000]  # [kpc physical]
@@ -606,7 +605,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 3:
             snapshot_redshift = float(sys.argv[3])
 
-        plot_contamination(directory, snapshot_redshift)
+        plot_contamination(snapshot_redshift, directory)
 
     else:
         print('! not recognize function')

@@ -151,7 +151,7 @@ class ReadClass(ut.io.SayClass):
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
                 for spec_name in part:
-                    self.say('assigning id-to-index for species {}'.format(spec_name))
+                    self.say('assigning id-to-index to species: {}'.format(spec_name))
                     ut.catalog.assign_id_to_index(part[spec_name], 'id', 0)
 
             parts.append(part)
@@ -402,8 +402,8 @@ def write_initial_points_from_uniform(
 
 
 def read_write_initial_points_from_zoom(
-    snapshot_redshifts=[0, 99], simulation_directory='.', distance_max=7, scale_to_halo_radius=True,
-    halo_radius=None, virial_kind='200m', region_kind='convex-hull'):
+    snapshot_redshifts=[0, 99], distance_max=7, scale_to_halo_radius=True,
+    halo_radius=None, virial_kind='200m', region_kind='convex-hull', simulation_directory='.'):
     '''
     Complete pipeline to generate and write initial condition points
     *from an existing zoom-in simulation*:
@@ -413,7 +413,6 @@ def read_write_initial_points_from_zoom(
     Parameters
     ----------
     snapshot_redshifts : list : redshifts of final and initial snapshots
-    simulation_directory : string : directory of simulation
     distance_max : float : distance from center to select particles at final time
         [kpc physical, or in units of R_halo]
     scale_to_halo_radius : boolean : whether to scale distance to halo radius
@@ -421,6 +420,7 @@ def read_write_initial_points_from_zoom(
     virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
     region_kind : string : method to determine zoom-in regon at initial time:
         'particles', 'convex-hull', 'cube'
+    simulation_directory : string : directory of simulation
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
         print('! selection radius = {} looks odd. are you sure?'.format(distance_max))

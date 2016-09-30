@@ -22,15 +22,15 @@ import utilities as ut
 #===================================================================================================
 # delete files
 #===================================================================================================
-def delete_snapshots(directory='.', snapshot_index_limits=[3, 599]):
+def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
     '''
     Delete all snapshots within snapshot_index_limits in given directory,
     except for those in snapshot_indices_keep list below.
 
     Parameters
     ----------
-    directory : string : directory of snapshots
     snapshot_index_limits : list : min and max snapshot indices to consider deleting
+    directory : string : directory of snapshots
     '''
     snapshot_indices_keep = [
         0, 1, 2,
@@ -121,14 +121,14 @@ if __name__ == '__main__':
     directory = '.'
 
     if 'delete' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
         snapshot_index_limits = None
-        if len(sys.argv) > 4:
-            snapshot_index_limits = [int(sys.argv[3]), int(sys.argv[4])]
+        if len(sys.argv) > 3:
+            snapshot_index_limits = [int(sys.argv[2]), int(sys.argv[3])]
 
-        delete_snapshots(directory, snapshot_index_limits)
+        if len(sys.argv) > 4:
+            directory = str(sys.argv[4])
+
+        delete_snapshots(snapshot_index_limits, directory)
 
     elif 'transfer' in function_kind:
         if len(sys.argv) < 6:
