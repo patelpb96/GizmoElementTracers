@@ -3023,8 +3023,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def read_simulations(
         self, simulation_names=None, redshift=0, species='all',
-        property_names=['mass', 'position', 'form.time'], element_indices=[0, 1],
-        force_float32=True):
+        property_names=['mass', 'position', 'form.time', 'massfraction'],
+        element_indices=[0, 1, 6, 10], force_float32=True):
         '''
         Read snapshots from simulations.
 
