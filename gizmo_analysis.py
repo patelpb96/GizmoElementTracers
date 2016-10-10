@@ -882,12 +882,11 @@ class ImageClass(ut.io.SayClass):
                 color_map = plt.cm.afmhot  # @UndefinedVariable
             elif spec_name == 'star':
                 color_map = plt.get_cmap('byw')
+                color_map = plt.cm.afmhot  # @UndefinedVariable
         elif background_color == 'white':
             #color_map = plt.cm.YlOrBr  # @UndefinedVariable
             #color_map = plt.cm.Greys_r,  # @UndefinedVariable
             color_map = plt.cm.afmhot  # @UndefinedVariable
-        #color_map = plt.cm.afmhot  # @UndefinedVariable
-        #color_map = None
 
         if len(dimen_indices_plot) == 2:
             fig, subplot = ut.plot.make_figure(
