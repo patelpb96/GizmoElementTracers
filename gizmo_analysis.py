@@ -3196,7 +3196,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def plot_images(
         self, parts=None,
-        distance_max=15, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 9.5],
+        distance_max=20, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
         align_principal_axes=True, simulation_names=None,
         redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
                    0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
