@@ -618,6 +618,12 @@ class ReadClass(ut.io.SayClass):
             'StarFormationRate': 'sfr',  # [M_sun / yr]
 
             ## star/gas particles ##
+            ## id.generation and id.child initialized to 0 for all gas particles
+            ## each time a gas particle splits into two:
+            ##   'self' particle retains id.child, other particle gets id.child += 2 ^ id.generation
+            ##   both particles get id.generation += 1
+            ## allows maximum of 30 generations, then restarts at 0
+            ##   thus, particles with id.child > 2^30 are not unique anymore
             'ParticleChildIDsNumber': 'id.child',
             'ParticleIDGenerationNumber': 'id.generation',
 
@@ -909,9 +915,10 @@ class ReadClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale-factor to [Gyr]
-                    part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
-                        1 / part[spec_name]['form.time'] - 1).astype(
-                            part[spec_name]['form.time'].dtype)
+                    #part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
+                    #    1 / part[spec_name]['form.time'] - 1).astype(
+                    #        part[spec_name]['form.time'].dtype)
+                    a = 1
                 else:
                     # convert to [Gyr]
                     part[spec_name]['form.time'] /= header['hubble']
@@ -1025,6 +1032,7 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
+    # write to file ----------
     def rewrite_snapshot(
         self, species_names='gas', action='delete', value_adjust=None,
         snapshot_number_kind='redshift', snapshot_number=0,
@@ -1146,6 +1154,47 @@ def assign_orbit(
     for spec_name in species:
         for prop in orb[spec_name]:
             part[spec_name]['host.' + prop] = orb[spec_name][prop]
+
+
+def assign_star_form_snapshot_index(part):
+    '''
+    Assign to each star particle the first snapshot index after it formed,
+    to be able to track it back as far as possible.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    '''
+    part['star']['form.index'] = part.Snapshot.get_snapshot_indices(
+        'time', part['star']['form.time'], round_kind='up')
+
+
+def assign_star_birth_distance(part, part_indices=None):
+    '''
+    Assign to each star particle the distance wrt the host galaxy center at the first snapshot
+    after it formed.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    part_indices : array-like : list of indices to assign
+    '''
+    spec_name = 'star'
+
+    if 'form.index' not in part['star']:
+        assign_star_form_snapshot_index(part)
+
+    if part_indices is None or not len(part_indices):
+        part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
+
+    if 'id.child' in part[spec_name]:
+        pis_unsplit = part_indices[(part['star']['id.child'][part_indices] == 0) *
+                                   (part['star']['id.generation'][part_indices] == 0)]
+
+        pis_oversplit = part_indices[part['star']['id.child'][part_indices] >
+                                     2 ** part['star']['id.generation'][part_indices]]
+    else:
+        a = 1
 
 
 #===================================================================================================

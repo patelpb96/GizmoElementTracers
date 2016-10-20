@@ -82,9 +82,9 @@ def transfer_snapshots(
     to_directory : string : local directory to put snapshots
     '''
     if snapshot_kind == 'file':
-        snapshot_name_base = 'snapshot_{:.3d}.hdf5'
+        snapshot_name_base = 'snapshot_{:03d}.hdf5'
     elif snapshot_kind == 'directory':
-        snapshot_name_base = 'snapdir_{:.3d}'
+        snapshot_name_base = 'snapdir_{:03d}'
     else:
         raise ValueError('not recognize snapshot_kind = ' + snapshot_kind)
 

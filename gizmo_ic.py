@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+
 '''
 Generate initial condition points by selecting particles at final time and tracing them back
 to initial time.
