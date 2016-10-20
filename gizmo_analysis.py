@@ -3057,7 +3057,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 bad_directories += 1
 
         if bad_directories:
-            self.say('! could not read {} simulations'.format(bad_directories))
+            self.say('\n! could not read {} simulations'.format(bad_directories))
             return
 
         parts = []

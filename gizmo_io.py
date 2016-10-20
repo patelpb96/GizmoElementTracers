@@ -501,7 +501,7 @@ class ReadClass(ut.io.SayClass):
 
         if snapshot_number_kind != 'index':
             Snapshot = self.read_snapshot_times(simulation_directory)
-            snapshot_index = Snapshot.part_snapshot_number(snapshot_number_kind, snapshot_number)
+            snapshot_index = Snapshot.parse_snapshot_number(snapshot_number_kind, snapshot_number)
         else:
             snapshot_index = snapshot_number
 
@@ -1064,7 +1064,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         Snapshot = self.read_snapshot_times(simulation_directory)
-        snapshot_index = Snapshot.part_snapshot_number(snapshot_number_kind, snapshot_number)
+        snapshot_index = Snapshot.parse_snapshot_number(snapshot_number_kind, snapshot_number)
 
         # get file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
