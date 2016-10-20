@@ -3043,6 +3043,22 @@ class CompareSimulationsClass(ut.io.SayClass):
         if not isinstance(simulation_names, collections.OrderedDict):
             simulation_names = collections.OrderedDict(simulation_names)
 
+        # first pass, read just header to check that can read all simulations
+        bad_directories = 0
+        for directory in simulation_names:
+            try:
+                gizmo_io.Read.read_header(
+                    'redshift', redshift, directory, 'output/', simulation_names[directory])
+                self.say('read header at z = {:.3f} in {}'.format(redshift, directory))
+            except:
+                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
+                         redshift, directory))
+                bad_directories += 1
+
+            if bad_directories:
+                self.say('! could not read {} simulations'.format(bad_directories))
+                return
+
         parts = []
         directories = []
         for directory in simulation_names:
