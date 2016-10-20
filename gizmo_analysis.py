@@ -3049,15 +3049,16 @@ class CompareSimulationsClass(ut.io.SayClass):
             try:
                 gizmo_io.Read.read_header(
                     'redshift', redshift, directory, 'output/', simulation_names[directory])
-                self.say('read header at z = {:.3f} in {}'.format(redshift, directory))
+                self.say('read header from snapshot at z = {:.3f} in {}'.format(
+                         redshift, directory))
             except:
                 self.say('! could not read snapshot at z = {:.3f} in {}'.format(
                          redshift, directory))
                 bad_directories += 1
 
-            if bad_directories:
-                self.say('! could not read {} simulations'.format(bad_directories))
-                return
+        if bad_directories:
+            self.say('! could not read {} simulations'.format(bad_directories))
+            return
 
         parts = []
         directories = []
