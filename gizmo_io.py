@@ -915,10 +915,9 @@ class ReadClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale-factor to [Gyr]
-                    #part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
-                    #    1 / part[spec_name]['form.time'] - 1).astype(
-                    #        part[spec_name]['form.time'].dtype)
-                    a = 1
+                    part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
+                        1 / part[spec_name]['form.time'] - 1).astype(
+                            part[spec_name]['form.time'].dtype)
                 else:
                     # convert to [Gyr]
                     part[spec_name]['form.time'] /= header['hubble']
