@@ -68,25 +68,22 @@ def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
 # transfer files
 #===================================================================================================
 def transfer_snapshots(
-    machine_name='stampede', from_directory='$STAMPEDE_SCRATCH/m12i_ref13/output',
-    snapshot_kind='file', snapshot_indices=600, to_directory='.'):
+    machine_name='stampede', from_directory='$STAMPEDE_SCRATCH/m12/m12i/fb-sym/m12i_ref13/output',
+    snapshot_indices=[600], to_directory='.'):
     '''
     Transfer snapshot file[s] or directory[s] from remote machine to local.
 
     Parameters
     ----------
-    machine_name : string : name of host machine
-    from_directory : string : directory of snapshot file on host machine
-    snapshot_kind : string : 'file' or 'directory'
-    snapshot indices : int or list : index[s] of snapshots
+    machine_name : string : name of remote machine
+        examples: 'stampede', 'pfe', 'ranch', 'lou'
+        these assume that you have aliased these names in your .ssh/config
+        else you need to supply, for example <username>@stampede.tacc.xsede.org
+    from_directory : string : directory of snapshot file[s] on remote machine
+    snapshot_indices : int or list : index[s] of snapshots to transfer
     to_directory : string : local directory to put snapshots
     '''
-    if snapshot_kind == 'file':
-        snapshot_name_base = 'snapshot_{:03d}.hdf5'
-    elif snapshot_kind == 'directory':
-        snapshot_name_base = 'snapdir_{:03d}'
-    else:
-        raise ValueError('not recognize snapshot_kind = ' + snapshot_kind)
+    snapshot_name_base = 'snap*_{:03d}*'
 
     #if machine_name == 'stampede':
     #    from_directory = '$STAMPEDE_SCRATCH/' + from_directory
