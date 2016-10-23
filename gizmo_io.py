@@ -508,7 +508,7 @@ class ReadClass(ut.io.SayClass):
         # get snapshot file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
 
-        self.say('reading header from: ' + file_name, end='\n\n')
+        self.say('reading header from: ' + file_name, end='\n')
 
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
         header_in = file_in['Header'].attrs  # load header dictionary
@@ -542,7 +542,7 @@ class ReadClass(ut.io.SayClass):
         particle_number_min = 0
         for spec_name in list(self.species_names):
             spec_id = self.species_dict[spec_name]
-            self.say('species = {:9s} (id = {}): {} particles'.format(
+            self.say('  species = {:9s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
             if header['particle.numbers.total'][spec_id] > 0:
                 particle_number_min = header['particle.numbers.total'][spec_id]
@@ -781,7 +781,7 @@ class ReadClass(ut.io.SayClass):
             file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
             file_in = h5py.File(file_name_i, 'r')
 
-            self.say('reading properties from: ' + file_name_i.split('/')[-1])
+            self.say('reading particles from: ' + file_name_i.split('/')[-1])
 
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
