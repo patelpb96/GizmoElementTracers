@@ -1024,7 +1024,7 @@ class ImageClass(ut.io.SayClass):
                 _Image = subplot.imshow(
                     hist_valuess.transpose(),
                     norm=colors.LogNorm(),
-                    cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+                    cmap=plt.cm.afmhot,  # @UndefinedVariable
                     #aspect='auto',
                     #interpolation='nearest',
                     interpolation='bilinear',
@@ -1281,8 +1281,8 @@ def plot_property_distribution(
 
 def plot_property_v_property(
     part, spec_name='gas',
-    x_prop_name='density', x_prop_limits=[], x_prop_scaling='log',
-    y_prop_name='temperature', y_prop_limits=[], y_prop_scaling='log',
+    x_prop_name='log number.density', x_prop_limits=[], x_prop_scaling='linear',
+    y_prop_name='log temperature', y_prop_limits=[], y_prop_scaling='linear',
     prop_bin_number=150, weight_by_mass=True, cut_percent=0,
     host_distance_limits=[0, 300], center_position=None,
     other_prop_limits={}, part_indices=None, draw_statistics=False,
@@ -1311,6 +1311,8 @@ def plot_property_v_property(
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
+    Say = ut.io.SayClass(plot_property_v_property)
+
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
     if part_indices is None or not len(part_indices):
@@ -1351,13 +1353,12 @@ def plot_property_v_property(
     if weight_by_mass:
         masses = masses[part_indices]
 
-    if 'log' in x_prop_scaling:
-        x_prop_values = ut.math.get_log(x_prop_values)
+    #if 'log' in x_prop_scaling:
+    #    x_prop_values = ut.math.get_log(x_prop_values)
+    #if 'log' in y_prop_scaling:
+    #    y_prop_values = ut.math.get_log(y_prop_values)
 
-    if 'log' in y_prop_scaling:
-        y_prop_values = ut.math.get_log(y_prop_values)
-
-    print(x_prop_values.size, y_prop_values.size)
+    Say.say('keeping {} particles'.format(x_prop_values.size))
 
     if draw_statistics:
         stat_bin_number = int(np.round(prop_bin_number / 10))
@@ -1371,6 +1372,13 @@ def plot_property_v_property(
         subplot, x_prop_scaling, x_prop_limits, x_prop_values,
         y_prop_scaling, y_prop_limits, y_prop_values)
 
+    if 'log' in x_prop_scaling:
+        x_prop_values = ut.math.get_log(x_prop_values)
+        #axis_x_limits = ut.math.get_log(axis_x_limits)
+    if 'log' in y_prop_scaling:
+        y_prop_values = ut.math.get_log(y_prop_values)
+        #axis_y_limits = ut.math.get_log(axis_y_limits)
+
     axis_x_label = ut.plot.get_label(
         x_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=x_prop_scaling)
     subplot.set_xlabel(axis_x_label, fontsize=30)
@@ -1379,29 +1387,32 @@ def plot_property_v_property(
         y_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=y_prop_scaling)
     subplot.set_ylabel(axis_y_label, fontsize=30)
 
+    color_map = plt.cm.inferno_r  # @UndefinedVariable
+    #color_map = plt.cm.gist_heat_r  # @UndefinedVariable
+    #color_map = plt.cm.afmhot_r  # @UndefinedVariable
+
+    #"""
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(), weights=masses,
         cmin=None, cmax=None,
-        cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+        cmap=color_map,
     )
 
     """
-    _valuess, xs, ys = np.histogram2d(
+    valuess, _xs, _ys = np.histogram2d(
         x_prop_values, y_prop_values, prop_bin_number,
-        #[axis_x_limits, axis_y_limits],
-        weights=masses)
+        [axis_x_limits, axis_y_limits],
+        normed=False, weights=masses)
 
     subplot.imshow(
-        _valuess.transpose(),
-        norm=colors.LogNorm(),
-        cmap=plt.cm.YlOrBr,  # @UndefinedVariable
+        valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
         aspect='auto',
-        #interpolation='nearest',
-        interpolation='none',
+        interpolation='nearest',
+        #interpolation='none',
         extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
         #vmin=valuess.min(), vmax=valuess.max(),
-        label=label,
+        #label=label,
     )
     """
     #plt.colorbar()
