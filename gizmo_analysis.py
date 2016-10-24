@@ -1437,6 +1437,7 @@ def plot_property_v_property(
         if name in plot_name:
             plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
     plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
+    plot_name = plot_name.replace('log ', '')
     plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
     if host_distance_limits is not None and len(host_distance_limits):
         plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limits[0], host_distance_limits[1])
