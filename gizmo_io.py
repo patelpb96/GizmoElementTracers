@@ -1168,7 +1168,7 @@ def assign_star_form_snapshot_index(part):
         'time', part['star']['form.time'], round_kind='up')
 
 
-def assign_star_birth_distance(part, part_indices=None):
+def assign_star_birth_distance(part, use_child_id=False, part_indices=None):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
     after it formed.
@@ -1180,20 +1180,54 @@ def assign_star_birth_distance(part, part_indices=None):
     '''
     spec_name = 'star'
 
+    part[spec_name]['form.distance'] = np.zeros(
+        part[spec_name]['position'].shape[0], part[spec_name]['position'].dtype)
+    part[spec_name]['form.distance'] -= 1  # initialize to -1
+
     if 'form.index' not in part['star']:
         assign_star_form_snapshot_index(part)
 
     if part_indices is None or not len(part_indices):
         part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
 
-    if 'id.child' in part[spec_name]:
-        pis_unsplit = part_indices[(part['star']['id.child'][part_indices] == 0) *
-                                   (part['star']['id.generation'][part_indices] == 0)]
+    if use_child_id and 'id.child' in part[spec_name]:
+        pis_unsplit = part_indices[(part[spec_name]['id.child'][part_indices] == 0) *
+                                   (part[spec_name]['id.generation'][part_indices] == 0)]
 
-        pis_oversplit = part_indices[part['star']['id.child'][part_indices] >
-                                     2 ** part['star']['id.generation'][part_indices]]
+        pis_oversplit = part_indices[part[spec_name]['id.child'][part_indices] >
+                                     2 ** part[spec_name]['id.generation'][part_indices]]
     else:
-        a = 1
+        pis_unique = ut.particle.get_indices_id_kind(part, spec_name, id_kind='unique')
+        pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, id_kind='multiple')
+        print(pis_unique.size, pis_multiple.size)
+
+    # particles to compute
+    part_indices = pis_unique
+
+    form_indices = np.unique(part[spec_name]['form.index'])[::-1]
+    form_indices = form_indices[:5]  # test
+
+    for snapshot_index in form_indices:
+        pis_form_i = part_indices[part[spec_name]['form.index'] == snapshot_index]
+        pids_form_i = part[spec_name]['id'][pis_form_i]
+
+        part_snap_i = Read.read_snapshots(
+            spec_name, 'index', property_names=['position', 'form.time'], element_indices=[0],
+            force_float32=True, assign_center=True, check_sanity=True)
+
+        ut.particle.assign_id_to_index_species(
+            part_snap_i, spec_name, 'id', id_min=0, store_as_dict=True)
+
+        pis_snap_i = np.array([part_snap_i[spec_name].id_to_index[pid] for pid in pids_form_i],
+                              dtype=part[spec_name]['id'].dtype)
+
+        distances_snap_i = ut.coordinate.get_distances(
+            'scalar', part[spec_name]['position'][pis_snap_i], part.center_position,
+            part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
+
+        part[spec_name]['form.distance'][pis_form_i] = distances_snap_i
+
+        del(part_snap_i)
 
 
 #===================================================================================================

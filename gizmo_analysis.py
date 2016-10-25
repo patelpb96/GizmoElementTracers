@@ -155,6 +155,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                 distancess = ut.particle.get_distances_along_principal_axes(
                     part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
                     part_indices, scalarize=True)
+                distancess = np.abs(distancess)  # ensure positive definite
 
                 if DistanceBin.dimension_number == 1:
                     distances = distancess[1]
@@ -317,6 +318,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                     distancess = ut.particle.get_distances_along_principal_axes(
                         part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
                         part_indices, scalarize=True)
+                    distancess = np.abs(distancess)
 
                     if DistanceBin.dimension_number == 1:
                         distances = distancess[1]
@@ -572,8 +574,8 @@ def plot_mass_contamination(
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
         distance_name += '.' + virial_kind
-    plot_name = 'mass.ratio_v_{}'.format(distance_name)
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+    plot_name = ut.plot.get_file_name(
+        'mass.ratio', distance_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -723,8 +725,8 @@ def plot_metal_v_distance(
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
         distance_name += '.' + virial_kind
-    plot_name = '{}.{}_v_{}'.format(spec_name, metal_kind, distance_name)
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+    plot_name = ut.plot.get_file_name(
+        'mass.ratio', distance_name, spec_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -960,8 +962,8 @@ class ImageClass(ut.io.SayClass):
                 subplot.scatter(
                     positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
                     marker='o', c=weights)
-                    #, markersize=2.0, markeredgecolor='red', markeredgewidth=0,
-                    #color='red', alpha=0.02)
+                #, markersize=2.0, markeredgecolor='red', markeredgewidth=0,
+                # color='red', alpha=0.02)
 
             fig.gca().set_aspect('equal')
 
@@ -1066,7 +1068,7 @@ class ImageClass(ut.io.SayClass):
         for dimen_i in dimen_indices_plot:
             plot_name += '.' + dimen_label[dimen_i]
         plot_name += '_d.{:.0f}'.format(np.max(distances_max[dimen_indices_plot]))
-        plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+        plot_name += ut.plot.get_time_name('redshift', part.snapshot)
 
         if 'histogram' in image_kind:
             plot_name += '_i.{:.1f}-{:.1f}'.format(
@@ -1270,12 +1272,8 @@ def plot_property_distribution(
         if legend_z:
             subplot.add_artist(legend_z)
 
-    plot_name = spec_name + '.' + prop_name + '_distr'
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
-    for name in ut.const.element_symbol_from_name:
-        if name in plot_name:
-            plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
-    plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
+    plot_name = ut.plot.get_file_name(
+        prop_name, 'distribution', spec_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -1432,15 +1430,9 @@ def plot_property_v_property(
             loc='best', prop=FontProperties(size=18))
         legend.get_frame().set_alpha(0.5)
 
-    plot_name = spec_name + '.' + y_prop_name + '_v_' + x_prop_name
-    for name in ut.const.element_symbol_from_name:
-        if name in plot_name:
-            plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
-    plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
-    plot_name = plot_name.replace('log ', '')
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
-    if host_distance_limits is not None and len(host_distance_limits):
-        plot_name += '_d.{:.0f}-{:.0f}'.format(host_distance_limits[0], host_distance_limits[1])
+    plot_name = ut.plot.get_file_name(
+        y_prop_name, x_prop_name, spec_name, snapshot_dict=part.snapshot,
+        host_distance_limits=host_distance_limits)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -1605,18 +1597,15 @@ def plot_property_v_distance(
         if legend_z:
             subplot.add_artist(legend_z)
 
-    plot_name = species + '.' + prop_name + '.' + prop_statistic + '_v_dist'
+    distance_name = 'dist'
     if dimension_number == 2:
-        plot_name += '.2d'
+        distance_name += '.2d'
     elif dimension_number == 1:
-        plot_name += '.1d'
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
-    for name in ut.const.element_symbol_from_name:
-        if name in plot_name:
-            plot_name = plot_name.replace(name, ut.const.element_symbol_from_name[name])
-    plot_name = plot_name.replace('metallicity.mg-metallicity.fe', 'metallicity.mg-fe')
+        distance_name += '.1d'
+
+    plot_name = ut.plot.get_file_name(
+        prop_name + '.' + prop_statistic, distance_name, species, snapshot_dict=part.snapshot)
     plot_name = plot_name.replace('.sum', '')
-    plot_name = plot_name.replace('.average', '.ave')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
@@ -1937,9 +1926,11 @@ def plot_property_v_distance_halos(
             subplot.add_artist(legend_z)
     """
 
-    plot_name = species + '.' + prop_name + '.' + prop_statistic + '_v_dist'
+    snapshot_dict = None
     if parts is not None:
-        plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+        snapshot_dict = parts[0].snapshot
+    plot_name = ut.plot.get_file_name(
+        prop_name + '.' + prop_statistic, 'dist', species, snapshot_dict=snapshot_dict)
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
@@ -2203,9 +2194,8 @@ def plot_star_form_history(
         if legend_z:
             subplot.add_artist(legend_z)
 
-    sfh_name = 'star' + '.' + sfh_kind + '.history'
-    plot_name = '{}_v_{}'.format(sfh_name, time_kind)
-    plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
+    plot_name = ut.plot.get_file_name(
+        sfh_kind + '.history', time_kind, 'star', snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
@@ -2377,15 +2367,17 @@ def plot_star_form_history_galaxies(
         if legend_z:
             subplot.add_artist(legend_z)
 
-    sf_name = 'star' + '.' + sfh_kind
-    plot_name = '{}_v_{}'.format(sf_name, time_kind)
+    snapshot_dict = None
+    if hal is not None:
+        snapshot_dict = part.snapshot
+    host_distance_limits = None
+    if 'host.distance' in other_prop_limits:
+        host_distance_limits = other_prop_limits['host.distance']
+    plot_name = ut.plot.get_file_name(
+        sfh_kind, time_kind, 'star', snapshot_dict=snapshot_dict,
+        host_distance_limits=host_distance_limits)
     if gal is not None:
         plot_name += '_lg'
-    if hal is not None:
-        plot_name += ut.plot.get_time_name_file('redshift', part.snapshot)
-    if 'host.distance' in other_prop_limits:
-        plot_name += '_d.{:.0f}-{:.0f}'.format(
-            other_prop_limits['host.distance'][0], other_prop_limits['host.distance'][1])
     ut.plot.parse_output(write_plot, plot_directory, plot_name)
 
 
