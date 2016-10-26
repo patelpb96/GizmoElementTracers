@@ -1228,9 +1228,9 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
         pis_snap = []
         not_find_id_number = 0
         for pid in pids_form:
-            if pid in part_snap[spec_name].id_to_index[pid]:
+            try:
                 pis_snap.append(part_snap[spec_name].id_to_index[pid])
-            else:
+            except:
                 not_find_id_number += 1
         pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
         if not_find_id_number:
