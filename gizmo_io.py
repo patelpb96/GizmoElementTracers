@@ -1207,7 +1207,7 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     part_indices = pis_unique  # particles to assign to
 
     form_indices = np.unique(part[spec_name]['form.index'])[::-1]  # sort going back in time
-    form_indices = form_indices[:5]  # test
+    form_indices = form_indices[:15]  # test
 
     form_time_offset_number_tot = 0
     not_find_id_number_tot = 0
@@ -1238,6 +1238,7 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
                     not_find_id_number += 1
             except:
                 not_find_id_number += 1
+                pids_form[1e9]
         pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
         pis_form = np.array(pis_form, dtype=pis_form_all.dtype)
 
@@ -1263,8 +1264,8 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
 
         del(part_snap)
 
-    Say.say('! {} particles not have id match'.format(not_find_id_number_tot))
-    Say.say('! {} particles have offset formation time'.format(form_time_offset_number_tot))
+    Say.say('\n{} particles total not have id match'.format(not_find_id_number_tot))
+    Say.say('{} particles total have offset formation time'.format(form_time_offset_number_tot))
 
 
 #===================================================================================================
