@@ -872,9 +872,9 @@ class ImageClass(ut.io.SayClass):
             hal_positions = hal_positions[masks]
 
         # plot ----------
-        BYW = colors.LinearSegmentedColormap('byw', ut.plot.cmap_dict['BlackYellowWhite'])
+        BYW = colors.LinearSegmentedColormap('byw', ut.plot.color_map_dict['BlackYellowWhite'])
         plt.register_cmap(cmap=BYW)
-        BBW = colors.LinearSegmentedColormap('bbw', ut.plot.cmap_dict['BlackBlueWhite'])
+        BBW = colors.LinearSegmentedColormap('bbw', ut.plot.color_map_dict['BlackBlueWhite'])
         plt.register_cmap(cmap=BBW)
 
         if background_color == 'black':
