@@ -576,7 +576,7 @@ def plot_mass_contamination(
         distance_name += '.' + virial_kind
     plot_name = ut.plot.get_file_name(
         'mass.ratio', distance_name, snapshot_dict=part.snapshot)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 def plot_mass_contamination_halo(
@@ -727,7 +727,7 @@ def plot_metal_v_distance(
         distance_name += '.' + virial_kind
     plot_name = ut.plot.get_file_name(
         'mass.ratio', distance_name, spec_name, snapshot_dict=part.snapshot)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 #===================================================================================================
@@ -1077,7 +1077,7 @@ class ImageClass(ut.io.SayClass):
         if add_simulation_name:
             plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
 
-        ut.plot.parse_output(write_plot, plot_directory, plot_name)
+        ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
         self.histogram_valuess = hist_valuess
         self.histogram_xs = hist_xs
@@ -1274,7 +1274,7 @@ def plot_property_distribution(
 
     plot_name = ut.plot.get_file_name(
         prop_name, 'distribution', spec_name, snapshot_dict=part.snapshot)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 def plot_property_v_property(
@@ -1433,7 +1433,7 @@ def plot_property_v_property(
     plot_name = ut.plot.get_file_name(
         y_prop_name, x_prop_name, spec_name, snapshot_dict=part.snapshot,
         host_distance_limits=host_distance_limits)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 def plot_property_v_distance(
@@ -1608,7 +1608,7 @@ def plot_property_v_distance(
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
     if get_values:
         if len(parts) == 1:
@@ -1934,7 +1934,7 @@ def plot_property_v_distance_halos(
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
     return pros
 
@@ -2196,7 +2196,7 @@ def plot_star_form_history(
 
     plot_name = ut.plot.get_file_name(
         sfh_kind + '.history', time_kind, 'star', snapshot_dict=part.snapshot)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 def plot_star_form_history_galaxies(
@@ -2378,7 +2378,7 @@ def plot_star_form_history_galaxies(
         host_distance_limits=host_distance_limits)
     if gal is not None:
         plot_name += '_lg'
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 #===================================================================================================
@@ -2803,7 +2803,7 @@ def plot_galaxy_property_v_time(
     legend_prop.get_frame().set_alpha(0.5)
 
     plot_name = 'galaxy_{}_v_{}'.format(prop_name, time_kind)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 #===================================================================================================

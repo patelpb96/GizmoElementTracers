@@ -209,4 +209,4 @@ def plot_nucleosynthetic_yields(
         legend_z.get_frame().set_alpha(0.7)
 
     plot_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)

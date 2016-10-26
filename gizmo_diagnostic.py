@@ -558,7 +558,7 @@ def plot_scaling(
         subplot.plot(mfm_particle_numbers, mfm_times, '*-', linewidth=2.0, color='blue')
 
     plot_name = 'test'
-    ut.plot.parse_output(write_plot, plot_directory, plot_name)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 #===================================================================================================
