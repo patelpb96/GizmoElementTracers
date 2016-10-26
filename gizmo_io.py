@@ -1214,8 +1214,9 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
         pids_form = part[spec_name]['id'][pis_form]
 
         part_snap = Read.read_snapshots(
-            spec_name, 'index', snapshot_index, property_names=['position', 'mass', 'form.time'],
-            element_indices=[0], force_float32=True, assign_center=True, check_sanity=True)
+            spec_name, 'index', snapshot_index,
+            property_names=['position', 'mass', 'id', 'form.time'], element_indices=[0],
+            force_float32=True, assign_center=True, check_sanity=True)
 
         ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
 
