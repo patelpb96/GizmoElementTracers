@@ -598,7 +598,7 @@ class ReadClass(ut.io.SayClass):
         # if comment out any property, will not read it
         property_dict = {
             ## all particles ##
-            'ParticleIDs': 'id',
+            'ParticleIDs': 'id',  # indexing starts at 0
             'Coordinates': 'position',
             'Velocities': 'velocity',
             'Masses': 'mass',
@@ -1168,7 +1168,7 @@ def assign_star_form_snapshot_index(part):
         'time', part['star']['form.time'], round_kind='up')
 
 
-def assign_star_birth_distance(part, use_child_id=False, part_indices=None):
+def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
     after it formed.
@@ -1176,8 +1176,10 @@ def assign_star_birth_distance(part, use_child_id=False, part_indices=None):
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    part_indices : array-like : list of indices to assign
+    part_indices : array-like : list of particle indices to assign to
     '''
+    Say = ut.io.SayClass(assign_star_form_distance)
+
     spec_name = 'star'
 
     part[spec_name]['form.distance'] = np.zeros(
@@ -1197,37 +1199,47 @@ def assign_star_birth_distance(part, use_child_id=False, part_indices=None):
         pis_oversplit = part_indices[part[spec_name]['id.child'][part_indices] >
                                      2 ** part[spec_name]['id.generation'][part_indices]]
     else:
-        pis_unique = ut.particle.get_indices_id_kind(part, spec_name, id_kind='unique')
-        pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, id_kind='multiple')
-        print(pis_unique.size, pis_multiple.size)
+        pis_unique = ut.particle.get_indices_id_kind(part, spec_name, 'unique', part_indices)
+        pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, 'multiple', part_indices)
+        Say.say('number of particles with id that is unique {}, and redundant {}'.format(
+                pis_unique.size, pis_multiple.size))
 
-    # particles to compute
-    part_indices = pis_unique
+    part_indices = pis_unique  # particles to assign to
 
-    form_indices = np.unique(part[spec_name]['form.index'])[::-1]
+    form_indices = np.unique(part[spec_name]['form.index'])[::-1]  # sort going back in time
     form_indices = form_indices[:5]  # test
 
     for snapshot_index in form_indices:
-        pis_form_i = part_indices[part[spec_name]['form.index'] == snapshot_index]
-        pids_form_i = part[spec_name]['id'][pis_form_i]
+        pis_form = part_indices[part[spec_name]['form.index'] == snapshot_index]
+        pids_form = part[spec_name]['id'][pis_form]
 
-        part_snap_i = Read.read_snapshots(
-            spec_name, 'index', property_names=['position', 'form.time'], element_indices=[0],
-            force_float32=True, assign_center=True, check_sanity=True)
+        part_snap = Read.read_snapshots(
+            spec_name, 'index', snapshot_index, property_names=['position', 'form.time'],
+            element_indices=[0], force_float32=True, assign_center=True, check_sanity=True)
 
-        ut.particle.assign_id_to_index_species(
-            part_snap_i, spec_name, 'id', id_min=0, store_as_dict=True)
+        ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
 
-        pis_snap_i = np.array([part_snap_i[spec_name].id_to_index[pid] for pid in pids_form_i],
-                              dtype=part[spec_name]['id'].dtype)
+        Say.say('assigning formation distance to {} particles'.format(pids_form.size))
 
-        distances_snap_i = ut.coordinate.get_distances(
-            'scalar', part[spec_name]['position'][pis_snap_i], part.center_position,
+        pis_snap = np.array([part_snap[spec_name].id_to_index[pid] for pid in pids_form],
+                            dtype=part[spec_name]['id'].dtype)
+
+        # sanity check
+        form_time_tolerance = 0.05  # [Gyr]
+        form_time_difs = np.abs(
+            part_snap[spec_name]['form.time'][pis_snap] - part[spec_name]['form.time'][pis_form])
+        bad_number = np.sum(form_time_difs > form_time_tolerance)
+        if bad_number:
+            Say.say('! {} particles have offset formation time, max = {:.3f} Gyr'.format(
+                    bad_number, np.max(form_time_difs)))
+
+        distances = ut.coordinate.get_distances(
+            'scalar', part[spec_name]['position'][pis_snap], part.center_position,
             part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
 
-        part[spec_name]['form.distance'][pis_form_i] = distances_snap_i
+        part[spec_name]['form.distance'][pis_form] = distances
 
-        del(part_snap_i)
+        del(part_snap)
 
 
 #===================================================================================================
