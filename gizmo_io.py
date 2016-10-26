@@ -1209,6 +1209,9 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     form_indices = np.unique(part[spec_name]['form.index'])[::-1]  # sort going back in time
     form_indices = form_indices[:5]  # test
 
+    form_time_offset_number_tot = 0
+    not_find_id_number_tot = 0
+
     for snapshot_index in form_indices:
         pis_form = part_indices[part[spec_name]['form.index'][part_indices] == snapshot_index]
         pids_form = part[spec_name]['id'][pis_form]
@@ -1220,19 +1223,29 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
 
         ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
 
-        Say.say('assigning formation distance to {} particles'.format(pids_form.size))
+        Say.say('\nassigning formation distance to {} particles'.format(pids_form.size))
 
-        pis_snap = np.array([part_snap[spec_name].id_to_index[pid] for pid in pids_form],
-                            dtype=part[spec_name]['id'].dtype)
+        pis_snap = []
+        not_find_id_number = 0
+        for pid in pids_form:
+            if pid in part_snap[spec_name].id_to_index[pid]:
+                pis_snap.append(part_snap[spec_name].id_to_index[pid])
+            else:
+                not_find_id_number += 1
+        pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
+        if not_find_id_number:
+            Say.say('! {} particles not have id match'.format(not_find_id_number))
+            not_find_id_number_tot += not_find_id_number
 
         # sanity check
         form_time_tolerance = 0.05  # [Gyr]
         form_time_difs = np.abs(
             part_snap[spec_name]['form.time'][pis_snap] - part[spec_name]['form.time'][pis_form])
-        bad_number = np.sum(form_time_difs > form_time_tolerance)
-        if bad_number:
+        form_time_offset_number = np.sum(form_time_difs > form_time_tolerance)
+        if form_time_offset_number:
             Say.say('! {} particles have offset formation time, max = {:.3f} Gyr'.format(
-                    bad_number, np.max(form_time_difs)))
+                    form_time_offset_number, np.max(form_time_difs)))
+            form_time_offset_number_tot += form_time_offset_number
 
         distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'][pis_snap], part.center_position,
@@ -1241,6 +1254,9 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
         part[spec_name]['form.distance'][pis_form] = distances
 
         del(part_snap)
+
+    Say.say('! {} particles not have id match'.format(not_find_id_number_tot))
+    Say.say('! {} particles have offset formation time'.format(form_time_offset_number_tot))
 
 
 #===================================================================================================
