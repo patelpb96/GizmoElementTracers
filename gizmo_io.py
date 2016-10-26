@@ -1223,13 +1223,17 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
 
         ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
 
-        Say.say('\nassigning formation distance to {} particles'.format(pids_form.size))
+        Say.say('\n* assigning formation distance to {} particles'.format(pids_form.size))
 
         pis_snap = []
         not_find_id_number = 0
         for pid in pids_form:
             try:
-                pis_snap.append(part_snap[spec_name].id_to_index[pid])
+                pi = part_snap[spec_name].id_to_index[pid]
+                if np.isscalar(pi):
+                    pis_snap.append(pi)
+                else:
+                    not_find_id_number += 1
             except:
                 not_find_id_number += 1
         pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
