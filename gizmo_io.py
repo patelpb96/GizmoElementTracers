@@ -1201,7 +1201,7 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     else:
         pis_unique = ut.particle.get_indices_id_kind(part, spec_name, 'unique', part_indices)
         pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, 'multiple', part_indices)
-        Say.say('number of particles with id that is unique {}, and redundant {}'.format(
+        Say.say('particles with id that is: unique {}, redundant {}'.format(
                 pis_unique.size, pis_multiple.size))
 
     part_indices = pis_unique  # particles to assign to
@@ -1213,8 +1213,8 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     not_find_id_number_tot = 0
 
     for snapshot_index in form_indices:
-        pis_form = part_indices[part[spec_name]['form.index'][part_indices] == snapshot_index]
-        pids_form = part[spec_name]['id'][pis_form]
+        pis_form_all = part_indices[part[spec_name]['form.index'][part_indices] == snapshot_index]
+        pids_form = part[spec_name]['id'][pis_form_all]
 
         part_snap = Read.read_snapshots(
             spec_name, 'index', snapshot_index,
@@ -1226,17 +1226,21 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
         Say.say('\n* assigning formation distance to {} particles'.format(pids_form.size))
 
         pis_snap = []
+        pis_form = []
         not_find_id_number = 0
-        for pid in pids_form:
+        for pii, pid in enumerate(pids_form):
             try:
                 pi = part_snap[spec_name].id_to_index[pid]
                 if np.isscalar(pi):
                     pis_snap.append(pi)
+                    pis_form.append(pis_form_all[pii])
                 else:
                     not_find_id_number += 1
             except:
                 not_find_id_number += 1
         pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
+        pis_form = np.array(pis_form, dtype=pis_form_all.dtype)
+
         if not_find_id_number:
             Say.say('! {} particles not have id match'.format(not_find_id_number))
             not_find_id_number_tot += not_find_id_number
