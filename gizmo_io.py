@@ -1210,7 +1210,7 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     form_indices = form_indices[:5]  # test
 
     for snapshot_index in form_indices:
-        pis_form = part_indices[part[spec_name]['form.index'] == snapshot_index]
+        pis_form = part_indices[part[spec_name]['form.index'][part_indices] == snapshot_index]
         pids_form = part[spec_name]['id'][pis_form]
 
         part_snap = Read.read_snapshots(
