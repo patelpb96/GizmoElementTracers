@@ -223,7 +223,7 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
         # sanity check
         bad_id_number = np.sum(part[spec_name]['id'] != pids)
         if bad_id_number:
-            Say.say('! {} particles with mismatched ids. this is not right.'.format(bad_id_number))
+            Say.say('! {} particles have mismatched id. this is not right!'.format(bad_id_number))
 
     else:
         raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
