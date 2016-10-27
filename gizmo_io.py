@@ -993,7 +993,7 @@ class ReadClass(ut.io.SayClass):
                                 part[spec_name][prop_name].max()))
         print()
 
-    def assign_center(self, part, method='center-of-mass', compare_centers=True):
+    def assign_center(self, part, method='center-of-mass', compare_centers=False):
         '''
         Assign center position [kpc comoving] and velocity [km / s physical] to galaxy/halo,
         using stars for hydro simulation or dark matter for dark matter simulation.
@@ -1193,8 +1193,6 @@ def assign_star_form_distance(
 
     spec_name = 'star'
 
-    file_name = 'star.form.distance'
-
     part[spec_name]['form.distance'] = np.zeros(
         part[spec_name]['position'].shape[0], part[spec_name]['position'].dtype)
     part[spec_name]['form.distance'] -= 1  # initialize to -1
@@ -1238,7 +1236,7 @@ def assign_star_form_distance(
 
         ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
 
-        Say.say('\n* assigning formation distance to {} particles'.format(pids_form.size))
+        Say.say('\n# assign formation distance to {} particles'.format(pids_form.size))
 
         pis_snap = []
         pis_form = []
@@ -1261,7 +1259,7 @@ def assign_star_form_distance(
             no_id_number_tot += no_id_number
 
         # sanity check
-        form_dif_frac_tolerance = 1e-4
+        form_dif_frac_tolerance = 1e-5
         form_scalefactor_difs = np.abs(
             part_snap[spec_name]['form.scalefactor'][pis_snap] -
             part[spec_name]['form.scalefactor'][pis_form]) / part_snap.snapshot['scalefactor']
@@ -1279,13 +1277,46 @@ def assign_star_form_distance(
 
         del(part_snap)
 
-        # continuously write as go, in case crash along the way
-        ut.io.pickle_object(file_name, 'write', part[spec_name]['form.distance'])
+        # continuously write as go, in case happens to crash along the way
+        pickle_star_form_distance(part, 'write')
 
     Say.say('\n')
     Say.say('# totals across all snapshots:')
     Say.say('{} particles not have id match'.format(no_id_number_tot))
     Say.say('{} particles have offset formation time'.format(form_offset_number_tot))
+
+
+def pickle_star_form_distance(part, pickle_direction='read'):
+    '''
+    Read or write the distance wrt the host galaxy center at the first snapshot
+    after each star particle formed.
+    If read, assign to catalog.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    pickle_direction : string : pickle direction: 'read', 'write'
+    '''
+    Say = ut.io.SayClass(pickle_star_form_distance)
+
+    spec_name = 'star'
+
+    file_name = 'star_form_distance_{:03d}'.format(part.snapshot['index'])
+
+    if pickle_direction == 'write':
+        pickle_object = [part[spec_name]['form.distance'], part[spec_name]['id']]
+        ut.io.pickle_object(file_name, pickle_direction, pickle_object)
+
+    elif pickle_direction == 'read':
+        part[spec_name]['form.distance'], pids = ut.io.pickle_object(
+            file_name, pickle_direction, pickle_object)
+
+        bad_id_number = np.sum(part[spec_name]['id'] != pids)
+        if bad_id_number:
+            Say.say('! {} particles with mismatched ids. this is bad.'.format(bad_id_number))
+
+    else:
+        raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
 
 
 #===================================================================================================
