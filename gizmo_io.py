@@ -1020,14 +1020,14 @@ class ReadClass(ut.io.SayClass):
         if 'position' in part[spec_name]:
             part.center_position = ut.particle.get_center_position(
                 part, spec_name, method, compare_centers=compare_centers)
-            print('  position = [', end='')
+            self.say('position = [', end='')
             ut.io.print_array(part.center_position, '{:.3f}', end='')
             print('] kpc comoving')
 
         if 'velocity' in part[spec_name]:
             part.center_velocity = ut.particle.get_center_velocity(
                 part, spec_name, velocity_radius_max, part.center_position)
-            print('  velocity = [', end='')
+            self.say('  velocity = [', end='')
             ut.io.print_array(part.center_velocity, '{:.1f}', end='')
             print('] km / sec')
 
@@ -1212,7 +1212,7 @@ def assign_star_index_snapshots(part, use_child_id=False, snapshot_index_limits=
 
 
 def assign_star_form_host_distance(
-    part, use_child_id=False, part_indices=None, snapshot_index_limits=[]):
+    part, use_child_id=False, snapshot_index_limits=[], part_indices=None):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
     after it formed.
@@ -1221,16 +1221,16 @@ def assign_star_form_host_distance(
     ----------
     part : dict : catalog of particles at snapshot
     use_child_id : boolean : whether to use id.child to match particles with redundant ids
-    part_indices : array-like : list of particle indices to assign to
     snapshot_index_limits : list : min and max snapshot indices to impose matching to
+    part_indices : array-like : list of particle indices to assign to
     '''
     Say = ut.io.SayClass(assign_star_form_host_distance)
 
     spec_name = 'star'
+    prop_name = 'form.host.distance'
 
-    part[spec_name]['form.host.distance'] = np.zeros(
-        part[spec_name]['position'].shape[0], part[spec_name]['position'].dtype)
-    part[spec_name]['form.host.distance'] -= 1  # initialize to -1
+    # store form.host.distance as 32-bit and initialize to -1
+    part[spec_name][prop_name] = np.zeros(part[spec_name]['position'].shape[0], np.float32) - 1
 
     if 'form.index' not in part['star']:
         assign_star_form_snapshot_index(part)
@@ -1308,12 +1308,9 @@ def assign_star_form_host_distance(
             form_time_offset_number_tot += form_time_offset_number
 
         # compute 3-D distance [kpc physical]
-        distances = ut.coordinate.get_distances(
+        part[spec_name][prop_name][pis_form] = ut.coordinate.get_distances(
             'scalar', part_snap[spec_name]['position'][pis_snap], part_snap.center_position,
             part_snap.info['box.length']) * part_snap.snapshot['scalefactor']  # [kpc physical]
-
-        # assign to catalog
-        part[spec_name]['form.host.distance'][pis_form] = distances
 
         # print cumulative diagnostics
         Say.say('{} (of {}) total assigned'.format(assigned_number_tot, part_indices.size))
@@ -1340,17 +1337,18 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
     Say = ut.io.SayClass(pickle_star_form_host_distance)
 
     spec_name = 'star'
+    prop_name = 'form.host.distance'
 
     file_name = 'output/star_form_host_distance_{:03d}'.format(part.snapshot['index'])
 
     if pickle_direction == 'write':
-        pickle_object = [part[spec_name]['form.host.distance'], part[spec_name]['id']]
+        pickle_object = [part[spec_name][prop_name], part[spec_name]['id']]
         ut.io.pickle_object(file_name, pickle_direction, pickle_object)
 
     elif pickle_direction == 'read':
-        part[spec_name]['form.host.distance'], pids = \
-            ut.io.pickle_object(file_name, pickle_direction)
+        part[spec_name][prop_name], pids = ut.io.pickle_object(file_name, pickle_direction)
 
+        # sanity check
         bad_id_number = np.sum(part[spec_name]['id'] != pids)
         if bad_id_number:
             Say.say('! {} particles with mismatched ids. this is not right.'.format(bad_id_number))
