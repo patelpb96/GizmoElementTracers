@@ -328,8 +328,7 @@ class ReadClass(ut.io.SayClass):
 
             # adjust properties for each species
             self.adjust_particles(
-                part, header, Cosmology, particle_subsample_factor, separate_dark_lowres,
-                sort_dark_by_id)
+                part, header, particle_subsample_factor, separate_dark_lowres, sort_dark_by_id)
 
             if check_sanity:
                 self.check_sanity(part)
@@ -826,8 +825,8 @@ class ReadClass(ut.io.SayClass):
         return part
 
     def adjust_particles(
-        self, part, header, Cosmology,
-        particle_subsample_factor=None, separate_dark_lowres=True, sort_dark_by_id=False):
+        self, part, header, particle_subsample_factor=None, separate_dark_lowres=True,
+        sort_dark_by_id=False):
         '''
         Adjust properties for each species, including unit conversions, separating dark species by
         mass, sorting by id, and subsampling.
@@ -836,7 +835,6 @@ class ReadClass(ut.io.SayClass):
         ----------
         part : dict : particle dictionary class
         header : dict : header dictionary
-        Cosmology : class : information on cosmology
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         separate_dark_lowres : boolean :
             whether to separate low-resolution dark matter into separate dicts according to mass
@@ -1217,11 +1215,13 @@ def assign_star_form_distance(
 
     part_indices = pis_unique  # particles to assign to
 
-    form_indices = np.unique(part[spec_name]['form.index'])[::-1]  # sort going back in time
+    # get snapshot indices to sort going back in time
+    form_indices = np.unique(part[spec_name]['form.index'][part_indices])[::-1]
     if snapshot_index_limits is not None and len(snapshot_index_limits):
         form_indices = form_indices[form_indices >= min(snapshot_index_limits)]
         form_indices = form_indices[form_indices <= max(snapshot_index_limits)]
 
+    assigned_number_tot = 0
     form_offset_number_tot = 0
     no_id_number_tot = 0
 
@@ -1234,9 +1234,11 @@ def assign_star_form_distance(
             property_names=['position', 'mass', 'id', 'form.scalefactor'], element_indices=[0],
             force_float32=True, assign_center=True, check_sanity=True)
 
-        ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
+        ut.particle.assign_id_to_index(
+            part_snap, spec_name, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
 
-        Say.say('\n# assign formation distance to {} particles'.format(pids_form.size))
+        Say.say('\n# {} particles to assign formation distance'.format(pids_form.size))
+        assigned_number_tot += pids_form.size
 
         pis_snap = []
         pis_form = []
@@ -1269,16 +1271,22 @@ def assign_star_form_distance(
                     form_offset_number, np.max(form_scalefactor_difs)))
             form_offset_number_tot += form_offset_number
 
+        # compute 3-D distance [kpc physical]
         distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'][pis_snap], part.center_position,
             part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
 
+        # assign to catalog
         part[spec_name]['form.distance'][pis_form] = distances
-
-        del(part_snap)
 
         # continuously write as go, in case happens to crash along the way
         pickle_star_form_distance(part, 'write')
+
+        # print cumulative diagnostics
+        Say.say('# totals so far')
+        Say.say('{} (of {}) particles assigned'.format(assigned_number_tot, part_indices.size))
+        Say.say('{} particles not have id match'.format(no_id_number_tot))
+        Say.say('{} particles have offset formation time'.format(form_offset_number_tot))
 
     Say.say('\n')
     Say.say('# totals across all snapshots:')
@@ -1288,9 +1296,9 @@ def assign_star_form_distance(
 
 def pickle_star_form_distance(part, pickle_direction='read'):
     '''
-    Read or write the distance wrt the host galaxy center at the first snapshot
-    after each star particle formed.
-    If read, assign to catalog.
+    Read or write, for each star particle, its distance wrt the host galaxy center at the first
+    snapshot after it formed.
+    If read, assign to particle catalog.
 
     Parameters
     ----------
@@ -1308,12 +1316,11 @@ def pickle_star_form_distance(part, pickle_direction='read'):
         ut.io.pickle_object(file_name, pickle_direction, pickle_object)
 
     elif pickle_direction == 'read':
-        part[spec_name]['form.distance'], pids = ut.io.pickle_object(
-            file_name, pickle_direction, pickle_object)
+        part[spec_name]['form.distance'], pids = ut.io.pickle_object(file_name, pickle_direction)
 
         bad_id_number = np.sum(part[spec_name]['id'] != pids)
         if bad_id_number:
-            Say.say('! {} particles with mismatched ids. this is bad.'.format(bad_id_number))
+            Say.say('! {} particles with mismatched ids. this is not right.'.format(bad_id_number))
 
     else:
         raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
