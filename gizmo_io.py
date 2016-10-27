@@ -508,7 +508,7 @@ class ReadClass(ut.io.SayClass):
         # get snapshot file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
 
-        self.say('reading header from: ' + file_name, end='\n')
+        self.say('* reading header from: ' + file_name, end='\n')
 
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
         header_in = file_in['Header'].attrs  # load header dictionary
@@ -542,7 +542,7 @@ class ReadClass(ut.io.SayClass):
         particle_number_min = 0
         for spec_name in list(self.species_names):
             spec_id = self.species_dict[spec_name]
-            self.say('  species = {:9s} (id = {}): {} particles'.format(
+            self.say('species = {:9s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
             if header['particle.numbers.total'][spec_id] > 0:
                 particle_number_min = header['particle.numbers.total'][spec_id]
@@ -727,6 +727,7 @@ class ReadClass(ut.io.SayClass):
             else:
                 part_in = file_in['PartType' + str(spec_id)]
 
+            prop_names_ignore = []
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
                     prop_name = property_dict[prop_name_in]
@@ -756,7 +757,10 @@ class ReadClass(ut.io.SayClass):
                         prop_name_print = property_dict[prop_name_in]
                     else:
                         prop_name_print = prop_name_in
-                    self.say('not reading:  {:6} {}'.format(spec_name, prop_name_print))
+                    prop_names_ignore.append(prop_name_print)
+
+            if len(prop_names_ignore):
+                self.say('not reading {:6} {}'.format(spec_name, prop_names_ignore))
 
             # might have opened extra file if using multi-file snapshot
             try:
@@ -775,13 +779,14 @@ class ReadClass(ut.io.SayClass):
         # initial particle indices to assign to each species from each file
         part_indices_lo = np.zeros(len(self.species_names), dtype=np.int64)
 
+        self.say('* reading particles')
         # loop over all files at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
             file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
             file_in = h5py.File(file_name_i, 'r')
 
-            self.say('reading particles from: ' + file_name_i.split('/')[-1])
+            self.say('from: ' + file_name_i.split('/')[-1])
 
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
@@ -845,12 +850,11 @@ class ReadClass(ut.io.SayClass):
         if spec_name in part and 'mass' in part[spec_name]:
             dark_lowres_masses = np.unique(part[spec_name]['mass'])
             if dark_lowres_masses.size > 9:
-                self.say(
-                    '! warning: {} different masses of low-resolution dark matter'.format(
-                        dark_lowres_masses.size))
+                self.say('! warning: {} different masses of low-resolution dark matter'.format(
+                         dark_lowres_masses.size))
 
             if separate_dark_lowres and dark_lowres_masses.size > 1:
-                self.say('separating low-resolution dark-matter by mass into separate dictionaries')
+                self.say('* separating low-res dark-matter by mass into separate dictionaries')
                 dark_lowres = {}
                 for prop_name in part[spec_name]:
                     dark_lowres[prop_name] = np.array(part[spec_name][prop_name])
@@ -863,7 +867,7 @@ class ReadClass(ut.io.SayClass):
 
                     for prop_name in dark_lowres:
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
-                    self.say('  {}: {} particles'.format(spec_name, spec_indices.size))
+                    self.say('{}: {} particles'.format(spec_name, spec_indices.size))
 
                     if spec_name not in self.species_names:
                         self.species_names.append(spec_name)
@@ -875,7 +879,7 @@ class ReadClass(ut.io.SayClass):
             # order dark-matter particles by id - should be conserved across snapshots
             for spec_name in self.species_names:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
-                    self.say('sorting {:6} particles by id'.format(spec_name))
+                    self.say('* sorting {:6} particles by id'.format(spec_name))
                     indices_sorted = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted]
@@ -944,7 +948,7 @@ class ReadClass(ut.io.SayClass):
         if particle_subsample_factor > 1:
             # sub-sample highest-resolution particles, for smaller memory
             spec_names = ['dark', 'gas', 'star']
-            self.say('subsampling (periodically) {} particles by factor = {}'.format(
+            self.say('* subsampling (periodically) {} particles by factor = {}'.format(
                      spec_names, particle_subsample_factor), end='\n\n')
             for spec_name in part:
                 if spec_name in spec_names:
@@ -978,17 +982,16 @@ class ReadClass(ut.io.SayClass):
             'form.scalefactor': [0, 1],
         }
 
-        self.say('checking sanity of particle properties')
+        self.say('* checking sanity of particle properties')
 
         for spec_name in self.species_names:
             for prop_name in part[spec_name]:
                 if prop_name in prop_limit_dict:
                     if (part[spec_name][prop_name].min() < prop_limit_dict[prop_name][0] or
                             part[spec_name][prop_name].max() > prop_limit_dict[prop_name][1]):
-                        self.say(
-                            '! warning: {} {} [min, max] = [{:.3f}, {:.3f}]'.format(
-                                spec_name, prop_name, part[spec_name][prop_name].min(),
-                                part[spec_name][prop_name].max()))
+                        self.say('! warning: {} {} [min, max] = [{:.3f}, {:.3f}]'.format(
+                                 spec_name, prop_name, part[spec_name][prop_name].min(),
+                                 part[spec_name][prop_name].max()))
         print()
 
     def assign_center(self, part, method='center-of-mass', compare_centers=False):
@@ -1012,7 +1015,7 @@ class ReadClass(ut.io.SayClass):
             self.say('! catalog not contain star or dark particles, skipping center finding')
             return
 
-        self.say('assigning center of galaxy/halo:')
+        self.say('* assigning center of galaxy/halo:')
 
         if 'position' in part[spec_name]:
             part.center_position = ut.particle.get_center_position(
@@ -1067,7 +1070,7 @@ class ReadClass(ut.io.SayClass):
 
         # get file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
-        self.say('reading header from: ' + file_name, end='\n\n')
+        self.say('* reading header from: ' + file_name, end='\n\n')
 
         ## read header ##
         # open file and parse header
@@ -1080,7 +1083,7 @@ class ReadClass(ut.io.SayClass):
             file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
             file_in = h5py.File(file_name_i, 'r+')
 
-            self.say('reading properties from: ' + file_name_i.split('/')[-1])
+            self.say('reading particles from: ' + file_name_i.split('/')[-1])
 
             if 'delete' in action:
                 part_number_in_file = header['NumPart_ThisFile']
@@ -1090,10 +1093,10 @@ class ReadClass(ut.io.SayClass):
             for _spec_i, spec_name in enumerate(species_names):
                 spec_id = self.species_dict[spec_name]
                 spec_name_in = 'PartType' + str(spec_id)
-                self.say('  adjusting species = {}'.format(spec_name))
+                self.say('adjusting species = {}'.format(spec_name))
 
                 if 'delete' in action:
-                    self.say('  deleting species = {}'.format(spec_name))
+                    self.say('deleting species = {}'.format(spec_name))
 
                     # zero numbers in header
                     part_number_in_file[spec_id] = 0
@@ -1174,7 +1177,41 @@ def assign_star_form_snapshot_index(part):
         'scalefactor', form_scalefactors, round_kind='up')
 
 
-def assign_star_form_distance(
+def assign_star_index_snapshots(part, use_child_id=False, snapshot_index_limits=[]):
+    '''
+    Assign to each star particle its index in the star particle catalog at each snapshot.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    use_child_id : boolean : whether to use id.child to match particles with redundant ids
+    snapshot_index_limits : list : min and max snapshot indices to impose matching to
+    '''
+    Say = ut.io.SayClass(assign_star_index_snapshots)
+
+    spec_name = 'star'
+
+    if 'form.index' not in part['star']:
+        assign_star_form_snapshot_index(part)
+
+    if use_child_id and 'id.child' in part[spec_name]:
+        part_indices = None
+        pis_unsplit = part_indices[(part[spec_name]['id.child'] == 0) *
+                                   (part[spec_name]['id.generation'] == 0)]
+
+        pis_oversplit = part_indices[part[spec_name]['id.child'] >
+                                     2 ** part[spec_name]['id.generation']]
+    else:
+        pis_unique = ut.particle.get_indices_id_kind(part, spec_name, 'unique')
+        pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, 'multiple')
+        Say.say('particles with id that is: unique {}, redundant {}'.format(
+                pis_unique.size, pis_multiple.size))
+
+    for snapshot_index in part.Snapshot['index']:
+        a = 1
+
+
+def assign_star_form_host_distance(
     part, use_child_id=False, part_indices=None, snapshot_index_limits=[]):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
@@ -1187,13 +1224,13 @@ def assign_star_form_distance(
     part_indices : array-like : list of particle indices to assign to
     snapshot_index_limits : list : min and max snapshot indices to impose matching to
     '''
-    Say = ut.io.SayClass(assign_star_form_distance)
+    Say = ut.io.SayClass(assign_star_form_host_distance)
 
     spec_name = 'star'
 
-    part[spec_name]['form.distance'] = np.zeros(
+    part[spec_name]['form.host.distance'] = np.zeros(
         part[spec_name]['position'].shape[0], part[spec_name]['position'].dtype)
-    part[spec_name]['form.distance'] -= 1  # initialize to -1
+    part[spec_name]['form.host.distance'] -= 1  # initialize to -1
 
     if 'form.index' not in part['star']:
         assign_star_form_snapshot_index(part)
@@ -1222,7 +1259,7 @@ def assign_star_form_distance(
         form_indices = form_indices[form_indices <= max(snapshot_index_limits)]
 
     assigned_number_tot = 0
-    form_offset_number_tot = 0
+    form_time_offset_number_tot = 0
     no_id_number_tot = 0
 
     for snapshot_index in form_indices:
@@ -1237,7 +1274,7 @@ def assign_star_form_distance(
         ut.particle.assign_id_to_index(
             part_snap, spec_name, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
 
-        Say.say('\n# {} particles to assign formation distance'.format(pids_form.size))
+        Say.say('# {} to assign this snapshot'.format(pids_form.size))
         assigned_number_tot += pids_form.size
 
         pis_snap = []
@@ -1257,19 +1294,18 @@ def assign_star_form_distance(
         pis_form = np.array(pis_form, dtype=pis_form_all.dtype)
 
         if no_id_number:
-            Say.say('! {} particles not have id match'.format(no_id_number))
+            Say.say('! {} not have id match'.format(no_id_number))
             no_id_number_tot += no_id_number
 
         # sanity check
-        form_dif_frac_tolerance = 1e-5
+        form_time_tolerance = 1e-5
         form_scalefactor_difs = np.abs(
             part_snap[spec_name]['form.scalefactor'][pis_snap] -
             part[spec_name]['form.scalefactor'][pis_form]) / part_snap.snapshot['scalefactor']
-        form_offset_number = np.sum(form_scalefactor_difs > form_dif_frac_tolerance)
-        if form_offset_number:
-            Say.say('! {} particles have offset formation time, max = {:.3f} Gyr'.format(
-                    form_offset_number, np.max(form_scalefactor_difs)))
-            form_offset_number_tot += form_offset_number
+        form_time_offset_number = np.sum(form_scalefactor_difs > form_time_tolerance)
+        if form_time_offset_number:
+            Say.say('! {} have offset formation time'.format(form_time_offset_number))
+            form_time_offset_number_tot += form_time_offset_number
 
         # compute 3-D distance [kpc physical]
         distances = ut.coordinate.get_distances(
@@ -1277,24 +1313,20 @@ def assign_star_form_distance(
             part_snap.info['box.length']) * part_snap.snapshot['scalefactor']  # [kpc physical]
 
         # assign to catalog
-        part[spec_name]['form.distance'][pis_form] = distances
-
-        # continuously write as go, in case happens to crash along the way
-        pickle_star_form_distance(part, 'write')
+        part[spec_name]['form.host.distance'][pis_form] = distances
 
         # print cumulative diagnostics
-        Say.say('# totals so far')
-        Say.say('{} (of {}) particles assigned'.format(assigned_number_tot, part_indices.size))
-        Say.say('{} particles not have id match'.format(no_id_number_tot))
-        Say.say('{} particles have offset formation time'.format(form_offset_number_tot))
+        Say.say('{} (of {}) total assigned'.format(assigned_number_tot, part_indices.size))
+        if no_id_number_tot:
+            Say.say('! {} total not have id match'.format(no_id_number_tot))
+        if form_time_offset_number_tot:
+            Say.say('! {} total have offset formation time'.format(form_time_offset_number_tot))
 
-    Say.say('\n')
-    Say.say('# totals across all snapshots:')
-    Say.say('{} particles not have id match'.format(no_id_number_tot))
-    Say.say('{} particles have offset formation time'.format(form_offset_number_tot))
+        # continuously write as go, in case happens to crash along the way
+        pickle_star_form_host_distance(part, 'write')
 
 
-def pickle_star_form_distance(part, pickle_direction='read'):
+def pickle_star_form_host_distance(part, pickle_direction='read'):
     '''
     Read or write, for each star particle, its distance wrt the host galaxy center at the first
     snapshot after it formed.
@@ -1305,18 +1337,19 @@ def pickle_star_form_distance(part, pickle_direction='read'):
     part : dict : catalog of particles at snapshot
     pickle_direction : string : pickle direction: 'read', 'write'
     '''
-    Say = ut.io.SayClass(pickle_star_form_distance)
+    Say = ut.io.SayClass(pickle_star_form_host_distance)
 
     spec_name = 'star'
 
-    file_name = 'star_form_distance_{:03d}'.format(part.snapshot['index'])
+    file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
 
     if pickle_direction == 'write':
-        pickle_object = [part[spec_name]['form.distance'], part[spec_name]['id']]
+        pickle_object = [part[spec_name]['form.host.distance'], part[spec_name]['id']]
         ut.io.pickle_object(file_name, pickle_direction, pickle_object)
 
     elif pickle_direction == 'read':
-        part[spec_name]['form.distance'], pids = ut.io.pickle_object(file_name, pickle_direction)
+        part[spec_name]['form.host.distance'], pids = \
+            ut.io.pickle_object(file_name, pickle_direction)
 
         bad_id_number = np.sum(part[spec_name]['id'] != pids)
         if bad_id_number:
