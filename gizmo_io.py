@@ -1176,7 +1176,8 @@ def assign_star_form_snapshot_index(part):
         'scalefactor', form_scalefactors, round_kind='up')
 
 
-def assign_star_form_distance(part, use_child_id=False, part_indices=None):
+def assign_star_form_distance(
+    part, use_child_id=False, part_indices=None, snapshot_index_limits=[]):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
     after it formed.
@@ -1184,11 +1185,15 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
+    use_child_id : boolean : whether to use id.child to match particles with redundant ids
     part_indices : array-like : list of particle indices to assign to
+    snapshot_index_limits : list : min and max snapshot indices to impose matching to
     '''
     Say = ut.io.SayClass(assign_star_form_distance)
 
     spec_name = 'star'
+
+    file_name = 'star.form.distance'
 
     part[spec_name]['form.distance'] = np.zeros(
         part[spec_name]['position'].shape[0], part[spec_name]['position'].dtype)
@@ -1215,10 +1220,12 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
     part_indices = pis_unique  # particles to assign to
 
     form_indices = np.unique(part[spec_name]['form.index'])[::-1]  # sort going back in time
-    form_indices = form_indices[:15]  # test
+    if snapshot_index_limits is not None and len(snapshot_index_limits):
+        form_indices = form_indices[form_indices >= min(snapshot_index_limits)]
+        form_indices = form_indices[form_indices <= max(snapshot_index_limits)]
 
-    form_time_offset_number_tot = 0
-    not_find_id_number_tot = 0
+    form_offset_number_tot = 0
+    no_id_number_tot = 0
 
     for snapshot_index in form_indices:
         pis_form_all = part_indices[part[spec_name]['form.index'][part_indices] == snapshot_index]
@@ -1235,7 +1242,7 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
 
         pis_snap = []
         pis_form = []
-        not_find_id_number = 0
+        no_id_number = 0
         for pii, pid in enumerate(pids_form):
             try:
                 pi = part_snap[spec_name].id_to_index[pid]
@@ -1243,26 +1250,26 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
                     pis_snap.append(pi)
                     pis_form.append(pis_form_all[pii])
                 else:
-                    not_find_id_number += 1
+                    no_id_number += 1
             except:
-                not_find_id_number += 1
+                no_id_number += 1
         pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
         pis_form = np.array(pis_form, dtype=pis_form_all.dtype)
 
-        if not_find_id_number:
-            Say.say('! {} particles not have id match'.format(not_find_id_number))
-            not_find_id_number_tot += not_find_id_number
+        if no_id_number:
+            Say.say('! {} particles not have id match'.format(no_id_number))
+            no_id_number_tot += no_id_number
 
         # sanity check
-        form_time_tolerance = 0.001
-        form_time_difs = np.abs(
+        form_dif_frac_tolerance = 1e-4
+        form_scalefactor_difs = np.abs(
             part_snap[spec_name]['form.scalefactor'][pis_snap] -
-            part[spec_name]['form.scalefactor'][pis_form])
-        form_time_offset_number = np.sum(form_time_difs > form_time_tolerance)
-        if form_time_offset_number:
+            part[spec_name]['form.scalefactor'][pis_form]) / part_snap.snapshot['scalefactor']
+        form_offset_number = np.sum(form_scalefactor_difs > form_dif_frac_tolerance)
+        if form_offset_number:
             Say.say('! {} particles have offset formation time, max = {:.3f} Gyr'.format(
-                    form_time_offset_number, np.max(form_time_difs)))
-            form_time_offset_number_tot += form_time_offset_number
+                    form_offset_number, np.max(form_scalefactor_difs)))
+            form_offset_number_tot += form_offset_number
 
         distances = ut.coordinate.get_distances(
             'scalar', part[spec_name]['position'][pis_snap], part.center_position,
@@ -1272,8 +1279,13 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
 
         del(part_snap)
 
-    Say.say('\n{} particles total not have id match'.format(not_find_id_number_tot))
-    Say.say('{} particles total have offset formation time'.format(form_time_offset_number_tot))
+        # continuously write as go, in case crash along the way
+        ut.io.pickle_object(file_name, 'write', part[spec_name]['form.distance'])
+
+    Say.say('\n')
+    Say.say('# totals across all snapshots:')
+    Say.say('{} particles not have id match'.format(no_id_number_tot))
+    Say.say('{} particles have offset formation time'.format(form_offset_number_tot))
 
 
 #===================================================================================================
