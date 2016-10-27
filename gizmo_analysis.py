@@ -2708,7 +2708,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     for prop in gal:
         gal[prop] = np.array(gal[prop])
 
-    ut.io.pickle_object(simulation_directory + 'galaxy_properties_v_time', 'write', gal)
+    ut.io.pickle_object(simulation_directory + 'host_properties_v_time', 'write', gal)
 
     return gal
 
