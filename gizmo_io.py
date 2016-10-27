@@ -1020,14 +1020,14 @@ class ReadClass(ut.io.SayClass):
         if 'position' in part[spec_name]:
             part.center_position = ut.particle.get_center_position(
                 part, spec_name, method, compare_centers=compare_centers)
-            print('    position = [', end='')
+            print('  position = [', end='')
             ut.io.print_array(part.center_position, '{:.3f}', end='')
             print('] kpc comoving')
 
         if 'velocity' in part[spec_name]:
             part.center_velocity = ut.particle.get_center_velocity(
                 part, spec_name, velocity_radius_max, part.center_position)
-            print('    velocity = [', end='')
+            print('  velocity = [', end='')
             ut.io.print_array(part.center_velocity, '{:.1f}', end='')
             print('] km / sec')
 
@@ -1341,7 +1341,7 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
 
     spec_name = 'star'
 
-    file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
+    file_name = 'output/star_form_host_distance_{:03d}'.format(part.snapshot['index'])
 
     if pickle_direction == 'write':
         pickle_object = [part[spec_name]['form.host.distance'], part[spec_name]['id']]
