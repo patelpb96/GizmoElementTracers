@@ -1983,10 +1983,10 @@ def get_time_bin_dictionary(
     if 'time' in time_kind:
         if 'lookback' in time_kind:
             time_dict['time.lookback'] = times
-            time_dict['time'] = Cosmology.get_time_from_redshift(0) - times
+            time_dict['time'] = Cosmology.get_time(0) - times
         else:
             time_dict['time'] = times
-            time_dict['time.lookback'] = Cosmology.get_time_from_redshift(0) - times
+            time_dict['time.lookback'] = Cosmology.get_time(0) - times
         time_dict['redshift'] = Cosmology.convert_time('redshift', 'time', time_dict['time'])
         time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
 
@@ -1997,8 +1997,8 @@ def get_time_bin_dictionary(
         elif 'scalefactor' in time_kind:
             time_dict['scalefactor'] = times
             time_dict['redshift'] = 1 / time_dict['scalefactor'] - 1
-        time_dict['time'] = Cosmology.get_time_from_redshift(time_dict['redshift'])
-        time_dict['time.lookback'] = Cosmology.get_time_from_redshift(0) - time_dict['time']
+        time_dict['time'] = Cosmology.get_time(time_dict['redshift'])
+        time_dict['time.lookback'] = Cosmology.get_time(0) - time_dict['time']
 
     return time_dict
 

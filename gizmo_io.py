@@ -345,13 +345,13 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name].Cosmology = part.Cosmology
 
             # store information about snapshot time
-            time = Cosmology.get_time_from_redshift(header['redshift'])
+            time = Cosmology.get_time(header['redshift'])
             part.snapshot = {
                 'index': snapshot_index,
                 'redshift': header['redshift'],
                 'scalefactor': header['scalefactor'],
                 'time': time,
-                'time.lookback': Cosmology.get_time_from_redshift(0) - time,
+                'time.lookback': Cosmology.get_time(0) - time,
                 'time.hubble': ut.const.Gyr_per_sec / Cosmology.get_hubble_parameter(0),
             }
             for spec_name in self.species_names:
@@ -419,14 +419,14 @@ class ReadClass(ut.io.SayClass):
 
         return path_file_name
 
-    def read_snapshot_times(self, directory):
+    def read_snapshot_times(self, directory='.'):
         '''
         Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
         Return as dictionary.
 
         Parameters
         ----------
-        directory : string : directory of snapshot file
+        directory : string : directory of snapshot time file
 
         Returns
         -------
@@ -915,8 +915,8 @@ class ReadClass(ut.io.SayClass):
             if 'form.time' in part[spec_name]:
                 if header['is.cosmological']:
                     # convert from units of scale-factor to [Gyr]
-                    part[spec_name]['form.time'] = Cosmology.get_time_from_redshift(
-                        1 / part[spec_name]['form.time'] - 1).astype(
+                    part[spec_name]['form.time'] = Cosmology.get_time(
+                        part[spec_name]['form.time'], 'scalefactor').astype(
                             part[spec_name]['form.time'].dtype)
                 else:
                     # convert to [Gyr]
@@ -1238,7 +1238,6 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
                     not_find_id_number += 1
             except:
                 not_find_id_number += 1
-                pids_form[1e9]
         pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
         pis_form = np.array(pis_form, dtype=pis_form_all.dtype)
 
