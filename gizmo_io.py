@@ -1253,7 +1253,7 @@ def assign_star_form_distance(
                     no_id_number += 1
             except:
                 no_id_number += 1
-        pis_snap = np.array(pis_snap, dtype=part[spec_name]['id'].dtype)
+        pis_snap = np.array(pis_snap, dtype=pis_form_all.dtype)
         pis_form = np.array(pis_form, dtype=pis_form_all.dtype)
 
         if no_id_number:
@@ -1273,8 +1273,8 @@ def assign_star_form_distance(
 
         # compute 3-D distance [kpc physical]
         distances = ut.coordinate.get_distances(
-            'scalar', part[spec_name]['position'][pis_snap], part.center_position,
-            part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
+            'scalar', part_snap[spec_name]['position'][pis_snap], part_snap.center_position,
+            part_snap.info['box.length']) * part_snap.snapshot['scalefactor']  # [kpc physical]
 
         # assign to catalog
         part[spec_name]['form.distance'][pis_form] = distances
