@@ -366,7 +366,7 @@ def print_properties_statistics(part, species_names='all'):
     species_property_dict['dark.2'] = ['id', 'position', 'velocity', 'mass']
     species_property_dict['dark'] = ['id', 'position', 'velocity', 'mass']
     species_property_dict['star'] = [
-        'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'form.time',
+        'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'form.scalefactor',
         'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
     species_property_dict['gas'] = [
         'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'density.number',
@@ -3026,7 +3026,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def read_simulations(
         self, simulation_names=None, redshift=0, species='all',
-        property_names=['mass', 'position', 'form.time', 'massfraction'],
+        property_names=['mass', 'position', 'form.scalefactor', 'massfraction'],
         element_indices=[0, 1, 6, 10], force_float32=True):
         '''
         Read snapshots from simulations.
@@ -3093,7 +3093,7 @@ class CompareSimulationsClass(ut.io.SayClass):
     def plot_profiles(
         self, parts=None, distance_bin_width=0.1,
         simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', property_names=['mass', 'position', 'form.time', 'massfraction'],
+        species='all', property_names=['mass', 'position', 'form.scalefactor', 'massfraction'],
         element_indices=[0, 1, 6, 10], force_float32=True):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
@@ -3178,7 +3178,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'star', 'mass', 'density', 'log', False, [None, None],
                     distance_limits_galaxy, distance_bin_width, write_plot=True)
 
-                if 'form.time' in property_names and redshift <= 5:
+                if 'form' in property_names and redshift <= 5:
                     plot_property_v_distance(
                         parts, 'star', 'age', 'average', 'linear', True,
                         [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)

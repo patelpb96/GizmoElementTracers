@@ -118,13 +118,14 @@ class ParticleDictionaryClass(dict):
         ## parsing specific to this catalog ##
         if 'form.' in property_name or property_name == 'age':
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
-                return self.snapshot['time'] - self.prop('form.time', indices)
+                values = self.snapshot['time'] - self.prop('form.time', indices)
+            elif 'time' in property_name:
+                values = self.Cosmology.get_time(
+                    self.prop('form.scalefactor', indices), 'scalefactor')
             elif 'redshift' in property_name:
-                return self.Cosmology.convert_time(
-                    'redshift', 'time', self.prop('form.time', indices))
-            elif 'scalefactor' in property_name:
-                return self.Cosmology.convert_time(
-                    'scalefactor', 'time', self.prop('form.time', indices))
+                values = 1 / self.prop('form.scalefactor', indices) - 1
+
+            return values
 
         if 'number.density' in property_name or 'density.number' in property_name:
             values = (self.prop('density', indices) * ut.const.proton_per_sun *
@@ -635,7 +636,7 @@ class ReadClass(ut.io.SayClass):
             ## star particles ##
             ## 'time' when star particle formed
             ## for cosmological runs, = scale-factor; for non-cosmological runs, = time {Gyr/h}
-            'StellarFormationTime': 'form.time',
+            'StellarFormationTime': 'form.scalefactor',
 
             ## black hole particles ##
             'BH_Mass': 'bh.mass',
@@ -912,15 +913,15 @@ class ReadClass(ut.io.SayClass):
                 # convert to Plummer softening. this value should be valid for most simulations
                 part[spec_name]['smooth.length'] /= 2.8
 
-            if 'form.time' in part[spec_name]:
+            if 'form.scalefactor' in part[spec_name]:
                 if header['is.cosmological']:
+                    pass
                     # convert from units of scale-factor to [Gyr]
-                    part[spec_name]['form.time'] = Cosmology.get_time(
-                        part[spec_name]['form.time'], 'scalefactor').astype(
-                            part[spec_name]['form.time'].dtype)
+                    #part[spec_name]['form.scalefactor'] = Cosmology.get_time(
+                    #    part[spec_name]['form.time'], 'scalefactor').astype(
+                    #        part[spec_name]['form.time'].dtype)
                 else:
-                    # convert to [Gyr]
-                    part[spec_name]['form.time'] /= header['hubble']
+                    part[spec_name]['form.scalefactor'] /= header['hubble']  # convert to [Gyr]
 
             if 'temperature' in part[spec_name]:
                 # convert from [(km / s) ^ 2] to [Kelvin]
@@ -976,7 +977,7 @@ class ReadClass(ut.io.SayClass):
             'hydrogen.neutral.fraction': [0, 1],
             'sfr': [0, 1000],  # [M_sun/yr]
             'massfraction': [0, 1],
-            'form.time': [0, 15],  # [Gyr]
+            'form.scalefactor': [0, 1],
         }
 
         self.say('checking sanity of particle properties')
@@ -1164,8 +1165,15 @@ def assign_star_form_snapshot_index(part):
     ----------
     part : dict : catalog of particles at snapshot
     '''
+    # increase formation time slightly for safety, because output snapshots do not exactly
+    # coincide with input snapshot scale-factors
+    padding_factor = (1 + 1e-7)
+
+    form_scalefactors = np.array(part['star']['form.scalefactor'])
+    form_scalefactors[form_scalefactors < 1] *= padding_factor
+
     part['star']['form.index'] = part.Snapshot.get_snapshot_indices(
-        'time', part['star']['form.time'], round_kind='up')
+        'scalefactor', form_scalefactors, round_kind='up')
 
 
 def assign_star_form_distance(part, use_child_id=False, part_indices=None):
@@ -1218,7 +1226,7 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
 
         part_snap = Read.read_snapshots(
             spec_name, 'index', snapshot_index,
-            property_names=['position', 'mass', 'id', 'form.time'], element_indices=[0],
+            property_names=['position', 'mass', 'id', 'form.scalefactor'], element_indices=[0],
             force_float32=True, assign_center=True, check_sanity=True)
 
         ut.particle.assign_id_to_index(part_snap, spec_name, 'id', id_min=0, store_as_dict=True)
@@ -1246,9 +1254,10 @@ def assign_star_form_distance(part, use_child_id=False, part_indices=None):
             not_find_id_number_tot += not_find_id_number
 
         # sanity check
-        form_time_tolerance = 0.05  # [Gyr]
+        form_time_tolerance = 0.001
         form_time_difs = np.abs(
-            part_snap[spec_name]['form.time'][pis_snap] - part[spec_name]['form.time'][pis_form])
+            part_snap[spec_name]['form.scalefactor'][pis_snap] -
+            part[spec_name]['form.scalefactor'][pis_form])
         form_time_offset_number = np.sum(form_time_difs > form_time_tolerance)
         if form_time_offset_number:
             Say.say('! {} particles have offset formation time, max = {:.3f} Gyr'.format(
