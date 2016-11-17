@@ -937,13 +937,15 @@ class ReadClass(ut.io.SayClass):
                     ut.const.boltzmann)
 
         if 'potential' in part[self.species_names[0]]:
+            # convert from [km / s^2 comoving] to [km / s^2 physical]
+            part[spec_name]['potential'] = part[spec_name]['potential'] / header['scalefactor']
             # renormalize so potential max = 0
-            potential_max = 0
-            for spec_name in self.species_names:
-                if part[spec_name]['potential'].max() > potential_max:
-                    potential_max = part[spec_name]['potential'].max()
-            for spec_name in self.species_names:
-                part[spec_name]['potential'] -= potential_max
+            #potential_max = 0
+            #for spec_name in self.species_names:
+            #    if part[spec_name]['potential'].max() > potential_max:
+            #        potential_max = part[spec_name]['potential'].max()
+            #for spec_name in self.species_names:
+            #    part[spec_name]['potential'] -= potential_max
 
         if particle_subsample_factor > 1:
             # sub-sample highest-resolution particles, for smaller memory
