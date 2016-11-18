@@ -3044,15 +3044,12 @@ class CompareSimulationsClass(ut.io.SayClass):
         if simulation_names is None:
             simulation_names = self.simulation_names
 
-        if not isinstance(simulation_names, collections.OrderedDict):
-            simulation_names = collections.OrderedDict(simulation_names)
-
         # first pass, read just header, to check that can read all simulations
         bad_snapshot_number = 0
-        for directory in simulation_names:
+        for directory, simulation_name in simulation_names:
             try:
                 _header = gizmo_io.Read.read_header(
-                    'redshift', redshift, directory, 'output/', simulation_names[directory])
+                    'redshift', redshift, directory, 'output/', simulation_name)
             except:
                 self.say('! could not read snapshot at z = {:.3f} in {}'.format(
                          redshift, directory))
@@ -3064,12 +3061,11 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         parts = []
         directories = []
-        for directory in simulation_names:
+        for directory, simulation_name in simulation_names:
             try:
                 part = gizmo_io.Read.read_snapshots(
                     species, 'redshift', redshift, directory, 'output/',
-                    simulation_names[directory], property_names, element_indices,
-                    force_float32=force_float32)
+                    simulation_name, property_names, element_indices, force_float32=force_float32)
 
                 if 'velocity' in property_names:
                     gizmo_io.assign_orbit(part, 'gas')
