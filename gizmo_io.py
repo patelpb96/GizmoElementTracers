@@ -56,7 +56,7 @@ class ParticleDictionaryClass(dict):
         -------
         values : float or array : convertes values as float (for scalar) or numpy array
         '''
-        ## parsing general to all catalogs ##
+        ## parsing general to all catalogs ----------
         property_name = property_name.strip()  # strip white space
 
         # if input is in self dictionary, return as is
@@ -115,7 +115,7 @@ class ParticleDictionaryClass(dict):
         if property_name[:3] == 'abs':
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
-        ## parsing specific to this catalog ##
+        ## parsing specific to this catalog ----------
         if 'form.' in property_name or property_name == 'age':
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 values = self.snapshot['time'] - self.prop('form.time', indices)
@@ -257,10 +257,11 @@ class ReadClass(ut.io.SayClass):
             'star' = stars
             'blackhole' = black holes, if run contains them
             'bulge' or 'disk' = stars for non-cosmological run
-        snapshot_number_kind : string : input snapshot number kind: index, redshift
+        snapshot_number_kind : string :
+            input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_numbers : int or float or list thereof :
             index[s] or redshifts[s] or scale-factor[s] of snapshot file[s]
-        simulation_directory : root directory of simulation
+        simulation_directory : string : root directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
         simulation_name : string : name to store for future identification
         property_names : string or list : name[s] of particle properties to read - options:
@@ -306,7 +307,7 @@ class ReadClass(ut.io.SayClass):
 
         parts = []  # list to store particle dictionaries
 
-        # read all input snapshot numbers of simulation
+        # read all input snapshots
         for snapshot_number in snapshot_numbers:
             snapshot_index = Snapshot.parse_snapshot_number(snapshot_number_kind, snapshot_number)
 
@@ -775,7 +776,7 @@ class ReadClass(ut.io.SayClass):
 
         file_in.close()
 
-        ## read properties for each species ##
+        ## read properties for each species ----------
         # initial particle indices to assign to each species from each file
         part_indices_lo = np.zeros(len(self.species_names), dtype=np.int64)
 
