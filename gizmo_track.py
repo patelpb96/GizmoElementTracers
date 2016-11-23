@@ -115,34 +115,37 @@ def write_particle_index_pointer(
         prop_no_match_number = 0
         prop_redundant_number = 0
         for pii, part_id in enumerate(part_ids):
+            part_index = part_indices[pii]
+
             try:
                 part_indices_at_snap = part_at_snap[species].id_to_index[part_id]
-                part_index = part_indices[pii]
-                if np.isscalar(part_indices_at_snap):
-                    # particle id is unique - easy
-                    part_index_pointers_at_snap[part_index] = part_indices_at_snap
-                else:
-                    # particle id is redundant
-                    # loop through particles with this id, use second_property to match
-                    # sanity check
-                    if np.unique(part_at_snap[species][second_property][
-                            part_indices_at_snap]).size != part_indices_at_snap.size:
-                        prop_redundant_number += 1
-                    prop_0 = part[species][second_property][part_index]
-                    for part_index_at_snap in part_indices_at_snap:
-                        prop_test = part_at_snap[species][second_property][part_index_at_snap]
-                        if second_property == 'id.child':
-                            if prop_test == prop_0:
-                                part_index_pointers_at_snap[part_index] = part_index_at_snap
-                                break
-                        else:
-                            if np.abs((prop_test - prop_0) / prop_0) < prop_match_tolerance:
-                                part_index_pointers_at_snap[part_index] = part_index_at_snap
-                                break
-                    else:
-                        prop_no_match_number += 1
             except:
                 id_no_match_number += 1
+                continue
+
+            if np.isscalar(part_indices_at_snap):
+                # particle id is unique - easy
+                part_index_pointers_at_snap[part_index] = part_indices_at_snap
+            else:
+                # particle id is redundant
+                # loop through particles with this id, use second_property to match
+                # sanity check
+                if np.unique(part_at_snap[species][second_property][
+                        part_indices_at_snap]).size != part_indices_at_snap.size:
+                    prop_redundant_number += 1
+                prop_0 = part[species][second_property][part_index]
+                for part_index_at_snap in part_indices_at_snap:
+                    prop_test = part_at_snap[species][second_property][part_index_at_snap]
+                    if second_property == 'id.child':
+                        if prop_test == prop_0:
+                            part_index_pointers_at_snap[part_index] = part_index_at_snap
+                            break
+                    else:
+                        if np.abs((prop_test - prop_0) / prop_0) < prop_match_tolerance:
+                            part_index_pointers_at_snap[part_index] = part_index_at_snap
+                            break
+                else:
+                    prop_no_match_number += 1
 
         if id_no_match_number:
             Say.say('! {} not have id match at snapshot {}!'.format(
@@ -173,20 +176,20 @@ def write_particle_index_pointer(
                         test_prop_offset_number, test_property, snapshot_index))
                 test_prop_offset_number_tot += test_prop_offset_number
 
-        # print cumulative diagnostics
-        if id_no_match_number_tot:
-            Say.say('! {} total not have id match!'.format(id_no_match_number_tot))
-        if prop_no_match_number_tot:
-            Say.say('! {} total not have second_property match!'.format(prop_no_match_number_tot))
-        if prop_redundant_number_tot:
-            Say.say('! {} total have redundant second_property!'.format(prop_redundant_number_tot))
-        if test_prop_offset_number_tot:
-            Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_property))
-
         # write file for this snapshot
         file_name = '{}_index_pointer_{}'.format(species, snapshot_index)
         file_path = ut.io.get_path(output_directory) + file_name
         ut.io.pickle_object(file_path, 'write', part_index_pointers_at_snap)
+
+    # print cumulative diagnostics
+    if id_no_match_number_tot:
+        Say.say('! {} total not have id match!'.format(id_no_match_number_tot))
+    if prop_no_match_number_tot:
+        Say.say('! {} total not have second_property match!'.format(prop_no_match_number_tot))
+    if prop_redundant_number_tot:
+        Say.say('! {} total have redundant second_property!'.format(prop_redundant_number_tot))
+    if test_prop_offset_number_tot:
+        Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_property))
 
 
 def assign_star_form_host_distance(
