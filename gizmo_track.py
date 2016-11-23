@@ -105,7 +105,7 @@ def write_particle_index_pointer(
 
         # assign pointer from particle id to its index in list
         ut.particle.assign_id_to_index(
-            part_at_snap, species, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
+            part_at_snap, species, 'id', id_min=0, store_as_dict=True, print_diagnostic=True)
 
         # re-initialize with null values
         part_index_pointers_at_snap *= 0
@@ -125,8 +125,8 @@ def write_particle_index_pointer(
                     # particle id is redundant
                     # loop through particles with this id, use second_property to match
                     # sanity check
-                    if (np.unique(part[species][second_property][part_indices_at_snap]).size !=
-                            part_indices_at_snap.size):
+                    if np.unique(part_at_snap[species][second_property][
+                            part_indices_at_snap]).size != part_indices_at_snap.size:
                         prop_redundant_number += 1
                     prop_0 = part[species][second_property][part_index]
                     for part_index_at_snap in part_indices_at_snap:
