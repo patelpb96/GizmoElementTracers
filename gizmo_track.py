@@ -98,7 +98,7 @@ def write_particle_index_pointer(
     part_indices = ut.array.get_arange(part[species]['id'])
 
     # diagnostic
-    pis_multiple = ut.particle.get_indices_id_kind(part, species, 'multiple')
+    pis_multiple = ut.particle.get_indices_id_kind(part, species, 'multiple', part_indices)
     Say.say('{} particles have redundant id'.format(pis_multiple.size))
 
     # initialize pointer array
@@ -180,8 +180,6 @@ def write_particle_index_pointer(
             Say.say('! {} have redundant match_prop_name at snapshot {}!'.format(
                     prop_redundant_number, snapshot_index))
             prop_redundant_number_tot += prop_redundant_number
-
-        #part_index_pointers_at_snap[-1e9]
 
         # sanity check
         if (test_prop_name and test_prop_name != match_prop_name and
