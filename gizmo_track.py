@@ -39,7 +39,7 @@ def assign_star_form_snapshot(part):
 
 def write_particle_index_pointer(
     part=None, species='star', match_prop_name='id.child', match_prop_tolerance=1e-6,
-    test_prop_name='form.scalefactor', snapshot_indices=[]):
+    test_prop_name='form.scalefactor', snapshot_indices=[], output_directory='output/'):
     '''
     Assign to each particle a pointer to its index in the list of particles at each previous
     snapshot, to make it easier to track particles back in time.
@@ -50,46 +50,56 @@ def write_particle_index_pointer(
     part : dict : catalog of particles at snapshot
     species : string : name of particle species to track
     match_prop_name : string :
-        secondary property to use to match particles with the same id
-        options: 'id.child', 'massfraction.metals', 'form.scalefactor'
+        some particles have the same id. this is the property to use to match them.
+        options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
     match_prop_tolerance : float : tolerance for matching via match_prop_name, if it is a float
     test_prop_name : string : additional property to use to test matching
     snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+    output_directory : string : where to write files
     '''
     Say = ut.io.SayClass(write_particle_index_pointer)
-
-    output_directory = 'output/'  # where to write files
 
     assert match_prop_name in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
     if part is None:
+        # read particles at z = 0
+        # complete list of all possible properties relevant to use in matching
+        property_names_read = ['id', 'id.child', 'massfraction.metals', 'form.scalefactor']
+        if match_prop_name not in property_names_read:
+            property_names_read.append(match_prop_name)
+        if test_prop_name and test_prop_name not in property_names_read:
+            property_names_read.append(test_prop_name)
         part = gizmo_io.Read.read_snapshots(
-            species, 'redshift', 0, property_names=['id', match_prop_name, test_prop_name],
-            element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
+            species, 'redshift', 0, property_names=property_names_read, element_indices=[0],
+            force_float32=True, assign_center=False, check_sanity=False)
+
+    # older snapshot files do not have id.child - use metal abundance instead
+    if match_prop_name == 'id.child' and 'id.child' not in part[species]:
+        Say.say('input match_prop_name = {}, but it does not exist in the snapshot'.format(
+                match_prop_name))
+        match_prop_name = 'massfraction.metals'
+        Say.say('switching to using match_prop_name = {}'.format(match_prop_name))
 
     assert part[species].prop(match_prop_name) is not None
 
     if test_prop_name:
         assert part[species].prop(test_prop_name) is not None
 
-    if 'form.index' not in part['star']:
+    if species == 'star' and 'form.index' not in part[species]:
         assign_star_form_snapshot(part)
-
-    # determine particles to assign to
-    part_indices = ut.array.get_arange(part[species]['id'])
-    pis_unique = ut.particle.get_indices_id_kind(part, species, 'unique', part_indices)
-    pis_multiple = ut.particle.get_indices_id_kind(part, species, 'multiple', part_indices)
-    Say.say('particles with id that is: unique {}, redundant {}'.format(
-            pis_unique.size, pis_multiple.size))
-
-    #part_indices = pis_unique
-    part_indices = part_indices
 
     # get list of snapshot indices to assign
     if snapshot_indices is None or not len(snapshot_indices):
         snapshot_indices = np.arange(min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
     snapshot_indices = np.setdiff1d(snapshot_indices, part.snapshot['index'])  # skip current
     snapshot_indices = snapshot_indices[::-1]  # work backwards in time
+
+    # particles to assign to
+    part_indices = ut.array.get_arange(part[species]['id'])
+
+    # diagnostic
+    pis_multiple = ut.particle.get_indices_id_kind(part, species, 'multiple')
+    Say.say('{} particles have redundant id'.format(pis_multiple.size))
 
     # initialize pointer array
     # set null values to negative and will return error if called as index
@@ -110,8 +120,9 @@ def write_particle_index_pointer(
 
         # read particles at this snapshot
         part_at_snap = gizmo_io.Read.read_snapshots(
-            species, 'index', snapshot_index, property_names=['id', match_prop_name, test_prop_name],
-            element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
+            species, 'index', snapshot_index,
+            property_names=['id', match_prop_name, test_prop_name], element_indices=[0],
+            force_float32=True, assign_center=False, check_sanity=False)
 
         # assign pointer from particle id to its index in list
         ut.particle.assign_id_to_index(
