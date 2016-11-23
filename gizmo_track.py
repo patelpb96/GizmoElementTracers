@@ -37,9 +37,9 @@ def assign_star_form_snapshot(part):
         'scalefactor', form_scalefactors, round_kind='up')
 
 
-def write_particle_index_pointers(
-    part=None, species='star', match_property='id.child', test_property='form.scalefactor',
-    snapshot_indices=[]):
+def write_particle_index_pointer(
+    part=None, species='star', match_prop_name='id.child', match_prop_tolerance=1e-6,
+    test_prop_name='form.scalefactor', snapshot_indices=[]):
     '''
     Assign to each particle a pointer to its index in the list of particles at each previous
     snapshot, to make it easier to track particles back in time.
@@ -49,28 +49,28 @@ def write_particle_index_pointers(
     ----------
     part : dict : catalog of particles at snapshot
     species : string : name of particle species to track
-    match_property : string :
+    match_prop_name : string :
         secondary property to use to match particles with the same id
         options: 'id.child', 'massfraction.metals', 'form.scalefactor'
-    test_property : string : additional property to use to test matching
+    match_prop_tolerance : float : tolerance for matching via match_prop_name, if it is a float
+    test_prop_name : string : additional property to use to test matching
     snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
     '''
-    Say = ut.io.SayClass(write_particle_index_pointers)
+    Say = ut.io.SayClass(write_particle_index_pointer)
 
     output_directory = 'output/'  # where to write files
-    match_prop_tolerance = 1e-5  # tolerance for matching via match_property, if is a float
 
-    assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
+    assert match_prop_name in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
     if part is None:
         part = gizmo_io.Read.read_snapshots(
-            species, 'redshift', 0, property_names=['id', match_property, test_property],
+            species, 'redshift', 0, property_names=['id', match_prop_name, test_prop_name],
             element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
 
-    assert part[species].prop(match_property) is not None
+    assert part[species].prop(match_prop_name) is not None
 
-    if test_property:
-        assert part[species].prop(test_property) is not None
+    if test_prop_name:
+        assert part[species].prop(test_prop_name) is not None
 
     if 'form.index' not in part['star']:
         assign_star_form_snapshot(part)
@@ -110,7 +110,7 @@ def write_particle_index_pointers(
 
         # read particles at this snapshot
         part_at_snap = gizmo_io.Read.read_snapshots(
-            species, 'index', snapshot_index, property_names=['id', match_property, test_property],
+            species, 'index', snapshot_index, property_names=['id', match_prop_name, test_prop_name],
             element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
 
         # assign pointer from particle id to its index in list
@@ -138,15 +138,15 @@ def write_particle_index_pointers(
                 part_index_pointers_at_snap[part_index] = part_indices_at_snap
             else:
                 # particle id is redundant
-                # loop through particles with this id, use match_property to match
+                # loop through particles with this id, use match_prop_name to match
                 # sanity check
                 if np.unique(part_at_snap[species].prop(
-                        match_property, part_indices_at_snap)).size != part_indices_at_snap.size:
+                        match_prop_name, part_indices_at_snap)).size != part_indices_at_snap.size:
                     prop_redundant_number += 1
-                prop_0 = part[species].prop(match_property, part_index)
+                prop_0 = part[species].prop(match_prop_name, part_index)
                 for part_index_at_snap in part_indices_at_snap:
-                    prop_test = part_at_snap[species].prop(match_property, part_index_at_snap)
-                    if match_property == 'id.child':
+                    prop_test = part_at_snap[species].prop(match_prop_name, part_index_at_snap)
+                    if match_prop_name == 'id.child':
                         if prop_test == prop_0:
                             part_index_pointers_at_snap[part_index] = part_index_at_snap
                             break
@@ -162,29 +162,29 @@ def write_particle_index_pointers(
                     id_no_match_number, snapshot_index))
             id_no_match_number_tot += id_no_match_number
         if prop_no_match_number:
-            Say.say('! {} not have match_property match at snapshot {}!'.format(
+            Say.say('! {} not have match_prop_name match at snapshot {}!'.format(
                     prop_no_match_number, snapshot_index))
             prop_no_match_number_tot += prop_no_match_number
         if prop_redundant_number:
-            Say.say('! {} have redundant match_property at snapshot {}!'.format(
+            Say.say('! {} have redundant match_prop_name at snapshot {}!'.format(
                     prop_redundant_number, snapshot_index))
             prop_redundant_number_tot += prop_redundant_number
 
         #part_index_pointers_at_snap[-1e9]
 
         # sanity check
-        if (test_property and test_property != match_property and
+        if (test_prop_name and test_prop_name != match_prop_name and
                 id_no_match_number == prop_no_match_number == prop_redundant_number_tot == 0):
             part_index_pointers_at_snap_test = part_index_pointers_at_snap[
                 part_index_pointers_at_snap >= 0]
             prop_difs = np.abs(
-                (part_at_snap[species].prop(test_property, part_index_pointers_at_snap_test) -
-                 part[species].prop(test_property, part_indices)) /
-                part[species].prop(test_property, part_indices))
+                (part_at_snap[species].prop(test_prop_name, part_index_pointers_at_snap_test) -
+                 part[species].prop(test_prop_name, part_indices)) /
+                part[species].prop(test_prop_name, part_indices))
             test_prop_offset_number = np.sum(prop_difs > match_prop_tolerance)
             if test_prop_offset_number:
                 Say.say('! {} have offset {} at snapshot {}!'.format(
-                        test_prop_offset_number, test_property, snapshot_index))
+                        test_prop_offset_number, test_prop_name, snapshot_index))
                 test_prop_offset_number_tot += test_prop_offset_number
 
         # write file for this snapshot
@@ -196,11 +196,11 @@ def write_particle_index_pointers(
     if id_no_match_number_tot:
         Say.say('! {} total not have id match!'.format(id_no_match_number_tot))
     if prop_no_match_number_tot:
-        Say.say('! {} total not have match_property match!'.format(prop_no_match_number_tot))
+        Say.say('! {} total not have match_prop_name match!'.format(prop_no_match_number_tot))
     if prop_redundant_number_tot:
-        Say.say('! {} total have redundant match_property!'.format(prop_redundant_number_tot))
+        Say.say('! {} total have redundant match_prop_name!'.format(prop_redundant_number_tot))
     if test_prop_offset_number_tot:
-        Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_property))
+        Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_prop_name))
 
 
 def assign_star_form_host_distance(
@@ -319,6 +319,40 @@ def assign_star_form_host_distance(
 #===================================================================================================
 # read/write
 #===================================================================================================
+def pickle_star_index_pointer(part, pickle_direction='read'):
+    '''
+    Read or write, for each star particle, its distance wrt the host galaxy center at the first
+    snapshot after it formed.
+    If read, assign to particle catalog.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    pickle_direction : string : pickle direction: 'read', 'write'
+    '''
+    Say = ut.io.SayClass(pickle_star_form_host_distance)
+
+    spec_name = 'star'
+    prop_name = 'form.host.distance'
+
+    file_name = 'output/star_form_host_distance_{:03d}'.format(part.snapshot['index'])
+
+    if pickle_direction == 'write':
+        pickle_object = [part[spec_name][prop_name], part[spec_name]['id']]
+        ut.io.pickle_object(file_name, pickle_direction, pickle_object)
+
+    elif pickle_direction == 'read':
+        part[spec_name][prop_name], part_ids = ut.io.pickle_object(file_name, pickle_direction)
+
+        # sanity check
+        bad_id_number = np.sum(part[spec_name]['id'] != part_ids)
+        if bad_id_number:
+            Say.say('! {} particles have mismatched id. this is not right!'.format(bad_id_number))
+
+    else:
+        raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
+
+
 def pickle_star_form_host_distance(part, pickle_direction='read'):
     '''
     Read or write, for each star particle, its distance wrt the host galaxy center at the first
@@ -360,6 +394,6 @@ if __name__ == '__main__':
     match_property = 'massfraction.metals'
 
     if len(sys.argv) == 2:
-        match_property = float(sys.argv[1])
+        match_property = sys.argv[1]
 
-    write_particle_index_pointers(match_property=match_property)
+    write_particle_index_pointer(match_prop_name=match_property)
