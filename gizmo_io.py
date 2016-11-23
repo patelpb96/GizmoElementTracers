@@ -1078,7 +1078,7 @@ class ReadClass(ut.io.SayClass):
 
         # get file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
-        self.say('* reading header from: ' + file_name, end='\n\n')
+        self.say('* reading header from: ' + file_name.replace('./', ''), end='\n\n')
 
         ## read header ##
         # open file and parse header

@@ -54,11 +54,12 @@ def write_particle_index_pointer(
     '''
     Say = ut.io.SayClass(write_particle_index_pointer)
 
+    assert part[species].prop(second_property) is not None
+
     output_directory = 'output/'  # where to write files
     prop_match_tolerance = 1e-5  # tolerance for matching via second_property, if is a float
-    test_property = 'form.scalefactor'  # additional property to test matching
 
-    assert part[species].prop(second_property) is not None
+    test_property = 'form.scalefactor'  # additional property to test matching
     assert part[species].prop(test_property) is not None
 
     if 'form.index' not in part['star']:
@@ -130,12 +131,12 @@ def write_particle_index_pointer(
                 # particle id is redundant
                 # loop through particles with this id, use second_property to match
                 # sanity check
-                if np.unique(part_at_snap[species][second_property][
-                        part_indices_at_snap]).size != part_indices_at_snap.size:
+                if np.unique(part_at_snap[species].prop(
+                        second_property, part_indices_at_snap)).size != part_indices_at_snap.size:
                     prop_redundant_number += 1
-                prop_0 = part[species][second_property][part_index]
+                prop_0 = part[species].prop(second_property, part_index)
                 for part_index_at_snap in part_indices_at_snap:
-                    prop_test = part_at_snap[species][second_property][part_index_at_snap]
+                    prop_test = part_at_snap[species].prop(second_property, part_index_at_snap)
                     if second_property == 'id.child':
                         if prop_test == prop_0:
                             part_index_pointers_at_snap[part_index] = part_index_at_snap
@@ -163,13 +164,14 @@ def write_particle_index_pointer(
         #part_index_pointers_at_snap[-1e9]
 
         # sanity check
-        if id_no_match_number == 0 and prop_no_match_number == 0 and prop_redundant_number_tot == 0:
+        if (test_property != second_property and
+                id_no_match_number == prop_no_match_number == prop_redundant_number_tot == 0):
             part_index_pointers_at_snap_test = part_index_pointers_at_snap[
                 part_index_pointers_at_snap >= 0]
             prop_difs = np.abs(
-                (part_at_snap[species][test_property][part_index_pointers_at_snap_test] -
-                 part[species][test_property][part_indices]) /
-                part[species][test_property][part_indices])
+                (part_at_snap[species].prop(test_property, part_index_pointers_at_snap_test) -
+                 part[species].prop(test_property, part_indices)) /
+                part[species].prop(test_property, part_indices))
             test_prop_offset_number = np.sum(prop_difs > prop_match_tolerance)
             if test_prop_offset_number:
                 Say.say('! {} have offset {} at snapshot {}!'.format(
