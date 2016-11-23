@@ -8,7 +8,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
@@ -635,7 +635,7 @@ class ReadClass(ut.io.SayClass):
 
             ## star particles ##
             ## 'time' when star particle formed
-            ## for cosmological runs, = scale-factor; for non-cosmological runs, = time {Gyr/h}
+            ## for cosmological runs, = scale-factor; for non-cosmological runs, = time [Gyr/h]
             'StellarFormationTime': 'form.scalefactor',
 
             ## black hole particles ##
@@ -655,6 +655,8 @@ class ReadClass(ut.io.SayClass):
             property_names_temp = []
             for prop_name in list(property_names):
                 prop_name = str.lower(prop_name)
+                if 'massfraction' in prop_name or 'metallicity' in prop_name:
+                    prop_name = 'massfraction'  # this has several aliases, so ensure default name
                 for prop_name_in in property_dict:
                     if (prop_name == str.lower(prop_name_in) or
                             prop_name == str.lower(property_dict[prop_name_in])):
@@ -975,7 +977,7 @@ class ReadClass(ut.io.SayClass):
             'position': [0, 1e6],  # [kpc comoving]
             'velocity': [-1e5, 1e5],  # [km/sec]
             'mass': [10, 3e10],  # [M_sun]
-            'potential': [-1e9, 0],  # [M_sun]
+            'potential': [-1e9, 1e9],  # [M_sun]
             'temperature': [3, 1e9],  # [K]
             'density': [0, 1e14],  # [M_sun/kpc^3]
             'smooth.length': [0, 1e9],  # [kpc physical]

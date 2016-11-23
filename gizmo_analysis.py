@@ -8,7 +8,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
@@ -2023,7 +2023,7 @@ def get_star_form_history(
 
     Returns
     -------
-    time_bins : array : times at midpoint of bin {Gyr or redshift, according to time_kind}
+    time_bins : array : times at midpoint of bin [Gyr or redshift, according to time_kind]
     dm_dt_in_bins : array : star-formation rate at each time bin mid [M_sun / yr]
     mass_cum_in_bins : array : cumulative mass at each time bin mid [M_sun]
     '''
