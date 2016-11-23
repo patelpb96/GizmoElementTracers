@@ -690,6 +690,8 @@ class ReadClass(ut.io.SayClass):
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
         part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
+        self.say('* reading particles')
+
         # initialize arrays to store each property for each species
         for spec_name in self.species_names:
             spec_id = self.species_dict[spec_name]
@@ -730,7 +732,8 @@ class ReadClass(ut.io.SayClass):
             else:
                 part_in = file_in['PartType' + str(spec_id)]
 
-            prop_names_ignore = []
+            prop_names_print = []
+            ignore_flag = 0
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
                     prop_name = property_dict[prop_name_in]
@@ -755,15 +758,16 @@ class ReadClass(ut.io.SayClass):
                     if prop_name == 'id':
                         # initialize so calling an un-itialized value leads to error
                         part[spec_name][prop_name] -= part_number_tot
-                else:
-                    if prop_name_in in property_dict:
-                        prop_name_print = property_dict[prop_name_in]
-                    else:
-                        prop_name_print = prop_name_in
-                    prop_names_ignore.append(prop_name_print)
 
-            if len(prop_names_ignore):
-                self.say('not reading {:6} {}'.format(spec_name, prop_names_ignore))
+                    if prop_name_in in property_dict:
+                        prop_names_print.append(property_dict[prop_name_in])
+                    else:
+                        prop_names_print.append(prop_name_in)
+                else:
+                    ignore_flag = 1
+
+            if ignore_flag:
+                self.say('reading only {:6} {}'.format(spec_name, prop_names_print))
 
             # might have opened extra file if using multi-file snapshot
             try:
@@ -782,7 +786,6 @@ class ReadClass(ut.io.SayClass):
         # initial particle indices to assign to each species from each file
         part_indices_lo = np.zeros(len(self.species_names), dtype=np.int64)
 
-        self.say('* reading particles')
         # loop over all files at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
