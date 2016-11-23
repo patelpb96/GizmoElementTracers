@@ -55,9 +55,11 @@ def write_particle_index_pointer(
     Say = ut.io.SayClass(write_particle_index_pointer)
 
     output_directory = 'output/'  # where to write files
-    second_prop_match_tolerance = 1e-5  # tolerance for matching via second_property, if is a float
+    prop_match_tolerance = 1e-5  # tolerance for matching via second_property, if is a float
+    test_property = 'form.scalefactor'  # additional property to test matching
 
-    assert part[species].prop(second_property)
+    assert part[species].prop(second_property) is not None
+    assert part[species].prop(test_property) is not None
 
     if 'form.index' not in part['star']:
         assign_star_form_snapshot(part)
@@ -98,7 +100,7 @@ def write_particle_index_pointer(
 
         # read particles at this snapshot
         part_at_snap = gizmo_io.Read.read_snapshots(
-            species, 'index', snapshot_index, property_names=['id', second_property],
+            species, 'index', snapshot_index, property_names=['id', second_property, test_property],
             element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
 
         # assign pointer from particle id to its index in list
@@ -134,7 +136,7 @@ def write_particle_index_pointer(
                                 part_index_pointers_at_snap[part_index] = part_index_at_snap
                                 break
                         else:
-                            if np.abs((prop_test - prop_0) / prop_0) < second_prop_match_tolerance:
+                            if np.abs((prop_test - prop_0) / prop_0) < prop_match_tolerance:
                                 part_index_pointers_at_snap[part_index] = part_index_at_snap
                                 break
                     else:
@@ -158,7 +160,6 @@ def write_particle_index_pointer(
         #part_index_pointers_at_snap[-1e9]
 
         # sanity check
-        test_property = 'form.scalefactor'
         if id_no_match_number == 0 and prop_no_match_number == 0 and prop_redundant_number_tot == 0:
             part_index_pointers_at_snap_test = part_index_pointers_at_snap[
                 part_index_pointers_at_snap >= 0]
@@ -166,9 +167,9 @@ def write_particle_index_pointer(
                 (part_at_snap[species][test_property][part_index_pointers_at_snap_test] -
                  part[species][test_property][part_indices]) /
                 part[species][test_property][part_indices])
-            test_prop_offset_number = np.sum(prop_difs > second_prop_match_tolerance)
+            test_prop_offset_number = np.sum(prop_difs > prop_match_tolerance)
             if test_prop_offset_number:
-                Say.say('! {} have offset {} at snapshot {}'.format(
+                Say.say('! {} have offset {} at snapshot {}!'.format(
                         test_prop_offset_number, test_property, snapshot_index))
                 test_prop_offset_number_tot += test_prop_offset_number
 
