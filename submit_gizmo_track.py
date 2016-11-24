@@ -7,8 +7,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
 #SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
-#SBATCH --time=2:00:00
-#SBATCH --output=track/gizmo_track%j.txt
+#SBATCH --time=8:00:00
+#SBATCH --output=track/gizmo_track_%j.txt
 #SBATCH --mail-user=arwetzel@gmail.com
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
