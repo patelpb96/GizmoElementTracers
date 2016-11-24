@@ -3298,8 +3298,8 @@ def compare_resolution(
                     property_names=['position', 'mass'], assign_center=assign_center,
                     force_float32=True)
                 if 'ref14' in simulation_dir:
-                    part.center_position = np.array([41820.015, 44151.745, 46272.818],
-                                                    dtype=np.float32)
+                    part.center_position = np.array(
+                        [41820.015, 44151.745, 46272.818], dtype=np.float32)
                 if len(redshifts) > 1:
                     part.info['simulation.name'] += ' z=%.1f'.format(redshift)
 

@@ -18,8 +18,7 @@ from . import gizmo_io
 
 
 # directory where to store particle tracking files
-track_directory = 'track/'
-track_directory = ut.io.get_path(track_directory)
+TRACK_DIRECTORY = ut.io.get_path('track/')
 
 
 def assign_star_form_snapshot(part):
@@ -109,6 +108,8 @@ def write_particle_index_pointer(
     # set null values to negative and will return error if called as index
     part_index_pointers_at_snap = ut.array.get_array_null(part[species]['id'].size)
     null_value = part_index_pointers_at_snap[0]
+
+    track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
 
     # counters for sanity checks
     id_no_match_number_tot = 0
@@ -202,8 +203,7 @@ def write_particle_index_pointer(
 
         # write file for this snapshot
         file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
-        file_path = track_directory + file_name
-        ut.io.pickle_object(file_path, 'write', part_index_pointers_at_snap)
+        ut.io.pickle_object(track_directory + file_name, 'write', part_index_pointers_at_snap)
 
     # print cumulative diagnostics
     if id_no_match_number_tot:
@@ -216,7 +216,7 @@ def write_particle_index_pointer(
         Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_prop_name))
 
 
-def assign_star_form_host_distance(part=None, snapshot_indices=[], part_indices=None):
+def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=None):
     '''
     Assign to each star particle its distance wrt the host galaxy center at the snapshot after
     it formed.
@@ -227,7 +227,7 @@ def assign_star_form_host_distance(part=None, snapshot_indices=[], part_indices=
     snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
     part_indices : array-like : list of particle indices to assign to
     '''
-    Say = ut.io.SayClass(assign_star_form_host_distance)
+    Say = ut.io.SayClass(write_star_form_host_distance)
 
     spec_name = 'star'
     prop_name = 'form.host.distance'
@@ -274,8 +274,7 @@ def assign_star_form_host_distance(part=None, snapshot_indices=[], part_indices=
                 part_index_pointers = part_indices
             else:
                 file_name = 'star_indices_{:03d}'.format(snapshot_index)
-                file_name = track_directory + file_name
-                part_index_pointers = ut.io.pickle_object(file_name, 'read')
+                part_index_pointers = ut.io.pickle_object(TRACK_DIRECTORY + file_name, 'read')
 
             part_indices_at_snap = part_index_pointers[part_indices_form]
 
@@ -306,7 +305,7 @@ def assign_star_form_host_distance(part=None, snapshot_indices=[], part_indices=
             pickle_star_form_host_distance(part, 'write')
 
 
-def assign_star_form_host_distance_orig(
+def write_star_form_host_distance_orig(
     part, use_child_id=False, snapshot_index_limits=[], part_indices=None):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
@@ -319,7 +318,7 @@ def assign_star_form_host_distance_orig(
     snapshot_index_limits : list : min and max snapshot indices to impose matching to
     part_indices : array-like : list of particle indices to assign to
     '''
-    Say = ut.io.SayClass(assign_star_form_host_distance)
+    Say = ut.io.SayClass(write_star_form_host_distance)
 
     spec_name = 'star'
     prop_name = 'form.host.distance'
@@ -439,26 +438,27 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
     prop_name = 'form.host.distance'
 
     file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
-    file_name = track_directory + file_name
 
     if pickle_direction == 'write':
+        track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
         pickle_object = [part[spec_name][prop_name], part[spec_name]['id']]
-        ut.io.pickle_object(file_name, pickle_direction, pickle_object)
+        ut.io.pickle_object(track_directory + file_name, pickle_direction, pickle_object)
 
     elif pickle_direction == 'read':
-        part[spec_name][prop_name], part_ids = ut.io.pickle_object(file_name, pickle_direction)
+        part[spec_name][prop_name], part_ids = ut.io.pickle_object(
+            track_directory + file_name, pickle_direction)
 
         # sanity check
         bad_id_number = np.sum(part[spec_name]['id'] != part_ids)
         if bad_id_number:
-            Say.say('! {} particles have mismatched id. this is not right!'.format(bad_id_number))
+            Say.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
     else:
         raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
 
 
 #===================================================================================================
-# running from command line
+# run from command line
 #===================================================================================================
 if __name__ == '__main__':
     match_property = 'id.child'

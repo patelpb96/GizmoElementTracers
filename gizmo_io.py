@@ -509,7 +509,7 @@ class ReadClass(ut.io.SayClass):
         # get snapshot file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
 
-        self.say('* reading header from: ' + file_name, end='\n')
+        self.say('* reading header from: ' + file_name.replace('./', ''), end='\n')
 
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
         header_in = file_in['Header'].attrs  # load header dictionary
@@ -767,7 +767,7 @@ class ReadClass(ut.io.SayClass):
                     ignore_flag = 1
 
             if ignore_flag:
-                self.say('reading only {:6} {}'.format(spec_name, prop_names_print))
+                self.say('reading only {:6} {}'.format(spec_name, prop_names_print.sort()))
 
             # might have opened extra file if using multi-file snapshot
             try:
