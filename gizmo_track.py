@@ -202,7 +202,7 @@ def write_particle_index_pointer(
 
         # write file for this snapshot
         file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
-        part_index_pointers_at_snap.dump(track_directory + file_name)
+        np.save(track_directory + file_name, part_index_pointers_at_snap, allow_pickle=False)
         #ut.io.pickle_object(track_directory + file_name, 'write', part_index_pointers_at_snap)
 
     # print cumulative diagnostics
