@@ -28,7 +28,7 @@ import os
 import time
 import datetime
 # local ----
-from . import gizmo_track
+from gizmo import gizmo_track
 
 
 # print job information

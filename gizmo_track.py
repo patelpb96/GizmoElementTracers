@@ -9,7 +9,6 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
-import sys
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
@@ -234,7 +233,7 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
 
     if part is None:
         # read particles at z = 0
-        # complete list of all possible properties relevant to use in matching
+        # complete list of all possible properties relevant for matching
         property_names_read = [
             'position', 'mass', 'id', 'id.child', 'massfraction.metals', 'form.scalefactor']
         part = gizmo_io.Read.read_snapshots(
@@ -446,7 +445,7 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
 
     elif pickle_direction == 'read':
         part[spec_name][prop_name], part_ids = ut.io.pickle_object(
-            track_directory + file_name, pickle_direction)
+            TRACK_DIRECTORY + file_name, pickle_direction)
 
         # sanity check
         bad_id_number = np.sum(part[spec_name]['id'] != part_ids)
@@ -461,9 +460,4 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
 # run from command line
 #===================================================================================================
 if __name__ == '__main__':
-    match_property = 'id.child'
-
-    if len(sys.argv) == 2:
-        match_property = sys.argv[1]
-
-    write_particle_index_pointer(match_prop_name=match_property)
+    write_particle_index_pointer()
