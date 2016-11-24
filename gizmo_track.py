@@ -17,6 +17,11 @@ import utilities as ut
 from . import gizmo_io
 
 
+# directory where to store particle tracking files
+track_directory = 'track/'
+track_directory = ut.io.get_path(track_directory)
+
+
 def assign_star_form_snapshot(part):
     '''
     Assign to each star particle the index of the snapshot after it formed,
@@ -39,7 +44,7 @@ def assign_star_form_snapshot(part):
 
 def write_particle_index_pointer(
     part=None, species='star', match_prop_name='id.child', match_prop_tolerance=1e-6,
-    test_prop_name='form.scalefactor', snapshot_indices=[], output_directory='output/'):
+    test_prop_name='form.scalefactor', snapshot_indices=[]):
     '''
     Assign to each particle a pointer to its index in the list of particles at each previous
     snapshot, to make it easier to track particles back in time.
@@ -55,7 +60,6 @@ def write_particle_index_pointer(
     match_prop_tolerance : float : tolerance for matching via match_prop_name, if it is a float
     test_prop_name : string : additional property to use to test matching
     snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
-    output_directory : string : where to write files
     '''
     Say = ut.io.SayClass(write_particle_index_pointer)
 
@@ -197,8 +201,8 @@ def write_particle_index_pointer(
                 test_prop_offset_number_tot += test_prop_offset_number
 
         # write file for this snapshot
-        file_name = '{}_indices_{}'.format(species, snapshot_index)
-        file_path = ut.io.get_path(output_directory) + file_name
+        file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
+        file_path = track_directory + file_name
         ut.io.pickle_object(file_path, 'write', part_index_pointers_at_snap)
 
     # print cumulative diagnostics
@@ -212,7 +216,97 @@ def write_particle_index_pointer(
         Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_prop_name))
 
 
-def assign_star_form_host_distance(
+def assign_star_form_host_distance(part=None, snapshot_indices=[], part_indices=None):
+    '''
+    Assign to each star particle its distance wrt the host galaxy center at the snapshot after
+    it formed.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+    part_indices : array-like : list of particle indices to assign to
+    '''
+    Say = ut.io.SayClass(assign_star_form_host_distance)
+
+    spec_name = 'star'
+    prop_name = 'form.host.distance'
+
+    if part is None:
+        # read particles at z = 0
+        # complete list of all possible properties relevant to use in matching
+        property_names_read = [
+            'position', 'mass', 'id', 'id.child', 'massfraction.metals', 'form.scalefactor']
+        part = gizmo_io.Read.read_snapshots(
+            spec_name, 'redshift', 0, property_names=property_names_read, element_indices=[0],
+            force_float32=True, assign_center=False, check_sanity=False)
+
+    # get list of particles to assign
+    if part_indices is None or not len(part_indices):
+        part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
+
+    # get list of snapshots to assign
+    if snapshot_indices is None or not len(snapshot_indices):
+        snapshot_indices = np.arange(min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
+    snapshot_indices = np.sort(snapshot_indices)[::-1]  # work backwards in time
+
+    if 'form.index' not in part[spec_name]:
+        assign_star_form_snapshot(part)
+
+    # store form.host.distance as 32-bit and initialize to -1
+    part[spec_name][prop_name] = np.zeros(part[spec_name]['position'].shape[0], np.float32) - 1
+
+    id_wrong_number_tot = 0
+    id_none_number_tot = 0
+
+    for snapshot_index in snapshot_indices:
+        part_indices_form = part_indices[
+            part[spec_name]['form.index'][part_indices] == snapshot_index]
+
+        Say.say('# {} to assign at snapshot {}'.format(part_indices_form.size, snapshot_index))
+
+        if part_indices_form.size:
+            part_at_snap = gizmo_io.Read.read_snapshots(
+                spec_name, 'index', snapshot_index, property_names=['position', 'mass', 'id'],
+                force_float32=True, assign_center=True, check_sanity=True)
+
+            if snapshot_index == part.snapshot['index']:
+                part_index_pointers = part_indices
+            else:
+                file_name = 'star_indices_{:03d}'.format(snapshot_index)
+                file_name = track_directory + file_name
+                part_index_pointers = ut.io.pickle_object(file_name, 'read')
+
+            part_indices_at_snap = part_index_pointers[part_indices_form]
+
+            # sanity checks
+            masks = (part_indices_at_snap >= 0)
+            id_none_number = part_indices_form.size - np.sum(masks)
+            if id_none_number:
+                Say.say('! {} have no id match at snapshot {}!'.format(
+                        id_none_number, snapshot_index))
+                id_none_number_tot += id_none_number
+                part_indices_at_snap = part_indices_at_snap[masks]
+                part_indices_form = part_indices_form[masks]
+
+            id_wrong_number = np.sum(part[spec_name]['id'][part_indices_form] !=
+                                     part_at_snap[spec_name]['id'][part_indices_at_snap])
+            if id_wrong_number:
+                Say.say('! {} have wrong id match at snapshot {}!'.format(
+                        id_wrong_number, snapshot_index))
+                id_wrong_number_tot += id_wrong_number
+
+            # compute 3-D distance wrt host [kpc physical]
+            part[spec_name][prop_name][part_indices_form] = ut.coordinate.get_distances(
+                'scalar', part_at_snap[spec_name]['position'][part_indices_at_snap],
+                part_at_snap.center_position,
+                part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
+
+            # continuously (re)write as go
+            pickle_star_form_host_distance(part, 'write')
+
+
+def assign_star_form_host_distance_orig(
     part, use_child_id=False, snapshot_index_limits=[], part_indices=None):
     '''
     Assign to each star particle the distance wrt the host galaxy center at the first snapshot
@@ -328,40 +422,6 @@ def assign_star_form_host_distance(
 #===================================================================================================
 # read/write
 #===================================================================================================
-def pickle_star_index_pointer(part, pickle_direction='read'):
-    '''
-    Read or write, for each star particle, its distance wrt the host galaxy center at the first
-    snapshot after it formed.
-    If read, assign to particle catalog.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    pickle_direction : string : pickle direction: 'read', 'write'
-    '''
-    Say = ut.io.SayClass(pickle_star_form_host_distance)
-
-    spec_name = 'star'
-    prop_name = 'form.host.distance'
-
-    file_name = 'output/star_form_host_distance_{:03d}'.format(part.snapshot['index'])
-
-    if pickle_direction == 'write':
-        pickle_object = [part[spec_name][prop_name], part[spec_name]['id']]
-        ut.io.pickle_object(file_name, pickle_direction, pickle_object)
-
-    elif pickle_direction == 'read':
-        part[spec_name][prop_name], part_ids = ut.io.pickle_object(file_name, pickle_direction)
-
-        # sanity check
-        bad_id_number = np.sum(part[spec_name]['id'] != part_ids)
-        if bad_id_number:
-            Say.say('! {} particles have mismatched id. this is not right!'.format(bad_id_number))
-
-    else:
-        raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
-
-
 def pickle_star_form_host_distance(part, pickle_direction='read'):
     '''
     Read or write, for each star particle, its distance wrt the host galaxy center at the first
@@ -378,7 +438,8 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
     spec_name = 'star'
     prop_name = 'form.host.distance'
 
-    file_name = 'output/star_form_host_distance_{:03d}'.format(part.snapshot['index'])
+    file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
+    file_name = track_directory + file_name
 
     if pickle_direction == 'write':
         pickle_object = [part[spec_name][prop_name], part[spec_name]['id']]
@@ -400,7 +461,7 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
 # running from command line
 #===================================================================================================
 if __name__ == '__main__':
-    match_property = 'massfraction.metals'
+    match_property = 'id.child'
 
     if len(sys.argv) == 2:
         match_property = sys.argv[1]
