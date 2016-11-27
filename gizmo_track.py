@@ -201,9 +201,10 @@ def write_particle_index_pointer(
                 test_prop_offset_number_tot += test_prop_offset_number
 
         # write file for this snapshot
-        file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
-        np.save(track_directory + file_name, part_index_pointers_at_snap, allow_pickle=False)
-        #ut.io.pickle_object(track_directory + file_name, 'write', part_index_pointers_at_snap)
+        file_name = '{}_indices_{:03d}.npy'.format(species, snapshot_index)
+        #np.save(track_directory + file_name, part_index_pointers_at_snap, allow_pickle=False)
+        ut.io.pickle_object(track_directory + file_name, 'write', part_index_pointers_at_snap,
+                            protocol=2)
 
     # print cumulative diagnostics
     if id_no_match_number_tot:
@@ -273,8 +274,7 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
             if snapshot_index == part.snapshot['index']:
                 part_index_pointers = part_indices
             else:
-                file_name = 'star_indices_{:03d}'.format(snapshot_index)
-                #part_index_pointers = ut.io.pickle_object(TRACK_DIRECTORY + file_name, 'read')
+                file_name = 'star_indices_{:03d}.npy'.format(snapshot_index)
                 part_index_pointers = np.load(TRACK_DIRECTORY + file_name, 'read')
 
             part_indices_at_snap = part_index_pointers[part_indices_form]

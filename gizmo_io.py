@@ -232,7 +232,8 @@ class ReadClass(ut.io.SayClass):
         #self.species_dict['bulge'] = 2
         #self.species_dict['disk'] = 3
 
-        self.species_names = list(self.species_dict.keys())
+        self.species_names_all = list(self.species_dict.keys())
+        self.species_names_read = list(self.species_dict.keys())
 
         self.read_snapshot = self.read_snapshots  # alias for backwards compatability
 
@@ -261,7 +262,7 @@ class ReadClass(ut.io.SayClass):
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_numbers : int or float or list thereof :
             index[s] or redshifts[s] or scale-factor[s] of snapshot file[s]
-        simulation_directory : string : root directory of simulation
+        simulation_directory : string : directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
         simulation_name : string : name to store for future identification
         property_names : string or list : name[s] of particle properties to read - options:
@@ -285,7 +286,7 @@ class ReadClass(ut.io.SayClass):
         # parse input species list
         if species_names == 'all' or species_names == ['all'] or not species_names:
             # read all species in snapshot
-            species_names = list(self.species_dict.keys())
+            species_names = self.species_names_all
         else:
             # read subsample of species in snapshot
             if np.isscalar(species_names):
@@ -295,7 +296,7 @@ class ReadClass(ut.io.SayClass):
                 if spec_name not in self.species_dict:
                     species_names.remove(spec_name)
                     self.say('! not recognize input species = {}'.format(spec_name))
-        self.species_names = species_names
+        self.species_names_read = species_names
 
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
@@ -337,12 +338,12 @@ class ReadClass(ut.io.SayClass):
             # assign auxilliary information to particle dictionary class
             # store header dictionary
             part.info = header
-            for spec_name in self.species_names:
+            for spec_name in part:
                 part[spec_name].info = part.info
 
             # store cosmology class
             part.Cosmology = Cosmology
-            for spec_name in self.species_names:
+            for spec_name in part:
                 part[spec_name].Cosmology = part.Cosmology
 
             # store information about snapshot time
@@ -355,7 +356,7 @@ class ReadClass(ut.io.SayClass):
                 'time.lookback': Cosmology.get_time(0) - time,
                 'time.hubble': ut.const.Gyr_per_sec / Cosmology.get_hubble_parameter(0),
             }
-            for spec_name in self.species_names:
+            for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
 
             # store information on all snapshot times - may or may not be initialized
@@ -373,6 +374,86 @@ class ReadClass(ut.io.SayClass):
             else:
                 parts.append(part)
                 print()
+
+        return parts
+
+    def read_simulations(
+        self, simulation_directories=[], species_names='all', redshift=0,
+        property_names='all', element_indices=[0, 1], force_float32=False):
+        '''
+        Read snapshots at the same redshift from different simulations.
+        Return as list of dictionaries.
+
+        Parameters
+        ----------
+        directories : list or list of lists :
+            list of simulation directories, or list of pairs of directory + simulation name
+        species_names : string or list : particle species to read
+        redshift : float
+        property_names : string or list : names of properties to read
+        element_indices : int or list : indices of elements to read
+        force_float32 : boolean : whether to force positions to be 32-bit
+
+        Returns
+        -------
+        parts : list of dictionaries
+        '''
+        # parse list of directories
+        if np.ndim(simulation_directories) == 0:
+            raise ValueError('input simulation_directories = {} but need to input list'.format(
+                             simulation_directories))
+        elif np.ndim(simulation_directories) == 1:
+            # assign null names
+            simulation_directories = list(
+                zip(simulation_directories, ['' for _ in simulation_directories]))
+        elif np.ndim(simulation_directories) == 2:
+            pass
+        elif np.ndim(simulation_directories) >= 3:
+            raise ValueError('not sure how to parse simulation_directories = {}'.format(
+                             simulation_directories))
+
+        # first pass, read only header, to check that can read all simulations
+        bad_snapshot_number = 0
+        for directory, simulation_name in simulation_directories:
+            _header = self.read_header(
+                'redshift', redshift, directory, simulation_name=simulation_name)
+            try:
+                _header = self.read_header(
+                    'redshift', redshift, directory, simulation_name=simulation_name)
+            except:
+                self.say('! could not read snapshot header at z = {:.3f} in {}'.format(
+                         redshift, directory))
+                bad_snapshot_number += 1
+
+        if bad_snapshot_number:
+            self.say('\n! could not read {} snapshots'.format(bad_snapshot_number))
+            return
+
+        parts = []
+        directories_read = []
+        for directory, simulation_name in simulation_directories:
+            try:
+                part = self.read_snapshots(
+                    species_names, 'redshift', redshift, directory, simulation_name=simulation_name,
+                    property_names=property_names, element_indices=element_indices,
+                    force_float32=force_float32)
+
+                if 'velocity' in property_names:
+                    self.assign_orbit(part, 'gas')
+
+                parts.append(part)
+                directories_read.append(directory)
+            except:
+                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
+                         redshift, directory))
+
+        if not len(parts):
+            self.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
+            return
+
+        if 'mass' in property_names and 'star' in part:
+            for part, directory in zip(parts, directories_read):
+                print('{}: star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
 
         return parts
 
@@ -511,7 +592,7 @@ class ReadClass(ut.io.SayClass):
 
         self.say('* reading header from: ' + file_name.replace('./', ''), end='\n')
 
-        file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
+        file_in = h5py.File(file_name, 'r')  # open snapshot file
         header_in = file_in['Header'].attrs  # load header dictionary
 
         for prop_name_in in header_in:
@@ -540,22 +621,30 @@ class ReadClass(ut.io.SayClass):
             header['time'] /= header['hubble']  # convert to [Gyr]
 
         # keep only species that have any particles
-        particle_number_min = 0
-        for spec_name in list(self.species_names):
+        read_particle_number = 0
+        for spec_name in self.species_names_all:
             spec_id = self.species_dict[spec_name]
-            self.say('species = {:9s} (id = {}): {} particles'.format(
-                     spec_name, spec_id, header['particle.numbers.total'][spec_id]))
-            if header['particle.numbers.total'][spec_id] > 0:
-                particle_number_min = header['particle.numbers.total'][spec_id]
-            else:
-                self.species_names.remove(spec_name)
+            if spec_name in self.species_names_read:
+                self.say('species = {:9s} (id = {}): {} particles'.format(
+                         spec_name, spec_id, header['particle.numbers.total'][spec_id]))
+
+                if header['particle.numbers.total'][spec_id] > 0:
+                    read_particle_number += header['particle.numbers.total'][spec_id]
+                else:
+                    self.species_names_read.remove(spec_name)
+
+        if read_particle_number <= 0:
+            raise ValueError('! snapshot file[s] contain no particles of species = {}'.format(
+                             self.species_names_read))
 
         # check if simulation contains baryons
-        if ('gas' not in self.species_names and 'star' not in self.species_names and
-                'disk' not in self.species_names and 'bulge' not in self.species_names):
-            header['has.baryons'] = False
-        else:
-            header['has.baryons'] = True
+        header['has.baryons'] = False
+        for spec_name in self.species_names_all:
+            if spec_name in ['gas', 'star', 'disk', 'bulge']:
+                spec_id = self.species_dict[spec_name]
+                if header['particle.numbers.total'][spec_id] > 0:
+                    header['has.baryons'] = True
+                    break
 
         # assign simulation name
         if not simulation_name and simulation_directory != './':
@@ -563,9 +652,6 @@ class ReadClass(ut.io.SayClass):
         header['simulation.name'] = simulation_name
 
         header['catalog.kind'] = 'particle'
-
-        if particle_number_min == 0:
-            raise ValueError('! found no particles in file')
 
         print()
 
@@ -690,10 +776,13 @@ class ReadClass(ut.io.SayClass):
         file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
         part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
-        self.say('* reading particles')
+        if header['file.number.per.snapshot'] == 1:
+            self.say('* reading particles from: {}'.format(file_name))
+        else:
+            self.say('* reading particles')
 
         # initialize arrays to store each property for each species
-        for spec_name in self.species_names:
+        for spec_name in self.species_names_read:
             spec_id = self.species_dict[spec_name]
             part_number_tot = header['particle.numbers.total'][spec_id]
 
@@ -733,7 +822,7 @@ class ReadClass(ut.io.SayClass):
                 part_in = file_in['PartType' + str(spec_id)]
 
             prop_names_print = []
-            ignore_flag = 0
+            ignore_flag = False
             for prop_name_in in part_in:
                 if prop_name_in in property_names:
                     prop_name = property_dict[prop_name_in]
@@ -764,7 +853,7 @@ class ReadClass(ut.io.SayClass):
                     else:
                         prop_names_print.append(prop_name_in)
                 else:
-                    ignore_flag = 1
+                    ignore_flag = True
 
             if ignore_flag:
                 self.say('reading only {:6} {}'.format(spec_name, prop_names_print.sort()))
@@ -784,7 +873,7 @@ class ReadClass(ut.io.SayClass):
 
         ## read properties for each species ----------
         # initial particle indices to assign to each species from each file
-        part_indices_lo = np.zeros(len(self.species_names), dtype=np.int64)
+        part_indices_lo = np.zeros(len(self.species_names_read), dtype=np.int64)
 
         # loop over all files at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
@@ -792,12 +881,13 @@ class ReadClass(ut.io.SayClass):
             file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
             file_in = h5py.File(file_name_i, 'r')
 
-            self.say('from: ' + file_name_i.split('/')[-1])
+            if header['file.number.per.snapshot'] > 1:
+                self.say('from: ' + file_name_i.split('/')[-1])
 
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
             # read particle properties
-            for spec_i, spec_name in enumerate(self.species_names):
+            for spec_i, spec_name in enumerate(self.species_names_read):
                 spec_id = self.species_dict[spec_name]
                 if part_numbers_in_file[spec_id] > 0:
                     part_in = file_in['PartType' + str(spec_id)]
@@ -875,25 +965,22 @@ class ReadClass(ut.io.SayClass):
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
                     self.say('{}: {} particles'.format(spec_name, spec_indices.size))
 
-                    if spec_name not in self.species_names:
-                        self.species_names.append(spec_name)
-
                 del(spec_indices)
                 print()
 
         if sort_dark_by_id:
             # order dark-matter particles by id - should be conserved across snapshots
-            for spec_name in self.species_names:
+            for spec_name in part:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
                     self.say('* sorting {:6} particles by id'.format(spec_name))
                     indices_sorted = np.argsort(part[spec_name]['id'])
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted]
-                    del(indices_sorted)
+            del(indices_sorted)
             print()
 
         # apply unit conversions
-        for spec_name in self.species_names:
+        for spec_name in part:
             if 'position' in part[spec_name]:
                 # convert to [kpc comoving]
                 part[spec_name]['position'] /= header['hubble']
@@ -941,28 +1028,28 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name]['temperature'] *= (
                     ut.const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights /
                     ut.const.boltzmann)
+                del(helium_mass_fracs, ys_helium, mus, molecular_weights)
 
-        if 'potential' in part[self.species_names[0]]:
-            # convert from [km / s^2 comoving] to [km / s^2 physical]
-            part[spec_name]['potential'] = part[spec_name]['potential'] / header['scalefactor']
-            # renormalize so potential max = 0
-            #potential_max = 0
-            #for spec_name in self.species_names:
-            #    if part[spec_name]['potential'].max() > potential_max:
-            #        potential_max = part[spec_name]['potential'].max()
-            #for spec_name in self.species_names:
-            #    part[spec_name]['potential'] -= potential_max
+            if 'potential' in part[spec_name]:
+                # convert from [km / s^2 comoving] to [km / s^2 physical]
+                part[spec_name]['potential'] = part[spec_name]['potential'] / header['scalefactor']
 
+        # renormalize so potential max = 0
+        #potential_max = 0
+        #for spec_name in part:
+        #    if part[spec_name]['potential'].max() > potential_max:
+        #        potential_max = part[spec_name]['potential'].max()
+        #for spec_name in part:
+        #    part[spec_name]['potential'] -= potential_max
+
+        # sub-sample particles, for smaller memory
         if particle_subsample_factor > 1:
-            # sub-sample highest-resolution particles, for smaller memory
-            spec_names = ['dark', 'gas', 'star']
-            self.say('* subsampling (periodically) {} particles by factor = {}'.format(
-                     spec_names, particle_subsample_factor), end='\n\n')
+            self.say('* periodically subsampling all particles by factor = {}'.format(
+                     particle_subsample_factor), end='\n\n')
             for spec_name in part:
-                if spec_name in spec_names:
-                    for prop_name in part[spec_name]:
-                        part[spec_name][prop_name] = (
-                            part[spec_name][prop_name][::particle_subsample_factor])
+                for prop_name in part[spec_name]:
+                    part[spec_name][prop_name] = part[spec_name][prop_name][
+                        ::particle_subsample_factor]
 
     def check_sanity(self, part):
         '''
@@ -978,7 +1065,7 @@ class ReadClass(ut.io.SayClass):
             'id.child': [0, 4e9],
             'id.generation': [0, 4e9],
             'position': [0, 1e6],  # [kpc comoving]
-            'velocity': [-1e5, 1e5],  # [km/sec]
+            'velocity': [-1e5, 1e5],  # [km / s]
             'mass': [10, 3e10],  # [M_sun]
             'potential': [-1e9, 1e9],  # [M_sun]
             'temperature': [3, 1e9],  # [K]
@@ -992,7 +1079,7 @@ class ReadClass(ut.io.SayClass):
 
         self.say('* checking sanity of particle properties')
 
-        for spec_name in self.species_names:
+        for spec_name in part:
             for prop_name in part[spec_name]:
                 if prop_name in prop_limit_dict:
                     if (part[spec_name][prop_name].min() < prop_limit_dict[prop_name][0] or
@@ -1028,16 +1115,16 @@ class ReadClass(ut.io.SayClass):
         if 'position' in part[spec_name]:
             part.center_position = ut.particle.get_center_position(
                 part, spec_name, method, compare_centers=compare_centers)
-            self.say('position = [', end='')
+            self.say('position = (', end='')
             ut.io.print_array(part.center_position, '{:.3f}', end='')
-            print('] kpc comoving')
+            print(') [kpc comoving]')
 
         if 'velocity' in part[spec_name]:
             part.center_velocity = ut.particle.get_center_velocity(
                 part, spec_name, velocity_radius_max, part.center_position)
-            self.say('  velocity = [', end='')
+            self.say('velocity = (', end='')
             ut.io.print_array(part.center_velocity, '{:.1f}', end='')
-            print('] km / sec')
+            print(') [km / s]')
 
         print()
 

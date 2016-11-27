@@ -3008,13 +3008,13 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         self.simulation_names = [
             # FIRE-1
-            ['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE1'],
+            #['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE1'],
 
             # FIRE-2
             ['m12i/m12i_ref12', 'm12i r12'],
             ['fb-sym/m12i_ref13', 'm12i r13'],
 
-            # different halos
+            # Latte halos
             ['m12i/m12i_ref12', 'm12i r12'],
             ['m12b/m12b_ref12', 'm12b r12'],
             ['m12m/m12m_ref12', 'm12m r12'],
@@ -3025,66 +3025,17 @@ class CompareSimulationsClass(ut.io.SayClass):
         ]
 
     def read_simulations(
-        self, simulation_names=None, redshift=0, species='all',
+        self, simulation_names=[], species_names='all', redshift=0,
         property_names=['mass', 'position', 'form.scalefactor', 'massfraction'],
         element_indices=[0, 1, 6, 10], force_float32=True):
         '''
-        Read snapshots from simulations.
-
-        Parameters
-        ----------
-        simulation_names : list : list of simulation directories and name/label for figure.
-        redshift : float
-        species : string or list : particle species to read
-        property_names : string or list : names of properties to read
-        force_float32 : boolean : whether to force positions to be 32-bit
+        Wrapper for gizmo_io.Read.read_simulations().
         '''
         from . import gizmo_io
 
-        if simulation_names is None:
-            simulation_names = self.simulation_names
-
-        # first pass, read just header, to check that can read all simulations
-        bad_snapshot_number = 0
-        for directory, simulation_name in simulation_names:
-            try:
-                _header = gizmo_io.Read.read_header(
-                    'redshift', redshift, directory, 'output/', simulation_name)
-            except:
-                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
-                         redshift, directory))
-                bad_snapshot_number += 1
-
-        if bad_snapshot_number:
-            self.say('\n! could not read {} snapshots'.format(bad_snapshot_number))
-            return
-
-        parts = []
-        directories = []
-        for directory, simulation_name in simulation_names:
-            try:
-                part = gizmo_io.Read.read_snapshots(
-                    species, 'redshift', redshift, directory, 'output/',
-                    simulation_name, property_names, element_indices, force_float32=force_float32)
-
-                if 'velocity' in property_names:
-                    gizmo_io.assign_orbit(part, 'gas')
-
-                parts.append(part)
-                directories.append(directory)
-            except:
-                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
-                         redshift, directory))
-
-        if not len(parts):
-            self.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
-            return
-
-        if 'mass' in property_names and 'star' in part:
-            for part, directory in zip(parts, directories):
-                print('{} star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
-
-        return parts
+        return gizmo_io.Read.read_simulations(
+            simulation_names, species_names, redshift, property_names, element_indices,
+            force_float32)
 
     def plot_profiles(
         self, parts=None, distance_bin_width=0.1,
