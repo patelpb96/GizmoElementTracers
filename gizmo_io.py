@@ -235,8 +235,6 @@ class ReadClass(ut.io.SayClass):
         self.species_names_all = list(self.species_dict.keys())
         self.species_names_read = list(self.species_dict.keys())
 
-        self.read_snapshot = self.read_snapshots  # alias for backwards compatability
-
     def read_snapshots(
         self, species_names='all',
         snapshot_number_kind='index', snapshot_numbers=600,
