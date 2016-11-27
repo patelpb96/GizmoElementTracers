@@ -201,7 +201,7 @@ def write_particle_index_pointer(
                 test_prop_offset_number_tot += test_prop_offset_number
 
         # write file for this snapshot
-        file_name = '{}_indices_{:03d}.npy'.format(species, snapshot_index)
+        file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
         #np.save(track_directory + file_name, part_index_pointers_at_snap, allow_pickle=False)
         ut.io.pickle_object(track_directory + file_name, 'write', part_index_pointers_at_snap,
                             protocol=2)

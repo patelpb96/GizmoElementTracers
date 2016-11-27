@@ -3006,6 +3006,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         Set directories and names of simulations to read.
         '''
+        self.property_names = ['mass', 'position', 'form.scalefactor', 'massfraction']
+
         self.simulation_names = [
             # FIRE-1
             #['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE1'],
@@ -3021,21 +3023,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             ['m12c/m12c_ref12', 'm12c r12'],
             ['m12f/m12f_ref12', 'm12f r12'],
             ['m12q/m12q_ref12', 'm12q r12'],
-
         ]
-
-    def read_simulations(
-        self, simulation_names=[], species_names='all', redshift=0,
-        property_names=['mass', 'position', 'form.scalefactor', 'massfraction'],
-        element_indices=[0, 1, 6, 10], force_float32=True):
-        '''
-        Wrapper for gizmo_io.Read.read_simulations().
-        '''
-        from . import gizmo_io
-
-        return gizmo_io.Read.read_simulations(
-            simulation_names, species_names, redshift, property_names, element_indices,
-            force_float32)
 
     def plot_profiles(
         self, parts=None, distance_bin_width=0.1,
@@ -3073,7 +3061,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
                 parts = self.read_simulations(
-                    simulation_names, redshift, species, property_names, element_indices,
+                    simulation_names, species, redshift, property_names, element_indices,
                     force_float32)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:

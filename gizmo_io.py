@@ -239,7 +239,7 @@ class ReadClass(ut.io.SayClass):
         self, species_names='all',
         snapshot_number_kind='index', snapshot_numbers=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
-        property_names='all', element_indices=[0, 1], particle_subsample_factor=0,
+        property_names='all', element_indices=None, particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False, assign_center=True,
         check_sanity=True):
         '''
@@ -377,7 +377,7 @@ class ReadClass(ut.io.SayClass):
 
     def read_simulations(
         self, simulation_directories=[], species_names='all', redshift=0,
-        property_names='all', element_indices=[0, 1], force_float32=False):
+        property_names='all', element_indices=[0, 1, 6, 10], force_float32=True):
         '''
         Read snapshots at the same redshift from different simulations.
         Return as list of dictionaries.
