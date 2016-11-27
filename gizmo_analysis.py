@@ -3027,9 +3027,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def plot_profiles(
         self, parts=None, distance_bin_width=0.1,
-        simulation_names=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', property_names=['mass', 'position', 'form.scalefactor', 'massfraction'],
-        element_indices=[0, 1, 6, 10], force_float32=True):
+        simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        species='all'):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
@@ -3037,13 +3036,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         ----------
         parts : list : dictionaries of particles at snapshot
         distance_bin_width : float : width of distance bin
-        simulation_names : list : list of simulation directories and name/label for figure.
+        simulation_directories : list : list of simulation directories and name/label for figure.
         redshifts : float or list
         species : string or list : particle species to read
-        property_names : string or list : names of properties to read
-        element_indices : int or list : indices of elements to keep
-            note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
-        force_float32 : boolean : whether to force positions to be 32-bit
         '''
         distance_limits_galaxy = [0.1, 30]
         distance_limits_halo = [0.5, 300]
@@ -3060,9 +3055,9 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
-                parts = self.read_simulations(
-                    simulation_names, species, redshift, property_names, element_indices,
-                    force_float32)
+                from . import gizmo_io
+                parts = gizmo_io.Read.read_simulations(
+                    simulation_directories, species, redshift, self.property_names)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
@@ -3095,7 +3090,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'star', 'metallicity.total', 'median', 'linear', True, [None, None],
                     distance_limits_galaxy, distance_bin_width, write_plot=True)
 
-                if 'velocity' in property_names:
+                if 'velocity' in parts[0]['gas']:
                     plot_property_v_distance(
                         parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
                         distance_limits_halo, 0.25, write_plot=True)
@@ -3113,7 +3108,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     parts, 'star', 'mass', 'density', 'log', False, [None, None],
                     distance_limits_galaxy, distance_bin_width, write_plot=True)
 
-                if 'form' in property_names and redshift <= 5:
+                if 'form.scalefactor' in parts[0]['star'] and redshift <= 5:
                     plot_property_v_distance(
                         parts, 'star', 'age', 'average', 'linear', True,
                         [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)
@@ -3151,20 +3146,19 @@ class CompareSimulationsClass(ut.io.SayClass):
     def plot_images(
         self, parts=None,
         distance_max=20, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
-        align_principal_axes=True, simulation_names=None,
+        align_principal_axes=True, simulation_directories=None,
         redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
                    0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
                    0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
                    0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
                    0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
-        species=['star', 'gas'], property_names=['mass', 'position'], element_indices=[0, 1],
-        force_float32=True):
+        species=['star', 'gas'], property_names=['mass', 'position']):
         '''
         Plot images of simulations at each snapshot.
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
+        parts : list : list of particle dictionaries at snapshot
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
         image_limits : list : min and max limits for image dyanmic range
@@ -3186,9 +3180,9 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
-                parts = self.read_simulations(
-                    simulation_names, redshift, species, property_names, element_indices,
-                    force_float32)
+                from . import gizmo_io
+                parts = gizmo_io.Read.read_simulations(
+                    simulation_directories, species, redshift, property_names)
 
             for part in parts:
                 for spec_name in ['star', 'gas']:

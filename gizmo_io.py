@@ -588,7 +588,7 @@ class ReadClass(ut.io.SayClass):
         # get snapshot file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
 
-        self.say('* reading header from: ' + file_name.replace('./', ''), end='\n')
+        self.say('* reading header from: {}'.format(file_name.replace('./', '')), end='\n')
 
         file_in = h5py.File(file_name, 'r')  # open snapshot file
         header_in = file_in['Header'].attrs  # load header dictionary
@@ -771,11 +771,11 @@ class ReadClass(ut.io.SayClass):
         # get snapshot file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
 
-        file_in = h5py.File(file_name, 'r')  # open hdf5 snapshot file
+        file_in = h5py.File(file_name, 'r')  # open snapshot file
         part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
         if header['file.number.per.snapshot'] == 1:
-            self.say('* reading particles from: {}'.format(file_name))
+            self.say('* reading particles from: {}'.format(file_name.replace('./', '')))
         else:
             self.say('* reading particles')
 
@@ -854,7 +854,7 @@ class ReadClass(ut.io.SayClass):
                     ignore_flag = True
 
             if ignore_flag:
-                self.say('reading only {:6} {}'.format(spec_name, prop_names_print.sort()))
+                self.say('reading only {:6} {}'.format(spec_name, prop_names_print))
 
             # might have opened extra file if using multi-file snapshot
             try:
@@ -1167,7 +1167,7 @@ class ReadClass(ut.io.SayClass):
 
         ## read header ##
         # open file and parse header
-        file_in = h5py.File(file_name, 'r+')  # open hdf5 snapshot file
+        file_in = h5py.File(file_name, 'r+')  # open snapshot file
         header = file_in['Header'].attrs  # load header dictionary
 
         ## read and delete input species ##

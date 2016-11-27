@@ -120,6 +120,11 @@ def write_particle_index_pointer(
         if species == 'star':
             # keep only particles that formed prior to this snapshot
             part_indices = part_indices[part[species]['form.index'][part_indices] <= snapshot_index]
+            if not len(part_indices):
+                Say.say('# no {} particles to track at snapshot index <= {}'.format(
+                        species, snapshot_index))
+                break
+
         part_ids = part[species]['id'][part_indices]
 
         # read particles at this snapshot
