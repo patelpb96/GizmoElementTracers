@@ -154,16 +154,18 @@ def write_particle_index_pointer(
                 continue
 
             if np.isscalar(part_indices_at_snap):
-                # particle id is unique - easy
+                # particle id is unique - easy case
                 part_index_pointers_at_snap[part_index] = part_indices_at_snap
             else:
-                # particle id is redundant
+                # particle id is redundant - difficult case
                 # loop through particles with this id, use match_prop_name to match
                 # sanity check
                 if np.unique(part_at_snap[species].prop(
                         match_prop_name, part_indices_at_snap)).size != part_indices_at_snap.size:
                     prop_redundant_number += 1
+
                 prop_0 = part[species].prop(match_prop_name, part_index)
+
                 for part_index_at_snap in part_indices_at_snap:
                     prop_test = part_at_snap[species].prop(match_prop_name, part_index_at_snap)
                     if match_prop_name == 'id.child':
@@ -279,8 +281,8 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
             if snapshot_index == part.snapshot['index']:
                 part_index_pointers = part_indices
             else:
-                file_name = 'star_indices_{:03d}.npy'.format(snapshot_index)
-                part_index_pointers = np.load(TRACK_DIRECTORY + file_name, 'read')
+                file_name = 'star_indices_{:03d}'.format(snapshot_index)
+                part_index_pointers = ut.io.pickle_object(TRACK_DIRECTORY + file_name, 'read')
 
             part_indices_at_snap = part_index_pointers[part_indices_form]
 
