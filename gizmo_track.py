@@ -10,6 +10,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import sys
+import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
@@ -341,7 +342,7 @@ class HostDistanceClass(ut.io.SayClass):
                         # get galaxy radius to use to determine principal axes
                         distance_max = 20  # [kpc physical]
                         gal_radius, _gal_mass = ut.particle.get_galaxy_radius_mass(
-                            part_at_snap, spec_name, 'mass.percent', 90, distance_max,
+                            part_at_snap, spec_name, 'mass.percent', 95, distance_max,
                             print_results=True)
 
                         if '3d' in host_distance_kind:
@@ -371,12 +372,13 @@ class HostDistanceClass(ut.io.SayClass):
         '''
         spec_name = 'star'
 
-        file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
+        file_name = '{}_form_host_distance_{:03d}'.format(spec_name, part.snapshot['index'])
 
         if io_direction == 'write':
             track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
 
-            dict_out = {'id': part[spec_name]['id']}
+            dict_out = collections.OrderedDict()
+            dict_out['id'] = part[spec_name]['id']
             for host_distance_kind in self.host_distance_kinds:
                 dict_out[host_distance_kind] = part[spec_name][host_distance_kind]
 
