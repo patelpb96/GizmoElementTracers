@@ -341,7 +341,8 @@ class HostDistanceClass(ut.io.SayClass):
                         # get galaxy radius to use to determine principal axes
                         distance_max = 20  # [kpc physical]
                         gal_radius, _gal_mass = ut.particle.get_galaxy_radius_mass(
-                            part, spec_name, 'mass.percent', 90, distance_max, print_results=True)
+                            part_at_snap, spec_name, 'mass.percent', 90, distance_max,
+                            print_results=True)
 
                         if '3d' in host_distance_kind:
                             distance_kind = 'rotated.3d'
