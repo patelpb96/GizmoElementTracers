@@ -109,7 +109,6 @@ def transfer_snapshots(
 # running from command line
 #===================================================================================================
 if __name__ == '__main__':
-
     if len(sys.argv) <= 1:
         raise ValueError('specify function: delete, transfer')
 

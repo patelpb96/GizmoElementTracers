@@ -25,6 +25,7 @@ Submit gizmo particle tracking to queue.
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import os
+import sys
 import time
 import datetime
 # local ----
@@ -47,11 +48,21 @@ print('using {} CPUs total'.format(cpu_number))
 os.sys.stdout.flush()
 
 
+# check if any input arguments
+if len(sys.argv) > 2:
+    function_kind = str(sys.argv[1])
+else:
+    function_kind = 'indices'  # default is to assign just index pointers
+
 # execute
 time_ini = time.time()
 
-gizmo_track.write_particle_index_pointer(
-    species='star', match_prop_name='id.child', test_prop_name='form.scalefactor')
+if 'indices' in function_kind:
+    gizmo_track.write_particle_index_pointer(
+        species='star', match_prop_name='id.child', test_prop_name='form.scalefactor')
+
+if 'distance' in function_kind:
+    gizmo_track.write_star_form_host_distance()
 
 
 # print run time information

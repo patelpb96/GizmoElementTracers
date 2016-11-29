@@ -9,6 +9,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
+import sys
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
@@ -80,7 +81,7 @@ def write_particle_index_pointer(
         Say.say('input match_prop_name = {}, but it does not exist in the snapshot'.format(
                 match_prop_name))
         match_prop_name = 'massfraction.metals'
-        Say.say('switching to using match_prop_name = {}'.format(match_prop_name))
+        Say.say('switching to using: {}'.format(match_prop_name))
 
     assert part[species].prop(match_prop_name) is not None
 
@@ -121,7 +122,7 @@ def write_particle_index_pointer(
             # keep only particles that formed prior to this snapshot
             part_indices = part_indices[part[species]['form.index'][part_indices] <= snapshot_index]
             if not len(part_indices):
-                Say.say('# no {} particles to track at snapshot index <= {}'.format(
+                Say.say('# no {} particles to track at snapshot index <= {}\n'.format(
                         species, snapshot_index))
                 break
 
@@ -241,7 +242,7 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
 
     if part is None:
         # read particles at z = 0
-        # complete list of all possible properties relevant for matching
+        # read all properties possibly relevant for matching
         property_names_read = [
             'position', 'mass', 'id', 'id.child', 'massfraction.metals', 'form.scalefactor']
         part = gizmo_io.Read.read_snapshots(
@@ -473,4 +474,15 @@ def io_star_form_host_distance(part, io_direction='read'):
 # run from command line
 #===================================================================================================
 if __name__ == '__main__':
-    write_particle_index_pointer()
+    if len(sys.argv) <= 1:
+        raise ValueError('specify function: indices, distance, indices+distance')
+
+    function_kind = str(sys.argv[1])
+
+    assert ('indices' in function_kind or 'distance' in function_kind)
+
+    if 'indices' in function_kind:
+        write_particle_index_pointer()
+
+    if 'distance' in function_kind:
+        write_star_form_host_distance()

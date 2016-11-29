@@ -681,16 +681,16 @@ class ReadClass(ut.io.SayClass):
         # convert name in snapshot's particle dictionary to custon name preference
         # if comment out any property, will not read it
         property_dict = {
-            ## all particles ##
+            ## all particles ----------
             'ParticleIDs': 'id',  # indexing starts at 0
             'Coordinates': 'position',
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
-            ## particles with adaptive smoothing ##
+            ## particles with adaptive smoothing
             'AGS-Softening': 'smooth.length',  # for gas, this is same as SmoothingLength
 
-            ## gas particles ##
+            ## gas particles ----------
             'InternalEnergy': 'temperature',
             'Density': 'density',
             'SmoothingLength': 'smooth.length',
@@ -701,7 +701,7 @@ class ReadClass(ut.io.SayClass):
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
             'StarFormationRate': 'sfr',  # [M_sun / yr]
 
-            ## star/gas particles ##
+            ## star/gas particles ----------
             ## id.generation and id.child initialized to 0 for all gas particles
             ## each time a gas particle splits into two:
             ##   'self' particle retains id.child, other particle gets id.child += 2 ^ id.generation
@@ -711,17 +711,17 @@ class ReadClass(ut.io.SayClass):
             'ParticleChildIDsNumber': 'id.child',
             'ParticleIDGenerationNumber': 'id.generation',
 
-            ## mass fraction of individual elements ##
+            ## mass fraction of individual elements ----------
             ## 0 = all metals (everything not H, He)
             ## 1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
             'Metallicity': 'massfraction',
 
-            ## star particles ##
+            ## star particles ----------
             ## 'time' when star particle formed
             ## for cosmological runs, = scale-factor; for non-cosmological runs, = time [Gyr/h]
             'StellarFormationTime': 'form.scalefactor',
 
-            ## black hole particles ##
+            ## black hole particles ----------
             'BH_Mass': 'bh.mass',
             'BH_Mdot': 'form.rate'
         }
@@ -805,6 +805,7 @@ class ReadClass(ut.io.SayClass):
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
                         file_name = file_name.replace('.0.', '.{}.'.format(file_i))
+                        # open snapshot file
                         with h5py.File(file_name, 'r') as file_in_i:
                             part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
                             if part_numbers_in_file_i[spec_id] > 0:
@@ -870,8 +871,8 @@ class ReadClass(ut.io.SayClass):
             # open i'th of multiple files for snapshot
             file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
 
+            # open snapshot file
             with h5py.File(file_name_i, 'r') as file_in:
-
                 if header['file.number.per.snapshot'] > 1:
                     self.say('from: ' + file_name_i.split('/')[-1])
 
@@ -1146,7 +1147,7 @@ class ReadClass(ut.io.SayClass):
         if np.isscalar(species_names):
             species_names = [species_names]  # ensure is list
 
-        ## read information about snapshot times ##
+        ## read information about snapshot times ----------
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
@@ -1157,12 +1158,12 @@ class ReadClass(ut.io.SayClass):
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
         self.say('* reading header from: ' + file_name.replace('./', ''), end='\n\n')
 
-        ## read header ##
-        # open file and parse header
+        ## read header ----------
+        # open snapshot file and parse header
         with h5py.File(file_name, 'r+') as file_in:
             header = file_in['Header'].attrs  # load header dictionary
 
-            ## read and delete input species ##
+            ## read and delete input species ----------
             for file_i in range(header['NumFilesPerSnapshot']):
                 # open i'th of multiple files for snapshot
                 file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
