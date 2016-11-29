@@ -590,14 +590,13 @@ class ReadClass(ut.io.SayClass):
 
         self.say('* reading header from: {}'.format(file_name.replace('./', '')), end='\n')
 
-        file_in = h5py.File(file_name, 'r')  # open snapshot file
-        header_in = file_in['Header'].attrs  # load header dictionary
+        # open snapshot file
+        with h5py.File(file_name, 'r') as file_in:
+            header_in = file_in['Header'].attrs  # load header dictionary
 
-        for prop_name_in in header_in:
-            prop_name = header_dict[prop_name_in]
-            header[prop_name] = header_in[prop_name_in]  # transfer to custom header dict
-
-        file_in.close()
+            for prop_name_in in header_in:
+                prop_name = header_dict[prop_name_in]
+                header[prop_name] = header_in[prop_name_in]  # transfer to custom header dict
 
         # determine whether simulation is cosmological
         if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] < 1 and
@@ -771,103 +770,95 @@ class ReadClass(ut.io.SayClass):
         # get snapshot file name
         file_name = self.get_file_name(snapshot_directory, snapshot_index)
 
-        file_in = h5py.File(file_name, 'r')  # open snapshot file
-        part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
+        # open snapshot file
+        with h5py.File(file_name, 'r') as file_in:
+            part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
-        if header['file.number.per.snapshot'] == 1:
-            self.say('* reading particles from: {}'.format(file_name.replace('./', '')))
-        else:
-            self.say('* reading particles')
-
-        # initialize arrays to store each property for each species
-        for spec_name in self.species_names_read:
-            spec_id = self.species_dict[spec_name]
-            part_number_tot = header['particle.numbers.total'][spec_id]
-
-            # add species to particle dictionary
-            part[spec_name] = ParticleDictionaryClass()
-
-            # set element pointers if reading only subset of elements
-            if (element_indices is not None and element_indices != [] and
-                    element_indices != 'all'):
-                if np.isscalar(element_indices):
-                    element_indices = [element_indices]
-                for element_i, element_index in enumerate(element_indices):
-                    part[spec_name].element_pointer[element_index] = element_i
-
-            # check if snapshot file happens not to have particles of this species
-            if part_numbers_in_file[spec_id] <= 0:
-                # this scenario should occur only for multi-file snapshot
-                if header['file.number.per.snapshot'] == 1:
-                    raise ValueError(
-                        '! no {} particles in single-file snapshot'.format(spec_name))
-
-                # need to read in other snapshot files until find one with particles of species
-                for file_i in range(1, header['file.number.per.snapshot']):
-                    file_name = file_name.replace('.0.', '.{}.'.format(file_i))
-                    file_in_i = h5py.File(file_name, 'r')
-                    part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
-                    if part_numbers_in_file_i[spec_id] > 0:
-                        # found one!
-                        part_in = file_in_i['PartType' + str(spec_id)]
-                        break
-                    file_in_i.close()
-                else:
-                    # tried all files and still did not find particles of species
-                    raise ValueError(
-                        '! no {} particles in any snapshot files'.format(spec_name))
+            if header['file.number.per.snapshot'] == 1:
+                self.say('* reading particles from: {}'.format(file_name.replace('./', '')))
             else:
-                part_in = file_in['PartType' + str(spec_id)]
+                self.say('* reading particles')
 
-            prop_names_print = []
-            ignore_flag = False
-            for prop_name_in in part_in:
-                if prop_name_in in property_names:
-                    prop_name = property_dict[prop_name_in]
+            # initialize arrays to store each property for each species
+            for spec_name in self.species_names_read:
+                spec_id = self.species_dict[spec_name]
+                part_number_tot = header['particle.numbers.total'][spec_id]
 
-                    # determine shape of property array
-                    if len(part_in[prop_name_in].shape) == 1:
-                        prop_shape = part_number_tot
-                    elif len(part_in[prop_name_in].shape) == 2:
-                        prop_shape = [part_number_tot, part_in[prop_name_in].shape[1]]
-                        if (prop_name_in == 'Metallicity' and element_indices is not None and
-                                element_indices != 'all'):
-                            prop_shape = [part_number_tot, len(element_indices)]
+                # add species to particle dictionary
+                part[spec_name] = ParticleDictionaryClass()
 
-                    # determine data type to store
-                    prop_in_dtype = part_in[prop_name_in].dtype
-                    if force_float32 and prop_in_dtype == 'float64':
-                        prop_in_dtype = np.float32
+                # set element pointers if reading only subset of elements
+                if (element_indices is not None and element_indices != [] and
+                        element_indices != 'all'):
+                    if np.isscalar(element_indices):
+                        element_indices = [element_indices]
+                    for element_i, element_index in enumerate(element_indices):
+                        part[spec_name].element_pointer[element_index] = element_i
 
-                    # initialize to -1's
-                    part[spec_name][prop_name] = np.zeros(prop_shape, prop_in_dtype) - 1
+                # check if snapshot file happens not to have particles of this species
+                if part_numbers_in_file[spec_id] <= 0:
+                    # this scenario should occur only for multi-file snapshot
+                    if header['file.number.per.snapshot'] == 1:
+                        raise ValueError(
+                            '! no {} particles in single-file snapshot'.format(spec_name))
 
-                    if prop_name == 'id':
-                        # initialize so calling an un-itialized value leads to error
-                        part[spec_name][prop_name] -= part_number_tot
-
-                    if prop_name_in in property_dict:
-                        prop_names_print.append(property_dict[prop_name_in])
+                    # need to read in other snapshot files until find one with particles of species
+                    for file_i in range(1, header['file.number.per.snapshot']):
+                        file_name = file_name.replace('.0.', '.{}.'.format(file_i))
+                        with h5py.File(file_name, 'r') as file_in_i:
+                            part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
+                            if part_numbers_in_file_i[spec_id] > 0:
+                                # found one!
+                                part_in = file_in_i['PartType' + str(spec_id)]
+                                break
                     else:
-                        prop_names_print.append(prop_name_in)
+                        # tried all files and still did not find particles of species
+                        raise ValueError(
+                            '! no {} particles in any snapshot files'.format(spec_name))
                 else:
-                    ignore_flag = True
+                    part_in = file_in['PartType' + str(spec_id)]
 
-            if ignore_flag:
-                self.say('reading only {:6} {}'.format(spec_name, prop_names_print))
+                prop_names_print = []
+                ignore_flag = False
+                for prop_name_in in part_in:
+                    if prop_name_in in property_names:
+                        prop_name = property_dict[prop_name_in]
 
-            # might have opened extra file if using multi-file snapshot
-            try:
-                file_in_i.close()
-            except:
-                pass
+                        # determine shape of property array
+                        if len(part_in[prop_name_in].shape) == 1:
+                            prop_shape = part_number_tot
+                        elif len(part_in[prop_name_in].shape) == 2:
+                            prop_shape = [part_number_tot, part_in[prop_name_in].shape[1]]
+                            if (prop_name_in == 'Metallicity' and element_indices is not None and
+                                    element_indices != 'all'):
+                                prop_shape = [part_number_tot, len(element_indices)]
 
-            # special case: particle mass is fixed and given in mass array in header
-            if 'Masses' in property_names and 'Masses' not in part_in:
-                prop_name = property_dict['Masses']
-                part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
+                        # determine data type to store
+                        prop_in_dtype = part_in[prop_name_in].dtype
+                        if force_float32 and prop_in_dtype == 'float64':
+                            prop_in_dtype = np.float32
 
-        file_in.close()
+                        # initialize to -1's
+                        part[spec_name][prop_name] = np.zeros(prop_shape, prop_in_dtype) - 1
+
+                        if prop_name == 'id':
+                            # initialize so calling an un-itialized value leads to error
+                            part[spec_name][prop_name] -= part_number_tot
+
+                        if prop_name_in in property_dict:
+                            prop_names_print.append(property_dict[prop_name_in])
+                        else:
+                            prop_names_print.append(prop_name_in)
+                    else:
+                        ignore_flag = True
+
+                if ignore_flag:
+                    self.say('reading only {:6} {}'.format(spec_name, prop_names_print))
+
+                # special case: particle mass is fixed and given in mass array in header
+                if 'Masses' in property_names and 'Masses' not in part_in:
+                    prop_name = property_dict['Masses']
+                    part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
         ## read properties for each species ----------
         # initial particle indices to assign to each species from each file
@@ -877,47 +868,47 @@ class ReadClass(ut.io.SayClass):
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
             file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
-            file_in = h5py.File(file_name_i, 'r')
 
-            if header['file.number.per.snapshot'] > 1:
-                self.say('from: ' + file_name_i.split('/')[-1])
+            with h5py.File(file_name_i, 'r') as file_in:
 
-            part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
+                if header['file.number.per.snapshot'] > 1:
+                    self.say('from: ' + file_name_i.split('/')[-1])
 
-            # read particle properties
-            for spec_i, spec_name in enumerate(self.species_names_read):
-                spec_id = self.species_dict[spec_name]
-                if part_numbers_in_file[spec_id] > 0:
-                    part_in = file_in['PartType' + str(spec_id)]
+                part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
-                    part_index_lo = part_indices_lo[spec_i]
-                    part_index_hi = part_index_lo + part_numbers_in_file[spec_id]
+                # read particle properties
+                for spec_i, spec_name in enumerate(self.species_names_read):
+                    spec_id = self.species_dict[spec_name]
+                    if part_numbers_in_file[spec_id] > 0:
+                        part_in = file_in['PartType' + str(spec_id)]
 
-                    # check if mass of species is fixed, according to header mass array
-                    if 'Masses' in property_names and header['particle.masses'][spec_id] > 0:
-                        prop_name = property_dict['Masses']
-                        part[spec_name][prop_name][part_index_lo:part_index_hi] = (
-                            header['particle.masses'][spec_id])
+                        part_index_lo = part_indices_lo[spec_i]
+                        part_index_hi = part_index_lo + part_numbers_in_file[spec_id]
 
-                    for prop_name_in in part_in:
-                        if prop_name_in in property_names:
-                            prop_name = property_dict[prop_name_in]
-                            if len(part_in[prop_name_in].shape) == 1:
-                                part[spec_name][prop_name][part_index_lo:part_index_hi] = (
-                                    part_in[prop_name_in])
-                            elif len(part_in[prop_name_in].shape) == 2:
-                                if (prop_name_in == 'Metallicity' and
-                                        element_indices is not None and
-                                        element_indices != 'all'):
-                                    prop_in = part_in[prop_name_in][:, element_indices]
-                                else:
-                                    prop_in = part_in[prop_name_in]
-                                part[spec_name][prop_name][part_index_lo:part_index_hi, :] = (
-                                    prop_in)
+                        # check if mass of species is fixed, according to header mass array
+                        if 'Masses' in property_names and header['particle.masses'][spec_id] > 0:
+                            prop_name = property_dict['Masses']
+                            part[spec_name][prop_name][
+                                part_index_lo:part_index_hi] = header['particle.masses'][spec_id]
 
-                    part_indices_lo[spec_i] = part_index_hi  # set indices for next file
+                        for prop_name_in in part_in:
+                            if prop_name_in in property_names:
+                                prop_name = property_dict[prop_name_in]
+                                if len(part_in[prop_name_in].shape) == 1:
+                                    part[spec_name][prop_name][
+                                        part_index_lo:part_index_hi] = part_in[prop_name_in]
+                                elif len(part_in[prop_name_in].shape) == 2:
+                                    if (prop_name_in == 'Metallicity' and
+                                            element_indices is not None and
+                                            element_indices != 'all'):
+                                        prop_in = part_in[prop_name_in][:, element_indices]
+                                    else:
+                                        prop_in = part_in[prop_name_in]
 
-            file_in.close()
+                                    part[spec_name][prop_name][
+                                        part_index_lo:part_index_hi, :] = prop_in
+
+                        part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 
         print()
 
@@ -1167,58 +1158,55 @@ class ReadClass(ut.io.SayClass):
 
         ## read header ##
         # open file and parse header
-        file_in = h5py.File(file_name, 'r+')  # open snapshot file
-        header = file_in['Header'].attrs  # load header dictionary
+        with h5py.File(file_name, 'r+') as file_in:
+            header = file_in['Header'].attrs  # load header dictionary
 
-        ## read and delete input species ##
-        for file_i in range(header['NumFilesPerSnapshot']):
-            # open i'th of multiple files for snapshot
-            file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
-            file_in = h5py.File(file_name_i, 'r+')
+            ## read and delete input species ##
+            for file_i in range(header['NumFilesPerSnapshot']):
+                # open i'th of multiple files for snapshot
+                file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+                file_in = h5py.File(file_name_i, 'r+')
 
-            self.say('reading particles from: ' + file_name_i.split('/')[-1])
-
-            if 'delete' in action:
-                part_number_in_file = header['NumPart_ThisFile']
-                part_number = header['NumPart_Total']
-
-            # read and delete particle properties
-            for _spec_i, spec_name in enumerate(species_names):
-                spec_id = self.species_dict[spec_name]
-                spec_name_in = 'PartType' + str(spec_id)
-                self.say('adjusting species = {}'.format(spec_name))
+                self.say('reading particles from: ' + file_name_i.split('/')[-1])
 
                 if 'delete' in action:
-                    self.say('deleting species = {}'.format(spec_name))
+                    part_number_in_file = header['NumPart_ThisFile']
+                    part_number = header['NumPart_Total']
 
-                    # zero numbers in header
-                    part_number_in_file[spec_id] = 0
-                    part_number[spec_id] = 0
+                # read and delete particle properties
+                for _spec_i, spec_name in enumerate(species_names):
+                    spec_id = self.species_dict[spec_name]
+                    spec_name_in = 'PartType' + str(spec_id)
+                    self.say('adjusting species = {}'.format(spec_name))
 
-                    # delete properties
-                    #for prop_name in file_in[spec_name_in]:
-                    #    del(file_in[spec_name_in + '/' + prop_name])
-                    #    self.say('  deleting {}'.format(prop_name))
+                    if 'delete' in action:
+                        self.say('deleting species = {}'.format(spec_name))
 
-                    del(file_in[spec_name_in])
+                        # zero numbers in header
+                        part_number_in_file[spec_id] = 0
+                        part_number[spec_id] = 0
 
-                elif 'velocity' in action and value_adjust:
-                    dimen_index = 2  # boost velocity along z-axis
-                    self.say('  boosting velocity along axis.{} by {:.1f} km/s'.format(
-                             dimen_index, value_adjust))
-                    velocities = file_in[spec_name_in + '/' + 'Velocities']
-                    scalefactor = 1 / (1 + header['Redshift'])
-                    velocities[:, 2] += value_adjust / np.sqrt(scalefactor)
-                    #file_in[spec_name_in + '/' + 'Velocities'] = velocities
+                        # delete properties
+                        #for prop_name in file_in[spec_name_in]:
+                        #    del(file_in[spec_name_in + '/' + prop_name])
+                        #    self.say('  deleting {}'.format(prop_name))
 
-                print()
+                        del(file_in[spec_name_in])
 
-            if 'delete' in action:
-                header['NumPart_ThisFile'] = part_number_in_file
-                header['NumPart_Total'] = part_number
+                    elif 'velocity' in action and value_adjust:
+                        dimen_index = 2  # boost velocity along z-axis
+                        self.say('  boosting velocity along axis.{} by {:.1f} km/s'.format(
+                                 dimen_index, value_adjust))
+                        velocities = file_in[spec_name_in + '/' + 'Velocities']
+                        scalefactor = 1 / (1 + header['Redshift'])
+                        velocities[:, 2] += value_adjust / np.sqrt(scalefactor)
+                        #file_in[spec_name_in + '/' + 'Velocities'] = velocities
 
-            file_in.close()
+                    print()
 
+                if 'delete' in action:
+                    header['NumPart_ThisFile'] = part_number_in_file
+                    header['NumPart_Total'] = part_number
 
 Read = ReadClass()
 

@@ -101,7 +101,8 @@ def transfer_snapshots(
     for snapshot_index in snapshot_indices:
         snapshot_path_names += from_directory + snapshot_name_base.format(snapshot_index) + ' '
 
-    os.system('rsync -ahvP {}:"{}" {}'.format(machine_name, snapshot_path_names, to_directory))
+    os.system('rsync -ahvP --size-only {}:"{}" {}'.format(
+              machine_name, snapshot_path_names, to_directory))
 
 
 #===================================================================================================

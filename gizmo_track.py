@@ -209,9 +209,8 @@ def write_particle_index_pointer(
 
         # write file for this snapshot
         file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
-        #np.save(track_directory + file_name, part_index_pointers_at_snap, allow_pickle=False)
-        ut.io.pickle_object(track_directory + file_name, 'write', part_index_pointers_at_snap,
-                            protocol=2)
+        ut.io.file_hdf5(track_directory + file_name, {'indices': part_index_pointers_at_snap})
+        #ut.io.file_pickle(track_directory + file_name, part_index_pointers_at_snap, protocol=2)
 
     # print cumulative diagnostics
     if id_no_match_number_tot:
@@ -282,7 +281,7 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
                 part_index_pointers = part_indices
             else:
                 file_name = 'star_indices_{:03d}'.format(snapshot_index)
-                part_index_pointers = ut.io.pickle_object(TRACK_DIRECTORY + file_name, 'read')
+                part_index_pointers = ut.io.file_hdf5(TRACK_DIRECTORY + file_name)['indices']
 
             part_indices_at_snap = part_index_pointers[part_indices_form]
 
@@ -310,7 +309,7 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
                 part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
 
             # continuously (re)write as go
-            pickle_star_form_host_distance(part, 'write')
+            io_star_form_host_distance(part, 'write')
 
 
 def write_star_form_host_distance_orig(
@@ -423,13 +422,13 @@ def write_star_form_host_distance_orig(
             Say.say('! {} total have offset formation time'.format(form_time_offset_number_tot))
 
         # continuously write as go, in case happens to crash along the way
-        pickle_star_form_host_distance(part, 'write')
+        io_star_form_host_distance(part, 'write')
 
 
 #===================================================================================================
 # read/write
 #===================================================================================================
-def pickle_star_form_host_distance(part, pickle_direction='read'):
+def io_star_form_host_distance(part, io_direction='read'):
     '''
     Read or write, for each star particle, its distance wrt the host galaxy center at the first
     snapshot after it formed.
@@ -438,31 +437,36 @@ def pickle_star_form_host_distance(part, pickle_direction='read'):
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    pickle_direction : string : pickle direction: 'read', 'write'
+    io_direction : string : 'read' or 'write'
     '''
-    Say = ut.io.SayClass(pickle_star_form_host_distance)
+    Say = ut.io.SayClass(io_star_form_host_distance)
 
     spec_name = 'star'
     prop_name = 'form.host.distance'
 
     file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
 
-    if pickle_direction == 'write':
+    if io_direction == 'write':
         track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
-        pickle_object = [part[spec_name][prop_name], part[spec_name]['id']]
-        ut.io.pickle_object(track_directory + file_name, pickle_direction, pickle_object)
+        dict_out = {'id': part[spec_name]['id'], prop_name: part[spec_name][prop_name]}
+        ut.io.file_hdf5(track_directory + file_name, dict_out)
 
-    elif pickle_direction == 'read':
-        part[spec_name][prop_name], part_ids = ut.io.pickle_object(
-            TRACK_DIRECTORY + file_name, pickle_direction)
+        #pickle_object = [part[spec_name]['id'], part[spec_name][prop_name]]
+        #ut.io.file_pickle(track_directory + file_name, pickle_object, protocol=2)
+
+    elif io_direction == 'read':
+        dict_in = ut.io.file_hdf5(TRACK_DIRECTORY + file_name)
 
         # sanity check
-        bad_id_number = np.sum(part[spec_name]['id'] != part_ids)
+        bad_id_number = np.sum(part[spec_name]['id'] != dict_in['id'])
         if bad_id_number:
             Say.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
+        part[spec_name][prop_name] = dict_in[prop_name]
+        #part[spec_name][prop_name], part_ids = ut.io.file_pickle(TRACK_DIRECTORY + file_name)
+
     else:
-        raise ValueError('! not recognize pickle_direction = {}'.format(pickle_direction))
+        raise ValueError('! not recognize io_direction = {}'.format(io_direction))
 
 
 #===================================================================================================

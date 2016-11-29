@@ -1138,19 +1138,20 @@ class ImageClass(ut.io.SayClass):
         .
         '''
         plot_name = self.plot_name + '.txt'
-        file_out = open(plot_name, 'w')
-        Write = ut.io.WriteClass(file_out, print_stdout=False)
-        Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(
-                    self.histogram_xs[1] - self.histogram_xs[0]))
-        for ix in range(self.histogram_xs.size - 1):
-            x = self.histogram_xs[ix] + 0.5 * (self.histogram_xs[ix + 1] - self.histogram_xs[ix])
-            for iy in range(self.histogram_ys.size - 1):
-                y = self.histogram_ys[iy] + 0.5 * (self.histogram_ys[iy + 1] -
-                                                   self.histogram_ys[iy])
-                Write.write('{:.3f} {:.3f} {:.3e} {:.3e} {:.3e}'.format(
-                            x, y, self.histogram_valuess[0, ix, iy],
-                            self.histogram_valuess[1, ix, iy], self.histogram_valuess[2, ix, iy]))
-        file_out.close()
+        with open(plot_name, 'w') as file_out:
+            Write = ut.io.WriteClass(file_out, print_stdout=False)
+            Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(
+                        self.histogram_xs[1] - self.histogram_xs[0]))
+            for ix in range(self.histogram_xs.size - 1):
+                x = self.histogram_xs[ix] + 0.5 * (self.histogram_xs[ix + 1] -
+                                                   self.histogram_xs[ix])
+                for iy in range(self.histogram_ys.size - 1):
+                    y = self.histogram_ys[iy] + 0.5 * (self.histogram_ys[iy + 1] -
+                                                       self.histogram_ys[iy])
+                    Write.write('{:.3f} {:.3f} {:.3e} {:.3e} {:.3e}'.format(
+                                x, y, self.histogram_valuess[0, ix, iy],
+                                self.histogram_valuess[1, ix, iy],
+                                self.histogram_valuess[2, ix, iy]))
 
 Image = ImageClass()
 
@@ -2708,7 +2709,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     for prop in gal:
         gal[prop] = np.array(gal[prop])
 
-    ut.io.pickle_object(simulation_directory + 'host_properties_v_time', 'write', gal)
+    ut.io.file_pickle(simulation_directory + 'host_properties_v_time', gal)
 
     return gal
 

@@ -310,66 +310,65 @@ def write_initial_points(
 
     # MUSIC does not support header information in points file, so put in separate log file
     log_file_name = file_name.replace('.txt', '_log.txt')
-    file_out = open(log_file_name, 'w')
 
-    Write = ut.io.WriteClass(file_out, print_stdout=True)
+    with open(log_file_name, 'w') as file_out:
+        Write = ut.io.WriteClass(file_out, print_stdout=True)
 
-    Write.write('# redshift: final = {:.3f}, initial = {:.3f}'.format(
-                part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
-    Write.write('# center of region at final time = [{:.3f}, {:.3f}, {:.3f}] kpc comoving'.format(
-                center_position[0], center_position[1], center_position[2]))
-    Write.write('# radius of selection region at final time = {:.3f} kpc physical'.format(
-                distance_max))
-    if scale_to_halo_radius:
-        Write.write('  = {:.2f} x R_{}, R_{} = {:.2f} kpc physical'.format(
-                    distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
-    Write.write('# number of particles in selection region at final time = {}'.format(
-                np.sum(spec_select_number)))
-    for spec_i in range(len(spec_names)):
-        spec_name = spec_names[spec_i]
-        Write.write('  species {:6}: number = {}'.format(spec_name, spec_select_number[spec_i]))
-    Write.write('# mass of all dark-matter particles:')
-    if 'mass' in part_ini['dark']:
-        mass_dark_all = part_ini['dark']['mass'].sum()
-    else:
-        mass_dark_all = dark_mass * part_ini['dark']['id'].size
-    Write.write('  at highest-resolution in input catalog = {:.2e} M_sun'.format(mass_dark_all))
-    Write.write('  in selection region at final time = {:.2e} M_sun'.format(mass_select))
+        Write.write('# redshift: final = {:.3f}, initial = {:.3f}'.format(
+                    part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
+        Write.write('# center of region at final time = [{:.3f}, {:.3f}, {:.3f}] kpc comoving'.format(
+                    center_position[0], center_position[1], center_position[2]))
+        Write.write('# radius of selection region at final time = {:.3f} kpc physical'.format(
+                    distance_max))
+        if scale_to_halo_radius:
+            Write.write('  = {:.2f} x R_{}, R_{} = {:.2f} kpc physical'.format(
+                        distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
+        Write.write('# number of particles in selection region at final time = {}'.format(
+                    np.sum(spec_select_number)))
+        for spec_i in range(len(spec_names)):
+            spec_name = spec_names[spec_i]
+            Write.write('  species {:6}: number = {}'.format(spec_name, spec_select_number[spec_i]))
+        Write.write('# mass of all dark-matter particles:')
+        if 'mass' in part_ini['dark']:
+            mass_dark_all = part_ini['dark']['mass'].sum()
+        else:
+            mass_dark_all = dark_mass * part_ini['dark']['id'].size
+        Write.write('  at highest-resolution in input catalog = {:.2e} M_sun'.format(mass_dark_all))
+        Write.write('  in selection region at final time = {:.2e} M_sun'.format(mass_select))
 
-    Write.write('# within convex hull at initial time')
-    Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
-    Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                volume_ini_chull * ut.const.mega_per_kilo ** 3))
+        Write.write('# within convex hull at initial time')
+        Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
+        Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_chull * ut.const.mega_per_kilo ** 3))
 
-    Write.write('# within encompassing cube at initial time')
-    Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
-    Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                volume_ini_cube * ut.const.mega_per_kilo ** 3))
+        Write.write('# within encompassing cube at initial time')
+        Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
+        Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_cube * ut.const.mega_per_kilo ** 3))
 
-    Write.write('# initial position range')
-    for dimen_i in range(positions_ini.shape[1]):
-        Write.write(
-            '  {} [min, max] = [{:.3f}, {:.3f}] kpc comoving, [{:.9f}, {:.9f}] box units'.format(
-                dimen_i, np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]),
-                np.min(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
-                np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length']))
+        Write.write('# initial position range')
+        for dimen_i in range(positions_ini.shape[1]):
+            string = '  {} [min, max] = [{:.3f}, {:.3f}] kpc comoving, [{:.9f}, {:.9f}] box units'
+            Write.write(
+                string.format(
+                    dimen_i, np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]),
+                    np.min(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
+                    np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length'])
+            )
 
-    positions_ini /= part_ini.info['box.length']  # renormalize to box units
+        positions_ini /= part_ini.info['box.length']  # renormalize to box units
 
-    if region_kind == 'convex-hull':
-        # use convex hull to define initial region to reduce memory
-        ConvexHull = spatial.ConvexHull(positions_ini)
-        positions_ini = positions_ini[ConvexHull.vertices]
-        Write.write('# using convex hull with {} vertices to define initial volume'.format(
-                    positions_ini.shape[0]))
+        if region_kind == 'convex-hull':
+            # use convex hull to define initial region to reduce memory
+            ConvexHull = spatial.ConvexHull(positions_ini)
+            positions_ini = positions_ini[ConvexHull.vertices]
+            Write.write('# using convex hull with {} vertices to define initial volume'.format(
+                        positions_ini.shape[0]))
 
-    file_out.close()
-
-    file_out = open(file_name, 'w')
-    for pi in range(positions_ini.shape[0]):
-        file_out.write('{:.8f} {:.8f} {:.8f}\n'.format(
-                       positions_ini[pi, 0], positions_ini[pi, 1], positions_ini[pi, 2]))
-    file_out.close()
+    with open(file_name, 'w') as file_out:
+        for pi in range(positions_ini.shape[0]):
+            file_out.write('{:.8f} {:.8f} {:.8f}\n'.format(
+                           positions_ini[pi, 0], positions_ini[pi, 1], positions_ini[pi, 2]))
 
 
 def write_initial_points_from_uniform(
