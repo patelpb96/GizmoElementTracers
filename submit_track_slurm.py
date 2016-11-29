@@ -61,8 +61,8 @@ if 'indices' in function_kind:
     gizmo_track.write_particle_index_pointer(
         species='star', match_prop_name='id.child', test_prop_name='form.scalefactor')
 
-if 'distance' in function_kind:
-    gizmo_track.write_star_form_host_distance()
+if 'distances' in function_kind:
+    gizmo_track.HostDistance.write_star_form_host_distance()
 
 
 # print run time information
