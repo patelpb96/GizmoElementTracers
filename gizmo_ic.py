@@ -171,7 +171,7 @@ class ReadClass(ut.io.SayClass):
         '''
         from rockstar import rockstar_io
 
-        hal = rockstar_io.Read.read_catalog(
+        hal = rockstar_io.Read.read_catalogs(
             'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=False,
             sort_host_first=False)
 
@@ -316,8 +316,9 @@ def write_initial_points(
 
         Write.write('# redshift: final = {:.3f}, initial = {:.3f}'.format(
                     part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
-        Write.write('# center of region at final time = [{:.3f}, {:.3f}, {:.3f}] kpc comoving'.format(
-                    center_position[0], center_position[1], center_position[2]))
+        Write.write(
+            '# center of region at final time = [{:.3f}, {:.3f}, {:.3f}] kpc comoving'.format(
+                center_position[0], center_position[1], center_position[2]))
         Write.write('# radius of selection region at final time = {:.3f} kpc physical'.format(
                     distance_max))
         if scale_to_halo_radius:

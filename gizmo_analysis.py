@@ -152,9 +152,9 @@ class SpeciesProfileClass(ut.io.SayClass):
                     'scalar', part[spec_name]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             elif DistanceBin.dimension_number in [1, 2]:
-                distancess = ut.particle.get_distances_along_principal_axes(
-                    part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
-                    part_indices, scalarize=True)
+                distancess = ut.particle.get_distances_wrt_center(
+                    part, spec_name, 'rotated.2d', center_position, rotation_vectors,
+                    axis_distance_max, part_indices, scalarize=True)
                 distancess = np.abs(distancess)  # ensure positive definite
 
                 if DistanceBin.dimension_number == 1:
@@ -315,9 +315,9 @@ class SpeciesProfileClass(ut.io.SayClass):
                         part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
 
                 elif DistanceBin.dimension_number in [1, 2]:
-                    distancess = ut.particle.get_distances_along_principal_axes(
-                        part, spec_name, '2d', center_position, rotation_vectors, axis_distance_max,
-                        part_indices, scalarize=True)
+                    distancess = ut.particle.get_distances_wrt_center(
+                        part, spec_name, 'rotated.2d', center_position, rotation_vectors,
+                        axis_distance_max, part_indices, scalarize=True)
                     distancess = np.abs(distancess)
 
                     if DistanceBin.dimension_number == 1:

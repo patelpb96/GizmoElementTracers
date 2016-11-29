@@ -20,6 +20,9 @@ from . import gizmo_io
 # directory where to store particle tracking files
 TRACK_DIRECTORY = ut.io.get_path('track/')
 
+# star form host distance kinds to compute
+HOST_DISTANCE_KINDS = ['form.host.distance.1d', 'form.host.distance.3d']
+
 
 def assign_star_form_snapshot(part):
     '''
@@ -224,7 +227,8 @@ def write_particle_index_pointer(
         Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_prop_name))
 
 
-def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=None):
+def write_star_form_host_distance(
+    part=None, snapshot_indices=[], part_indices=None):
     '''
     Assign to each star particle its distance wrt the host galaxy center at the snapshot after
     it formed.
@@ -238,7 +242,6 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
     Say = ut.io.SayClass(write_star_form_host_distance)
 
     spec_name = 'star'
-    prop_name = 'form.host.distance'
 
     if part is None:
         # read particles at z = 0
@@ -261,8 +264,16 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
     if 'form.index' not in part[spec_name]:
         assign_star_form_snapshot(part)
 
-    # store form.host.distance as 32-bit and initialize to -1
-    part[spec_name][prop_name] = np.zeros(part[spec_name]['position'].shape[0], np.float32) - 1
+    # store prop_names as 32-bit and initialize to nan
+    particle_number = part[spec_name]['position'].shape[0]
+    for host_distance_kind in HOST_DISTANCE_KINDS:
+        if '1d' in host_distance_kind:
+            shape = particle_number
+        elif '2d' in host_distance_kind:
+            shape = [particle_number, 2]
+        elif '3d' in host_distance_kind:
+            shape = [particle_number, 3]
+        part[spec_name][host_distance_kind] = np.zeros(shape, np.float32) + np.nan
 
     id_wrong_number_tot = 0
     id_none_number_tot = 0
@@ -303,11 +314,36 @@ def write_star_form_host_distance(part=None, snapshot_indices=[], part_indices=N
                         id_wrong_number, snapshot_index))
                 id_wrong_number_tot += id_wrong_number
 
-            # compute 3-D distance wrt host [kpc physical]
-            part[spec_name][prop_name][part_indices_form] = ut.coordinate.get_distances(
-                'scalar', part_at_snap[spec_name]['position'][part_indices_at_snap],
-                part_at_snap.center_position,
-                part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
+            for host_distance_kind in HOST_DISTANCE_KINDS:
+                if '1d' in host_distance_kind:
+                    # compute total scalar distance wrt host [kpc physical]
+                    part[spec_name][host_distance_kind][part_indices_form] = \
+                        ut.particle.get_distances_wrt_center(
+                            part_at_snap, spec_name, 'scalar', part_indicess=part_indices_at_snap,
+                            scalarize=True)
+
+                    #part[spec_name][prop_name][part_indices_form] = ut.coordinate.get_distances(
+                    #    'scalar', part_at_snap[spec_name]['position'][part_indices_at_snap],
+                    #    part_at_snap.center_position,
+                    #    part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
+
+                elif '3d' in host_distance_kind or '2d' in host_distance_kind:
+                    # compute distance wrt host, aligned with principal axes [kpc physical]
+
+                    # get galaxy radius to use to determine principal axes
+                    distance_max = 20  # [kpc physical]
+                    gal_radius, _gal_mass = ut.particle.get_galaxy_radius_mass(
+                        part, spec_name, 'mass.percent', 90, distance_max, print_results=True)
+
+                    if '3d' in host_distance_kind:
+                        distance_kind = 'rotated.3d'
+                    elif '2d' in host_distance_kind:
+                        distance_kind = 'rotated.2d'
+
+                    part[spec_name][host_distance_kind][part_indices_form] = \
+                        ut.particle.get_distances_wrt_center(
+                            part_at_snap, spec_name, distance_kind, axis_distance_max=gal_radius,
+                            part_indicess=part_indices_at_snap, scalarize=True)
 
             # continuously (re)write as go
             io_star_form_host_distance(part, 'write')
@@ -443,13 +479,16 @@ def io_star_form_host_distance(part, io_direction='read'):
     Say = ut.io.SayClass(io_star_form_host_distance)
 
     spec_name = 'star'
-    prop_name = 'form.host.distance'
 
     file_name = 'star_form_host_distance_{:03d}'.format(part.snapshot['index'])
 
     if io_direction == 'write':
         track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
-        dict_out = {'id': part[spec_name]['id'], prop_name: part[spec_name][prop_name]}
+
+        dict_out = {'id': part[spec_name]['id']}
+        for host_distance_kind in HOST_DISTANCE_KINDS:
+            dict_out[host_distance_kind] = part[spec_name][host_distance_kind]
+
         ut.io.file_hdf5(track_directory + file_name, dict_out)
 
         #pickle_object = [part[spec_name]['id'], part[spec_name][prop_name]]
@@ -463,7 +502,9 @@ def io_star_form_host_distance(part, io_direction='read'):
         if bad_id_number:
             Say.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
-        part[spec_name][prop_name] = dict_in[prop_name]
+        for host_distance_kind in HOST_DISTANCE_KINDS:
+            part[spec_name][host_distance_kind] = dict_in[host_distance_kind]
+
         #part[spec_name][prop_name], part_ids = ut.io.file_pickle(TRACK_DIRECTORY + file_name)
 
     else:
