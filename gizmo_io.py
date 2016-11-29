@@ -853,7 +853,8 @@ class ReadClass(ut.io.SayClass):
                         ignore_flag = True
 
                 if ignore_flag:
-                    self.say('reading only {:6} {}'.format(spec_name, prop_names_print))
+                    prop_names_print.sort()
+                    self.say('reading {:6}: {}'.format(spec_name, prop_names_print))
 
                 # special case: particle mass is fixed and given in mass array in header
                 if 'Masses' in property_names and 'Masses' not in part_in:
