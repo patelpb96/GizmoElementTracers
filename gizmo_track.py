@@ -411,7 +411,7 @@ class HostDistanceClass(ut.io.SayClass):
             if bad_id_number:
                 self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
-            for host_distance_kind in self.host_distance_kinds:
+            for host_distance_kind in dict_in.keys():
                 part[species_name][host_distance_kind] = dict_in[host_distance_kind]
 
         else:
