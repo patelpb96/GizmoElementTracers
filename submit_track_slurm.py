@@ -25,7 +25,6 @@ Submit gizmo particle tracking to queue.
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import os
-import sys
 import time
 import datetime
 # local ----
@@ -47,11 +46,11 @@ print('using {} CPUs total\n'.format(cpu_number))
 
 
 # check if any input arguments
-if len(sys.argv) > 2:
-    function_kind = str(sys.argv[1])
+if len(os.sys.argv) > 1:
+    function_kind = str(os.sys.argv[1])
 else:
     function_kind = 'indices'  # default is to assign just index pointers
-print('running functions = {}'.format(function_kind))
+print('executing function[s]: {}'.format(function_kind))
 
 os.sys.stdout.flush()
 
