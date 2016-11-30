@@ -43,9 +43,7 @@ if int(os.environ['SLURM_CPUS_PER_TASK']) > 1:
     os.environ['OMP_NUM_THREADS'] = os.environ['SLURM_CPUS_PER_TASK']
     print('using {} OpenMP threads per MPI task'.format(os.environ['OMP_NUM_THREADS']))
 cpu_number = int(os.environ['SLURM_NTASKS']) * int(os.environ['OMP_NUM_THREADS'])
-print('using {} CPUs total'.format(cpu_number))
-
-os.sys.stdout.flush()
+print('using {} CPUs total\n'.format(cpu_number))
 
 
 # check if any input arguments
@@ -53,6 +51,10 @@ if len(sys.argv) > 2:
     function_kind = str(sys.argv[1])
 else:
     function_kind = 'indices'  # default is to assign just index pointers
+print('running functions = {}'.format(function_kind))
+
+os.sys.stdout.flush()
+
 
 # execute
 time_ini = time.time()

@@ -215,7 +215,6 @@ def write_particle_index_pointer(
         # write file for this snapshot
         file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
         ut.io.file_hdf5(track_directory + file_name, {'indices': part_index_pointers_at_snap})
-        #ut.io.file_pickle(track_directory + file_name, part_index_pointers_at_snap, protocol=2)
 
     # print cumulative diagnostics
     if id_no_match_number_tot:
@@ -370,33 +369,30 @@ class HostDistanceClass(ut.io.SayClass):
         part : dict : catalog of particles at snapshot
         io_direction : string : 'read' or 'write'
         '''
-        spec_name = 'star'
+        species_name = 'star'
 
-        file_name = '{}_form_host_distance_{:03d}'.format(spec_name, part.snapshot['index'])
+        file_name = '{}_form_host_distance_{:03d}'.format(species_name, part.snapshot['index'])
 
         if io_direction == 'write':
             track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
 
             dict_out = collections.OrderedDict()
-            dict_out['id'] = part[spec_name]['id']
+            dict_out['id'] = part[species_name]['id']
             for host_distance_kind in self.host_distance_kinds:
-                dict_out[host_distance_kind] = part[spec_name][host_distance_kind]
+                dict_out[host_distance_kind] = part[species_name][host_distance_kind]
 
             ut.io.file_hdf5(track_directory + file_name, dict_out)
-
-            #pickle_object = [part[spec_name]['id'], part[spec_name][prop_name]]
-            #ut.io.file_pickle(track_directory + file_name, pickle_object, protocol=2)
 
         elif io_direction == 'read':
             dict_in = ut.io.file_hdf5(TRACK_DIRECTORY + file_name)
 
             # sanity check
-            bad_id_number = np.sum(part[spec_name]['id'] != dict_in['id'])
+            bad_id_number = np.sum(part[species_name]['id'] != dict_in['id'])
             if bad_id_number:
                 self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
             for host_distance_kind in self.host_distance_kinds:
-                part[spec_name][host_distance_kind] = dict_in[host_distance_kind]
+                part[species_name][host_distance_kind] = dict_in[host_distance_kind]
 
             #part[spec_name][prop_name], part_ids = ut.io.file_pickle(TRACK_DIRECTORY + file_name)
 
