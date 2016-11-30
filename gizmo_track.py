@@ -18,8 +18,8 @@ import utilities as ut
 from . import gizmo_io
 
 
-# directory where to store particle tracking files
-TRACK_DIRECTORY = ut.io.get_path('track/')
+# default directory to store particle tracking files
+TRACK_DIRECTORY = 'track/'
 
 
 #===================================================================================================
@@ -47,7 +47,7 @@ def assign_star_form_snapshot(part):
 
 def write_particle_index_pointer(
     part=None, species='star', match_prop_name='id.child', match_prop_tolerance=1e-6,
-    test_prop_name='form.scalefactor', snapshot_indices=[]):
+    test_prop_name='form.scalefactor', snapshot_indices=[], directory=TRACK_DIRECTORY):
     '''
     Assign to each particle a pointer to its index in the list of particles at each previous
     snapshot, to make it easier to track particles back in time.
@@ -63,10 +63,13 @@ def write_particle_index_pointer(
     match_prop_tolerance : float : tolerance for matching via match_prop_name, if it is a float
     test_prop_name : string : additional property to use to test matching
     snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+    directory : string : directory where to write files
     '''
     Say = ut.io.SayClass(write_particle_index_pointer)
 
     assert match_prop_name in ['id.child', 'massfraction.metals', 'form.scalefactor']
+
+    directory = ut.io.get_path(directory, create_path=True)
 
     if part is None:
         # read particles at z = 0
@@ -112,8 +115,6 @@ def write_particle_index_pointer(
     # set null values to negative and will return error if called as index
     part_index_pointers_at_snap = ut.array.get_array_null(part[species]['id'].size)
     null_value = part_index_pointers_at_snap[0]
-
-    track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
 
     # counters for sanity checks
     id_no_match_number_tot = 0
@@ -214,7 +215,7 @@ def write_particle_index_pointer(
 
         # write file for this snapshot
         file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
-        ut.io.file_hdf5(track_directory + file_name, {'indices': part_index_pointers_at_snap})
+        ut.io.file_hdf5(directory + file_name, {'indices': part_index_pointers_at_snap})
 
     # print cumulative diagnostics
     if id_no_match_number_tot:
@@ -236,7 +237,7 @@ class HostDistanceClass(ut.io.SayClass):
         self.host_distance_kinds = ['form.host.distance', 'form.host.distance.3d']
 
     def write_star_form_host_distance(
-        self, part=None, snapshot_indices=[], part_indices=None):
+        self, part=None, snapshot_indices=[], part_indices=None, directory=TRACK_DIRECTORY):
         '''
         Assign to each star particle its distance wrt the host galaxy center at the snapshot after
         it formed.
@@ -246,8 +247,11 @@ class HostDistanceClass(ut.io.SayClass):
         part : dict : catalog of particles at snapshot
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         part_indices : array-like : list of particle indices to assign to
+        directory : string : directory where to write files
         '''
         spec_name = 'star'
+
+        directory = ut.io.get_path(directory, create_path=True)
 
         if part is None:
             # read particles at z = 0
@@ -301,7 +305,7 @@ class HostDistanceClass(ut.io.SayClass):
                     part_index_pointers = part_indices
                 else:
                     file_name = 'star_indices_{:03d}'.format(snapshot_index)
-                    part_index_pointers = ut.io.file_hdf5(TRACK_DIRECTORY + file_name)['indices']
+                    part_index_pointers = ut.io.file_hdf5(directory + file_name)['indices']
 
                 part_indices_at_snap = part_index_pointers[part_indices_form]
 
@@ -376,9 +380,9 @@ class HostDistanceClass(ut.io.SayClass):
                     part[spec_name][host_distance_kind][part_indices_form] = distances_t
 
                 # continuously (re)write as go
-                self.io_star_form_host_distance(part, 'write')
+                self.io_star_form_host_distance(part, 'write', directory)
 
-    def io_star_form_host_distance(self, part, io_direction='read'):
+    def io_star_form_host_distance(self, part, io_direction='read', directory=TRACK_DIRECTORY):
         '''
         Read or write, for each star particle, its distance wrt the host galaxy center at the first
         snapshot after it formed.
@@ -388,23 +392,24 @@ class HostDistanceClass(ut.io.SayClass):
         ----------
         part : dict : catalog of particles at snapshot
         io_direction : string : 'read' or 'write'
+        directory : string : directory where to write files
         '''
         species_name = 'star'
 
         file_name = '{}_form_host_distance_{:03d}'.format(species_name, part.snapshot['index'])
 
-        if io_direction == 'write':
-            track_directory = ut.io.get_path(TRACK_DIRECTORY, create_path=True)
+        directory = ut.io.get_path(directory, create_path=True)
 
+        if io_direction == 'write':
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[species_name]['id']
             for host_distance_kind in self.host_distance_kinds:
                 dict_out[host_distance_kind] = part[species_name][host_distance_kind]
 
-            ut.io.file_hdf5(track_directory + file_name, dict_out)
+            ut.io.file_hdf5(directory + file_name, dict_out)
 
         elif io_direction == 'read':
-            dict_in = ut.io.file_hdf5(TRACK_DIRECTORY + file_name)
+            dict_in = ut.io.file_hdf5(directory + file_name)
 
             # sanity check
             bad_id_number = np.sum(part[species_name]['id'] != dict_in['id'])

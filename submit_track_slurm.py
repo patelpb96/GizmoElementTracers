@@ -33,16 +33,13 @@ from gizmo import gizmo_track
 ScriptPrint = ut_io.ScriptPrintClass('slurm')
 ScriptPrint.print_initial()
 
-
 # check if any input arguments
 if len(os.sys.argv) > 1:
     function_kind = str(os.sys.argv[1])
 else:
     function_kind = 'indices'  # default is to assign just index pointers
 print('executing function[s]: {}'.format(function_kind))
-
 os.sys.stdout.flush()
-
 
 # execute
 if 'indices' in function_kind:
@@ -51,6 +48,5 @@ if 'indices' in function_kind:
 
 if 'distances' in function_kind:
     gizmo_track.HostDistance.write_star_form_host_distance()
-
 
 ScriptPrint.print_final()
