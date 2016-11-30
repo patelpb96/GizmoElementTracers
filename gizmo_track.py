@@ -289,7 +289,8 @@ class HostDistanceClass(ut.io.SayClass):
             part_indices_form = part_indices[
                 part[spec_name]['form.index'][part_indices] == snapshot_index]
 
-            self.say('# {} to assign at snapshot {}'.format(part_indices_form.size, snapshot_index))
+            self.say('\n# {} to assign at snapshot {}'.format(
+                     part_indices_form.size, snapshot_index))
 
             if part_indices_form.size:
                 part_at_snap = gizmo_io.Read.read_snapshots(
