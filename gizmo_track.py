@@ -314,46 +314,66 @@ class HostDistanceClass(ut.io.SayClass):
                     part_indices_at_snap = part_indices_at_snap[masks]
                     part_indices_form = part_indices_form[masks]
 
-                id_wrong_number = np.sum(part[spec_name]['id'][part_indices_form] !=
-                                         part_at_snap[spec_name]['id'][part_indices_at_snap])
+                id_wrong_number = np.sum(
+                    part[spec_name]['id'][part_indices_form] !=
+                    part_at_snap[spec_name]['id'][part_indices_at_snap])
+
                 if id_wrong_number:
                     self.say('! {} have wrong id match at snapshot {}!'.format(
                              id_wrong_number, snapshot_index))
                     id_wrong_number_tot += id_wrong_number
 
+                # 3-D distance wrt host along default x,y,z axes [kpc physical]
+                distance_vectors = ut.coordinate.get_distances(
+                    'vector', part_at_snap[spec_name]['position'][part_indices_at_snap],
+                    part_at_snap.center_position,
+                    part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
+
+                # rotate to align with principal axes
                 for host_distance_kind in self.host_distance_kinds:
-                    if '1d' in host_distance_kind:
-                        # compute total scalar distance wrt host [kpc physical]
-                        part[spec_name][host_distance_kind][part_indices_form] = \
-                            ut.particle.get_distances_wrt_center(
-                                part_at_snap, spec_name, 'scalar',
-                                part_indicess=part_indices_at_snap, scalarize=True)
-
-                        #part[spec_name][prop_name][part_indices_form] = \
-                        #    ut.coordinate.get_distances(
-                        #    'scalar', part_at_snap[spec_name]['position'][part_indices_at_snap],
-                        #    part_at_snap.center_position,
-                        #    part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
-
-                    elif '3d' in host_distance_kind or '2d' in host_distance_kind:
-                        # compute distance wrt host, aligned with principal axes [kpc physical]
-
-                        # get galaxy radius to use to determine principal axes
-                        distance_max = 20  # [kpc physical]
+                    if '3d' in host_distance_kind or '2d' in host_distance_kind:
+                        # compute galaxy radius
                         gal_radius, _gal_mass = ut.particle.get_galaxy_radius_mass(
-                            part_at_snap, spec_name, 'mass.percent', 95, distance_max,
+                            part_at_snap, spec_name, 'mass.percent', 95, distance_max=20,
                             print_results=True)
 
-                        if '3d' in host_distance_kind:
-                            distance_kind = 'rotated.3d'
-                        elif '2d' in host_distance_kind:
-                            distance_kind = 'rotated.2d'
+                        # compute rotation vectors
+                        rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
+                            part_at_snap, spec_name, gal_radius, scalarize=True, print_results=True)
 
-                        part[spec_name][host_distance_kind][part_indices_form] = \
-                            ut.particle.get_distances_wrt_center(
-                                part_at_snap, spec_name, distance_kind,
-                                axis_distance_max=gal_radius, part_indicess=part_indices_at_snap,
-                                scalarize=True)
+                        # rotate to align with principal axes
+                        distance_vectors = ut.coordinate.get_coordinates_rotated(
+                            distance_vectors, rotation_vectors)
+
+                        break
+
+                # compute distances to store
+                for host_distance_kind in self.host_distance_kinds:
+                    if '3d' in host_distance_kind:
+                        # 3-D distance wrt host along principal axes [kpc physical]
+                        distances_t = distance_vectors
+
+                        #if '3d' in host_distance_kind:
+                        #    distance_kind = 'rotated.3d'
+                        #elif '2d' in host_distance_kind:
+                        #    distance_kind = 'rotated.2d'
+                        #distances_t = ut.particle.get_distances_wrt_center(
+                        #    part_at_snap, spec_name, distance_kind, axis_distance_max=gal_radius,
+                        #    part_indicess=part_indices_at_snap, scalarize=True)
+
+                    elif '2d' in host_distance_kind:
+                        # compute distance along major axes and along minor axis [kpc physical]
+                        distances_t = ut.coordinate.get_distances_2d(distance_vectors)
+
+                    elif '1d' in host_distance_kind:
+                        # compute total scalar distance wrt host [kpc physical]
+                        distances_t = np.sqrt(np.sum(distance_vectors ** 2, 1))
+
+                        #distances_t = ut.particle.get_distances_wrt_center(
+                        #    part_at_snap, spec_name, 'scalar',
+                        #    part_indicess=part_indices_at_snap, scalarize=True)
+
+                    part[spec_name][host_distance_kind][part_indices_form] = distances_t
 
                 # continuously (re)write as go
                 self.io_star_form_host_distance(part, 'write')
@@ -400,119 +420,6 @@ class HostDistanceClass(ut.io.SayClass):
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))
 
 HostDistance = HostDistanceClass()
-
-
-def write_star_form_host_distance_orig(
-    part, use_child_id=False, snapshot_index_limits=[], part_indices=None):
-    '''
-    Assign to each star particle the distance wrt the host galaxy center at the first snapshot
-    after it formed.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    use_child_id : boolean : whether to use id.child to match particles with redundant ids
-    snapshot_index_limits : list : min and max snapshot indices to impose matching to
-    part_indices : array-like : list of particle indices to assign to
-    '''
-    Say = ut.io.SayClass(write_star_form_host_distance_orig)
-
-    spec_name = 'star'
-    prop_name = 'form.host.distance'
-
-    # store form.host.distance as 32-bit and initialize to -1
-    part[spec_name][prop_name] = np.zeros(part[spec_name]['position'].shape[0], np.float32) - 1
-
-    if 'form.index' not in part['star']:
-        assign_star_form_snapshot(part)
-
-    if part_indices is None or not len(part_indices):
-        part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
-
-    if use_child_id and 'id.child' in part[spec_name]:
-        pass
-        #pis_unsplit = part_indices[(part[spec_name]['id.child'][part_indices] == 0) *
-        #                           (part[spec_name]['id.generation'][part_indices] == 0)]
-        #pis_oversplit = part_indices[part[spec_name]['id.child'][part_indices] >
-        #                             2 ** part[spec_name]['id.generation'][part_indices]]
-    else:
-        pis_unique = ut.particle.get_indices_id_kind(part, spec_name, 'unique', part_indices)
-        pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, 'multiple', part_indices)
-        Say.say('particles with id that is: unique {}, redundant {}'.format(
-                pis_unique.size, pis_multiple.size))
-
-    part_indices = pis_unique  # particles to assign to
-
-    # get snapshot indices to sort going back in time
-    form_indices = np.unique(part[spec_name]['form.index'][part_indices])[::-1]
-    if snapshot_index_limits is not None and len(snapshot_index_limits):
-        form_indices = form_indices[form_indices >= min(snapshot_index_limits)]
-        form_indices = form_indices[form_indices <= max(snapshot_index_limits)]
-
-    assigned_number_tot = 0
-    form_time_offset_number_tot = 0
-    no_id_number_tot = 0
-
-    for snapshot_index in form_indices:
-        part_indices_form_all = part_indices[
-            part[spec_name]['form.index'][part_indices] == snapshot_index]
-        part_ids_form = part[spec_name]['id'][part_indices_form_all]
-
-        part_at_snap = gizmo_io.Read.read_snapshots(
-            spec_name, 'index', snapshot_index,
-            property_names=['position', 'mass', 'id', 'form.scalefactor'], element_indices=[0],
-            force_float32=True, assign_center=True, check_sanity=True)
-
-        ut.particle.assign_id_to_index(
-            part_at_snap, spec_name, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
-
-        Say.say('# {} to assign this snapshot'.format(part_ids_form.size))
-        assigned_number_tot += part_ids_form.size
-
-        pis_snap = []
-        pis_form = []
-        no_id_number = 0
-        for pii, part_id in enumerate(part_ids_form):
-            try:
-                pi = part_at_snap[spec_name].id_to_index[part_id]
-                if np.isscalar(pi):
-                    pis_snap.append(pi)
-                    pis_form.append(part_indices_form_all[pii])
-                else:
-                    no_id_number += 1
-            except:
-                no_id_number += 1
-        pis_snap = np.array(pis_snap, dtype=part_indices_form_all.dtype)
-        pis_form = np.array(pis_form, dtype=part_indices_form_all.dtype)
-
-        if no_id_number:
-            Say.say('! {} not have id match'.format(no_id_number))
-            no_id_number_tot += no_id_number
-
-        # sanity check
-        form_time_tolerance = 1e-5
-        form_scalefactor_difs = np.abs(
-            part_at_snap[spec_name]['form.scalefactor'][pis_snap] -
-            part[spec_name]['form.scalefactor'][pis_form]) / part_at_snap.snapshot['scalefactor']
-        form_time_offset_number = np.sum(form_scalefactor_difs > form_time_tolerance)
-        if form_time_offset_number:
-            Say.say('! {} have offset formation time'.format(form_time_offset_number))
-            form_time_offset_number_tot += form_time_offset_number
-
-        # compute 3-D distance [kpc physical]
-        part[spec_name][prop_name][pis_form] = ut.coordinate.get_distances(
-            'scalar', part_at_snap[spec_name]['position'][pis_snap], part_at_snap.center_position,
-            part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
-
-        # print cumulative diagnostics
-        Say.say('{} (of {}) total assigned'.format(assigned_number_tot, part_indices.size))
-        if no_id_number_tot:
-            Say.say('! {} total not have id match'.format(no_id_number_tot))
-        if form_time_offset_number_tot:
-            Say.say('! {} total have offset formation time'.format(form_time_offset_number_tot))
-
-        # continuously write as go, in case happens to crash along the way
-        #io_star_form_host_distance(part, 'write')
 
 
 #===================================================================================================
