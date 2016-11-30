@@ -69,6 +69,7 @@ if 'distances' in function_kind:
 # print run time information
 time_dif = time.time() - time_ini
 time_dif_str = str(datetime.timedelta(seconds=time_dif))
+print('')
 print('wall time = {:.0f} sec = {:.2f} day = {}'.format(
       time_dif, time_dif / 3600 / 24, time_dif_str.split('.')[0]))
 print('cpu time = {:.1f} hr\n'.format(time_dif * cpu_number / 3600))

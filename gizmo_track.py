@@ -335,7 +335,7 @@ class HostDistanceClass(ut.io.SayClass):
                     if '3d' in host_distance_kind or '2d' in host_distance_kind:
                         # compute galaxy radius
                         gal_radius, _gal_mass = ut.particle.get_galaxy_radius_mass(
-                            part_at_snap, spec_name, 'mass.percent', 95, distance_max=20,
+                            part_at_snap, spec_name, 'mass.percent', 90, distance_max=15,
                             print_results=True)
 
                         # compute rotation vectors
@@ -414,8 +414,6 @@ class HostDistanceClass(ut.io.SayClass):
 
             for host_distance_kind in self.host_distance_kinds:
                 part[species_name][host_distance_kind] = dict_in[host_distance_kind]
-
-            #part[spec_name][prop_name], part_ids = ut.io.file_pickle(TRACK_DIRECTORY + file_name)
 
         else:
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))
