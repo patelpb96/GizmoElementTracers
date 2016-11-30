@@ -2,7 +2,7 @@
 
 
 '''
-Delete snapshot files or transfer them across machines.
+Delete snapshot files or transfer files across machines.
 
 @author: Andrew Wetzel
 '''
@@ -60,7 +60,7 @@ def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
                     snapshot_index >= min(snapshot_index_limits) and
                     snapshot_index <= max(snapshot_index_limits)):
 
-                print('deleting {}'.format(snapshot_name))
+                print('* deleting {}'.format(snapshot_name))
                 os.system('rm -rf ' + snapshot_name)
 
 

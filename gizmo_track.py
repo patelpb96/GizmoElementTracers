@@ -189,12 +189,12 @@ def write_particle_index_pointer(
                     id_no_match_number, snapshot_index))
             id_no_match_number_tot += id_no_match_number
         if prop_no_match_number:
-            Say.say('! {} not have match_prop_name match at snapshot {}!'.format(
-                    prop_no_match_number, snapshot_index))
+            Say.say('! {} not have {} match at snapshot {}!'.format(
+                    prop_no_match_number, match_prop_name, snapshot_index))
             prop_no_match_number_tot += prop_no_match_number
         if prop_redundant_number:
-            Say.say('! {} have redundant match_prop_name at snapshot {}!'.format(
-                    prop_redundant_number, snapshot_index))
+            Say.say('! {} have redundant {} at snapshot {}!'.format(
+                    prop_redundant_number, match_prop_name, snapshot_index))
             prop_redundant_number_tot += prop_redundant_number
 
         # sanity check
@@ -220,9 +220,9 @@ def write_particle_index_pointer(
     if id_no_match_number_tot:
         Say.say('! {} total not have id match!'.format(id_no_match_number_tot))
     if prop_no_match_number_tot:
-        Say.say('! {} total not have match_prop_name match!'.format(prop_no_match_number_tot))
+        Say.say('! {} total not have {} match!'.format(prop_no_match_number_tot, match_prop_name))
     if prop_redundant_number_tot:
-        Say.say('! {} total have redundant match_prop_name!'.format(prop_redundant_number_tot))
+        Say.say('! {} total have redundant {}!'.format(prop_redundant_number_tot, match_prop_name))
     if test_prop_offset_number_tot:
         Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_prop_name))
 
@@ -318,7 +318,6 @@ class HostDistanceClass(ut.io.SayClass):
                 id_wrong_number = np.sum(
                     part[spec_name]['id'][part_indices_form] !=
                     part_at_snap[spec_name]['id'][part_indices_at_snap])
-
                 if id_wrong_number:
                     self.say('! {} have wrong id match at snapshot {}!'.format(
                              id_wrong_number, snapshot_index))
