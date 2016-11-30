@@ -233,7 +233,7 @@ class HostDistanceClass(ut.io.SayClass):
     '''
     def __init__(self):
         # star form host distance kinds to write/read
-        self.host_distance_kinds = ['form.host.distance.1d', 'form.host.distance.3d']
+        self.host_distance_kinds = ['form.host.distance', 'form.host.distance.3d']
 
     def write_star_form_host_distance(
         self, part=None, snapshot_indices=[], part_indices=None):
@@ -274,12 +274,12 @@ class HostDistanceClass(ut.io.SayClass):
         # store prop_names as 32-bit and initialize to nan
         particle_number = part[spec_name]['position'].shape[0]
         for host_distance_kind in self.host_distance_kinds:
-            if '1d' in host_distance_kind:
-                shape = particle_number
-            elif '2d' in host_distance_kind:
+            if '2d' in host_distance_kind:
                 shape = [particle_number, 2]
             elif '3d' in host_distance_kind:
                 shape = [particle_number, 3]
+            else:
+                shape = particle_number
             part[spec_name][host_distance_kind] = np.zeros(shape, np.float32) + np.nan
 
         id_wrong_number_tot = 0
@@ -365,7 +365,7 @@ class HostDistanceClass(ut.io.SayClass):
                         # compute distance along major axes and along minor axis [kpc physical]
                         distances_t = ut.coordinate.get_distances_2d(distance_vectors)
 
-                    elif '1d' in host_distance_kind:
+                    else:
                         # compute total scalar distance wrt host [kpc physical]
                         distances_t = np.sqrt(np.sum(distance_vectors ** 2, 1))
 
