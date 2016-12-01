@@ -6,29 +6,38 @@ Python package for running and analyzing Gizmo simulations.
 # Contents
 
 ## gizmo_io.py
-* functions to read in Gizmo snapshot files, which are in HDF5 format.
+* read Gizmo snapshot files
 
 ## gizmo_analysis.py
-* functions for analyzing Gizmo particle data.
+* high-level analysis and plotting of Gizmo particle data
 
 ## gizmo_diagnostic.py
-* functions for diagnosing Gizmo simulations.
+* diagnostics of Gizmo simulations
 
 ## gizmo_file.py
-* functions for deleting snapshot files or transferring them across machines.
+* delete snapshot files or transfer them across machines
 
 ## gizmo_ic.py
-* functions for generating cosmological zoom-in initial conditions.
+* generate cosmological zoom-in initial conditions from Gizmo snapshot files
+
+## gizmo_track.py
+* track particles across snapshots
+
+## submit_track_slurm.py
+* script for submitting job for particle tracking
+
+## gizmo_yield.py
+* print/plot information about nucleosynthetic yields in Gizmo
 
 ## tutorial.ipynb
-* ipython notebook tutorial for using this package and reading in particle data from a snapshot.
+* ipython notebook tutorial for using this package and readin particles from a snapshot
 
 
 # Requirements
 
 This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
-I develop this package using the latest version of the Anaconda Python environment, which I update weekly.
+I develop this package using the latest version of the Anaconda Python environment.
 I use Python 3.5 and recommend that you do the same.
 However, I try to maintain backward compatibility with Python 2.7.
 
