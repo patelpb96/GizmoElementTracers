@@ -45,199 +45,262 @@ def assign_star_form_snapshot(part):
         'scalefactor', form_scalefactors, round_kind='up')
 
 
-def write_particle_index_pointer(
-    part=None, species='star', match_prop_name='id.child', match_prop_tolerance=1e-6,
-    test_prop_name='form.scalefactor', snapshot_indices=[], directory=TRACK_DIRECTORY):
+class IndexPointerClass(ut.io.SayClass):
     '''
-    Assign to each particle a pointer to its index in the list of particles at each previous
-    snapshot, to make it easier to track particles back in time.
-    Write index pointers to a pickle file, one for each previous snapshot.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    species : string : name of particle species to track
-    match_prop_name : string :
-        some particles have the same id. this is the property to use to match them.
-        options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
-    match_prop_tolerance : float : tolerance for matching via match_prop_name, if it is a float
-    test_prop_name : string : additional property to use to test matching
-    snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
-    directory : string : directory where to write files
+    Compute particle index pointers for tracking particles across time.
     '''
-    Say = ut.io.SayClass(write_particle_index_pointer)
+    def __init__(self, species='star', directory=TRACK_DIRECTORY):
+        '''
+        Parameters
+        ----------
+        species : string : name of particle species to track
+        directory : string : directory where to write files
+        '''
+        self.species = species
+        self.directory = directory
 
-    assert match_prop_name in ['id.child', 'massfraction.metals', 'form.scalefactor']
+    def write_index_pointer(
+        self, part=None, match_prop_name='id.child', match_prop_tolerance=1e-6,
+        test_prop_name='form.scalefactor', snapshot_indices=[]):
+        '''
+        Assign to each particle a pointer to its index in the list of particles at each previous
+        snapshot, to make it easier to track particles back in time.
+        Write index pointers to a pickle file, one for each previous snapshot.
 
-    directory = ut.io.get_path(directory, create_path=True)
+        Parameters
+        ----------
+        part : dict : catalog of particles at snapshot
+        match_prop_name : string :
+            some particles have the same id. this is the property to use to match them.
+            options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
+        match_prop_tolerance : float : tolerance for matching via match_prop_name, if it is a float
+        test_prop_name : string : additional property to use to test matching
+        snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+        '''
+        assert match_prop_name in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
-    if part is None:
-        # read particles at z = 0
-        # complete list of all possible properties relevant to use in matching
-        property_names_read = ['id', 'id.child', 'massfraction.metals', 'form.scalefactor']
-        if match_prop_name not in property_names_read:
-            property_names_read.append(match_prop_name)
-        if test_prop_name and test_prop_name not in property_names_read:
-            property_names_read.append(test_prop_name)
-        part = gizmo_io.Read.read_snapshots(
-            species, 'redshift', 0, property_names=property_names_read, element_indices=[0],
-            force_float32=True, assign_center=False, check_sanity=False)
+        spec_name = self.species
 
-    # older snapshot files do not have id.child - use metal abundance instead
-    if match_prop_name == 'id.child' and 'id.child' not in part[species]:
-        Say.say('input match_prop_name = {}, but it does not exist in the snapshot'.format(
-                match_prop_name))
-        match_prop_name = 'massfraction.metals'
-        Say.say('switching to using: {}'.format(match_prop_name))
+        if part is None:
+            # read particles at z = 0
+            # complete list of all possible properties relevant to use in matching
+            property_names_read = ['id', 'id.child', 'massfraction.metals', 'form.scalefactor']
+            if match_prop_name not in property_names_read:
+                property_names_read.append(match_prop_name)
+            if test_prop_name and test_prop_name not in property_names_read:
+                property_names_read.append(test_prop_name)
+            part = gizmo_io.Read.read_snapshots(
+                spec_name, 'redshift', 0, property_names=property_names_read,
+                element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
 
-    assert part[species].prop(match_prop_name) is not None
+        # older snapshot files do not have id.child - use metal abundance instead
+        if match_prop_name == 'id.child' and 'id.child' not in part[spec_name]:
+            self.say('input match_prop_name = {}, but it does not exist in the snapshot'.format(
+                     match_prop_name))
+            match_prop_name = 'massfraction.metals'
+            self.say('switching to using: {}'.format(match_prop_name))
 
-    if test_prop_name:
-        assert part[species].prop(test_prop_name) is not None
+        assert part[spec_name].prop(match_prop_name) is not None
 
-    if species == 'star' and 'form.index' not in part[species]:
-        assign_star_form_snapshot(part)
+        if test_prop_name:
+            assert part[spec_name].prop(test_prop_name) is not None
 
-    # get list of snapshot indices to assign
-    if snapshot_indices is None or not len(snapshot_indices):
-        snapshot_indices = np.arange(min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
-    snapshot_indices = np.setdiff1d(snapshot_indices, part.snapshot['index'])  # skip current
-    snapshot_indices = snapshot_indices[::-1]  # work backwards in time
+        if spec_name == 'star' and 'form.index' not in part[spec_name]:
+            assign_star_form_snapshot(part)
 
-    # particles to assign to
-    part_indices = ut.array.get_arange(part[species]['id'])
+        # get list of snapshot indices to assign
+        if snapshot_indices is None or not len(snapshot_indices):
+            snapshot_indices = np.arange(
+                min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
+        snapshot_indices = np.setdiff1d(snapshot_indices, part.snapshot['index'])  # skip current
+        snapshot_indices = snapshot_indices[::-1]  # work backwards in time
 
-    # diagnostic
-    pis_multiple = ut.particle.get_indices_id_kind(part, species, 'multiple', part_indices)
-    Say.say('{} particles have redundant id'.format(pis_multiple.size))
+        # particles to assign to
+        part_indices = ut.array.get_arange(part[spec_name]['id'])
 
-    # initialize pointer array
-    # set null values to negative and will return error if called as index
-    part_index_pointers_at_snap = ut.array.get_array_null(part[species]['id'].size)
-    null_value = part_index_pointers_at_snap[0]
+        # diagnostic
+        pis_multiple = ut.particle.get_indices_id_kind(part, spec_name, 'multiple', part_indices)
+        self.say('{} particles have redundant id'.format(pis_multiple.size))
 
-    # counters for sanity checks
-    id_no_match_number_tot = 0
-    prop_no_match_number_tot = 0
-    prop_redundant_number_tot = 0
-    test_prop_offset_number_tot = 0
+        # initialize pointer array
+        # set null values to negative and will return error if called as index
+        part_index_pointers_at_snap = ut.array.get_array_null(part[spec_name]['id'].size)
+        null_value = part_index_pointers_at_snap[0]
 
-    for snapshot_index in snapshot_indices:
-        if species == 'star':
-            # keep only particles that formed prior to this snapshot
-            part_indices = part_indices[part[species]['form.index'][part_indices] <= snapshot_index]
-            if not len(part_indices):
-                Say.say('# no {} particles to track at snapshot index <= {}\n'.format(
-                        species, snapshot_index))
-                break
+        # counters for sanity checks
+        id_no_match_number_tot = 0
+        prop_no_match_number_tot = 0
+        prop_redundant_number_tot = 0
+        test_prop_offset_number_tot = 0
 
-        part_ids = part[species]['id'][part_indices]
+        for snapshot_index in snapshot_indices:
+            if spec_name == 'star':
+                # keep only particles that formed prior to this snapshot
+                part_indices = part_indices[
+                    part[spec_name]['form.index'][part_indices] <= snapshot_index]
+                if not len(part_indices):
+                    self.say('# no {} particles to track at snapshot index <= {}\n'.format(
+                             spec_name, snapshot_index))
+                    break
 
-        # read particles at this snapshot
-        part_at_snap = gizmo_io.Read.read_snapshots(
-            species, 'index', snapshot_index,
-            property_names=['id', match_prop_name, test_prop_name], element_indices=[0],
-            force_float32=True, assign_center=False, check_sanity=False)
+            part_ids = part[spec_name]['id'][part_indices]
 
-        # assign pointer from particle id to its index in list
-        ut.particle.assign_id_to_index(
-            part_at_snap, species, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
+            # read particles at this snapshot
+            part_at_snap = gizmo_io.Read.read_snapshots(
+                spec_name, 'index', snapshot_index,
+                property_names=['id', match_prop_name, test_prop_name], element_indices=[0],
+                force_float32=True, assign_center=False, check_sanity=False)
 
-        # re-initialize with null values
-        part_index_pointers_at_snap *= 0
-        part_index_pointers_at_snap += null_value
+            # assign pointer from particle id to its index in list
+            ut.particle.assign_id_to_index(
+                part_at_snap, spec_name, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
 
-        id_no_match_number = 0
-        prop_no_match_number = 0
-        prop_redundant_number = 0
-        for pii, part_id in enumerate(part_ids):
-            part_index = part_indices[pii]
+            # re-initialize with null values
+            part_index_pointers_at_snap *= 0
+            part_index_pointers_at_snap += null_value
 
-            try:
-                part_indices_at_snap = part_at_snap[species].id_to_index[part_id]
-            except:
-                id_no_match_number += 1
-                continue
+            id_no_match_number = 0
+            prop_no_match_number = 0
+            prop_redundant_number = 0
+            for pii, part_id in enumerate(part_ids):
+                part_index = part_indices[pii]
 
-            if np.isscalar(part_indices_at_snap):
-                # particle id is unique - easy case
-                part_index_pointers_at_snap[part_index] = part_indices_at_snap
-            else:
-                # particle id is redundant - difficult case
-                # loop through particles with this id, use match_prop_name to match
-                # sanity check
-                if np.unique(part_at_snap[species].prop(
-                        match_prop_name, part_indices_at_snap)).size != part_indices_at_snap.size:
-                    prop_redundant_number += 1
+                try:
+                    part_indices_at_snap = part_at_snap[spec_name].id_to_index[part_id]
+                except:
+                    id_no_match_number += 1
+                    continue
 
-                prop_0 = part[species].prop(match_prop_name, part_index)
-
-                for part_index_at_snap in part_indices_at_snap:
-                    prop_test = part_at_snap[species].prop(match_prop_name, part_index_at_snap)
-                    if match_prop_name == 'id.child':
-                        if prop_test == prop_0:
-                            part_index_pointers_at_snap[part_index] = part_index_at_snap
-                            break
-                    else:
-                        if np.abs((prop_test - prop_0) / prop_0) < match_prop_tolerance:
-                            part_index_pointers_at_snap[part_index] = part_index_at_snap
-                            break
+                if np.isscalar(part_indices_at_snap):
+                    # particle id is unique - easy case
+                    part_index_pointers_at_snap[part_index] = part_indices_at_snap
                 else:
-                    prop_no_match_number += 1
+                    # particle id is redundant - difficult case
+                    # loop through particles with this id, use match_prop_name to match
+                    # sanity check
+                    if (np.unique(part_at_snap[spec_name].prop(
+                            match_prop_name, part_indices_at_snap)).size !=
+                            part_indices_at_snap.size):
+                        prop_redundant_number += 1
 
-        if id_no_match_number:
-            Say.say('! {} not have id match at snapshot {}!'.format(
-                    id_no_match_number, snapshot_index))
-            id_no_match_number_tot += id_no_match_number
-        if prop_no_match_number:
-            Say.say('! {} not have {} match at snapshot {}!'.format(
-                    prop_no_match_number, match_prop_name, snapshot_index))
-            prop_no_match_number_tot += prop_no_match_number
-        if prop_redundant_number:
-            Say.say('! {} have redundant {} at snapshot {}!'.format(
-                    prop_redundant_number, match_prop_name, snapshot_index))
-            prop_redundant_number_tot += prop_redundant_number
+                    prop_0 = part[spec_name].prop(match_prop_name, part_index)
 
-        # sanity check
-        if (test_prop_name and test_prop_name != match_prop_name and
-                id_no_match_number == prop_no_match_number == prop_redundant_number_tot == 0):
-            part_index_pointers_at_snap_test = part_index_pointers_at_snap[
-                part_index_pointers_at_snap >= 0]
-            prop_difs = np.abs(
-                (part_at_snap[species].prop(test_prop_name, part_index_pointers_at_snap_test) -
-                 part[species].prop(test_prop_name, part_indices)) /
-                part[species].prop(test_prop_name, part_indices))
-            test_prop_offset_number = np.sum(prop_difs > match_prop_tolerance)
-            if test_prop_offset_number:
-                Say.say('! {} have offset {} at snapshot {}!'.format(
-                        test_prop_offset_number, test_prop_name, snapshot_index))
-                test_prop_offset_number_tot += test_prop_offset_number
+                    for part_index_at_snap in part_indices_at_snap:
+                        prop_test = part_at_snap[spec_name].prop(
+                            match_prop_name, part_index_at_snap)
+                        if match_prop_name == 'id.child':
+                            if prop_test == prop_0:
+                                part_index_pointers_at_snap[part_index] = part_index_at_snap
+                                break
+                        else:
+                            if np.abs((prop_test - prop_0) / prop_0) < match_prop_tolerance:
+                                part_index_pointers_at_snap[part_index] = part_index_at_snap
+                                break
+                    else:
+                        prop_no_match_number += 1
 
-        # write file for this snapshot
-        file_name = '{}_indices_{:03d}'.format(species, snapshot_index)
-        ut.io.file_hdf5(directory + file_name, {'indices': part_index_pointers_at_snap})
+            if id_no_match_number:
+                self.say('! {} not have id match at snapshot {}!'.format(
+                         id_no_match_number, snapshot_index))
+                id_no_match_number_tot += id_no_match_number
+            if prop_no_match_number:
+                self.say('! {} not have {} match at snapshot {}!'.format(
+                         prop_no_match_number, match_prop_name, snapshot_index))
+                prop_no_match_number_tot += prop_no_match_number
+            if prop_redundant_number:
+                self.say('! {} have redundant {} at snapshot {}!'.format(
+                         prop_redundant_number, match_prop_name, snapshot_index))
+                prop_redundant_number_tot += prop_redundant_number
 
-    # print cumulative diagnostics
-    if id_no_match_number_tot:
-        Say.say('! {} total not have id match!'.format(id_no_match_number_tot))
-    if prop_no_match_number_tot:
-        Say.say('! {} total not have {} match!'.format(prop_no_match_number_tot, match_prop_name))
-    if prop_redundant_number_tot:
-        Say.say('! {} total have redundant {}!'.format(prop_redundant_number_tot, match_prop_name))
-    if test_prop_offset_number_tot:
-        Say.say('! {} total have offset {}'.format(test_prop_offset_number_tot, test_prop_name))
+            # sanity check
+            if (test_prop_name and test_prop_name != match_prop_name and
+                    id_no_match_number == prop_no_match_number == prop_redundant_number_tot == 0):
+                part_index_pointers_at_snap_test = part_index_pointers_at_snap[
+                    part_index_pointers_at_snap >= 0]
+                prop_difs = np.abs(
+                    (part_at_snap[spec_name].prop(
+                        test_prop_name, part_index_pointers_at_snap_test) -
+                     part[spec_name].prop(test_prop_name, part_indices)) /
+                    part[spec_name].prop(test_prop_name, part_indices))
+                test_prop_offset_number = np.sum(prop_difs > match_prop_tolerance)
+                if test_prop_offset_number:
+                    self.say('! {} have offset {} at snapshot {}!'.format(
+                             test_prop_offset_number, test_prop_name, snapshot_index))
+                    test_prop_offset_number_tot += test_prop_offset_number
+
+            # write file for this snapshot
+            self.io_index_pointer(None, snapshot_index, part_index_pointers_at_snap)
+
+        # print cumulative diagnostics
+        if id_no_match_number_tot:
+            self.say('! {} total not have id match!'.format(id_no_match_number_tot))
+        if prop_no_match_number_tot:
+            self.say('! {} total not have {} match!'.format(
+                     prop_no_match_number_tot, match_prop_name))
+        if prop_redundant_number_tot:
+            self.say('! {} total have redundant {}!'.format(
+                     prop_redundant_number_tot, match_prop_name))
+        if test_prop_offset_number_tot:
+            self.say('! {} total have offset {}'.format(
+                     test_prop_offset_number_tot, test_prop_name))
+
+    def io_index_pointer(
+        self, part=None, snapshot_index=None, part_index_pointers=None):
+        '''
+        Read or write, for each star particle, its index in the catalog at another snapshot.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles at snapshot
+        snapshot_index : int : index of snapshot file (if not input particle catalog)
+        part_index_pointers : array : particle index pointers (if writing)
+        '''
+        hdf5_dict_name = 'indices'
+
+        if part is not None:
+            snapshot_index = part.snapshot['index']
+        elif not snapshot_index:
+            raise ValueError('! need to input either particle catalog or snapshot_index')
+
+        file_name = '{}_indices_{:03d}'.format(self.species, snapshot_index)
+
+        if part_index_pointers is not None:
+            # write to file
+            directory = ut.io.get_path(self.directory, create_path=True)
+            ut.io.file_hdf5(directory + file_name, {hdf5_dict_name: part_index_pointers})
+
+        else:
+            # read from file
+            directory = ut.io.get_path(self.directory)
+            dict_in = ut.io.file_hdf5(directory + file_name)
+            part_index_pointers = dict_in[hdf5_dict_name]
+            if part is None:
+                return part_index_pointers
+            else:
+                part.index_pointers = part_index_pointers
+
+IndexPointer = IndexPointerClass()
 
 
-class HostDistanceClass(ut.io.SayClass):
+class HostDistanceClass(IndexPointerClass):
     '''
     Compute distance wrt the host galaxy center for particles across time.
     '''
-    def __init__(self):
+    def __init__(self, species='star', directory=TRACK_DIRECTORY):
+        '''
+        Parameters
+        ----------
+        species : string : name of particle species to track
+        directory : string : directory to write files
+        '''
+        self.species = species
+        self.directory = directory
+
         # star form host distance kinds to write/read
         self.host_distance_kinds = ['form.host.distance', 'form.host.distance.3d']
 
-    def write_star_form_host_distance(
-        self, part=None, snapshot_indices=[], part_indices=None, directory=TRACK_DIRECTORY):
+    def write_form_host_distance(
+        self, part=None, snapshot_indices=[], part_indices=None):
         '''
         Assign to each star particle its distance wrt the host galaxy center at the snapshot after
         it formed.
@@ -247,11 +310,8 @@ class HostDistanceClass(ut.io.SayClass):
         part : dict : catalog of particles at snapshot
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         part_indices : array-like : list of particle indices to assign to
-        directory : string : directory where to write files
         '''
-        spec_name = 'star'
-
-        directory = ut.io.get_path(directory, create_path=True)
+        spec_name = self.species
 
         if part is None:
             # read particles at z = 0
@@ -304,8 +364,7 @@ class HostDistanceClass(ut.io.SayClass):
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
                 else:
-                    file_name = 'star_indices_{:03d}'.format(snapshot_index)
-                    part_index_pointers = ut.io.file_hdf5(directory + file_name)['indices']
+                    part_index_pointers = self.io_index_pointer(snapshot_index=snapshot_index)
 
                 part_indices_at_snap = part_index_pointers[part_indices_form]
 
@@ -380,9 +439,9 @@ class HostDistanceClass(ut.io.SayClass):
                     part[spec_name][host_distance_kind][part_indices_form] = distances_t
 
                 # continuously (re)write as go
-                self.io_star_form_host_distance(part, 'write', directory)
+                self.io_form_host_distance(part, 'write', self.directory)
 
-    def io_star_form_host_distance(self, part, io_direction='read', directory=TRACK_DIRECTORY):
+    def io_form_host_distance(self, part, io_direction='read'):
         '''
         Read or write, for each star particle, its distance wrt the host galaxy center at the first
         snapshot after it formed.
@@ -392,15 +451,13 @@ class HostDistanceClass(ut.io.SayClass):
         ----------
         part : dict : catalog of particles at snapshot
         io_direction : string : 'read' or 'write'
-        directory : string : directory where to write files
         '''
         species_name = 'star'
 
         file_name = '{}_form_host_distance_{:03d}'.format(species_name, part.snapshot['index'])
 
-        directory = ut.io.get_path(directory, create_path=True)
-
         if io_direction == 'write':
+            directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[species_name]['id']
             for host_distance_kind in self.host_distance_kinds:
@@ -409,6 +466,7 @@ class HostDistanceClass(ut.io.SayClass):
             ut.io.file_hdf5(directory + file_name, dict_out)
 
         elif io_direction == 'read':
+            directory = ut.io.get_path(self.directory)
             dict_in = ut.io.file_hdf5(directory + file_name)
 
             # sanity check
@@ -437,7 +495,7 @@ if __name__ == '__main__':
     assert ('indices' in function_kind or 'distances' in function_kind)
 
     if 'indices' in function_kind:
-        write_particle_index_pointer()
+        IndexPointer.write_index_pointer()
 
     if 'distances' in function_kind:
-        HostDistance.write_star_form_host_distance()
+        HostDistance.write_form_host_distance()
