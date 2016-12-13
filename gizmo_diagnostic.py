@@ -369,14 +369,14 @@ def plot_contamination(redshift=0, directory='.'):
         ['dark', 'dark.2'], 'redshift', redshift, directory,
         property_names=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 
-    halo_radius, _halo_mass = ut.particle.get_halo_radius_mass(part, 'all', virial_kind)
+    halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
 
     gizmo_analysis.plot_mass_contamination(
-        part, distance_limits_phys, distance_bin_width, halo_radius=halo_radius,
+        part, distance_limits_phys, distance_bin_width, halo_radius=halo_prop['radius'],
         scale_to_halo_radius=False, write_plot=True, plot_directory='plot')
 
     gizmo_analysis.plot_mass_contamination(
-        part, distance_limits_halo, distance_bin_width, halo_radius=halo_radius,
+        part, distance_limits_halo, distance_bin_width, halo_radius=halo_prop['radius'],
         scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
 
 

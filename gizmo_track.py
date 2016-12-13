@@ -396,13 +396,14 @@ class HostDistanceClass(IndexPointerClass):
                 for host_distance_kind in self.host_distance_kinds:
                     if '3d' in host_distance_kind or '2d' in host_distance_kind:
                         # compute galaxy radius
-                        gal_radius, _gal_mass = ut.particle.get_galaxy_radius_mass(
+                        gal = ut.particle.get_galaxy_properties(
                             part_at_snap, spec_name, 'mass.percent', 90, distance_max=15,
                             print_results=True)
 
                         # compute rotation vectors
                         rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
-                            part_at_snap, spec_name, gal_radius, scalarize=True, print_results=True)
+                            part_at_snap, spec_name, gal['radius'], scalarize=True,
+                            print_results=True)
 
                         # rotate to align with principal axes
                         distance_vectors = ut.coordinate.get_coordinates_rotated(
@@ -426,7 +427,7 @@ class HostDistanceClass(IndexPointerClass):
 
                     elif '2d' in host_distance_kind:
                         # compute distance along major axes and along minor axis [kpc physical]
-                        distances_t = ut.coordinate.get_distances_2d(distance_vectors)
+                        distances_t = ut.coordinate.get_distances_major_minor(distance_vectors)
 
                     else:
                         # compute total scalar distance wrt host [kpc physical]
