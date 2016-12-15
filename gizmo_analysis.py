@@ -756,7 +756,7 @@ class ImageClass(ut.io.SayClass):
         part : dict : catalog of particles
         spec_name : string : particle species to plot
         weight_prop_name : string : property to weight positions by
-        image_kind : string : 'histogram', 'points'
+        image_kind : string : 'histogram', 'histogram.3d', 'points'
         dimen_indices_plot : list : which dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
         dimen_indices_select : list : which dimensions to use to select particles
