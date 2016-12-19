@@ -39,7 +39,7 @@ def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
         214, 242, 277,
         322, 382,
         412, 446, 486,
-        534, 561, 585, 590, 600
+        534, 561, 580, 585, 590, 600
     ]
 
     if snapshot_index_limits is None or not len(snapshot_index_limits):
