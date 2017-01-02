@@ -744,7 +744,7 @@ class ImageClass(ut.io.SayClass):
         center_position=None, align_principal_axes=False, rotation_vectors=None,
         other_prop_limits={}, part_indices=None, subsample_factor=None,
         use_column_units=None, image_limits=[None, None],
-        background_color='white',
+        background_color='black',
         hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
         write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
         '''
@@ -877,6 +877,7 @@ class ImageClass(ut.io.SayClass):
         BBW = colors.LinearSegmentedColormap('bbw', ut.plot.color_map_dict['BlackBlueWhite'])
         plt.register_cmap(cmap=BBW)
 
+        # set color map
         if background_color == 'black':
             if 'dark' in spec_name:
                 color_map = plt.get_cmap('bbw')
@@ -886,9 +887,13 @@ class ImageClass(ut.io.SayClass):
                 color_map = plt.get_cmap('byw')
                 color_map = plt.cm.afmhot  # @UndefinedVariable
         elif background_color == 'white':
-            #color_map = plt.cm.YlOrBr  # @UndefinedVariable
-            #color_map = plt.cm.Greys_r,  # @UndefinedVariable
-            color_map = plt.cm.afmhot  # @UndefinedVariable
+            color_map = plt.cm.YlOrBr  # @UndefinedVariable
+
+        # set interpolation method
+        #interpolation='nearest',
+        interpolation = 'bilinear',
+        #interpolation='bicubic',
+        #interpolation='gaussian',
 
         if len(dimen_indices_plot) == 2:
             fig, subplot = ut.plot.make_figure(
@@ -919,10 +924,7 @@ class ImageClass(ut.io.SayClass):
                     norm=colors.LogNorm(),
                     cmap=color_map,
                     aspect='auto',
-                    #interpolation='nearest',
-                    interpolation='bilinear',
-                    #interpolation='bicubic',
-                    #interpolation='gaussian',
+                    interpolation=interpolation,
                     extent=np.concatenate(position_limits[dimen_indices_plot]),
                     vmin=image_limits[0], vmax=image_limits[1],
                 )
@@ -934,8 +936,7 @@ class ImageClass(ut.io.SayClass):
                     positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
                     weights=weights, range=position_limits, bins=position_bin_number,
                     norm=colors.LogNorm(),
-                    #cmap=plt.cm.YlOrBr,  # @UndefinedVariable
-                    cmap=plt.get_cmap('test'),
+                    cmap=color_map,
                     vmin=image_limits[0], vmax=image_limits[1],
                 )
                 """
@@ -947,10 +948,9 @@ class ImageClass(ut.io.SayClass):
                 subplot.imshow(
                     hist_valuess.transpose(),
                     #norm=colors.LogNorm(),
-                    cmap=color_map,  # @UndefinedVariable
+                    cmap=color_map,
                     aspect='auto',
-                    #interpolation='nearest',
-                    interpolation='none',
+                    interpolation=interpolation,
                     extent=np.concatenate(position_limits),
                     vmin=np.min(weights), vmax=np.max(weights),
                 )
@@ -1026,12 +1026,9 @@ class ImageClass(ut.io.SayClass):
                 _Image = subplot.imshow(
                     hist_valuess.transpose(),
                     norm=colors.LogNorm(),
-                    cmap=plt.cm.afmhot,  # @UndefinedVariable
+                    cmap=color_map,
                     #aspect='auto',
-                    #interpolation='nearest',
-                    interpolation='bilinear',
-                    #interpolation='bicubic',
-                    #interpolation='gaussian',
+                    interpolation=interpolation,
                     extent=np.concatenate(position_limits[plot_dimen_is]),
                     vmin=image_limits[0], vmax=image_limits[1],
                 )
@@ -1039,9 +1036,12 @@ class ImageClass(ut.io.SayClass):
                 # default method
                 """
                 hist_valuess, hist_xs, hist_ys, _Image = subplot.hist2d(
-                    positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]], weights=weights,
-                    range=position_limits, bins=position_bin_number, norm=colors.LogNorm(),
-                    cmap=plt.cm.YlOrBr)  # @UndefinedVariable
+                    positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]],
+                    norm=colors.LogNorm(),
+                    weights=weights,
+                    range=position_limits, bins=position_bin_number,
+                    cmap=color_map
+                )
                 """
 
                 #fig.colorbar(_Image)  # , ax=subplot)
@@ -1075,9 +1075,11 @@ class ImageClass(ut.io.SayClass):
                 log10(image_limits_use[0]), log10(image_limits_use[1]))
 
         if add_simulation_name:
-            plot_name = part.info['simulation.name'].replace(' ', '.') + '_' + plot_name
+            prefix = part.info['simulation.name']
+        else:
+            prefix = ''
 
-        ut.plot.parse_output(write_plot, plot_name, plot_directory)
+        ut.plot.parse_output(write_plot, plot_name, plot_directory, prefix=prefix)
 
         self.histogram_valuess = hist_valuess
         self.histogram_xs = hist_xs
@@ -1285,7 +1287,7 @@ def plot_property_v_property(
     prop_bin_number=150, weight_by_mass=True, cut_percent=0,
     host_distance_limits=[0, 300], center_position=None,
     other_prop_limits={}, part_indices=None, draw_statistics=False,
-    write_plot=False, plot_directory='.', figure_index=1):
+    write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
     '''
     Plot property v property.
 
@@ -1308,6 +1310,7 @@ def plot_property_v_property(
     draw_statistics : boolean : whether to draw statistics (such as median) on figure
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
+    add_simulation_name : boolean : whether to add name of simulation to figure name
     figure_index : int : index of figure for matplotlib
     '''
     Say = ut.io.SayClass(plot_property_v_property)
@@ -1431,9 +1434,15 @@ def plot_property_v_property(
             loc='best', prop=FontProperties(size=18))
         legend.get_frame().set_alpha(0.5)
 
+    if add_simulation_name:
+        prefix = part.info['simulation.name']
+    else:
+        prefix = ''
+
     plot_name = ut.plot.get_file_name(
         y_prop_name, x_prop_name, spec_name, snapshot_dict=part.snapshot,
-        host_distance_limits=host_distance_limits)
+        host_distance_limits=host_distance_limits, prefix=prefix)
+
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
@@ -3003,19 +3012,17 @@ class CompareSimulationsClass(ut.io.SayClass):
     '''
     Plot different simulations on same figure for comparison.
     '''
-    def __init__(self):
+    def __init__(self, plot_directory='plot'):
         '''
         Set directories and names of simulations to read.
         '''
         self.property_names = ['mass', 'position', 'form.scalefactor', 'massfraction']
+        self.galaxy_radius_limits = [0, 12]
+        self.plot_directory = ut.io.get_path(plot_directory)
 
         self.simulation_names = [
             # FIRE-1
             #['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE1'],
-
-            # FIRE-2
-            ['m12i/m12i_ref12', 'm12i r12'],
-            ['fb-sym/m12i_ref13', 'm12i r13'],
 
             # Latte halos
             ['m12i/m12i_ref12', 'm12i r12'],
@@ -3026,20 +3033,19 @@ class CompareSimulationsClass(ut.io.SayClass):
             ['m12q/m12q_ref12', 'm12q r12'],
         ]
 
-    def plot_profiles(
-        self, parts=None, distance_bin_width=0.1,
-        simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all'):
+    def plot_properties(
+        self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        species='all', distance_bin_width=0.1):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        distance_bin_width : float : width of distance bin
-        simulation_directories : list : list of simulation directories and name/label for figure.
+        simulation_directories : list : list of simulation directories and name/label for figure
         redshifts : float or list
         species : string or list : particle species to read
+        distance_bin_width : float : width of distance bin
         '''
         distance_limits_galaxy = [0.1, 30]
         distance_limits_halo = [0.5, 300]
@@ -3063,115 +3069,228 @@ class CompareSimulationsClass(ut.io.SayClass):
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
                     parts, 'total', 'mass', 'vel.circ', 'linear', False, [0, None],
-                    [0.1, 300], distance_bin_width, write_plot=True)
+                    [0.1, 300], distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
                 plot_property_v_distance(
                     parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width, write_plot=True)
+                    distance_limits_halo, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
                 plot_property_v_distance(
                     parts, 'baryon', 'mass', 'sum.cum.fraction', 'linear', False, [0, 2],
-                    [10, 2000], distance_bin_width, write_plot=True)
+                    [10, 2000], distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
-            if 'dark' in parts[0]:
+            prop_name = 'dark'
+            if prop_name in parts[0]:
                 plot_property_v_distance(
-                    parts, 'dark', 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width, write_plot=True)
-
-                plot_property_v_distance(
-                    parts, 'dark', 'mass', 'density', 'log', False, [None, None],
-                    distance_limits_galaxy, distance_bin_width, write_plot=True)
-
-            if 'gas' in parts[0]:
-                plot_property_v_distance(
-                    parts, 'gas', 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width, write_plot=True)
+                    parts, prop_name, 'mass', 'sum.cum', 'log', False, [None, None],
+                    distance_limits_halo, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
                 plot_property_v_distance(
-                    parts, 'star', 'metallicity.total', 'median', 'linear', True, [None, None],
-                    distance_limits_galaxy, distance_bin_width, write_plot=True)
+                    parts, prop_name, 'mass', 'density', 'log', False, [None, None],
+                    distance_limits_galaxy, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
-                if 'velocity' in parts[0]['gas']:
-                    plot_property_v_distance(
-                        parts, 'gas', 'host.velocity.rad', 'average', 'linear', True, [None, None],
-                        distance_limits_halo, 0.25, write_plot=True)
+            prop_name = 'gas'
+            if prop_name in parts[0]:
+                plot_property_v_distance(
+                    parts, prop_name, 'mass', 'sum.cum', 'log', False, [None, None],
+                    distance_limits_halo, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                plot_property_v_distance(
+                    parts, prop_name, 'metallicity.total', 'median', 'linear', True, [None, None],
+                    distance_limits_galaxy, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
                 plot_property_distribution(
-                    parts, 'gas', 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
-                    'probability', distance_limits_halo, write_plot=True)
+                    parts, prop_name, 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
+                    'probability', distance_limits_halo, axis_y_limits=[1e-4, None],
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
 
-            if 'star' in parts[0]:
-                plot_property_v_distance(
-                    parts, 'star', 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width, write_plot=True)
-
-                plot_property_v_distance(
-                    parts, 'star', 'mass', 'density', 'log', False, [None, None],
-                    distance_limits_galaxy, distance_bin_width, write_plot=True)
-
-                if 'form.scalefactor' in parts[0]['star'] and redshift <= 5:
+                if 'velocity' in parts[0][prop_name]:
                     plot_property_v_distance(
-                        parts, 'star', 'age', 'average', 'linear', True,
-                        [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)
+                        parts, prop_name, 'host.velocity.rad', 'average', 'linear', True,
+                        [None, None], distance_limits_halo, 0.25,
+                        write_plot=True, plot_directory=self.plot_directory,
+                    )
 
+            prop_name = 'star'
+            if prop_name in parts[0]:
+                plot_property_v_distance(
+                    parts, prop_name, 'mass', 'sum.cum', 'log', False, [None, None],
+                    distance_limits_halo, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                plot_property_v_distance(
+                    parts, prop_name, 'mass', 'density', 'log', False, [None, None],
+                    distance_limits_galaxy, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                plot_property_v_distance(
+                    parts, prop_name, 'metallicity.fe', 'median', 'linear', True,
+                    [None, None], distance_limits_galaxy, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                plot_property_v_distance(
+                    parts, prop_name, 'metallicity.mg-metallicity.fe', 'median', 'linear', True,
+                    [None, None], distance_limits_galaxy, distance_bin_width,
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                plot_property_distribution(
+                    parts, prop_name, 'metallicity.fe', [-4, 1.3], 0.1, None, 'linear',
+                    'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                plot_property_distribution(
+                    parts, prop_name, 'metallicity.mg-metallicity.fe', [-1.7, 0.6], 0.1, None,
+                    'linear', 'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
+                    write_plot=True, plot_directory=self.plot_directory,
+                )
+
+                if 'form.scalefactor' in parts[0][prop_name] and redshift <= 5:
                     plot_property_v_distance(
-                        parts, 'star', 'metallicity.total', 'median', 'linear', True,
-                        [None, None], distance_limits_galaxy, distance_bin_width, write_plot=True)
-
-                    plot_property_distribution(
-                        parts, 'star', 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
-                        'probability', [0, 15], write_plot=True)
-
-                    plot_property_distribution(
-                        parts, 'star', 'metallicity.iron', [-4, 1.3], 0.1, None, 'linear',
-                        'probability', [0, 15], write_plot=True)
-
-                    plot_property_distribution(
-                        parts, 'star', 'metallicity.magnesium-metallicity.iron', [-1.8, 0.8], 0.1,
-                        None, 'linear', 'probability', [0, 15], write_plot=True)
+                        parts, prop_name, 'age', 'average', 'linear', True,
+                        [None, None], distance_limits_galaxy, distance_bin_width,
+                        write_plot=True, plot_directory=self.plot_directory,
+                    )
 
                     plot_star_form_history(
                         parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
-                        distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+                        self.galaxy_radius_limits, sfh_limits=[None, None],
+                        write_plot=True, plot_directory=self.plot_directory,
+                    )
 
                     plot_star_form_history(
                         parts, 'form.rate', 'time.lookback', [0, 13], 0.5, 'linear',
-                        distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+                        self.galaxy_radius_limits, sfh_limits=[None, None],
+                        write_plot=True, plot_directory=self.plot_directory,
+                    )
 
                     plot_star_form_history(
                         parts, 'form.rate.specific', 'time.lookback', [0, 13], 0.5, 'linear',
-                        distance_limits=[0, 15], sfh_limits=[None, None], write_plot=True)
+                        self.galaxy_radius_limits, sfh_limits=[None, None],
+                        write_plot=True, plot_directory=self.plot_directory,
+                    )
 
+            self.plot_properties_2d(parts, redshifts=redshift)
             self.plot_images(parts, redshifts=redshift)
 
+    def plot_properties_2d(
+        self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
+        species='all', prop_bin_number=100):
+        '''
+        Plot property v property for each simulation at each redshift.
+
+        Parameters
+        ----------
+        parts : list : dictionaries of particles at snapshot
+        simulation_directories : list : list of simulation directories and name/label for figure
+        redshifts : float or list
+        species : string or list : particle species to read
+        prop_bin_number : int : number of bins along each dimension for histogram
+        '''
+        plot_directory = self.plot_directory + 'property_2d'
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        if np.isscalar(redshifts):
+            redshifts = [redshifts]
+
+        if parts is not None and len(redshifts) > 1:
+            self.say('! input particles at single snapshot but also input more than one redshift')
+            return
+
+        for redshift in redshifts:
+            if parts is None or len(redshifts) > 1:
+                from . import gizmo_io
+                parts = gizmo_io.Read.read_simulations(
+                    simulation_directories, species, redshift, self.property_names)
+
+            for part in parts:
+                prop_name = 'star'
+                if prop_name in parts[0]:
+                    plot_property_v_property(
+                        part, prop_name,
+                        'metallicity.fe', [-3, 1], 'linear',
+                        'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
+                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        draw_statistics=True,
+                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+
+                    plot_property_v_property(
+                        part, prop_name,
+                        'age', [0, 13.5], 'linear',
+                        'metallicity.fe', [-3, 1], 'linear',
+                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        draw_statistics=True,
+                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+
+                    plot_property_v_property(
+                        part, prop_name,
+                        'age', [0, 13.5], 'linear',
+                        'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
+                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        draw_statistics=True,
+                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+
+                #prop_name = 'gas'
+                #if prop_name in parts[0]:
+                #    plot_property_v_property(
+                #        part, prop_name,
+                #        'number.density', [-4, 4], 'log',
+                #        'temperature', y_prop_limits=[10, 1e7], 'log',
+                #        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                #        draw_statistics=False,
+                #        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+
     def plot_images(
-        self, parts=None,
-        distance_max=20, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
-        align_principal_axes=True, simulation_directories=None,
+        self, parts=None, simulation_directories=None,
         redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
                    0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
                    0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
                    0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
                    0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
-        species=['star', 'gas'], property_names=['mass', 'position']):
+        species=['star', 'gas'],
+        distance_max=20, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
+        align_principal_axes=True):
         '''
         Plot images of simulations at each snapshot.
 
         Parameters
         ----------
         parts : list : list of particle dictionaries at snapshot
+        simulation_directories : list : list of simulation directories and name/label for figure
+        redshifts : float or list
+        species : string or list : particle species to read
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
         image_limits : list : min and max limits for image dyanmic range
         align_principal_axes : boolean : whether to align plot axes with principal axes
-        simulation_names : list : list of simulation directories and name/label for figure.
-        redshifts : float or list
-        species : string or list : particle species to read
-        property_names : string or list : names of properties to read
-        element_indices : int or list : indices of elements to keep
-            note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
-        force_float32 : boolean : whether to force positions to be 32-bit
         '''
+        property_names = ['mass', 'position']
+        plot_directory = self.plot_directory + 'property_2d'
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
         if np.isscalar(redshifts):
             redshifts = [redshifts]
 
@@ -3191,8 +3310,10 @@ class CompareSimulationsClass(ut.io.SayClass):
                         Image.plot_image(
                             part, spec_name, 'mass', 'histogram',
                             [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
-                            image_limits=image_limits, align_principal_axes=align_principal_axes,
-                            write_plot=True, plot_directory='image', add_simulation_name=True,
+                            align_principal_axes=align_principal_axes, image_limits=image_limits,
+                            background_color='black',
+                            write_plot=True, plot_directory=plot_directory,
+                            add_simulation_name=True,
                         )
 
 CompareSimulations = CompareSimulationsClass()
