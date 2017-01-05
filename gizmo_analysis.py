@@ -890,10 +890,10 @@ class ImageClass(ut.io.SayClass):
             color_map = plt.cm.YlOrBr  # @UndefinedVariable
 
         # set interpolation method
-        #interpolation='nearest',
-        interpolation = 'bilinear',
-        #interpolation='bicubic',
-        #interpolation='gaussian',
+        #interpolation='nearest'
+        interpolation = 'bilinear'
+        #interpolation='bicubic'
+        #interpolation='gaussian'
 
         if len(dimen_indices_plot) == 2:
             fig, subplot = ut.plot.make_figure(
