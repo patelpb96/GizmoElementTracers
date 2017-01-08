@@ -8,7 +8,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 
 # system ----
-from __future__ import absolute_import, division, print_function  # python 2 compatability
+from __future__ import absolute_import, division, print_function  # python 2 compatibility
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
