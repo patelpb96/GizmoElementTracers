@@ -43,10 +43,10 @@ os.sys.stdout.flush()
 
 # execute
 if 'indices' in function_kind:
-    gizmo_track.write_particle_index_pointer(
+    gizmo_track.IndexPointer.write_index_pointer(
         species='star', match_prop_name='id.child', test_prop_name='form.scalefactor')
 
 if 'distances' in function_kind:
-    gizmo_track.HostDistance.write_star_form_host_distance()
+    gizmo_track.HostDistance.write_form_host_distance()
 
 ScriptPrint.print_final()

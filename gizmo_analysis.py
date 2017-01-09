@@ -3081,7 +3081,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts = gizmo_io.Read.read_simulations(
                     simulation_directories, species, redshift, self.property_names)
 
-            self.print_sizes(parts, None, redshifts, ['star'], distance_max=15)
+            self.print_masses_sizes(parts, None, redshifts, ['star'], distance_max=15)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
@@ -3334,7 +3334,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                             add_simulation_name=True,
                         )
 
-    def print_sizes(
+    def print_masses_sizes(
         self, parts=None, simulation_directories=None,
         redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
                    0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
@@ -3382,16 +3382,18 @@ class CompareSimulationsClass(ut.io.SayClass):
                         axis_kind='both', axis_distance_max=distance_max)
                     gals.append(gal)
 
-                self.say('species = {}, mass.fraction = {}%'.format(spec_name, mass_fraction))
+                self.say('species = {}'.format(spec_name))
                 for part_i, part in enumerate(parts):
-                    self.say(
-                        '{}: R_major = {:.1f} kpc ({:.2f}), R_minor = {:.1f} kpc ({:.2f})'.format(
-                            part.info['simulation.name'],
-                            gals[part_i]['radius.major'],
-                            gals[part_i]['radius.major'] / gals[0]['radius.major'],
-                            gals[part_i]['radius.minor'],
-                            gals[part_i]['radius.minor'] / gals[0]['radius.minor'],)
-                    )
+                    gal = gals[part_i]
+                    self.say('{}'.format(part.info['simulation.name']))
+                    self.say('* M_{},{} = {:2e} Msun ({:.2f})'.format(
+                             spec_name, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass'],))
+                    string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
+                    self.say(string.format(
+                             mass_fraction, gal['radius.major'],
+                             gal['radius.major'] / gals[0]['radius.major'],
+                             mass_fraction. gals[part_i]['radius.minor'],
+                             gal['radius.minor'] / gals[0]['radius.minor'],))
 
 CompareSimulations = CompareSimulationsClass()
 
