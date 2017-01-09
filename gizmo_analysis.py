@@ -3081,7 +3081,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts = gizmo_io.Read.read_simulations(
                     simulation_directories, species, redshift, self.property_names)
 
-            self.print_sizes(parts, redshifts=redshifts, ['star'], 15)
+            self.print_sizes(parts, None, redshifts, ['star'], distance_max=15)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
@@ -3304,7 +3304,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         property_names = ['mass', 'position']
         spec_names = ['star', 'gas']
-        plot_directory = self.plot_directory + 'property_2d'
+        plot_directory = self.plot_directory + 'image'
 
         if isinstance(parts, dict):
             parts = [parts]
@@ -3385,12 +3385,12 @@ class CompareSimulationsClass(ut.io.SayClass):
                 self.say('species = {}, mass.fraction = {}%'.format(spec_name, mass_fraction))
                 for part_i, part in enumerate(parts):
                     self.say(
-                        '{}: R_major = {:.1f} kpc ({:.0f}%), R_minor = {:.1f} kpc ({:.0f}%)'.format(
+                        '{}: R_major = {:.1f} kpc ({:.2f}), R_minor = {:.1f} kpc ({:.2f})'.format(
                             part.info['simulation.name'],
                             gals[part_i]['radius.major'],
-                            100 * gals[part_i]['radius.major'] / gals[0]['radius.major'],
+                            gals[part_i]['radius.major'] / gals[0]['radius.major'],
                             gals[part_i]['radius.minor'],
-                            100 * gals[part_i]['radius.minor'] / gals[0]['radius.minor'],)
+                            gals[part_i]['radius.minor'] / gals[0]['radius.minor'],)
                     )
 
 CompareSimulations = CompareSimulationsClass()
