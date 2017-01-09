@@ -25,21 +25,23 @@ class ParticleDictionaryClass(dict):
     Dictionary class to store particle data.
     Allows greater flexibility for producing derived quantities.
     '''
-    # use to translate between element name and index in element table
-    element_dict = collections.OrderedDict()
-    element_dict['metals'] = element_dict['total'] = 0
-    element_dict['helium'] = element_dict['he'] = 1
-    element_dict['carbon'] = element_dict['c'] = 2
-    element_dict['nitrogen'] = element_dict['n'] = 3
-    element_dict['oxygen'] = element_dict['o'] = 4
-    element_dict['neon'] = element_dict['ne'] = 5
-    element_dict['magnesium'] = element_dict['mg'] = 6
-    element_dict['silicon'] = element_dict['si'] = 7
-    element_dict['sulphur'] = element_dict['s'] = 8
-    element_dict['calcium'] = element_dict['ca'] = 9
-    element_dict['iron'] = element_dict['fe'] = 10
+    def __init__(self):
+        # use to translate between element name and index in element table
+        self.element_dict = collections.OrderedDict()
+        self.element_dict['metals'] = self.element_dict['total'] = 0
+        self.element_dict['helium'] = self.element_dict['he'] = 1
+        self.element_dict['carbon'] = self.element_dict['c'] = 2
+        self.element_dict['nitrogen'] = self.element_dict['n'] = 3
+        self.element_dict['oxygen'] = self.element_dict['o'] = 4
+        self.element_dict['neon'] = self.element_dict['ne'] = 5
+        self.element_dict['magnesium'] = self.element_dict['mg'] = 6
+        self.element_dict['silicon'] = self.element_dict['si'] = 7
+        self.element_dict['sulphur'] = self.element_dict['s'] = 8
+        self.element_dict['calcium'] = self.element_dict['ca'] = 9
+        self.element_dict['iron'] = self.element_dict['fe'] = 10
 
-    element_pointer = np.arange(len(element_dict))  # use if read only subset of elements
+        # to use if read only subset of elements
+        self.element_pointer = np.arange(len(self.element_dict) / 2, dtype=np.int32)
 
     def prop(self, property_name='', indices=None):
         '''
