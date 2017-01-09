@@ -3382,17 +3382,17 @@ class CompareSimulationsClass(ut.io.SayClass):
                         axis_kind='both', axis_distance_max=distance_max)
                     gals.append(gal)
 
-                self.say('species = {}'.format(spec_name))
+                self.say('\n\n# species = {}'.format(spec_name))
                 for part_i, part in enumerate(parts):
                     gal = gals[part_i]
-                    self.say('{}'.format(part.info['simulation.name']))
-                    self.say('* M_{},{} = {:2e} Msun ({:.2f})'.format(
+                    self.say('# {}'.format(part.info['simulation.name']))
+                    self.say('M_{},{} = {:2e} Msun ({:.2f})'.format(
                              spec_name, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass'],))
-                    string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
+                    string = 'R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
                     self.say(string.format(
                              mass_fraction, gal['radius.major'],
                              gal['radius.major'] / gals[0]['radius.major'],
-                             mass_fraction. gals[part_i]['radius.minor'],
+                             mass_fraction, gal['radius.minor'],
                              gal['radius.minor'] / gals[0]['radius.minor'],))
 
 CompareSimulations = CompareSimulationsClass()
