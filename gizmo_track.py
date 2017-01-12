@@ -440,7 +440,7 @@ class HostDistanceClass(IndexPointerClass):
                     part[spec_name][host_distance_kind][part_indices_form] = distances_t
 
                 # continuously (re)write as go
-                self.io_form_host_distance(part, 'write', self.directory)
+                self.io_form_host_distance(part, 'write')
 
     def io_form_host_distance(self, part, io_direction='read'):
         '''
