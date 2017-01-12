@@ -17,6 +17,7 @@
 
 '''
 Submit gizmo particle tracking to queue.
+Submit this script from within primary simulation directory.
 
 @author: Andrew Wetzel
 '''
@@ -28,6 +29,9 @@ import os
 # local ----
 from utilities.basic import io as ut_io
 from gizmo import gizmo_track
+
+
+species = 'star'  # which particle species to track
 
 
 ScriptPrint = ut_io.ScriptPrintClass('slurm')
@@ -43,10 +47,12 @@ os.sys.stdout.flush()
 
 # execute
 if 'indices' in function_kind:
-    gizmo_track.IndexPointer.write_index_pointer(
-        species='star', match_prop_name='id.child', test_prop_name='form.scalefactor')
+    IndexPointer = gizmo_track.IndexPointerClass(species)
+    IndexPointer.write_index_pointer(
+        match_prop_name='id.child', test_prop_name='form.scalefactor')
 
 if 'distances' in function_kind:
-    gizmo_track.HostDistance.write_form_host_distance()
+    HostDistance = gizmo_track.HostDistanceClass(species)
+    HostDistance.write_form_host_distance()
 
 ScriptPrint.print_final()
