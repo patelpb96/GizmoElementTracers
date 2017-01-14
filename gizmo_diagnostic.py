@@ -256,7 +256,8 @@ def print_properties_statistics(
     if 'all' in species_names:
         species_names = ['dark.2', 'dark', 'star', 'gas']
 
-    part = gizmo_io.Read.read_snapshots(
+    Read = gizmo_io.ReadClass()
+    part = Read.read_snapshots(
         species_names, snapshot_number_kind, snapshot_number, simulation_directory,
         snapshot_directory, '', None, None, assign_center=False,
         separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
@@ -316,7 +317,8 @@ def print_properties_snapshots(
 
     for snapshot_i in Snapshot['index']:
         try:
-            part = gizmo_io.Read.read_snapshots(
+            Read = gizmo_io.ReadClass()
+            part = Read.read_snapshots(
                 species_read, 'index', snapshot_i, simulation_directory, snapshot_directory, '',
                 properties_read, element_indices, assign_center=False, sort_dark_by_id=False,
                 force_float32=False)
@@ -365,7 +367,8 @@ def plot_contamination(redshift=0, directory='.'):
 
     os.chdir(directory)
 
-    part = gizmo_io.Read.read_snapshots(
+    Read = gizmo_io.ReadClass()
+    part = Read.read_snapshots(
         ['dark', 'dark.2'], 'redshift', redshift, directory,
         property_names=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 

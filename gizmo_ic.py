@@ -146,7 +146,8 @@ class ReadClass(ut.io.SayClass):
         parts = []
 
         for snapshot_redshift in self.snapshot_redshifts:
-            part = gizmo_io.Read.read_snapshots(
+            Read = gizmo_io.ReadClass()
+            part = Read.read_snapshots(
                 'all', 'redshift', snapshot_redshift, self.simulation_directory,
                 property_names=property_names, assign_center=False,
                 sort_dark_by_id=sort_dark_by_id, force_float32=force_float32)
@@ -171,7 +172,8 @@ class ReadClass(ut.io.SayClass):
         '''
         from rockstar import rockstar_io
 
-        hal = rockstar_io.Read.read_catalogs(
+        Read = rockstar_io.ReadClass()
+        hal = Read.read_catalogs(
             'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=False,
             sort_host_first=False)
 
@@ -429,7 +431,6 @@ def read_write_initial_points_from_zoom(
         print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
 
     Read = ReadClass(snapshot_redshifts, simulation_directory)
-
     parts = Read.read_particles()
 
     center_position = ut.particle.get_center_position(

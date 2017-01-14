@@ -89,7 +89,8 @@ class IndexPointerClass(ut.io.SayClass):
                 property_names_read.append(match_prop_name)
             if test_prop_name and test_prop_name not in property_names_read:
                 property_names_read.append(test_prop_name)
-            part = gizmo_io.Read.read_snapshots(
+            Read = gizmo_io.ReadClass()
+            part = Read.read_snapshots(
                 spec_name, 'redshift', 0, property_names=property_names_read,
                 element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
 
@@ -146,7 +147,8 @@ class IndexPointerClass(ut.io.SayClass):
             part_ids = part[spec_name]['id'][part_indices]
 
             # read particles at this snapshot
-            part_at_snap = gizmo_io.Read.read_snapshots(
+            Read = gizmo_io.ReadClass()
+            part_at_snap = Read.read_snapshots(
                 spec_name, 'index', snapshot_index,
                 property_names=['id', match_prop_name, test_prop_name], element_indices=[0],
                 force_float32=True, assign_center=False, check_sanity=False)
@@ -318,7 +320,8 @@ class HostDistanceClass(IndexPointerClass):
             # read all properties possibly relevant for matching
             property_names_read = [
                 'position', 'mass', 'id', 'id.child', 'massfraction.metals', 'form.scalefactor']
-            part = gizmo_io.Read.read_snapshots(
+            Read = gizmo_io.ReadClass()
+            part = Read.read_snapshots(
                 spec_name, 'redshift', 0, property_names=property_names_read, element_indices=[0],
                 force_float32=True, assign_center=False, check_sanity=False)
 
@@ -357,7 +360,8 @@ class HostDistanceClass(IndexPointerClass):
                      part_indices_form.size, snapshot_index))
 
             if part_indices_form.size:
-                part_at_snap = gizmo_io.Read.read_snapshots(
+                Read = gizmo_io.ReadClass()
+                part_at_snap = Read.read_snapshots(
                     spec_name, 'index', snapshot_index, property_names=['position', 'mass', 'id'],
                     force_float32=True, assign_center=True, check_sanity=True)
 

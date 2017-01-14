@@ -9,17 +9,14 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatibility
-
 import collections
-
-from numpy import log10, Inf  # @UnusedImport
 import h5py
-
 import numpy as np
+from numpy import log10, Inf  # @UnusedImport
+# local ----
 import utilities as ut
 
 
-# local ----
 #===================================================================================================
 # particle dictionary class
 #===================================================================================================
@@ -227,7 +224,7 @@ class ReadClass(ut.io.SayClass):
         # dark-matter species
         self.species_dict['dark'] = 1  # dark matter at highest resolution
         self.species_dict['dark.2'] = 2  # lower-resolution dark matter across all resolutions
-        self.species_dict['dark.3'] = 3
+        #self.species_dict['dark.3'] = 3
         #self.species_dict['dark.4'] = 5
         # baryon species
         self.species_dict['gas'] = 0
@@ -237,8 +234,8 @@ class ReadClass(ut.io.SayClass):
         #self.species_dict['bulge'] = 2
         #self.species_dict['disk'] = 3
 
-        self.species_names_all = list(self.species_dict.keys())
-        self.species_names_read = list(self.species_dict.keys())
+        self.species_names_all = tuple(self.species_dict.keys())
+        self.species_names_read = self.species_names_all
 
     def read_snapshots(
         self, species_names='all',
@@ -299,7 +296,7 @@ class ReadClass(ut.io.SayClass):
                 if spec_name not in self.species_dict:
                     species_names.remove(spec_name)
                     self.say('! not recognize input species = {}'.format(spec_name))
-        self.species_names_read = species_names
+        self.species_names_read = list(species_names)
 
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)

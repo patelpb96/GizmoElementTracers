@@ -2678,6 +2678,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     gal : dict : dictionary of host galaxy properties at input redshifts
     '''
     from . import gizmo_io
+    Read = gizmo_io.ReadClass()
 
     star_distance_max = 15
 
@@ -2712,7 +2713,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     redshifts = np.sort(redshifts)
 
     for _zi, redshift in enumerate(redshifts):
-        part = gizmo_io.Read.read_snapshots(
+        part = Read.read_snapshots(
             species, 'redshift', redshift, simulation_directory, property_names=properties_read,
             force_float32=True)
 
@@ -2851,6 +2852,7 @@ def get_galaxy_mass_profiles_v_redshift(
     dictionary of galaxy/halo properties at each redshift
     '''
     from . import gizmo_io
+    Read = gizmo_io.ReadClass()
 
     species_read = ['star', 'dark']
     properties_read = ['mass', 'position', 'velocity', 'potential']
@@ -2905,7 +2907,7 @@ def get_galaxy_mass_profiles_v_redshift(
         if parts is not None and len(parts):
             part = parts[zi]
         else:
-            part = gizmo_io.Read.read_snapshots(
+            part = Read.read_snapshots(
                 species_read, 'redshift', redshift, directory, property_names=properties_read,
                 force_float32=True)
 
@@ -3078,7 +3080,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
                 from . import gizmo_io
-                parts = gizmo_io.Read.read_simulations(
+                Read = gizmo_io.ReadClass()
+                parts = Read.read_simulations(
                     simulation_directories, species, redshift, self.property_names)
 
             self.print_masses_sizes(parts, None, redshifts, ['star'], distance_max=15)
@@ -3238,7 +3241,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
                 from . import gizmo_io
-                parts = gizmo_io.Read.read_simulations(
+                Read = gizmo_io.ReadClass()
+                parts = Read.read_simulations(
                     simulation_directories, species, redshift, self.property_names)
 
             for part in parts:
@@ -3319,7 +3323,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
                 from . import gizmo_io
-                parts = gizmo_io.Read.read_simulations(
+                Read = gizmo_io.ReadClass()
+                parts = Read.read_simulations(
                     simulation_directories, species, redshift, property_names)
 
             for part in parts:
@@ -3371,7 +3376,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if parts is None or len(redshifts) > 1:
                 from . import gizmo_io
-                parts = gizmo_io.Read.read_simulations(
+                Read = gizmo_io.ReadClass()
+                parts = Read.read_simulations(
                     simulation_directories, species, redshift, property_names)
 
             gals = []
@@ -3429,7 +3435,8 @@ def compare_resolution(
                 assign_center = True
                 if 'ref14' in simulation_dir:
                     assign_center = False
-                part = gizmo_io.Read.read_snapshots(
+                Read = gizmo_io.ReadClass()
+                part = Read.read_snapshots(
                     'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
                     property_names=['position', 'mass'], assign_center=assign_center,
                     force_float32=True)
