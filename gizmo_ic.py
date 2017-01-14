@@ -255,7 +255,8 @@ def write_initial_points(
         if not halo_radius:
             halo_prop = ut.particle.get_halo_properties(
                 part_fin, 'all', virial_kind, center_position=center_position)
-        distance_max *= halo_prop['radius']
+            halo_radius = halo_prop['radius']
+        distance_max *= halo_radius
 
     mass_select = 0
     positions_ini = []

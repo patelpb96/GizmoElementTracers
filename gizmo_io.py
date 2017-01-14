@@ -283,7 +283,7 @@ class ReadClass(ut.io.SayClass):
         parts : dictionary or list thereof :
             if single snapshot, return as dictionary, else if multiple snapshots, return as list
         '''
-        # parse input species list
+        # parse input species to read
         if species_names == 'all' or species_names == ['all'] or not species_names:
             # read all species in snapshot
             species_names = self.species_names_all
@@ -619,12 +619,13 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
 
+        self.say('snapshot contains the following number of particles:')
         # keep only species that have any particles
         read_particle_number = 0
         for spec_name in self.species_names_all:
             spec_id = self.species_dict[spec_name]
             if spec_name in self.species_names_read:
-                self.say('species = {:9s} (id = {}): {} particles'.format(
+                self.say('{:9s} (id = {}): {} particles'.format(
                          spec_name, spec_id, header['particle.numbers.total'][spec_id]))
 
                 if header['particle.numbers.total'][spec_id] > 0:
