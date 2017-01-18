@@ -235,7 +235,7 @@ class ReadClass(ut.io.SayClass):
         #self.species_dict['disk'] = 3
 
         self.species_names_all = tuple(self.species_dict.keys())
-        self.species_names_read = self.species_names_all
+        self.species_names_read = list(self.species_names_all)
 
     def read_snapshots(
         self, species_names='all',
@@ -964,10 +964,11 @@ class ReadClass(ut.io.SayClass):
 
         if sort_dark_by_id:
             # order dark-matter particles by id - should be conserved across snapshots
+            self.say('* sorting the following dark particles by id:'.format(spec_name))
             for spec_name in part:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
-                    self.say('* sorting {:6} particles by id'.format(spec_name))
                     indices_sorted = np.argsort(part[spec_name]['id'])
+                    self.say('{}: {} particles'.format(spec_name, indices_sorted.size))
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted]
             del(indices_sorted)
