@@ -473,12 +473,8 @@ class ReadClass(ut.io.SayClass):
         '''
         directory = ut.io.get_path(directory)
 
-        try:
-            path_names, file_indices = ut.io.get_file_names(
-                directory + self.snapshot_name_base, int)
-        except:
-            path_names, file_indices = ut.io.get_file_names(
-                directory + self.snapshot_name_base, float)
+        path_names, file_indices = ut.io.get_file_names(
+            directory + self.snapshot_name_base, (int, float))
 
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
