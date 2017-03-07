@@ -69,7 +69,7 @@ def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
 # transfer files
 #===================================================================================================
 def transfer_snapshots(
-    machine_name='stampede', from_directory='$STAMPEDE_SCRATCH/m12/m12i/fb-sym/m12i_ref13/output',
+    machine_name='stampede', from_directory='$STAMPEDE_FIRE/m12/m12i/m12i_res7000/output',
     snapshot_indices=[600], to_directory='.'):
     '''
     Transfer snapshot file[s] or directory[s] from remote machine to local.

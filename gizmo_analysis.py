@@ -884,8 +884,8 @@ class ImageClass(ut.io.SayClass):
             elif spec_name == 'gas':
                 color_map = plt.cm.afmhot  # @UndefinedVariable
             elif spec_name == 'star':
-                color_map = plt.get_cmap('byw')
-                #color_map = plt.cm.afmhot  # @UndefinedVariable
+                #color_map = plt.get_cmap('byw')
+                color_map = plt.cm.afmhot  # @UndefinedVariable
         elif background_color == 'white':
             color_map = plt.cm.YlOrBr  # @UndefinedVariable
 
@@ -1339,7 +1339,9 @@ def plot_property_v_property(
         distances = ut.coordinate.get_distances(
             'scalar', center_position, part[spec_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scalefactor']
+        print(distances)
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
+    print(part_indices)
 
     x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
     y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
@@ -2884,10 +2886,10 @@ def get_galaxy_mass_profiles_v_redshift(
         'profile.major.distance': [],  # distance bins along major (R) axis [kpc physical]
         'profile.major.density': [],  # surface density, in 2-D [M_sun / kpc ^ 2]
 
-        'profile.minor.bulge.distance': [],  # distance bins along minor (z) axis [kpc physical]
+        'profile.minor.bulge.distance': [],  # distance bins along minor (Z) axis [kpc physical]
         'profile.minor.bulge.density': [],  # density, in 1-D [M_sun / kpc]
 
-        'profile.minor.disk.distance': [],  # distance bins along minor (z) axis [kpc physical]
+        'profile.minor.disk.distance': [],  # distance bins along minor (Z) axis [kpc physical]
         'profile.minor.disk.density': [],  # density, in 1-D [M_sun / kpc]
     }
 
@@ -3038,16 +3040,12 @@ class CompareSimulationsClass(ut.io.SayClass):
         self.plot_directory = ut.io.get_path(plot_directory)
 
         self.simulation_names = [
-            # FIRE-1
-            #['/work/02769/arwetzel/fire/m12i_ref12', 'm12i r12 FIRE1'],
-
-            # Latte halos
-            ['m12i/m12i_ref12', 'm12i r12'],
-            ['m12b/m12b_ref12', 'm12b r12'],
-            ['m12m/m12m_ref12', 'm12m r12'],
-            ['m12c/m12c_ref12', 'm12c r12'],
-            ['m12f/m12f_ref12', 'm12f r12'],
-            ['m12q/m12q_ref12', 'm12q r12'],
+            ['m12i/m12i_res56000', 'm12i r56000'],
+            ['m12b/m12b_res56000', 'm12b r56000'],
+            ['m12m/m12m_res56000', 'm12m r56000'],
+            ['m12c/m12c_res56000', 'm12c r56000'],
+            ['m12f/m12f_res56000', 'm12f r56000'],
+            ['m12q/m12q_res56000', 'm12q r56000'],
         ]
 
     def plot_properties(
@@ -3246,10 +3244,10 @@ class CompareSimulationsClass(ut.io.SayClass):
                     simulation_directories, species, redshift, self.property_names)
 
             for part in parts:
-                prop_name = 'star'
-                if prop_name in parts[0]:
+                spec_name = 'star'
+                if spec_name in parts[0]:
                     plot_property_v_property(
-                        part, prop_name,
+                        part, spec_name,
                         'metallicity.fe', [-3, 1], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
                         prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
@@ -3257,7 +3255,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
                     plot_property_v_property(
-                        part, prop_name,
+                        part, spec_name,
                         'age', [0, 13.5], 'linear',
                         'metallicity.fe', [-3, 1], 'linear',
                         prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
@@ -3265,17 +3263,17 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
                     plot_property_v_property(
-                        part, prop_name,
+                        part, spec_name,
                         'age', [0, 13.5], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
                         prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=True,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
-                #prop_name = 'gas'
-                #if prop_name in parts[0]:
+                #spec_name = 'gas'
+                #if spec_name in parts[0]:
                 #    plot_property_v_property(
-                #        part, prop_name,
+                #        part, spec_name,
                 #        'number.density', [-4, 4], 'log',
                 #        'temperature', y_prop_limits=[10, 1e7], 'log',
                 #        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
@@ -3416,13 +3414,12 @@ def compare_resolution(
 
     if not simulation_names:
         simulation_names = [
-            ['m12i_ref11_dm', 'm12i r11 dm'],
-            ['m12i_ref11_dm_res-adapt', 'm12i r11 dm res-adapt'],
-            ['m12i_ref12_dm', 'm12i r12 dm'],
-            ['m12i_ref12_dm_res-adapt', 'm12i r12 dm res-adapt'],
-            ['m12i_ref13_dm', 'm12i r13 dm'],
-            ['m12i_ref13_dm_res-adapt', 'm12i r13 dm res-adapt'],
-            #['/work/02769/arwetzel/m12/m12i/tests/m12i_ref14_dm_res-low', 'm12i r14 dm'],
+            ['m12i_res450000_dm', 'm12i r450000 dm'],
+            ['m12i_res450000_dm_res-adapt', 'm12i r450000 dm res-adapt'],
+            ['m12i_res56000_dm', 'm12i r56000 dm'],
+            ['m12i_res56000_dm_res-adapt', 'm12i r56000 dm res-adapt'],
+            ['m12i_res7000_dm', 'm12i r7000 dm'],
+            ['m12i_res7000_dm_res-adapt', 'm12i r7000 dm res-adapt'],
         ]
 
     if np.isscalar(redshifts):
@@ -3433,14 +3430,14 @@ def compare_resolution(
         for simulation_dir, simulation_name in simulation_names:
             for redshift in redshifts:
                 assign_center = True
-                if 'ref14' in simulation_dir:
+                if 'res880' in simulation_dir:
                     assign_center = False
                 Read = gizmo_io.ReadClass()
                 part = Read.read_snapshots(
                     'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
                     property_names=['position', 'mass'], assign_center=assign_center,
                     force_float32=True)
-                if 'ref14' in simulation_dir:
+                if 'res880' in simulation_dir:
                     part.center_position = np.array(
                         [41820.015, 44151.745, 46272.818], dtype=np.float32)
                 if len(redshifts) > 1:

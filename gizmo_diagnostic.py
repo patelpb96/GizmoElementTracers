@@ -81,33 +81,32 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
 # simulation diagnostic
 #===================================================================================================
 def print_run_times(
-    simulation_directory='.', output_directory='output/', runtime_file_name='gizmo.out',
-    scale_factors=[
-        0.1, 0.2, 0.25, 0.3, 0.333, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0],
-    wall_time_restart=0, get_values=False):
+    simulation_directory='.', output_directory='output/', cpu_number=None,
+    runtime_file_name='gizmo.out', wall_time_restart=0,
+    scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]):
     '''
-    Print wall [and CPU] times (average per MPI task) at input scale-factors from cpu.txt for
-    Gizmo simulation.
+    Print wall [and CPU] times (based on average per MPI task from cpu.txt) at scale-factors,
+    for Gizmo simulation.
 
     Parameters
     ----------
     simulation_directory : string : directory of simulation
     output_directory : string : directory of output files within simulation directory
-    runtime_file_name : string : name of run-time file name (set in submission script)
-    scale_factors : array-like : list of scale-factors at which to print run times
+    cpu_number : int : total number of CPUs (input instead of reading from run-time file)
+    runtime_file_name : string : name of run-time file (set in submission script) to read CPU number
     wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
-    get_values : boolean : whether to return arrays of scale-factors, redshifts, run times
+    scalefactors : array-like : list of scale-factors at which to print run times
 
     Returns
     -------
-    scale_factors, redshifts, wall_times, cpu_times : arrays : return these if get_values is True
+    scalefactors, redshifts, wall_times, cpu_times : arrays
     '''
-    def get_scale_factor_string(scale_factor):
-        if scale_factor == 1:
-            scale_factor_string = '1'
+    def get_scalefactor_string(scalefactor):
+        if scalefactor == 1:
+            scalefactor_string = '1'
         else:
-            scale_factor_string = '{}'.format(scale_factor)
-        return scale_factor_string
+            scalefactor_string = '{}'.format(scalefactor)
+        return scalefactor_string
 
     file_name = 'cpu.txt'
 
@@ -115,30 +114,25 @@ def print_run_times(
                       file_name)
     file_in = open(file_path_name, 'r')
 
-    scale_factors = ut.array.arrayize(scale_factors)
+    scalefactors = ut.array.arrayize(scalefactors)
     wall_times = []
 
     i = 0
-    scale_factor = 'Time: {}'.format(get_scale_factor_string(scale_factors[i]))
+    scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
     print_next_line = False
+
     for line in file_in:
         if print_next_line:
             wall_times.append(float(line.split()[1]))
             print_next_line = False
             i += 1
-            if i >= len(scale_factors):
+            if i >= len(scalefactors):
                 break
             else:
-                scale_factor = 'Time: {}'.format(get_scale_factor_string(scale_factors[i]))
-        elif scale_factor in line:
-            print_next_line = True
+                scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
 
-    """
-    for i, a in enumerate(scale_factors):
-        scale_factor = 'Time: {}'.format(get_scale_factor_string(a))
-        os.system('grep "{}" {} --after-context=1 --max-count=1'.format(
-                  scale_factor, file_path_name))
-    """
+        elif scalefactor in line:
+            print_next_line = True
 
     wall_times = np.array(wall_times)
 
@@ -150,48 +144,45 @@ def print_run_times(
 
     wall_times /= 3600  # convert to [hr]
 
-    # get cpu number from run-time file
-    mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
-    cpu_number = mpi_number * omp_number
+    if not cpu_number:
+        # get cpu number from run-time file
+        mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
+        cpu_number = mpi_number * omp_number
+        print('# cpu = {} (mpi = {}, omp = {})'.format(cpu_number, mpi_number, omp_number))
+    else:
+        print('# cpu = {}'.format(cpu_number))
+
     cpu_times = wall_times * cpu_number
 
     # sanity check - simulation might not have run to all input scale-factors
-    scale_factors = scale_factors[: wall_times.size]
-    redshifts = 1 / scale_factors - 1
+    scalefactors = scalefactors[: wall_times.size]
+    redshifts = 1 / scalefactors - 1
 
-    print('# scale-factor redshift wall-time-percent wall-time[hr, day]', end='')
-    if cpu_number:
-        print(' cpu-time[hr]', end='')
-    print()
+    print('# scale-factor redshift wall-time[day] cpu-time[khr] run-time-percent')
     for t_i in range(len(wall_times)):
-        print('{:.3f} {:5.2f}   {:5.1f}% {:7.2f} {:5.2f}'.format(
-              scale_factors[t_i], redshifts[t_i], 100 * wall_times[t_i] / wall_times.max(),
-              wall_times[t_i], wall_times[t_i] / 24), end='')
-        if cpu_number:
-            print(' {:7.0f}'.format(cpu_times[t_i]), end='')
-        print()
+        print('{:.2f} {:5.2f} | {:6.2f}  {:7.1f}  {:3.0f}%'.format(
+              scalefactors[t_i], redshifts[t_i], wall_times[t_i] / 24,
+              cpu_times[t_i] / 1000, 100 * wall_times[t_i] / wall_times.max()))
 
-    if get_values:
-        return scale_factors, redshifts, wall_times, cpu_times
+    return scalefactors, redshifts, wall_times, cpu_times
 
 
 def print_run_times_ratios(
     simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out',
-    scale_factors=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.333, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
-                   0.666, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
-    wall_times_restart=[]):
+    wall_times_restart=[],
+    scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]):
     '''
-    Print ratios of wall times and CPU times (average per MPI taks) for input simulation directories
-    at input scale-factors from cpu.txt for Gizmo run.
-    'Reference' simulation is first in list.
+    Print ratios of wall times and CPU times (based on average per MPI taks from cpu.txt) at
+    scale-factors, from different simulation directories, for Gizmo simulations.
+    'reference' simulation is first in list.
 
     Parameters
     ----------
     simulation_directories : string or list : directory[s] of simulation[s]
     output_directory : string : directory of output files within simulation directory
-    runtime_file_name : string : name of run-time file name (set in submission script)
-    scale_factors : array-like : list of scale-factors at which to print run times
+    runtime_file_name : string : name of run-time file (set in submission script) to read CPU number
     wall_times_restart : float or list : wall time[s] [sec] of previous run[s] (snapshot restart)
+    scalefactors : array-like : list of scale-factors at which to print run times
     '''
     wall_timess = []
     cpu_timess = []
@@ -205,9 +196,8 @@ def print_run_times_ratios(
         wall_times_restart = [wall_times_restart]
 
     for d_i, directory in enumerate(simulation_directories):
-        scale_factors, redshifts, wall_times, cpu_times = print_run_times(
-            directory, output_directory, runtime_file_name, scale_factors, wall_times_restart[d_i],
-            get_values=True)
+        scalefactors, redshifts, wall_times, cpu_times = print_run_times(
+            directory, output_directory, runtime_file_name, scalefactors, wall_times_restart[d_i])
         wall_timess.append(wall_times)
         cpu_timess.append(cpu_times)
 
@@ -217,20 +207,19 @@ def print_run_times_ratios(
             snapshot_number_min = len(wall_times)
 
     # sanity check - simulations might not have run to each input scale-factor
-    scale_factors = scale_factors[: snapshot_number_min]
+    scalefactors = scalefactors[: snapshot_number_min]
     redshifts = redshifts[: snapshot_number_min]
 
     print('# scale-factor redshift', end='')
     for _ in range(1, len(wall_timess)):
-        print(' wall-time-ratio', end='')
-        print(' cpu-time-ratio', end='')
+        print(' wall-time-ratio cpu-time-ratio', end='')
     print()
 
     for a_i in range(snapshot_number_min):
-        print('{:.3f} {:5.2f}  '.format(scale_factors[a_i], redshifts[a_i]), end='')
+        print('{:.2f} {:5.2f} |'.format(scalefactors[a_i], redshifts[a_i]), end='')
         for d_i in range(1, len(wall_timess)):
-            print(' {:7.2f}'.format(wall_timess[d_i][a_i] / wall_timess[0][a_i]), end='')
-            print(' {:7.2f}'.format(cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
+            print(' {:5.1f}'.format(wall_timess[d_i][a_i] / wall_timess[0][a_i]), end='')
+            print(' {:5.1f}'.format(cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
         print()
 
 
@@ -387,7 +376,7 @@ def plot_contamination(redshift=0, directory='.'):
 # simulation performance and scaling
 #===================================================================================================
 def plot_scaling(
-    scaling_kind='strong', resolution='ref14', time_kind='cpu',
+    scaling_kind='strong', resolution='res880', time_kind='cpu',
     axis_x_scaling='log', axis_y_scaling='linear', write_plot=False, plot_directory='.'):
     '''
     Print simulation run times (all or CPU).
@@ -404,55 +393,55 @@ def plot_scaling(
     plot_directory : string : directory to write plot file
     '''
     weak_dark = {
-        'ref12': {'particle.number': 8.82e6, 'cpu.number': 64,
-                  'cpu.time': 385, 'wall.time': 6.0},
-        'ref13': {'particle.number': 7.05e7, 'cpu.number': 512,
-                  'cpu.time': 7135, 'wall.time': 13.9},
-        'ref14': {'particle.number': 5.64e8, 'cpu.number': 2048,
-                  'cpu.time': 154355, 'wall.time': 75.4},
+        'res46000': {'particle.number': 8.82e6, 'cpu.number': 64,
+                     'cpu.time': 385, 'wall.time': 6.0},
+        'res7000': {'particle.number': 7.05e7, 'cpu.number': 512,
+                    'cpu.time': 7135, 'wall.time': 13.9},
+        'res880': {'particle.number': 5.64e8, 'cpu.number': 2048,
+                   'cpu.time': 154355, 'wall.time': 75.4},
     }
 
     weak_baryon = {
-        'ref11': {'particle.number': 1.10e6 * 2, 'cpu.number': 32,
-                  'cpu.time': 1003, 'wall.time': 31.34 * 1.5},
-        'ref12': {'particle.number': 8.82e6 * 2, 'cpu.number': 512,
-                  'cpu.time': 33143, 'wall.time': 64.73},
-        'ref13': {'particle.number': 7.05e7 * 2, 'cpu.number': 2048,
-                  'cpu.time': 1092193, 'wall.time': 350.88},
-        #'ref14': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
-        #          'cpu.time': 568228, 'wall.time': 69.4},
+        'res450000': {'particle.number': 1.10e6 * 2, 'cpu.number': 32,
+                      'cpu.time': 1003, 'wall.time': 31.34 * 1.5},
+        'res56000': {'particle.number': 8.82e6 * 2, 'cpu.number': 512,
+                     'cpu.time': 33143, 'wall.time': 64.73},
+        'res7000': {'particle.number': 7.05e7 * 2, 'cpu.number': 2048,
+                    'cpu.time': 1092193, 'wall.time': 350.88},
+        #'res880': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
+        #           'cpu.time': 568228, 'wall.time': 69.4},
         # projected
-        #'ref14': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
-        #          'cpu.time': 1.95e7, 'wall.time': 2380},
+        #'res880': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
+        #           'cpu.time': 1.95e7, 'wall.time': 2380},
     }
 
     strong_baryon = collections.OrderedDict()
-    strong_baryon['ref14'] = collections.OrderedDict()
-    strong_baryon['ref14'][2048] = {'particle.number': 5.64e8 * 2, 'cpu.number': 2048,
-                                    'wall.time': 15.55, 'cpu.time': 31850}
-    strong_baryon['ref14'][4096] = {'particle.number': 5.64e8 * 2, 'cpu.number': 4096,
-                                    'wall.time': 8.64, 'cpu.time': 35389}
-    strong_baryon['ref14'][8192] = {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
-                                    'wall.time': 4.96, 'cpu.time': 40632}
-    strong_baryon['ref14'][16384] = {'particle.number': 5.64e8 * 2, 'cpu.number': 16384,
-                                     'wall.time': 4.57, 'cpu.time': 74875}
+    strong_baryon['res880'] = collections.OrderedDict()
+    strong_baryon['res880'][2048] = {'particle.number': 5.64e8 * 2, 'cpu.number': 2048,
+                                     'wall.time': 15.55, 'cpu.time': 31850}
+    strong_baryon['res880'][4096] = {'particle.number': 5.64e8 * 2, 'cpu.number': 4096,
+                                     'wall.time': 8.64, 'cpu.time': 35389}
+    strong_baryon['res880'][8192] = {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
+                                     'wall.time': 4.96, 'cpu.time': 40632}
+    strong_baryon['res880'][16384] = {'particle.number': 5.64e8 * 2, 'cpu.number': 16384,
+                                      'wall.time': 4.57, 'cpu.time': 74875}
 
-    # did not have time to run these, so just scale down from ref14
+    # did not have time to run these, so just scale down from res880
     # scaled to run time to z = 3 using 2048
-    strong_baryon['ref13'] = collections.OrderedDict()
-    strong_baryon['ref13'][512] = {'particle.number': 7e7 * 2, 'cpu.number': 512,
-                                   'wall.time': 72.23, 'cpu.time': 36984}
-    strong_baryon['ref13'][1024] = {'particle.number': 7e7 * 2, 'cpu.number': 1024,
-                                    'wall.time': 40.13, 'cpu.time': 41093}
-    strong_baryon['ref13'][2048] = {'particle.number': 7e7 * 2, 'cpu.number': 2048,
-                                    'wall.time': 23.04, 'cpu.time': 47182}
-    strong_baryon['ref13'][4096] = {'particle.number': 7e7 * 2, 'cpu.number': 4096,
-                                    'wall.time': 21.22, 'cpu.time': 86945}
+    strong_baryon['res7000'] = collections.OrderedDict()
+    strong_baryon['res7000'][512] = {'particle.number': 7e7 * 2, 'cpu.number': 512,
+                                     'wall.time': 72.23, 'cpu.time': 36984}
+    strong_baryon['res7000'][1024] = {'particle.number': 7e7 * 2, 'cpu.number': 1024,
+                                      'wall.time': 40.13, 'cpu.time': 41093}
+    strong_baryon['res7000'][2048] = {'particle.number': 7e7 * 2, 'cpu.number': 2048,
+                                      'wall.time': 23.04, 'cpu.time': 47182}
+    strong_baryon['res7000'][4096] = {'particle.number': 7e7 * 2, 'cpu.number': 4096,
+                                      'wall.time': 21.22, 'cpu.time': 86945}
 
     # conversion from running to scale-factor = 0.068 to 0.1 via 2x
-    for cpu_num in strong_baryon['ref14']:
-        strong_baryon['ref14'][cpu_num]['cpu.time'] *= 2
-        strong_baryon['ref14'][cpu_num]['wall.time'] *= 2
+    for cpu_num in strong_baryon['res880']:
+        strong_baryon['res880'][cpu_num]['cpu.time'] *= 2
+        strong_baryon['res880'][cpu_num]['wall.time'] *= 2
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(1, left=0.22, right=0.95, top=0.96, bottom=0.16)
@@ -473,16 +462,16 @@ def plot_scaling(
 
         subplot.set_xlabel('core number')
 
-        if resolution == 'ref14':
+        if resolution == 'res880':
             axis_x_limits = [1e2, 1.9e4]
-        elif resolution == 'ref13':
+        elif resolution == 'res7000':
             axis_x_limits = [3e2, 1e4]
 
         if time_kind == 'cpu':
-            if resolution == 'ref14':
+            if resolution == 'res880':
                 axis_y_limits = [0, 1.6e5]
                 subplot.set_ylabel('CPU time to $z = 9$ [hr]')
-            elif resolution == 'ref13':
+            elif resolution == 'res7000':
                 axis_y_limits = [0, 1e5]
                 subplot.set_ylabel('CPU time to $z = 3$ [hr]')
         elif time_kind == 'wall':
@@ -503,27 +492,27 @@ def plot_scaling(
         if time_kind == 'speedup':
             subplot.plot([0, 3e4], [0, 3e4], '--', linewidth=1.5, color='black')
 
-        if resolution == 'ref14':
+        if resolution == 'res880':
             subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                          transform=subplot.transAxes)
-        elif resolution == 'ref13':
+        elif resolution == 'res7000':
             subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.5e8', color='black',
                          transform=subplot.transAxes)
 
     elif scaling_kind == 'weak':
         dm_particle_numbers = np.array(
             [weak_dark[cpu_num]['particle.number'] for cpu_num in sorted(weak_dark.keys())])
-        mfm_particle_numbers = np.array([weak_baryon[cpu_num]['particle.number']
-                                         for cpu_num in sorted(weak_baryon.keys())])
+        mfm_particle_numbers = np.array(
+            [weak_baryon[cpu_num]['particle.number'] for cpu_num in sorted(weak_baryon.keys())])
 
         if time_kind == 'cpu':
-            dm_times = np.array([weak_dark[cpu_num]['cpu.time']
-                                 for cpu_num in sorted(weak_dark.keys())])
-            mfm_times = np.array([weak_baryon[cpu_num]['cpu.time']
-                                  for cpu_num in sorted(weak_baryon.keys())])
+            dm_times = np.array(
+                [weak_dark[cpu_num]['cpu.time'] for cpu_num in sorted(weak_dark.keys())])
+            mfm_times = np.array(
+                [weak_baryon[cpu_num]['cpu.time'] for cpu_num in sorted(weak_baryon.keys())])
         elif time_kind == 'wall':
-            #resolutinon_ref = 'ref14'
-            resolutinon_ref = 'ref13'
+            #resolutinon_ref = 'res880'
+            resolutinon_ref = 'res7000'
             ratio_ref = (weak_baryon[resolutinon_ref]['particle.number'] /
                          weak_baryon[resolutinon_ref]['cpu.number'])
             dm_times = np.array(
@@ -547,9 +536,11 @@ def plot_scaling(
         elif time_kind == 'wall':
             axis_y_limits = [10, 1000]
             subplot.set_ylabel('wall time to $z = 0$ [hr]')
-            subplot.text(0.05, 0.05,
-                         'weak scaling:\nfixed particles / core = {:.1e}'.format(ratio_ref),
-                         color='black', transform=subplot.transAxes)
+            subplot.text(
+                0.05, 0.05,
+                'weak scaling:\nfixed particles / core = {:.1e}'.format(ratio_ref),
+                color='black', transform=subplot.transAxes,
+            )
 
         ut.plot.set_axes_scaling_limits(
             subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits)
@@ -586,7 +577,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 3:
             wall_time_restart = float(sys.argv[3])
 
-        print_run_times(directory, wall_time_restart=wall_time_restart)
+        _ = print_run_times(directory, wall_time_restart=wall_time_restart)
 
     elif 'properties' in function_kind:
         if len(sys.argv) > 2:

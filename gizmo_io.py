@@ -153,8 +153,9 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        # element string -> index conversion
+        # elemental abundance: string -> index conversion
         if 'massfraction.' in property_name or 'metallicity.' in property_name:
+            # special cases
             if 'massfraction.hydrogen' in property_name:
                 # special case: mass fraction of hydrogen (excluding helium and metals)
                 values = (1 - self.prop('massfraction', indices)[:, 0] -
@@ -166,6 +167,15 @@ class ParticleDictionaryClass(dict):
 
                 return values
 
+            elif 'alpha' in property_name:
+                return np.mean(
+                    [self.prop('metallicity.o', indices),
+                     self.prop('metallicity.mg', indices),
+                     self.prop('metallicity.si', indices),
+                     self.prop('metallicity.ca', indices),
+                     ], 0)
+
+            # normal cases
             element_index = None
             for prop_name in property_name.split('.'):
                 if prop_name in self.element_dict:
@@ -185,6 +195,23 @@ class ParticleDictionaryClass(dict):
             if 'metallicity.' in property_name:
                 values = ut.math.get_log(
                     values / ut.const.sun_composition[element_name]['massfraction'])
+
+            return values
+
+        # distance wrt galaxy/halo center
+        if 'distance' in property_name:
+            # 3-D distance vector
+            values = ut.coordinate.get_distances(
+                'vector', self.prop('position', indices), self.center_position,
+                self.info['box.length']) * self.snapshot['scalefactor']  # [kpc physical]
+
+            if 'principal' in property_name:
+                # align with principal axes
+                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes)
+
+                if '2d' in property_name:
+                    # compute distances along major axes and minor axis (R and Z)
+                    values = ut.coordinate.get_distances_major_minor(values)
 
             return values
 
@@ -242,7 +269,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_number_kind='index', snapshot_numbers=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         property_names='all', element_indices=None, particle_subsample_factor=0,
-        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False, assign_center=True,
+        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
+        assign_center=True, assign_principal_axes=False,
         check_sanity=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -276,6 +304,7 @@ class ReadClass(ut.io.SayClass):
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
+        assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
         check_sanity : boolean : whether to check sanity of particle properties after read in
 
         Returns
@@ -362,11 +391,21 @@ class ReadClass(ut.io.SayClass):
             # store information on all snapshot times - may or may not be initialized
             part.Snapshot = Snapshot
 
-            # arrays to store center position and velocity
+            # initialize arrays to store center position and velocity
             part.center_position = []
             part.center_velocity = []
+            for spec_name in part:
+                part[spec_name].center_position = []
+                part[spec_name].center_velocity = []
             if assign_center:
                 self.assign_center(part)
+
+            # initialize arrays to store rotation vectors that define principal axes
+            part.principal_axes = []
+            for spec_name in part:
+                part[spec_name].principal_axes = []
+            if assign_center and assign_principal_axes:
+                self.assign_principal_axes(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_numbers) == 1:
@@ -774,7 +813,7 @@ class ReadClass(ut.io.SayClass):
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
             if header['file.number.per.snapshot'] == 1:
-                self.say('* reading particles from: {}'.format(file_name.replace('./', '')))
+                self.say('* reading particles from: {}'.format(file_name))
             else:
                 self.say('* reading particles')
 
@@ -1083,7 +1122,7 @@ class ReadClass(ut.io.SayClass):
     def assign_center(self, part, method='center-of-mass', compare_centers=False):
         '''
         Assign center position [kpc comoving] and velocity [km / s physical] to galaxy/halo,
-        using stars for hydro simulation or dark matter for dark matter simulation.
+        using stars for baryonic simulation or dark matter for dark matter simulation.
 
         Parameters
         ----------
@@ -1098,24 +1137,68 @@ class ReadClass(ut.io.SayClass):
             spec_name = 'dark'
             velocity_radius_max = 30
         else:
-            self.say('! catalog not contain star or dark particles, skipping center finding')
+            self.say('! catalog not contain star or dark particles, so cannot assign center')
             return
 
         self.say('* assigning center of galaxy/halo:')
 
         if 'position' in part[spec_name]:
+            # assign to overall dictionary
             part.center_position = ut.particle.get_center_position(
                 part, spec_name, method, compare_centers=compare_centers)
+            # assign to each species dictionary
+            for spec_name in part:
+                part[spec_name].center_position = part.center_position
+
             self.say('position = (', end='')
             ut.io.print_array(part.center_position, '{:.3f}', end='')
             print(') [kpc comoving]')
 
         if 'velocity' in part[spec_name]:
+            # assign to overall dictionary
             part.center_velocity = ut.particle.get_center_velocity(
                 part, spec_name, velocity_radius_max, part.center_position)
+            # assign to each species dictionary
+            for spec_name in part:
+                part[spec_name].center_velocity = part.center_velocity
+
             self.say('velocity = (', end='')
             ut.io.print_array(part.center_velocity, '{:.1f}', end='')
             print(') [km / s]')
+
+        print()
+
+    def assign_principal_axes(self, part, distance_max=30, mass_percent=90):
+        '''
+        Assign principal axes (rotation vectors defined by moment of inertia tensor) to galaxy/halo,
+        using stars for a baryonic simulation.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        distance_max : float : maximum distance to select particles [kpc physical]
+        mass_percent : float : keep particles within the distance that encloses mass percent
+            [0, 100] of all particles within distance_max
+        '''
+        if 'star' in part and len(part['star']['position']):
+            spec_name = 'star'
+        else:
+            self.say('! catalog not contain star particles, so cannot assign principal axes')
+            return
+
+        self.say('* assigning principal axes of galaxy/halo:')
+
+        rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
+            part, spec_name, distance_max, mass_percent, scalarize=True, print_results=False)
+
+        part.principal_axes = rotation_vectors
+        #part.principal_axes_ratios = axis_ratios
+        for spec_name in part:
+            part[spec_name].principal_axes = rotation_vectors
+            #part[spec_name].principal_axes_ratios = axis_ratios
+
+        self.say('axis ratios: min/maj = {:.3f}, min/med = {:.3f}, med/maj = {:.3f}'.format(
+                 axis_ratios[0], axis_ratios[1], axis_ratios[2]))
 
         print()
 

@@ -430,11 +430,11 @@ class HostDistanceClass(IndexPointerClass):
                         #    part_indicess=part_indices_at_snap, scalarize=True)
 
                     elif '2d' in host_distance_kind:
-                        # compute distance along major axes and along minor axis [kpc physical]
+                        # distance along major axes and along minor axis [kpc physical]
                         distances_t = ut.coordinate.get_distances_major_minor(distance_vectors)
 
                     else:
-                        # compute total scalar distance wrt host [kpc physical]
+                        # total scalar distance wrt host [kpc physical]
                         distances_t = np.sqrt(np.sum(distance_vectors ** 2, 1))
 
                         #distances_t = ut.particle.get_distances_wrt_center(
