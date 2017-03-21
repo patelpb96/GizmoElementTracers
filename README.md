@@ -12,7 +12,7 @@ Python package for running and analyzing Gizmo simulations.
 * high-level analysis and plotting of Gizmo particle data
 
 ## gizmo_diagnostic.py
-* diagnostics of Gizmo simulations
+* run diagnostics on Gizmo simulations
 
 ## gizmo_file.py
 * delete snapshot files or transfer them across machines
@@ -30,7 +30,7 @@ Python package for running and analyzing Gizmo simulations.
 * print/plot information about nucleosynthetic yields in Gizmo
 
 ## tutorial.ipynb
-* ipython notebook tutorial for using this package and readin particles from a snapshot
+* ipython notebook tutorial for using this package and reading particles from snapshots
 
 
 # Requirements
@@ -38,13 +38,13 @@ Python package for running and analyzing Gizmo simulations.
 This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
 I develop this package using the latest version of the Anaconda Python environment.
-I use Python 3.5 and recommend that you do the same.
+I use Python 3.6 and recommend that you do the same.
 However, I try to maintain backward compatibility with Python 2.7.
 
 
 # Licensing
 
-Copyright 2014-2016 by Andrew Wetzel.
+Copyright 2014-2017 by Andrew Wetzel.
 
 In summary, you are free to use, edit, share, and do whatever you want. But please keep me informed. Have fun!
 
