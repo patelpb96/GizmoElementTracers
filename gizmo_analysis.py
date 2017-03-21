@@ -31,9 +31,8 @@ class SpeciesProfileClass(ut.io.SayClass):
     '''
     def get_profiles(
         self, part, species=['all'], prop_name='', prop_statistic='sum', weight_by_mass=False,
-        DistanceBin=None, center_position=None, center_velocity=None, rotation_vectors=None,
-        axis_distance_max=Inf, other_axis_distance_limits=None, other_prop_limits={},
-        part_indicess=None):
+        DistanceBin=None, center_position=None, center_velocity=None, rotation=None,
+        other_axis_distance_limits=None, other_prop_limits={}, part_indicess=None):
         '''
         Parameters
         ----------
@@ -45,8 +44,9 @@ class SpeciesProfileClass(ut.io.SayClass):
         DistanceBin : class : distance bin class
         center_position : array : position of center
         center_velocity : array : velocity of center
-        rotation_vectors : array : eigen-vectors to define rotation
-        axis_distance_max : float : maximum distance to use to define principal axes [kpc physical]
+        rotation : boolean or array : whether to rotate particles - two options:
+          (a) if input array of eigen-vectors, will define rotation axes
+          (b) if True, will rotate to align with principal axes stored in species dictionary
         other_axis_distance_limits : float :
             min and max distances along other axis[s] to keep particles [kpc physical]
         other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -59,13 +59,13 @@ class SpeciesProfileClass(ut.io.SayClass):
         '''
         if 'sum' in prop_statistic or 'vel.circ' in prop_statistic or 'density' in prop_statistic:
             pros = self.get_sum_profiles(
-                part, species, prop_name, DistanceBin, center_position, rotation_vectors,
-                axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
+                part, species, prop_name, DistanceBin, center_position, rotation,
+                other_axis_distance_limits, other_prop_limits, part_indicess)
         else:
             pros = self.get_statistics_profiles(
                 part, species, prop_name, weight_by_mass, DistanceBin, center_position,
-                center_velocity, rotation_vectors, axis_distance_max, other_axis_distance_limits,
-                other_prop_limits, part_indicess)
+                center_velocity, rotation, other_axis_distance_limits, other_prop_limits,
+                part_indicess)
 
         for k in pros:
             if '.cum' in prop_statistic or 'vel.circ' in prop_statistic:
@@ -79,8 +79,7 @@ class SpeciesProfileClass(ut.io.SayClass):
 
     def get_sum_profiles(
         self, part, species=['all'], prop_name='mass', DistanceBin=None, center_position=None,
-        rotation_vectors=None, axis_distance_max=Inf, other_axis_distance_limits=None,
-        other_prop_limits={}, part_indicess=None):
+        rotation=None, other_axis_distance_limits=None, other_prop_limits={}, part_indicess=None):
         '''
         Get profiles of summed quantity (such as mass or density) for given property for each
         particle species.
@@ -92,8 +91,9 @@ class SpeciesProfileClass(ut.io.SayClass):
         prop_name : string : property to get sum of
         DistanceBin : class : distance bin class
         center_position : list : center position
-        rotation_vectors : array : eigen-vectors to define rotation
-        axis_distance_max : float : maximum distance to use to define principal axes [kpc physical]
+        rotation : boolean or array : whether to rotate particles - two options:
+          (a) if input array of eigen-vectors, will define rotation axes
+          (b) if True, will rotate to align with principal axes stored in species dictionary
         other_axis_distance_limits : float :
             min and max distances along other axis[s] to keep particles [kpc physical]
         other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -106,12 +106,12 @@ class SpeciesProfileClass(ut.io.SayClass):
         '''
         if 'gas' in species and 'consume.time' in prop_name:
             pros_mass = self.get_sum_profiles(
-                part, species, 'mass', DistanceBin, center_position, rotation_vectors,
-                axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
+                part, species, 'mass', DistanceBin, center_position, rotation,
+                other_axis_distance_limits, other_prop_limits, part_indicess)
 
             pros_sfr = self.get_sum_profiles(
-                part, species, 'sfr', DistanceBin, center_position, rotation_vectors,
-                axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess)
+                part, species, 'sfr', DistanceBin, center_position, rotation,
+                other_axis_distance_limits, other_prop_limits, part_indicess)
 
             pros = pros_sfr
             for k in pros_sfr['gas']:
@@ -152,9 +152,17 @@ class SpeciesProfileClass(ut.io.SayClass):
                     'scalar', part[spec_name]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             elif DistanceBin.dimension_number in [1, 2]:
+                if rotation is not None and len(rotation):
+                    rotation_vectors = rotation
+                elif (part[spec_name].principal_axes_vectors is not None and
+                      len(part[spec_name].principal_axes_vectors)):
+                    rotation_vectors = part[spec_name].principal_axes_vectors
+                else:
+                    raise ValueError('want 2-D or 1-D profile but no means to define rotation')
+
                 distancess = ut.particle.get_distances_wrt_center(
-                    part, spec_name, 'rotated.2d', center_position, rotation_vectors,
-                    axis_distance_max, part_indices, scalarize=True)
+                    part, spec_name, 'rotated.2d', center_position, rotation_vectors, None,
+                    part_indices, scalarize=True)
                 distancess = np.abs(distancess)  # ensure positive definite
 
                 if DistanceBin.dimension_number == 1:
@@ -236,8 +244,8 @@ class SpeciesProfileClass(ut.io.SayClass):
 
     def get_statistics_profiles(
         self, part, species=['all'], prop_name='', weight_by_mass=True, DistanceBin=None,
-        center_position=None, center_velocity=None, rotation_vectors=None, axis_distance_max=Inf,
-        other_axis_distance_limits=None, other_prop_limits={}, part_indicess=None):
+        center_position=None, center_velocity=None, rotation=None, other_axis_distance_limits=None,
+        other_prop_limits={}, part_indicess=None):
         '''
         Get profiles of statistics (such as median, average) for given property for each
         particle species.
@@ -251,8 +259,9 @@ class SpeciesProfileClass(ut.io.SayClass):
         DistanceBin : class : distance bin class
         center_position : array : position of center
         center_velocity : array : velocity of center
-        axis_distance_max : float : maximum distance to use to define principal axes [kpc physical]
-        rotation_vectors : array : eigen-vectors to define rotation
+        rotation : boolean or array : whether to rotate particles - two options:
+          (a) if input array of eigen-vectors, will define rotation axes
+          (b) if True, will rotate to align with principal axes stored in species dictionary
         other_axis_distance_limits : float :
             min and max distances along other axis[s] to keep particles [kpc physical]
         other_prop_limits : dict : dictionary with properties as keys and limits as values
@@ -313,11 +322,18 @@ class SpeciesProfileClass(ut.io.SayClass):
                     distances = ut.coordinate.get_distances(
                         'scalar', part[spec_name]['position'][part_indices], center_position,
                         part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
-
                 elif DistanceBin.dimension_number in [1, 2]:
+                    if rotation is not None and len(rotation):
+                        rotation_vectors = rotation
+                    elif (part[spec_name].principal_axes_vectors is not None and
+                          len(part[spec_name].principal_axes_vectors)):
+                        rotation_vectors = part[spec_name].principal_axes_vectors
+                    else:
+                        raise ValueError('want 2-D or 1-D profile but no means to define rotation')
+
                     distancess = ut.particle.get_distances_wrt_center(
-                        part, spec_name, 'rotated.2d', center_position, rotation_vectors,
-                        axis_distance_max, part_indices, scalarize=True)
+                        part, spec_name, 'rotated.2d', center_position, rotation_vectors, None,
+                        part_indices, scalarize=True)
                     distancess = np.abs(distancess)
 
                     if DistanceBin.dimension_number == 1:
@@ -741,7 +757,7 @@ class ImageClass(ut.io.SayClass):
         self, part, spec_name='dark', weight_prop_name='mass', image_kind='histogram',
         dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
         distances_max=1000, distance_bin_width=1, distance_bin_number=None,
-        center_position=None, align_principal_axes=False, rotation_vectors=None,
+        center_position=None, rotation=None,
         other_prop_limits={}, part_indices=None, subsample_factor=None,
         use_column_units=None, image_limits=[None, None],
         background_color='black',
@@ -765,11 +781,12 @@ class ImageClass(ut.io.SayClass):
         distance_bin_width : float : length pixel
         distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
         center_position : array-like : position of center
+        rotation : boolean or array : whether to rotate particles - two options:
+          (a) if input array of eigen-vectors, will define rotation axes
+          (b) if True, will rotate to align with principal axes defined by input species
         other_prop_limits : dict : dictionary with properties as keys and limits as values
         part_indices : array : input selection indices for particles
         subsample_factor : int : factor by which periodically to sub-sample particles
-        align_principal_axes : boolean : whether to align positions with principal axes
-        rotation_vectors : array : eigen-vectors to define rotation axes
         use_column_units : boolean : whether to convert to particle number / cm^2
         image_limits : list : min and max limits to impose on image dynamic range (exposure)
         background_color : string : name of color for background: 'white', 'black'
@@ -831,9 +848,18 @@ class ImageClass(ut.io.SayClass):
             if weights is not None:
                 weights = weights[masks]
 
-            if align_principal_axes:
-                if rotation_vectors is None:
+            if rotation is not None:
+                # rotate image
+                if rotation is True:
+                    # rotate to align with principal axes
+                    # first check if principal axes stored in dictionary
+                    if (part[spec_name].principal_axes_vectors is not None and
+                            len(part[spec_name].principal_axes_vectors)):
+                        rotation_vectors = part[spec_name].principal_axes_vectors
+                else:
+                    # else compute from particles within image limits
                     rotation_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
+
                 positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
         else:
             raise ValueError('need to input center position')
@@ -1464,9 +1490,7 @@ def plot_property_v_distance(
     prop_name='mass', prop_statistic='sum', prop_scaling='log', weight_by_mass=False,
     prop_limits=[],
     distance_limits=[0.1, 300], distance_bin_width=0.02, distance_bin_number=None,
-    distance_scaling='log',
-    dimension_number=3, rotation_vectors=None,
-    axis_distance_max=Inf, other_axis_distance_limits=None,
+    distance_scaling='log', dimension_number=3, rotation=None, other_axis_distance_limits=None,
     center_positions=None, center_velocities=None,
     other_prop_limits={}, part_indicess=None,
     distance_reference=None, plot_nfw=False, label_redshift=True,
@@ -1488,8 +1512,9 @@ def plot_property_v_distance(
     distance_scaling : string : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
         note : if 1, get profile along minor axis, if 2, get profile along 2 major axes
-    rotation_vectors : array : eigen-vectors to define rotation
-    axis_distance_max : float : maximum distance to use in defining principal axes [kpc physical]
+    rotation : boolean or array : whether to rotate particles - two options:
+      (a) if input array of eigen-vectors, will define rotation axes
+      (b) if True, will rotate to align with principal axes stored in species dictionary
     other_axis_distance_limits : float :
         min and max distances along other axis[s] to keep particles [kpc physical]
     center_positions : array or list of arrays : position of center for each particle catalog
@@ -1524,8 +1549,8 @@ def plot_property_v_distance(
     for part_i, part in enumerate(parts):
         pros_part = SpeciesProfile.get_profiles(
             part, species, prop_name, prop_statistic, weight_by_mass, DistanceBin,
-            center_positions[part_i], center_velocities[part_i], rotation_vectors,
-            axis_distance_max, other_axis_distance_limits, other_prop_limits, part_indicess[part_i])
+            center_positions[part_i], center_velocities[part_i], rotation,
+            other_axis_distance_limits, other_prop_limits, part_indicess[part_i])
 
         pros.append(pros_part)
 
@@ -3383,7 +3408,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 for part in parts:
                     gal = ut.particle.get_galaxy_properties(
                         part, spec_name, 'mass.percent', mass_fraction, distance_max,
-                        axis_kind='both', axis_distance_max=distance_max)
+                        axis_kind='both', principal_axes_distance_max=distance_max)
                     gals.append(gal)
 
                 self.say('\n# species = {}'.format(spec_name))

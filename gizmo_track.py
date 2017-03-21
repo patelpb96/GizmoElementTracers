@@ -422,11 +422,12 @@ class HostDistanceClass(IndexPointerClass):
                         distances_t = distance_vectors
 
                         #if '3d' in host_distance_kind:
-                        #    distance_kind = 'rotated.3d'
+                        #    distance_kind = 'rotated'
                         #elif '2d' in host_distance_kind:
                         #    distance_kind = 'rotated.2d'
                         #distances_t = ut.particle.get_distances_wrt_center(
-                        #    part_at_snap, spec_name, distance_kind, axis_distance_max=gal_radius,
+                        #    part_at_snap, spec_name, distance_kind,
+                        #    principal_axes_distance_max=gal_radius,
                         #    part_indicess=part_indices_at_snap, scalarize=True)
 
                     elif '2d' in host_distance_kind:

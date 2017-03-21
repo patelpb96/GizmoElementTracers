@@ -207,7 +207,7 @@ class ParticleDictionaryClass(dict):
 
             if 'principal' in property_name:
                 # align with principal axes
-                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes)
+                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes_vectors)
 
                 if '2d' in property_name:
                     # compute distances along major axes and minor axis (R and Z)
@@ -401,9 +401,9 @@ class ReadClass(ut.io.SayClass):
                 self.assign_center(part)
 
             # initialize arrays to store rotation vectors that define principal axes
-            part.principal_axes = []
+            part.principal_axes_vectors = []
             for spec_name in part:
-                part[spec_name].principal_axes = []
+                part[spec_name].principal_axes_vectors = []
             if assign_center and assign_principal_axes:
                 self.assign_principal_axes(part)
 
@@ -1188,17 +1188,17 @@ class ReadClass(ut.io.SayClass):
 
         self.say('* assigning principal axes of galaxy/halo:')
 
-        rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
+        rotation_vectors, _eigen_values, axes_ratios = ut.particle.get_principal_axes(
             part, spec_name, distance_max, mass_percent, scalarize=True, print_results=False)
 
-        part.principal_axes = rotation_vectors
-        #part.principal_axes_ratios = axis_ratios
+        part.principal_axes_vectors = rotation_vectors
+        part.principal_axes_ratios = axes_ratios
         for spec_name in part:
-            part[spec_name].principal_axes = rotation_vectors
-            #part[spec_name].principal_axes_ratios = axis_ratios
+            part[spec_name].principal_axes_vectors = rotation_vectors
+            part[spec_name].principal_axes_ratios = axes_ratios
 
         self.say('axis ratios: min/maj = {:.3f}, min/med = {:.3f}, med/maj = {:.3f}'.format(
-                 axis_ratios[0], axis_ratios[1], axis_ratios[2]))
+                 axes_ratios[0], axes_ratios[1], axes_ratios[2]))
 
         print()
 
