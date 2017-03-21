@@ -123,8 +123,8 @@ if __name__ == '__main__':
         if len(sys.argv) > 3:
             snapshot_index_limits = [int(sys.argv[2]), int(sys.argv[3])]
 
-        if len(sys.argv) > 4:
-            directory = str(sys.argv[4])
+            if len(sys.argv) > 4:
+                directory = str(sys.argv[4])
 
         delete_snapshots(snapshot_index_limits, directory)
 
