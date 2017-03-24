@@ -559,7 +559,7 @@ class ReadClass(ut.io.SayClass):
             except:
                 Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
         except:
-            raise ValueError('cannot find file of snapshot times in {}'.format(directory))
+            raise IOError('cannot find file of snapshot times in {}'.format(directory))
 
         self.is_first_print = True
 
