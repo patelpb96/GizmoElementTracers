@@ -1192,6 +1192,7 @@ class ImageClass(ut.io.SayClass):
                                 self.histogram_valuess[1, ix, iy],
                                 self.histogram_valuess[2, ix, iy]))
 
+
 Image = ImageClass()
 
 
@@ -2381,9 +2382,9 @@ class StarFormHistoryClass(ut.io.SayClass):
                              label=label)
 
         # draw simulated galaxies
-        label = '$M_{{\\rm star}}=$'
-        subplot.plot(-1, -1, label=label)
         if hal is not None:
+            label = '$M_{{\\rm star}}=$'
+            subplot.plot(-1, -1, label=label)
             for hal_ii, hal_i in enumerate(hal_indices):
                 linewidth = 2.5 + 0.1 * hal_ii
                 #linewidth = 3.0
@@ -2407,24 +2408,37 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         # property legend
         if label is not None:
+            if hal is None:
+                font_size = 17
+                label_spacing = 0.1
+            else:
+                font_size = 13.2
+                label_spacing = 0
             legend_prop = subplot.legend(
-                loc='best', prop=FontProperties(size=13.2), handlelength=0.8, labelspacing=0.0)
+                loc='best', prop=FontProperties(size=font_size), handlelength=0.8,
+                labelspacing=label_spacing)
             legend_prop.get_frame().set_alpha(0.5)
             if legend_z:
                 subplot.add_artist(legend_z)
 
         snapshot_dict = None
-        if hal is not None:
+        if part is not None:
             snapshot_dict = part.snapshot
+        time_kind_file_name = 'redshift'
+        if hal is None:
+            time_kind_file_name = None
+
         host_distance_limits = None
         if 'host.distance' in other_prop_limits:
             host_distance_limits = other_prop_limits['host.distance']
+
         plot_name = ut.plot.get_file_name(
-            sfh_kind, time_kind, 'star', snapshot_dict=snapshot_dict,
+            sfh_kind, time_kind, 'star', time_kind_file_name, snapshot_dict,
             host_distance_limits=host_distance_limits)
         if gal is not None:
             plot_name += '_lg'
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
+
 
 StarFormHistory = StarFormHistoryClass()
 
@@ -3425,6 +3439,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                              mass_fraction, gal['radius.minor'],
                              gal['radius.minor'] / gals[0]['radius.minor']))
             print()
+
 
 CompareSimulations = CompareSimulationsClass()
 
