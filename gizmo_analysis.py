@@ -14,7 +14,6 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import matplotlib
 from matplotlib import pyplot as plt
-from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 # local ----
@@ -557,18 +556,19 @@ def plot_mass_contamination(
         return
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14)
+    _fig, subplot = ut.plot.make_figure(figure_index)
+    #, left=0.17, right=0.96, top=0.96, bottom=0.14)
 
     ut.plot.set_axes_scaling_limits(
         subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits)
 
     subplot.set_ylabel(
-        '$M_{{\\rm species}} / M_{{\\rm {}}}$'.format(species_reference), fontsize=30)
+        '$M_{{\\rm species}} / M_{{\\rm {}}}$'.format(species_reference))
     if scale_to_halo_radius:
         axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
     else:
         axis_x_label = 'distance $[\\rm kpc]$'
-    subplot.set_xlabel(axis_x_label, fontsize=30)
+    subplot.set_xlabel(axis_x_label)
 
     colors = ut.plot.get_colors(len(species_test), use_black=False)
 
@@ -584,8 +584,7 @@ def plot_mass_contamination(
             DistanceBin.mids, profile_mass_ratio[spec_name]['bin'], color=colors[spec_i], alpha=0.7,
             label=spec_name)
 
-    legend = subplot.legend(loc='best', prop=FontProperties(size=16))
-    legend.get_frame().set_alpha(0.7)
+    ut.plot.make_legends(subplot, 'best')
 
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
@@ -691,7 +690,8 @@ def plot_metal_v_distance(
                 metal_values.append(pro_metal['sum'])
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14)
+    _fig, subplot = ut.plot.make_figure(figure_index)
+    #, left=0.17, right=0.96, top=0.96, bottom=0.14)
 
     ut.plot.set_axes_scaling_limits(
         subplot, distance_scaling, distance_limits, None,
@@ -708,13 +708,13 @@ def plot_metal_v_distance(
         # axis_y_label = '${}(< r) \, / \, M_{{\\rm Z,tot}}$'.format(metal_mass_label)
         axis_y_label = '${}{} \, [M_\odot]$'.format(metal_mass_label, radius_label)
     #axis_y_label = '$Z \, / \, Z_\odot$'
-    subplot.set_ylabel(axis_y_label, fontsize=30)
+    subplot.set_ylabel(axis_y_label)
 
     if scale_to_halo_radius:
         axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
     else:
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
-    subplot.set_xlabel(axis_x_label, fontsize=26)
+    subplot.set_xlabel(axis_x_label)
 
     colors = ut.plot.get_colors(len(parts), use_black=False)
 
@@ -734,9 +734,7 @@ def plot_metal_v_distance(
             xs, metal_values[part_i], color=colors[part_i], alpha=0.8,
             label=part.info['simulation.name'])
 
-    if len(parts):
-        legend = subplot.legend(loc='best', prop=FontProperties(size=16))
-        legend.get_frame().set_alpha(0.7)
+    ut.plot.make_legends(subplot, 'best')
 
     distance_name = 'dist'
     if halo_radius and scale_to_halo_radius:
@@ -850,14 +848,13 @@ class ImageClass(ut.io.SayClass):
 
             if rotation is not None:
                 # rotate image
-                if rotation is True:
-                    # rotate to align with principal axes
-                    # first check if principal axes stored in dictionary
-                    if (part[spec_name].principal_axes_vectors is not None and
-                            len(part[spec_name].principal_axes_vectors)):
-                        rotation_vectors = part[spec_name].principal_axes_vectors
+                if (rotation is True and part[spec_name].principal_axes_vectors is not None and
+                        len(part[spec_name].principal_axes_vectors)):
+                    # rotate to align with stored principal axes
+                    rotation_vectors = part[spec_name].principal_axes_vectors
+
                 else:
-                    # else compute from particles within image limits
+                    # compute from particles within image limits
                     rotation_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
 
                 positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
@@ -923,14 +920,16 @@ class ImageClass(ut.io.SayClass):
 
         if len(dimen_indices_plot) == 2:
             fig, subplot = ut.plot.make_figure(
-                figure_index, left=0.17, right=0.96, top=0.96, bottom=0.14,
+                figure_index, left=0.22, right=0.98, bottom=0.15, top=0.98,
                 background_color=background_color)
 
             subplot.set_xlim(position_limits[dimen_indices_plot[0]])
             subplot.set_ylim(position_limits[dimen_indices_plot[1]])
 
-            subplot.set_xlabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[0]]))
-            subplot.set_ylabel('{} $[\\rm kpc]$'.format(dimen_label[dimen_indices_plot[1]]))
+            subplot.set_xlabel('{} $\\left[ {{\\rm kpc}} \\right]$'.format(
+                dimen_label[dimen_indices_plot[0]]))
+            subplot.set_ylabel('{} $\\left[ {{\\rm kpc}} \\right]$'.format(
+                dimen_label[dimen_indices_plot[1]]))
 
             if 'histogram' in image_kind:
                 hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
@@ -1004,7 +1003,7 @@ class ImageClass(ut.io.SayClass):
 
         elif len(dimen_indices_plot) == 3:
             fig, subplots = ut.plot.make_figure(
-                figure_index, [2, 2], left=0.17, right=0.96, top=0.97, bottom=0.13,
+                figure_index, [2, 2], left=0.22, right=0.97, bottom=0.16, top=0.97,
                 background_color=background_color)
 
             plot_dimen_iss = [
@@ -1038,16 +1037,17 @@ class ImageClass(ut.io.SayClass):
                         image_limits_use[1] = image_limits[1]
 
                 # ensure that tick labels do not overlap
-                subplot.set_xlim(position_limits[plot_dimen_is[0]] * 0.99)
-                subplot.set_ylim(position_limits[plot_dimen_is[1]] * 0.99)
+                subplot.set_xlim(position_limits[plot_dimen_is[0]])
+                subplot.set_ylim(position_limits[plot_dimen_is[1]])
 
+                units_label = ' $\\left[ {\\rm kpc} \\right]$'
                 if subplot_is == [0, 0]:
-                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
+                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + units_label)
                 elif subplot_is == [1, 0]:
-                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
-                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + ' $[\\rm kpc]$')
+                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + units_label)
+                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + units_label)
                 elif subplot_is == [1, 1]:
-                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + ' $[\\rm kpc]$')
+                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + units_label)
 
                 _Image = subplot.imshow(
                     hist_valuess.transpose(),
@@ -1083,6 +1083,7 @@ class ImageClass(ut.io.SayClass):
                     subplot.add_artist(circle)
 
                 subplot.axis('equal')
+                #fig.gca().set_aspect('equal')
 
             hist_valuess = np.array(histogram_valuesss)
 
@@ -1279,7 +1280,8 @@ def plot_property_distribution(
     colors = ut.plot.get_colors(len(parts))
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.18, right=0.95, top=0.96, bottom=0.16)
+    _fig, subplot = ut.plot.make_figure(figure_index)
+    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     ut.plot.set_axes_scaling_limits(
         subplot, prop_scaling, prop_limits, prop_values)
@@ -1295,23 +1297,9 @@ def plot_property_distribution(
 
     for part_i, part in enumerate(parts):
         subplot.plot(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
-                     color=colors[part_i], alpha=0.8, linewidth=3.0,
-                     label=part.info['simulation.name'])
+                     color=colors[part_i], alpha=0.8, label=part.info['simulation.name'])
 
-    # redshift legend
-    #legend_z = None
-    legend_z = subplot.legend(
-        [plt.Line2D((0, 0), (0, 0), linestyle='')],
-        ['$z={:.1f}$'.format(parts[0].snapshot['redshift'])],
-        loc='lower left', prop=FontProperties(size=16))
-    legend_z.get_frame().set_alpha(0.5)
-
-    # property legend
-    if len(parts) > 1 and parts[0].info['simulation.name']:
-        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
-        legend_prop.get_frame().set_alpha(0.5)
-        if legend_z:
-            subplot.add_artist(legend_z)
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
     plot_name = ut.plot.get_file_name(
         prop_name, 'distribution', spec_name, snapshot_dict=part.snapshot)
@@ -1408,7 +1396,8 @@ def plot_property_v_property(
         stat = Bin.get_statistics_of_array(x_prop_values, y_prop_values)
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.18, right=0.95, top=0.96, bottom=0.16)
+    _fig, subplot = ut.plot.make_figure(figure_index)
+    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
         subplot, x_prop_scaling, x_prop_limits, x_prop_values,
@@ -1422,12 +1411,12 @@ def plot_property_v_property(
         #axis_y_limits = ut.math.get_log(axis_y_limits)
 
     axis_x_label = ut.plot.get_label(
-        x_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=x_prop_scaling)
-    subplot.set_xlabel(axis_x_label, fontsize=30)
+        x_prop_name, species=spec_name, get_units=True, get_symbol=False, get_log=x_prop_scaling)
+    subplot.set_xlabel(axis_x_label)
 
     axis_y_label = ut.plot.get_label(
-        y_prop_name, species=spec_name, get_units=True, get_symbol=True, get_log=y_prop_scaling)
-    subplot.set_ylabel(axis_y_label, fontsize=30)
+        y_prop_name, species=spec_name, get_units=True, get_symbol=False, get_log=y_prop_scaling)
+    subplot.set_ylabel(axis_y_label)
 
     color_map = plt.cm.inferno_r  # @UndefinedVariable
     #color_map = plt.cm.gist_heat_r  # @UndefinedVariable
@@ -1466,13 +1455,11 @@ def plot_property_v_property(
         subplot.plot(stat['bin.mid'], stat['percent.84'], color='black', linestyle='--', alpha=0.4)
 
     if host_distance_limits is not None and len(host_distance_limits):
-        label = ut.plot.get_label_distance('host.distance', host_distance_limits)
-
         # distance legend
-        legend = subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label],
-            loc='best', prop=FontProperties(size=18))
-        legend.get_frame().set_alpha(0.5)
+        label = ut.plot.get_label_distance('host.distance', host_distance_limits)
+        subplot.legend(
+            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label], loc='best', fontsize='small',
+            handlelength=0)
 
     if add_simulation_name:
         prefix = part.info['simulation.name']
@@ -1494,7 +1481,7 @@ def plot_property_v_distance(
     distance_scaling='log', dimension_number=3, rotation=None, other_axis_distance_limits=None,
     center_positions=None, center_velocities=None,
     other_prop_limits={}, part_indicess=None,
-    distance_reference=None, plot_nfw=False, label_redshift=True,
+    distance_reference=None, plot_nfw=False,
     get_values=False, write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
@@ -1524,7 +1511,6 @@ def plot_property_v_distance(
     part_indicess : array or list of arrays : indices of particles from which to select
     distance_reference : float : reference distance at which to draw vertical line
     plot_nfw : boolean : whether to overplot NFW profile: density ~ 1 / r
-    label_redshift : boolean : whether to label redshift
     get_values : boolean : whether to return values plotted
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
@@ -1561,14 +1547,14 @@ def plot_property_v_distance(
         #print(pros_part[species][prop_statistic])
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.18, right=0.95, top=0.96, bottom=0.16)
+    _fig, subplot = ut.plot.make_figure(figure_index)
+    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     y_values = [pro[species][prop_statistic] for pro in pros]
     _axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
         subplot, distance_scaling, distance_limits, None, prop_scaling, prop_limits, y_values)
 
-    #subplot.set_xlabel('radius $r$ $[\\rm kpc\,physical]$')
-    subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
+    subplot.set_xlabel(ut.plot.get_label('radius', get_units=True))
 
     if prop_statistic == 'vel.circ':
         label_prop_name = 'vel.circ'
@@ -1578,7 +1564,7 @@ def plot_property_v_distance(
         label_prop_name, prop_statistic, species, dimension_number, get_symbol=True, get_units=True)
     #if prop_statistic == 'vel.circ':
     #    axis_y_label = 'circular velocity ' + axis_y_label
-    subplot.set_ylabel(axis_y_label, fontsize=30)
+    subplot.set_ylabel(axis_y_label)
 
     colors = ut.plot.get_colors(len(parts))
 
@@ -1590,7 +1576,7 @@ def plot_property_v_distance(
         elif 'velocity.rad' in prop_name:
             y_values = [0, 0]
         subplot.plot(
-            distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
+            distance_limits, y_values, color='black', linestyle=':', alpha=0.3)
 
     if distance_reference is not None:
         subplot.plot([distance_reference, distance_reference], axis_y_limits,
@@ -1606,45 +1592,25 @@ def plot_property_v_distance(
 
     # plot profiles
     if len(pros) == 1:
-        alpha = 1.0
+        alpha = None
         linewidth = 3.5
     else:
         alpha = 0.7
-        linewidth = 2.5
+        linewidth = None
 
     for part_i, pro in enumerate(pros):
         print(pro[species][prop_statistic])
-        linestyle = '-'
         color = colors[part_i]
-        if 'res-adapt' in parts[part_i].info['simulation.name']:
-            linestyle = '--'
-            color = colors[part_i - 1]
 
         label = parts[part_i].info['simulation.name']
         if len(pros) > 1 and parts[0].info['simulation.name'] == parts[1].info['simulation.name']:
             label = '$z={:.1f}$'.format(parts[part_i].snapshot['redshift'])
-            label_redshift = False
 
         masks = pro[species][prop_statistic] != 0  # plot only non-zero values
         subplot.plot(pro[species]['distance'][masks], pro[species][prop_statistic][masks],
-                     color=color, linestyle=linestyle, alpha=alpha, linewidth=linewidth,
-                     label=label)
+                     color=color, alpha=alpha, linewidth=linewidth, label=label)
 
-    # redshift legend
-    legend_z = None
-    if label_redshift:
-        legend_z = subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')],
-            ['$z={:.1f}$'.format(parts[0].snapshot['redshift'])],
-            loc='lower left', prop=FontProperties(size=16))
-        legend_z.get_frame().set_alpha(0.5)
-
-    # property legend
-    if len(parts) > 1 and parts[0].info['simulation.name']:
-        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
-        legend_prop.get_frame().set_alpha(0.5)
-        if legend_z:
-            subplot.add_artist(legend_z)
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
     distance_name = 'dist'
     if dimension_number == 2:
@@ -1779,7 +1745,7 @@ def plot_property_v_distance_halos(
     prop_limits=[],
     distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log', dimension_number=3,
-    distance_reference=None, label_redshift=True,
+    distance_reference=None,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles at snapshot
@@ -1802,7 +1768,6 @@ def plot_property_v_distance_halos(
     distance_scaling : string : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
     distance_reference : float : reference distance at which to draw vertical line
-    label_redshift : boolean : whether to label redshift
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     figure_index : int : index of figure for matplotlib
@@ -1867,7 +1832,8 @@ def plot_property_v_distance_halos(
                 pros.append(pros_cat)
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.18, right=0.95, top=0.96, bottom=0.16)
+    _fig, subplot = ut.plot.make_figure(figure_index)
+    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     y_values = []
     for pro_cat in pros:
@@ -1885,7 +1851,8 @@ def plot_property_v_distance_halos(
 
     #subplot.yaxis.set_minor_locator(AutoMinorLocator(5))
 
-    subplot.set_xlabel('radius $r$ $[\\mathrm{kpc}]$', fontsize=30)
+    subplot.set_xlabel(ut.plot.get_label('radius', get_units=True))
+
     if prop_statistic in ['vel.circ']:
         label_prop_name = prop_statistic
     else:
@@ -1894,7 +1861,7 @@ def plot_property_v_distance_halos(
         label_prop_name, prop_statistic, species, dimension_number, get_symbol=True, get_units=True)
     #if prop_statistic == 'vel.circ':
     #    axis_y_label = 'circular velocity ' + axis_y_label
-    subplot.set_ylabel(axis_y_label, fontsize=30)
+    subplot.set_ylabel(axis_y_label)
 
     # draw reference values
     if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
@@ -1943,8 +1910,6 @@ def plot_property_v_distance_halos(
 
     # draw observed galaxies
     if gal is not None:
-        alpha = 0.7
-        linewidth = 2.0
         gis = ut.array.get_indices(gal['star.radius.50'], distance_limits, gal_indices)
         gis = gis[gal['host.name'][gis] == 'MW'.encode()]
         print(gal['vel.circ.50'][gis] / gal['star.vel.std'][gis])
@@ -1953,27 +1918,10 @@ def plot_property_v_distance_halos(
                 gal['star.radius.50'][gal_i],
                 gal['vel.circ.50'][gal_i],
                 [[gal['vel.circ.50.err.lo'][gal_i]], [gal['vel.circ.50.err.hi'][gal_i]]],
-                color='black', marker='s', markersize=10, alpha=alpha,
-                linewidth=2.5, capthick=2.5,
+                color='black', marker='s', markersize=10, alpha=0.7, capthick=2.5,
             )
 
-    # redshift legend
-    legend_z = None
-    if label_redshift:
-        legend_z = subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')],
-            ['$z={:.1f}$'.format(parts[0].snapshot['redshift'])],
-            loc='lower left', prop=FontProperties(size=16))
-        legend_z.get_frame().set_alpha(0.5)
-
-    """
-    if len(parts) > 1 and parts[0].info['simulation.name']:
-        # property legend
-        legend_prop = subplot.legend(loc='best', prop=FontProperties(size=16))
-        legend_prop.get_frame().set_alpha(0.5)
-        if legend_z:
-            subplot.add_artist(legend_z)
-    """
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
     snapshot_dict = None
     if parts is not None:
@@ -2136,8 +2084,8 @@ class StarFormHistoryClass(ut.io.SayClass):
         return sfh
 
     def plot_star_form_history(
-        self, parts=None, sfh_kind='rate',
-        time_kind='time.lookback', time_limits=[0, 13.8], time_width=0.2, time_scaling='linear',
+        self, parts=None, sfh_kind='form.rate',
+        time_kind='time.lookback', time_limits=[0, 13], time_width=0.2, time_scaling='linear',
         distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indicess=None,
         sfh_limits=[], sfh_scaling='log',
         write_plot=False, plot_directory='.', figure_index=1):
@@ -2149,7 +2097,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         ----------
         parts : dict or list : catalog[s] of particles
         sfh_kind : string : star form kind to plot:
-            'rate', 'rate.specific', 'mass', 'mass.normalized'
+            'form.rate', 'form.rate.specific', 'mass', 'mass.normalized'
         time_kind : string : time kind to use: 'time', 'time.lookback' (wrt z = 0), 'redshift'
         time_limits : list : min and max limits of time_kind to get
         time_width : float : width of time_kind bin
@@ -2194,52 +2142,37 @@ class StarFormHistoryClass(ut.io.SayClass):
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
-        _fig, subplot = ut.plot.make_figure(
-            figure_index, left=0.17, right=0.95, top=0.86, bottom=0.15)
+        _fig, subplot = ut.plot.make_figure(figure_index, left=0.21, axis_secondary='y')
 
         ut.plot.make_axis_time(
             subplot, time_kind, time_limits, time_scaling, label_axis_2=True,
-            Cosmology=part.Cosmology, fontsize=30)
+            Cosmology=part.Cosmology)
 
         y_values = None
         if sfh is not None:
             y_values = sfh[sfh_kind]
         ut.plot.set_axes_scaling_limits(
-            subplot, y_scaling=sfh_scaling, y_limits=sfh_limits, y_values=y_values)
+            subplot, time_scaling, time_limits, None,
+            sfh_scaling, sfh_limits, y_values)
 
         if sfh_kind == 'mass.normalized':
-            axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
+            axis_y_label = '$M_{\\rm star}(z) \, / \, M_{\\rm star}(z=0)$'
         else:
             axis_y_label = ut.plot.get_label('star.' + sfh_kind, get_symbol=True, get_units=True)
-        subplot.set_ylabel(axis_y_label, fontsize=30)
+        subplot.set_ylabel(axis_y_label)
 
         colors = ut.plot.get_colors(len(parts))
 
         for part_i, part in enumerate(parts):
             tis = (sfh[sfh_kind][part_i] > 0)
-            if time_kind in ['redshift', 'time.lookback']:
+            if time_kind in ['redshift', 'time.lookback', 'age']:
                 tis *= (sfh[time_kind][part_i] >= parts[0].snapshot[time_kind] * 0.99)
             else:
                 tis *= (sfh[time_kind][part_i] <= parts[0].snapshot[time_kind] * 1.01)
             subplot.plot(sfh[time_kind][part_i][tis], sfh[sfh_kind][part_i][tis],
-                         linewidth=2.5, color=colors[part_i], alpha=0.8,
-                         label=part.info['simulation.name'])
+                         color=colors[part_i], alpha=0.8, label=part.info['simulation.name'])
 
-        # redshift legend
-        legend_z = None
-        if parts[0].snapshot['redshift'] > 0.01:
-            legend_z = subplot.legend(
-                [plt.Line2D((0, 0), (0, 0), linestyle='')],
-                ['$z={:.1f}$'.format(parts[0].snapshot['redshift'])],
-                loc='lower left', prop=FontProperties(size=18))
-            legend_z.get_frame().set_alpha(0.5)
-
-        # property legend
-        if len(parts) > 1 and parts[0].info['simulation.name']:
-            legend_prop = subplot.legend(loc='best', prop=FontProperties(size=18))
-            legend_prop.get_frame().set_alpha(0.5)
-            if legend_z:
-                subplot.add_artist(legend_z)
+        ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
         plot_name = ut.plot.get_file_name(
             sfh_kind + '.history', time_kind, 'star', snapshot_dict=part.snapshot)
@@ -2268,7 +2201,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             'rate', 'rate.specific', 'mass', 'mass.normalized'
         sfh_limits : list : min and max limits for y-axis
         sfh_scaling : string : scailng of y-axis: 'log', 'linear'
-        time_kind : string : time kind to plot: 'time', 'time.lookback', 'redshift'
+        time_kind : string : time kind to plot: 'time', 'time.lookback', 'age', 'redshift'
         time_limits : list : min and max limits of time_kind to plot
         time_width : float : width of time_kind bin
         time_scaling : string : scaling of time_kind: 'log', 'linear'
@@ -2328,12 +2261,12 @@ class StarFormHistoryClass(ut.io.SayClass):
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
-        _fig, subplot = ut.plot.make_figure(
-            figure_index, left=0.17, right=0.95, top=0.86, bottom=0.15)
+        _fig, subplot = ut.plot.make_figure(figure_index)
+        #, left=0.17, right=0.95, top=0.86, bottom=0.15)
 
         ut.plot.make_axis_time(
             subplot, time_kind, time_limits, time_scaling, label_axis_2=True,
-            Cosmology=part.Cosmology, fontsize=30)
+            Cosmology=part.Cosmology)
 
         y_values = None
         if sfh is not None:
@@ -2346,7 +2279,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
         else:
             axis_y_label = ut.plot.get_label('star.' + sfh_kind, get_symbol=True, get_units=True)
-        subplot.set_ylabel(axis_y_label, fontsize=30)
+        subplot.set_ylabel(axis_y_label)
 
         if hal is not None:
             colors = ut.plot.get_colors(len(hal_indices))
@@ -2388,8 +2321,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             for hal_ii, hal_i in enumerate(hal_indices):
                 linewidth = 2.5 + 0.1 * hal_ii
                 #linewidth = 3.0
-                #label = '$M_{{\\rm star}}={}\,M_\odot$'.format(
-                label = '${}\,M_\odot$'.format(
+                label = '${}\,{{\\rm M}}_\odot$'.format(
                     ut.io.get_string_for_exponential(sfh['mass'][hal_ii][-1], 0))
                 subplot.plot(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                              linewidth=linewidth, color=colors[hal_ii], alpha=0.55, label=label)
@@ -2397,29 +2329,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         #subplot.plot(sfh['time'][0], sfh['mass.normalized.median'],
         #             linewidth=4.0, color='black', alpha=0.5)
 
-        # redshift legend
-        legend_z = None
-        if part is not None and part.snapshot['redshift'] > 0.03:
-            legend_z = subplot.legend(
-                [plt.Line2D((0, 0), (0, 0), linestyle='')],
-                ['$z={:.1f}$'.format(part.snapshot['redshift'])],
-                loc='lower left', prop=FontProperties(size=16))
-            legend_z.get_frame().set_alpha(0.5)
-
-        # property legend
-        if label is not None:
-            if hal is None:
-                font_size = 17
-                label_spacing = 0.1
-            else:
-                font_size = 13.2
-                label_spacing = 0
-            legend_prop = subplot.legend(
-                loc='best', prop=FontProperties(size=font_size), handlelength=0.8,
-                labelspacing=label_spacing)
-            legend_prop.get_frame().set_alpha(0.5)
-            if legend_z:
-                subplot.add_artist(legend_z)
+        ut.plot.make_legends(subplot, time_value=part.snapshot['redshift'])
 
         snapshot_dict = None
         if part is not None:
@@ -2826,8 +2736,7 @@ def plot_galaxy_property_v_time(
     _fig, subplot = ut.plot.make_figure(figure_index, left=0.17, right=0.95, top=0.86, bottom=0.15)
 
     ut.plot.make_axis_time(
-        subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=Cosmology,
-        fontsize=26)
+        subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=Cosmology)
 
     y_values = []
     if gals is not None:
@@ -2838,7 +2747,7 @@ def plot_galaxy_property_v_time(
 
     if 'mass' in prop_name:
         axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
-    subplot.set_ylabel(axis_y_label, fontsize=30)
+    subplot.set_ylabel(axis_y_label)
 
     #colors = ut.plot.get_colors(len(gals))
 
@@ -2863,10 +2772,7 @@ def plot_galaxy_property_v_time(
                 label='SFH computed at $z=0$',
             )
 
-    # property legend
-    #if len(gals) > 1 and gals[0].info['simulation.name']:
-    legend_prop = subplot.legend(loc='best', prop=FontProperties(size=18))
-    legend_prop.get_frame().set_alpha(0.5)
+    ut.plot.make_legends(subplot)
 
     plot_name = 'galaxy_{}_v_{}'.format(prop_name, time_kind)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
@@ -3176,12 +3082,14 @@ class CompareSimulationsClass(ut.io.SayClass):
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
+                """
                 if 'velocity' in parts[0][prop_name]:
                     plot_property_v_distance(
                         parts, prop_name, 'host.velocity.rad', 'average', 'linear', True,
                         [None, None], distance_limits_halo, 0.25,
                         write_plot=True, plot_directory=self.plot_directory,
                     )
+                """
 
             prop_name = 'star'
             if prop_name in parts[0]:
@@ -3327,7 +3235,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                    0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
                    0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
         species=['star', 'gas'],
-        distance_max=20, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
+        distance_max=21, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
         align_principal_axes=True):
         '''
         Plot images of simulations at each snapshot.
@@ -3370,7 +3278,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         Image.plot_image(
                             part, spec_name, 'mass', 'histogram',
                             [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
-                            align_principal_axes=align_principal_axes, image_limits=image_limits,
+                            rotation=align_principal_axes, image_limits=image_limits,
                             background_color='black',
                             write_plot=True, plot_directory=plot_directory,
                             add_simulation_name=True,

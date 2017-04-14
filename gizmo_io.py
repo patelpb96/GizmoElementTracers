@@ -418,7 +418,8 @@ class ReadClass(ut.io.SayClass):
 
     def read_simulations(
         self, simulation_directories=[], species_names='all', redshift=0,
-        property_names='all', element_indices=[0, 1, 6, 10], force_float32=True):
+        property_names='all', element_indices=[0, 1, 6, 10], force_float32=True,
+        assign_principal_axes=False):
         '''
         Read snapshots at the same redshift from different simulations.
         Return as list of dictionaries.
@@ -432,6 +433,7 @@ class ReadClass(ut.io.SayClass):
         property_names : string or list : names of properties to read
         element_indices : int or list : indices of elements to read
         force_float32 : boolean : whether to force positions to be 32-bit
+        assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
 
         Returns
         -------
@@ -475,13 +477,14 @@ class ReadClass(ut.io.SayClass):
                 part = self.read_snapshots(
                     species_names, 'redshift', redshift, directory, simulation_name=simulation_name,
                     property_names=property_names, element_indices=element_indices,
-                    force_float32=force_float32)
+                    force_float32=force_float32, assign_principal_axes=assign_principal_axes)
 
                 if 'velocity' in property_names:
                     self.assign_orbit(part, 'gas')
 
                 parts.append(part)
                 directories_read.append(directory)
+
             except:
                 self.say('! could not read snapshot at z = {:.3f} in {}'.format(
                          redshift, directory))
