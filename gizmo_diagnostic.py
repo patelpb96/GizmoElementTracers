@@ -256,7 +256,7 @@ def print_properties_statistics(
 
 def print_properties_snapshots(
     simulation_directory='.', snapshot_directory='output',
-    species_property_dict={'gas': ['smooth.length', 'density.number']}):
+    species_property_dict={'gas': ['smooth.length', 'number.density']}):
     '''
     For each input property, get its extremum at each snapshot.
     Print statistics of property across all snapshots.
@@ -272,7 +272,7 @@ def print_properties_snapshots(
     property_statistic = {
         'smooth.length': {'function.name': 'min', 'function': np.min},
         'density': {'function.name': 'max', 'function': np.max},
-        'density.number': {'function.name': 'max', 'function': np.max},
+        'number.density': {'function.name': 'max', 'function': np.max},
     }
 
     Say = ut.io.SayClass(print_properties_snapshots)
@@ -318,9 +318,9 @@ def print_properties_snapshots(
                         prop_ext = property_statistic[prop_name]['function'](
                             part[spec_name].prop(prop_name))
                         species_property_dict[spec_name][prop_name].append(prop_ext)
-                    except:
+                    except Exception:
                         Say.say('! {} {} not in particle dictionary'.format(spec_name, prop_name))
-        except:
+        except Exception:
             Say.say('! cannot read snapshot index {} in {}'.format(
                     snapshot_i, simulation_directory + snapshot_directory))
 

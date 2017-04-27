@@ -282,12 +282,11 @@ class SpeciesProfileClass(ut.io.SayClass):
         assert 0 < DistanceBin.dimension_number <= 3
 
         for spec_i, spec_name in enumerate(species):
+            assert part[spec_name].prop(prop_name) is not None
+
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
-                try:
-                    part_indices = ut.array.get_arange(part[spec_name].prop(prop_name))
-                except:
-                    part_indices = ut.array.get_arange(part[spec_name].prop('mass'))
+                part_indices = ut.array.get_arange(part[spec_name].prop(prop_name))
 
             if other_prop_limits:
                 part_indices = ut.catalog.get_indices_catalog(
@@ -384,7 +383,7 @@ def print_properties_statistics(part, species_names='all'):
         'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'form.scalefactor',
         'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
     species_property_dict['gas'] = [
-        'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'density.number',
+        'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'number.density',
         'smooth.length', 'temperature', 'hydrogen.neutral.fraction', 'sfr',
         'massfraction.hydrogen', 'massfraction.helium', 'massfraction.metals']
 
@@ -396,7 +395,7 @@ def print_properties_statistics(part, species_names='all'):
         for prop_name in species_property_dict[spec_name]:
             try:
                 prop_values = part[spec_name].prop(prop_name)
-            except:
+            except ValueError:
                 Say.say('{} not in catalog'.format(prop_name))
                 continue
 
@@ -1281,19 +1280,16 @@ def plot_property_distribution(
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
-    ut.plot.set_axes_scaling_limits(
-        subplot, prop_scaling, prop_limits, prop_values)
     y_values = np.array([Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))])
-    ut.plot.set_axes_scaling_limits(
-        subplot, None, None, None, axis_y_scaling, axis_y_limits, y_values)
 
-    subplot.set_xlabel(ut.plot.get_label(prop_name, species=spec_name, get_units=True))
-    subplot.set_ylabel(
-        ut.plot.get_label(
-            prop_name, prop_statistic, spec_name, get_symbol=True, get_units=False,
-            get_log=prop_scaling))
+    ut.plot.set_axes_scaling_limits(
+        subplot, prop_scaling, prop_limits, prop_values, axis_y_scaling, axis_y_limits, y_values)
+
+    axis_x_label = ut.plot.Label.get_label(prop_name, species=spec_name, get_words=True)
+    subplot.set_xlabel(axis_x_label)
+    axis_y_label = ut.plot.Label.get_label(prop_name, prop_statistic, spec_name, get_units=False)
+    subplot.set_ylabel(axis_y_label)
 
     for part_i, part in enumerate(parts):
         subplot.plot(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
@@ -1383,11 +1379,6 @@ def plot_property_v_property(
     if weight_by_mass:
         masses = masses[part_indices]
 
-    #if 'log' in x_prop_scaling:
-    #    x_prop_values = ut.math.get_log(x_prop_values)
-    #if 'log' in y_prop_scaling:
-    #    y_prop_values = ut.math.get_log(y_prop_values)
-
     Say.say('keeping {} particles'.format(x_prop_values.size))
 
     if draw_statistics:
@@ -1397,7 +1388,6 @@ def plot_property_v_property(
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
         subplot, x_prop_scaling, x_prop_limits, x_prop_values,
@@ -1405,17 +1395,13 @@ def plot_property_v_property(
 
     if 'log' in x_prop_scaling:
         x_prop_values = ut.math.get_log(x_prop_values)
-        #axis_x_limits = ut.math.get_log(axis_x_limits)
     if 'log' in y_prop_scaling:
         y_prop_values = ut.math.get_log(y_prop_values)
-        #axis_y_limits = ut.math.get_log(axis_y_limits)
 
-    axis_x_label = ut.plot.get_label(
-        x_prop_name, species=spec_name, get_units=True, get_symbol=False, get_log=x_prop_scaling)
+    axis_x_label = ut.plot.Label.get_label(x_prop_name, species=spec_name, get_words=True)
     subplot.set_xlabel(axis_x_label)
 
-    axis_y_label = ut.plot.get_label(
-        y_prop_name, species=spec_name, get_units=True, get_symbol=False, get_log=y_prop_scaling)
+    axis_y_label = ut.plot.Label.get_label(y_prop_name, species=spec_name, get_words=True)
     subplot.set_ylabel(axis_y_label)
 
     color_map = plt.cm.inferno_r  # @UndefinedVariable
@@ -1426,8 +1412,7 @@ def plot_property_v_property(
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(), weights=masses,
-        cmin=None, cmax=None,
-        cmap=color_map,
+        cmin=None, cmax=None, cmap=color_map,
     )
 
     """
@@ -1450,16 +1435,171 @@ def plot_property_v_property(
 
     if draw_statistics:
         print(stat['bin.mid'])
-        subplot.plot(stat['bin.mid'], stat['median'], color='black', linestyle='-', alpha=0.5)
-        subplot.plot(stat['bin.mid'], stat['percent.16'], color='black', linestyle='--', alpha=0.4)
-        subplot.plot(stat['bin.mid'], stat['percent.84'], color='black', linestyle='--', alpha=0.4)
+        subplot.plot(stat['bin.mid'], stat['median'], color='black', linestyle='-', alpha=0.4)
+        subplot.plot(stat['bin.mid'], stat['percent.16'], color='black', linestyle='--', alpha=0.3)
+        subplot.plot(stat['bin.mid'], stat['percent.84'], color='black', linestyle='--', alpha=0.3)
 
+    # distance legend
     if host_distance_limits is not None and len(host_distance_limits):
-        # distance legend
-        label = ut.plot.get_label_distance('host.distance', host_distance_limits)
+        label = ut.plot.Label.get_label('radius', prop_limits=host_distance_limits)
         subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label], loc='best', fontsize='small',
-            handlelength=0)
+            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label], loc='best', handlelength=0)
+
+    if add_simulation_name:
+        prefix = part.info['simulation.name']
+    else:
+        prefix = ''
+
+    plot_name = ut.plot.get_file_name(
+        y_prop_name, x_prop_name, spec_name, snapshot_dict=part.snapshot,
+        host_distance_limits=host_distance_limits, prefix=prefix)
+
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+
+
+def plot_property_v_property_v_distance(
+    part, spec_name='star',
+    x_prop_name='metallicity.fe', x_prop_limits=[], x_prop_scaling='linear',
+    y_prop_name='metallicity.alpha - metallicity.fe', y_prop_limits=[], y_prop_scaling='linear',
+    prop_bin_number=100, weight_by_mass=True, cut_percent=0,
+    distance_limitss=[[0, 300], [0, 3]], distance_bin_widths=[2, 3],
+    distance_bin_numbers=[None, None], distance_scaling='log',
+    other_prop_limits={}, part_indices=None, draw_statistics=False,
+    write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
+    '''
+    Plot property v property.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    spec_name : string : particle species
+    x_prop_name : string : property name for x-axis
+    x_prop_limits : list : min and max limits to impose on x_prop_name
+    x_prop_scaling : string : 'log', 'linear'
+    y_prop_name : string : property name for y-axis
+    y_prop_limits : list : min and max limits to impose on y_prop_name
+    y_prop_scaling : string : 'log', 'linear'
+    prop_bin_number : int : number of bins for histogram along each axis
+    weight_by_mass : boolean : whether to weight property by particle mass
+    host_distance_limits : list : min and max limits for distance from galaxy
+    center_position : array : position of galaxy center
+    other_prop_limits : dict : dictionary with properties as keys and limits as values
+    part_indices : array : indices of particles from which to select
+    draw_statistics : boolean : whether to draw statistics (such as median) on figure
+    write_plot : boolean : whether to write figure to file
+    plot_directory : string : directory to write figure file
+    add_simulation_name : boolean : whether to add name of simulation to figure name
+    figure_index : int : index of figure for matplotlib
+    '''
+    Say = ut.io.SayClass(plot_property_v_property)
+
+    center_position = ut.particle.parse_property(part, 'position', center_position)
+
+    if part_indices is None or not len(part_indices):
+        part_indices = ut.array.get_arange(part[spec_name].prop(x_prop_name))
+
+    if other_prop_limits:
+        part_indices = ut.catalog.get_indices_catalog(
+            part[spec_name], other_prop_limits, part_indices)
+
+    if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
+        distances = ut.coordinate.get_distances(
+            'scalar', center_position, part[spec_name]['position'][part_indices],
+            part.info['box.length']) * part.snapshot['scalefactor']
+        print(distances)
+        part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
+    print(part_indices)
+
+    x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
+    y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
+    masses = None
+    if weight_by_mass:
+        masses = part[spec_name].prop('mass', part_indices)
+
+    part_indices = ut.array.get_arange(part_indices)
+
+    if x_prop_limits:
+        part_indices = ut.array.get_indices(x_prop_values, x_prop_limits, part_indices)
+
+    if y_prop_limits:
+        part_indices = ut.array.get_indices(y_prop_values, y_prop_limits, part_indices)
+
+    if cut_percent > 0:
+        x_limits = ut.array.get_limits(x_prop_values[part_indices], cut_percent=cut_percent)
+        y_limits = ut.array.get_limits(y_prop_values[part_indices], cut_percent=cut_percent)
+        part_indices = ut.array.get_indices(x_prop_values, x_limits, part_indices)
+        part_indices = ut.array.get_indices(y_prop_values, y_limits, part_indices)
+
+    x_prop_values = x_prop_values[part_indices]
+    y_prop_values = y_prop_values[part_indices]
+    if weight_by_mass:
+        masses = masses[part_indices]
+
+    Say.say('keeping {} particles'.format(x_prop_values.size))
+
+    if draw_statistics:
+        stat_bin_number = int(np.round(prop_bin_number / 10))
+        Bin = ut.binning.BinClass(x_prop_limits, None, stat_bin_number, False, x_prop_scaling)
+        stat = Bin.get_statistics_of_array(x_prop_values, y_prop_values)
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot, x_prop_scaling, x_prop_limits, x_prop_values,
+        y_prop_scaling, y_prop_limits, y_prop_values)
+
+    if 'log' in x_prop_scaling:
+        x_prop_values = ut.math.get_log(x_prop_values)
+    if 'log' in y_prop_scaling:
+        y_prop_values = ut.math.get_log(y_prop_values)
+
+    axis_x_label = ut.plot.Label.get_label(x_prop_name, species=spec_name, get_words=True)
+    subplot.set_xlabel(axis_x_label)
+
+    axis_y_label = ut.plot.Label.get_label(y_prop_name, species=spec_name, get_words=True)
+    subplot.set_ylabel(axis_y_label)
+
+    color_map = plt.cm.inferno_r  # @UndefinedVariable
+    #color_map = plt.cm.gist_heat_r  # @UndefinedVariable
+    #color_map = plt.cm.afmhot_r  # @UndefinedVariable
+
+    #"""
+    _valuess, _xs, _ys, _Image = plt.hist2d(
+        x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
+        norm=colors.LogNorm(), weights=masses,
+        cmin=None, cmax=None, cmap=color_map,
+    )
+
+    """
+    valuess, _xs, _ys = np.histogram2d(
+        x_prop_values, y_prop_values, prop_bin_number,
+        [axis_x_limits, axis_y_limits],
+        normed=False, weights=masses)
+
+    subplot.imshow(
+        valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
+        aspect='auto',
+        interpolation='nearest',
+        #interpolation='none',
+        extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
+        #vmin=valuess.min(), vmax=valuess.max(),
+        #label=label,
+    )
+    """
+    #plt.colorbar()
+
+    if draw_statistics:
+        print(stat['bin.mid'])
+        subplot.plot(stat['bin.mid'], stat['median'], color='black', linestyle='-', alpha=0.4)
+        subplot.plot(stat['bin.mid'], stat['percent.16'], color='black', linestyle='--', alpha=0.3)
+        subplot.plot(stat['bin.mid'], stat['percent.84'], color='black', linestyle='--', alpha=0.3)
+
+    # distance legend
+    if host_distance_limits is not None and len(host_distance_limits):
+        label = ut.plot.Label.get_label('radius', prop_limits=host_distance_limits)
+        subplot.legend(
+            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label], loc='best', handlelength=0)
 
     if add_simulation_name:
         prefix = part.info['simulation.name']
@@ -1554,16 +1694,15 @@ def plot_property_v_distance(
     _axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
         subplot, distance_scaling, distance_limits, None, prop_scaling, prop_limits, y_values)
 
-    subplot.set_xlabel(ut.plot.get_label('radius', get_units=True))
+    axis_x_label = ut.plot.Label.get_label('radius', get_words=True)
+    subplot.set_xlabel(axis_x_label)
 
     if prop_statistic == 'vel.circ':
         label_prop_name = 'vel.circ'
     else:
         label_prop_name = prop_name
-    axis_y_label = ut.plot.get_label(
-        label_prop_name, prop_statistic, species, dimension_number, get_symbol=True, get_units=True)
-    #if prop_statistic == 'vel.circ':
-    #    axis_y_label = 'circular velocity ' + axis_y_label
+    axis_y_label = ut.plot.Label.get_label(
+        label_prop_name, prop_statistic, species, dimension_number=dimension_number)
     subplot.set_ylabel(axis_y_label)
 
     colors = ut.plot.get_colors(len(parts))
@@ -1598,6 +1737,7 @@ def plot_property_v_distance(
         alpha = 0.7
         linewidth = None
 
+    print(pros[0][species]['distance'])
     for part_i, pro in enumerate(pros):
         print(pro[species][prop_statistic])
         color = colors[part_i]
@@ -1851,16 +1991,15 @@ def plot_property_v_distance_halos(
 
     #subplot.yaxis.set_minor_locator(AutoMinorLocator(5))
 
-    subplot.set_xlabel(ut.plot.get_label('radius', get_units=True))
+    axis_x_label = ut.plot.Label.get_label('radius', get_words=True)
+    subplot.set_xlabel(axis_x_label)
 
     if prop_statistic in ['vel.circ']:
         label_prop_name = prop_statistic
     else:
         label_prop_name = prop_name
-    axis_y_label = ut.plot.get_label(
-        label_prop_name, prop_statistic, species, dimension_number, get_symbol=True, get_units=True)
-    #if prop_statistic == 'vel.circ':
-    #    axis_y_label = 'circular velocity ' + axis_y_label
+    axis_y_label = ut.plot.Label.get_label(
+        label_prop_name, prop_statistic, species, dimension_number=dimension_number)
     subplot.set_ylabel(axis_y_label)
 
     # draw reference values
@@ -2142,24 +2281,25 @@ class StarFormHistoryClass(ut.io.SayClass):
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
-        _fig, subplot = ut.plot.make_figure(figure_index, left=0.21, axis_secondary='y')
-
-        ut.plot.make_axis_time(
-            subplot, time_kind, time_limits, time_scaling, label_axis_2=True,
-            Cosmology=part.Cosmology)
+        _fig, subplot = ut.plot.make_figure(figure_index, left=0.21, axis_secondary='x')
 
         y_values = None
         if sfh is not None:
             y_values = sfh[sfh_kind]
+
         ut.plot.set_axes_scaling_limits(
-            subplot, time_scaling, time_limits, None,
-            sfh_scaling, sfh_limits, y_values)
+            subplot, time_scaling, time_limits, None, sfh_scaling, sfh_limits, y_values)
+
+        axis_x_label = ut.plot.Label.get_label(time_kind, get_words=True)
+        subplot.set_xlabel(axis_x_label)
 
         if sfh_kind == 'mass.normalized':
             axis_y_label = '$M_{\\rm star}(z) \, / \, M_{\\rm star}(z=0)$'
         else:
-            axis_y_label = ut.plot.get_label('star.' + sfh_kind, get_symbol=True, get_units=True)
+            axis_y_label = ut.plot.Label.get_label('star.' + sfh_kind)
         subplot.set_ylabel(axis_y_label)
+
+        ut.plot.make_axis_secondary_time(subplot, time_kind, time_limits, part.Cosmology)
 
         colors = ut.plot.get_colors(len(parts))
 
@@ -2262,24 +2402,26 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         # plot ----------
         _fig, subplot = ut.plot.make_figure(figure_index)
-        #, left=0.17, right=0.95, top=0.86, bottom=0.15)
-
-        ut.plot.make_axis_time(
-            subplot, time_kind, time_limits, time_scaling, label_axis_2=True,
-            Cosmology=part.Cosmology)
 
         y_values = None
         if sfh is not None:
             y_values = sfh[sfh_kind]
+
         ut.plot.set_axes_scaling_limits(
-            subplot, y_scaling=sfh_scaling, y_limits=sfh_limits, y_values=y_values)
+            subplot, time_scaling, time_limits, None, sfh_scaling, sfh_limits, y_values)
+
         subplot.xaxis.set_minor_locator(AutoMinorLocator(2))
+
+        axis_x_label = ut.plot.Label.get_label(time_kind, get_words=True)
+        subplot.set_xlabel(axis_x_label)
 
         if sfh_kind == 'mass.normalized':
             axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
         else:
-            axis_y_label = ut.plot.get_label('star.' + sfh_kind, get_symbol=True, get_units=True)
+            axis_y_label = ut.plot.Label.get_label('star.' + sfh_kind)
         subplot.set_ylabel(axis_y_label)
+
+        ut.plot.make_axis_secondary_time(subplot, time_kind, time_limits, part.Cosmology)
 
         if hal is not None:
             colors = ut.plot.get_colors(len(hal_indices))
@@ -2321,8 +2463,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             for hal_ii, hal_i in enumerate(hal_indices):
                 linewidth = 2.5 + 0.1 * hal_ii
                 #linewidth = 3.0
-                label = '${}\,{{\\rm M}}_\odot$'.format(
-                    ut.io.get_string_for_exponential(sfh['mass'][hal_ii][-1], 0))
+                mass = ut.io.get_string_from_numbers(sfh['mass'][hal_ii][-1], 1, exponential=True)
+                label = '${}\,{{\\rm M}}_\odot$'.format(mass)
                 subplot.plot(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                              linewidth=linewidth, color=colors[hal_ii], alpha=0.55, label=label)
 
@@ -2411,7 +2553,7 @@ def explore_galaxy(
             try:
                 element_name = 'metallicity.iron'
                 hal.prop(element_name)
-            except:
+            except ValueError:
                 element_name = 'metallicity.total'
 
             plot_property_distribution(
@@ -2733,10 +2875,8 @@ def plot_galaxy_property_v_time(
         time_limits += 1  # convert to z + 1 so log is well-defined
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.17, right=0.95, top=0.86, bottom=0.15)
-
-    ut.plot.make_axis_time(
-        subplot, time_kind, time_limits, time_scaling, label_axis_2=True, Cosmology=Cosmology)
+    _fig, subplot = ut.plot.make_figure(
+        figure_index, left=0.17, right=0.95, top=0.86, bottom=0.15)
 
     y_values = []
     if gals is not None:
@@ -2745,9 +2885,10 @@ def plot_galaxy_property_v_time(
         y_values.append(sfhs[0][time_kind])
     subplot.set_ylim(ut.plot.get_axis_limits(y_values, axis_y_scaling, axis_y_limits))
 
-    if 'mass' in prop_name:
-        axis_y_label = ut.plot.get_label('star.mass', get_symbol=True, get_units=True)
+    axis_y_label = ut.plot.Label.get_label('star.mass')
     subplot.set_ylabel(axis_y_label)
+
+    ut.plot.make_axis_secondary_time(subplot, time_kind, time_limits, Cosmology)
 
     #colors = ut.plot.get_colors(len(gals))
 

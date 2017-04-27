@@ -13,7 +13,6 @@ import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 from matplotlib import pyplot as plt
-from matplotlib.font_manager import FontProperties
 # local ----
 import utilities as ut
 
@@ -166,7 +165,7 @@ def plot_nucleosynthetic_yields(
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
     yield_names = np.array(yield_dict.keys())[yield_indices]
-    yield_labels = [ut.plot.element_name_dict[k] for k in yield_names]
+    yield_labels = [str.capitalize(ut.const.element_symbol_from_name[k]) for k in yield_names]
     yield_indices = np.arange(yield_indices.size)
 
     # plot ----------
@@ -185,7 +184,7 @@ def plot_nucleosynthetic_yields(
         if normalize:
             y_label = 'yield (mass fraction)'
         else:
-            y_label = 'yield $[M_\odot]$'
+            y_label = 'yield $\\left[ {\\rm M}_\odot \\right]$'
         subplots[si].set_ylabel(y_label, fontsize=28)
         subplots[si].set_xlabel('element', fontsize=28)
         #fig.set_ylabel(y_label, fontsize=26)
@@ -195,18 +194,17 @@ def plot_nucleosynthetic_yields(
             if yield_values[yi] > 0:
                 subplot.plot(
                     yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi])
-                subplots[si].text(yield_indices[yi] * 0.98, yield_values[yi] * 0.6,
-                                  yield_labels[yi])
+                subplots[si].text(
+                    yield_indices[yi] * 0.98, yield_values[yi] * 0.6, yield_labels[yi])
 
         subplots[si].set_title(title_dict[event_kind])
 
         # metallicity legend
-        legend_z = subplots[si].legend(
+        subplots[si].legend(
             [plt.Line2D((0, 0), (0, 0), linestyle='')],
-            ['$Z/Z_\odot={:.3f}$'.format(star_metallicity)],
-            loc='best', prop=FontProperties(size=16)
+            ['$\\left[ Z / {\\rm Z}_\odot={:.3f} \\right]$'.format(star_metallicity)],
+            loc='best', handlelength=0,
         )
-        legend_z.get_frame().set_alpha(0.7)
 
     plot_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)

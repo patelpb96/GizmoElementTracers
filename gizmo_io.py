@@ -129,7 +129,7 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        if 'number.density' in property_name or 'density.number' in property_name:
+        if 'number.density' in property_name:
             values = (self.prop('density', indices) * ut.const.proton_per_sun *
                       ut.const.kpc_per_cm ** 3)
 
@@ -456,12 +456,10 @@ class ReadClass(ut.io.SayClass):
         # first pass, read only header, to check that can read all simulations
         bad_snapshot_number = 0
         for directory, simulation_name in simulation_directories:
-            _header = self.read_header(
-                'redshift', redshift, directory, simulation_name=simulation_name)
             try:
                 _header = self.read_header(
                     'redshift', redshift, directory, simulation_name=simulation_name)
-            except:
+            except Exception:
                 self.say('! could not read snapshot header at z = {:.3f} in {}'.format(
                          redshift, directory))
                 bad_snapshot_number += 1
@@ -485,7 +483,7 @@ class ReadClass(ut.io.SayClass):
                 parts.append(part)
                 directories_read.append(directory)
 
-            except:
+            except Exception:
                 self.say('! could not read snapshot at z = {:.3f} in {}'.format(
                          redshift, directory))
 
@@ -559,9 +557,9 @@ class ReadClass(ut.io.SayClass):
         try:
             try:
                 Snapshot.read_snapshots('snapshot_times.txt', directory)
-            except:
+            except IOError:
                 Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
-        except:
+        except Exception:
             raise IOError('cannot find file of snapshot times in {}'.format(directory))
 
         self.is_first_print = True
@@ -1295,6 +1293,7 @@ class ReadClass(ut.io.SayClass):
                 if 'delete' in action:
                     header['NumPart_ThisFile'] = part_number_in_file
                     header['NumPart_Total'] = part_number
+
 
 Read = ReadClass()
 

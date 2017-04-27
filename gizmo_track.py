@@ -35,7 +35,7 @@ def assign_star_form_snapshot(part):
     part : dict : catalog of particles at snapshot
     '''
     # increase formation time slightly for safety, because scale-factors of snapshots that are
-    # actually written do not exactly coincide with input list of snapshot scale-factors
+    # written do not exactly coincide with input list of snapshot scale-factors
     padding_factor = (1 + 1e-7)
 
     form_scalefactors = np.array(part['star']['form.scalefactor'])
@@ -91,10 +91,10 @@ class IndexPointerClass(ut.io.SayClass):
                 property_names_read.append(test_prop_name)
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
-                spec_name, 'redshift', 0, property_names=property_names_read,
-                element_indices=[0], force_float32=True, assign_center=False, check_sanity=False)
+                spec_name, 'redshift', 0, property_names=property_names_read, element_indices=[0],
+                assign_center=False, check_sanity=False)
 
-        # older snapshot files do not have id.child - use metal abundance instead
+        # older snapshot files do not have id.child - use abundance of total metals instead
         if match_prop_name == 'id.child' and 'id.child' not in part[spec_name]:
             self.say('input match_prop_name = {}, but it does not exist in the snapshot'.format(
                      match_prop_name))
@@ -151,7 +151,7 @@ class IndexPointerClass(ut.io.SayClass):
             part_at_snap = Read.read_snapshots(
                 spec_name, 'index', snapshot_index,
                 property_names=['id', match_prop_name, test_prop_name], element_indices=[0],
-                force_float32=True, assign_center=False, check_sanity=False)
+                assign_center=False, check_sanity=False)
 
             # assign pointer from particle id to its index in list
             ut.particle.assign_id_to_index(
@@ -169,7 +169,7 @@ class IndexPointerClass(ut.io.SayClass):
 
                 try:
                     part_indices_at_snap = part_at_snap[spec_name].id_to_index[part_id]
-                except:
+                except IndexError:
                     id_no_match_number += 1
                     continue
 
@@ -281,6 +281,7 @@ class IndexPointerClass(ut.io.SayClass):
             else:
                 part.index_pointers = part_index_pointers
 
+
 IndexPointer = IndexPointerClass()
 
 
@@ -298,7 +299,7 @@ class HostDistanceClass(IndexPointerClass):
         self.species = species
         self.directory = directory
 
-        # star form host distance kinds to write/read
+        # star formation host distance kinds to write/read
         self.host_distance_kinds = ['form.host.distance', 'form.host.distance.3d']
 
     def write_form_host_distance(
@@ -316,8 +317,7 @@ class HostDistanceClass(IndexPointerClass):
         spec_name = self.species
 
         if part is None:
-            # read particles at z = 0
-            # read all properties possibly relevant for matching
+            # read particles at z = 0 - all properties possibly relevant for matching
             property_names_read = [
                 'position', 'mass', 'id', 'id.child', 'massfraction.metals', 'form.scalefactor']
             Read = gizmo_io.ReadClass()
@@ -421,15 +421,6 @@ class HostDistanceClass(IndexPointerClass):
                         # 3-D distance wrt host along principal axes [kpc physical]
                         distances_t = distance_vectors
 
-                        #if '3d' in host_distance_kind:
-                        #    distance_kind = 'rotated'
-                        #elif '2d' in host_distance_kind:
-                        #    distance_kind = 'rotated.2d'
-                        #distances_t = ut.particle.get_distances_wrt_center(
-                        #    part_at_snap, spec_name, distance_kind,
-                        #    principal_axes_distance_max=gal_radius,
-                        #    part_indicess=part_indices_at_snap, scalarize=True)
-
                     elif '2d' in host_distance_kind:
                         # distance along major axes and along minor axis [kpc physical]
                         distances_t = ut.coordinate.get_distances_major_minor(distance_vectors)
@@ -437,10 +428,6 @@ class HostDistanceClass(IndexPointerClass):
                     else:
                         # total scalar distance wrt host [kpc physical]
                         distances_t = np.sqrt(np.sum(distance_vectors ** 2, 1))
-
-                        #distances_t = ut.particle.get_distances_wrt_center(
-                        #    part_at_snap, spec_name, 'scalar',
-                        #    part_indicess=part_indices_at_snap, scalarize=True)
 
                     part[spec_name][host_distance_kind][part_indices_form] = distances_t
 
@@ -485,6 +472,7 @@ class HostDistanceClass(IndexPointerClass):
 
         else:
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))
+
 
 HostDistance = HostDistanceClass()
 
