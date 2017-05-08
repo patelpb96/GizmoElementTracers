@@ -1097,7 +1097,7 @@ class ReadClass(ut.io.SayClass):
             'id.generation': [0, 4e9],
             'position': [0, 1e6],  # [kpc comoving]
             'velocity': [-1e5, 1e5],  # [km / s]
-            'mass': [1, 3e10],  # [M_sun]
+            'mass': [9, 3e10],  # [M_sun]
             'potential': [-1e9, 1e9],  # [M_sun]
             'temperature': [3, 1e9],  # [K]
             'density': [0, 1e14],  # [M_sun/kpc^3]
@@ -1108,16 +1108,34 @@ class ReadClass(ut.io.SayClass):
             'form.scalefactor': [0, 1],
         }
 
+        mass_factor_wrt_median = 4  # mass should not vary by more than this!
+
         self.say('* checking sanity of particle properties')
 
         for spec_name in part:
-            for prop_name in part[spec_name]:
-                if prop_name in prop_limit_dict:
-                    if (part[spec_name][prop_name].min() < prop_limit_dict[prop_name][0] or
-                            part[spec_name][prop_name].max() > prop_limit_dict[prop_name][1]):
-                        self.say('! warning: {} {} [min, max] = [{:.3f}, {:.3f}]'.format(
-                                 spec_name, prop_name, part[spec_name][prop_name].min(),
-                                 part[spec_name][prop_name].max()))
+            for prop_name in [k for k in prop_limit_dict if k in part[spec_name]]:
+                if (part[spec_name][prop_name].min() < prop_limit_dict[prop_name][0] or
+                        part[spec_name][prop_name].max() > prop_limit_dict[prop_name][1]):
+                    self.say(
+                        '! warning: {} {} [min, max] = [{}, {}]'.format(
+                            spec_name, prop_name,
+                            ut.io.get_string_from_numbers(part[spec_name][prop_name].min(), 3),
+                            ut.io.get_string_from_numbers(part[spec_name][prop_name].max(), 3))
+                    )
+                elif prop_name is 'mass' and spec_name in ['star', 'gas', 'dark']:
+                    m_min = np.median(part[spec_name][prop_name]) / mass_factor_wrt_median
+                    m_max = np.median(part[spec_name][prop_name]) * mass_factor_wrt_median
+                    if (part[spec_name][prop_name].min() < m_min or
+                            part[spec_name][prop_name].max() > m_max):
+                        self.say(
+                            '! warning: {} {} [min, med, max] = [{}, {}, {}]'.format(
+                                spec_name, prop_name,
+                                ut.io.get_string_from_numbers(part[spec_name][prop_name].min(), 3),
+                                ut.io.get_string_from_numbers(
+                                    np.median(part[spec_name][prop_name]), 3),
+                                ut.io.get_string_from_numbers(part[spec_name][prop_name].max(), 3))
+                        )
+
         print()
 
     def assign_center(self, part, method='center-of-mass', compare_centers=False):

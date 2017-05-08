@@ -50,7 +50,7 @@ if 'indices' in function_kind:
     IndexPointer = gizmo_track.IndexPointerClass(species)
     IndexPointer.write_index_pointer(match_prop_name='id.child', test_prop_name='form.scalefactor')
 
-if 'distances' in function_kind:
+if 'distance' in function_kind:
     HostDistance = gizmo_track.HostDistanceClass(species)
     HostDistance.write_form_host_distance()
 
