@@ -1149,10 +1149,10 @@ class ReadClass(ut.io.SayClass):
         method : string : method of centering: 'center-of-mass', 'potential'
         compare_centers : boolean : whether to compare centers via center-of-mass v potential
         '''
-        if 'star' in part and len(part['star']['position']):
+        if 'star' in part and 'position' in part['star'] and len(part['star']['position']):
             spec_name = 'star'
             velocity_radius_max = 15
-        elif 'dark' in part and len(part['dark']['position']):
+        elif 'dark' in part and 'position' in part['dark'] and len(part['dark']['position']):
             spec_name = 'dark'
             velocity_radius_max = 30
         else:
