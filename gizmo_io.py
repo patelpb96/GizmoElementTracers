@@ -1150,10 +1150,10 @@ class ReadClass(ut.io.SayClass):
         compare_centers : boolean : whether to compare centers via center-of-mass v potential
         '''
         if 'star' in part and 'position' in part['star'] and len(part['star']['position']):
-            spec_name = 'star'
+            spec_name_center = 'star'
             velocity_radius_max = 15
         elif 'dark' in part and 'position' in part['dark'] and len(part['dark']['position']):
-            spec_name = 'dark'
+            spec_name_center = 'dark'
             velocity_radius_max = 30
         else:
             self.say('! catalog not contain star or dark particles, so cannot assign center')
@@ -1161,10 +1161,10 @@ class ReadClass(ut.io.SayClass):
 
         self.say('* assigning center of galaxy/halo:')
 
-        if 'position' in part[spec_name]:
+        if 'position' in part[spec_name_center]:
             # assign to overall dictionary
             part.center_position = ut.particle.get_center_position(
-                part, spec_name, method, compare_centers=compare_centers)
+                part, spec_name_center, method, compare_centers=compare_centers)
             # assign to each species dictionary
             for spec_name in part:
                 part[spec_name].center_position = part.center_position
@@ -1173,10 +1173,10 @@ class ReadClass(ut.io.SayClass):
             ut.io.print_array(part.center_position, '{:.3f}', end='')
             print(') [kpc comoving]')
 
-        if 'velocity' in part[spec_name]:
+        if 'velocity' in part[spec_name_center]:
             # assign to overall dictionary
             part.center_velocity = ut.particle.get_center_velocity(
-                part, spec_name, velocity_radius_max, part.center_position)
+                part, spec_name_center, velocity_radius_max, part.center_position)
             # assign to each species dictionary
             for spec_name in part:
                 part[spec_name].center_velocity = part.center_velocity
