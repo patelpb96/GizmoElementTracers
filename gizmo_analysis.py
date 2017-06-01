@@ -14,8 +14,8 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 import matplotlib
 from matplotlib import pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
+from matplotlib.ticker import AutoMinorLocator, AutoLocator
 # local ----
 import utilities as ut
 
@@ -282,7 +282,10 @@ class SpeciesProfileClass(ut.io.SayClass):
         assert 0 < DistanceBin.dimension_number <= 3
 
         for spec_i, spec_name in enumerate(species):
-            assert part[spec_name].prop(prop_name) is not None
+            prop_name_test = prop_name
+            if 'velocity' in prop_name_test:
+                prop_name_test = 'velocity'  # treat velocity specially because compile below
+            assert part[spec_name].prop(prop_name_test) is not None
 
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
@@ -1284,7 +1287,9 @@ def plot_property_distribution(
     y_values = np.array([Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))])
 
     ut.plot.set_axes_scaling_limits(
-        subplot, prop_scaling, prop_limits, prop_values, axis_y_scaling, axis_y_limits, y_values)
+        subplot, prop_scaling, prop_limits, prop_values)
+    ut.plot.set_axes_scaling_limits(
+        subplot, None, None, None, axis_y_scaling, axis_y_limits, y_values)
 
     axis_x_label = ut.plot.Label.get_label(prop_name, species=spec_name, get_words=True)
     subplot.set_xlabel(axis_x_label)
@@ -1457,6 +1462,7 @@ def plot_property_v_property(
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
+"""
 def plot_property_v_property_v_distance(
     part, spec_name='star',
     x_prop_name='metallicity.fe', x_prop_limits=[], x_prop_scaling='linear',
@@ -1564,14 +1570,14 @@ def plot_property_v_property_v_distance(
     #color_map = plt.cm.gist_heat_r  # @UndefinedVariable
     #color_map = plt.cm.afmhot_r  # @UndefinedVariable
 
-    #"""
+    #'''
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(), weights=masses,
         cmin=None, cmax=None, cmap=color_map,
     )
 
-    """
+    '''
     valuess, _xs, _ys = np.histogram2d(
         x_prop_values, y_prop_values, prop_bin_number,
         [axis_x_limits, axis_y_limits],
@@ -1586,7 +1592,7 @@ def plot_property_v_property_v_distance(
         #vmin=valuess.min(), vmax=valuess.max(),
         #label=label,
     )
-    """
+    '''
     #plt.colorbar()
 
     if draw_statistics:
@@ -1611,6 +1617,7 @@ def plot_property_v_property_v_distance(
         host_distance_limits=host_distance_limits, prefix=prefix)
 
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
+"""
 
 
 def plot_property_v_distance(
@@ -2281,7 +2288,10 @@ class StarFormHistoryClass(ut.io.SayClass):
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
-        _fig, subplot = ut.plot.make_figure(figure_index, left=0.21, axis_secondary='x')
+        left = None
+        if 'specific' in sfh_kind:
+            left = 0.21
+        _fig, subplot = ut.plot.make_figure(figure_index, left=left, axis_secondary='x')
 
         y_values = None
         if sfh is not None:
@@ -2401,7 +2411,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
-        _fig, subplot = ut.plot.make_figure(figure_index)
+        _fig, subplot = ut.plot.make_figure(figure_index, axis_secondary='x')
 
         y_values = None
         if sfh is not None:
@@ -2552,12 +2562,12 @@ def explore_galaxy(
 
             try:
                 element_name = 'metallicity.iron'
-                hal.prop(element_name)
+                hal.prop('star.' + element_name)
             except ValueError:
                 element_name = 'metallicity.total'
 
             plot_property_distribution(
-                part, 'star', element_name, [1e-4, 1], 0.1, None, 'log', 'histogram',
+                part, 'star', element_name, [-4, 1], 0.1, None, 'linear', 'histogram',
                 [], None, None, {}, part_indices,
                 [0, None], 'linear', write_plot, plot_directory, figure_index=13)
 
@@ -2617,14 +2627,14 @@ def explore_galaxy(
                 part, 'dark', 'mass', 'histogram',
                 [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), background_color='black',
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=1)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
 
             plot_property_v_distance(
                 part, 'dark', 'mass', 'density', 'log', False, None,
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=center_position, part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
 
             """
             plot_property_v_distance(
@@ -2633,7 +2643,7 @@ def explore_galaxy(
                 center_positions=center_position, center_velocities=center_velocity,
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=22)
             """
 
             plot_property_v_distance(
@@ -2641,7 +2651,7 @@ def explore_galaxy(
                 [0.1, distance_max], 0.1, None, 'log', 3,
                 center_positions=center_position, part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=22)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=23)
 
         if 'gas' in species_plot and 'gas' in part and 'gas.indices' in hal:
             part_indices = None

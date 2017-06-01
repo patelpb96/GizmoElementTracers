@@ -106,7 +106,7 @@ class ParticleDictionaryClass(dict):
                     prop_values = prop_values - self.prop(prop_name, indices)
 
             if prop_values.size == 1:
-                prop_values = np.float(prop_values, dtype=prop_values.dtype)
+                prop_values = np.float(prop_values)
 
             return prop_values
 
@@ -236,14 +236,7 @@ class ReadClass(ut.io.SayClass):
         self.snapshot_name_base = snapshot_name_base
         self.file_extension = '.hdf5'
 
-        self.eos = 5 / 3  # gas equation of state
-
-        # snapshot file does not contain these cosmological parameters, so have to set manually
-        # these are from AGORA cosmology
-        self.omega_baryon = 0.0455
-        self.sigma_8 = 0.807
-        self.n_s = 0.961
-        self.w = -1.0
+        self.gas_eos = 5 / 3  # gas equation of state
 
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
@@ -270,8 +263,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         property_names='all', element_indices=None, particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
-        assign_center=True, assign_principal_axes=False,
-        check_sanity=True):
+        assign_center=True, assign_principal_axes=False, check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary class.
@@ -305,7 +297,7 @@ class ReadClass(ut.io.SayClass):
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
-        check_sanity : boolean : whether to check sanity of particle properties after read in
+        check_properties : boolean : whether to check sanity of particle properties after read in
 
         Returns
         -------
@@ -350,19 +342,19 @@ class ReadClass(ut.io.SayClass):
                 'index', snapshot_index, simulation_directory, snapshot_directory, property_names,
                 element_indices, force_float32, header)
 
-            # assign cosmological parameters
+            # read/get (additional) cosmological parameters
             if header['is.cosmological']:
-                # for cosmological parameters not in header, use values set above
-                Cosmology = ut.cosmology.CosmologyClass(
-                    header['hubble'], header['omega_matter'], header['omega_lambda'],
-                    self.omega_baryon, self.sigma_8, self.n_s, self.w)
+                Cosmology = self.get_cosmology(
+                    simulation_directory, header['omega_lambda'], header['omega_matter'],
+                    hubble=header['hubble'])
 
             # adjust properties for each species
             self.adjust_particles(
                 part, header, particle_subsample_factor, separate_dark_lowres, sort_dark_by_id)
 
-            if check_sanity:
-                self.check_sanity(part)
+            # check sanity of particle properties read in
+            if check_properties:
+                self.check_properties(part)
 
             # assign auxilliary information to particle dictionary class
             # store header dictionary
@@ -416,7 +408,7 @@ class ReadClass(ut.io.SayClass):
 
         return parts
 
-    def read_simulations(
+    def read_snapshots_simulations(
         self, simulation_directories=[], species_names='all', redshift=0,
         property_names='all', element_indices=[0, 1, 6, 10], force_float32=True,
         assign_principal_axes=False):
@@ -497,75 +489,6 @@ class ReadClass(ut.io.SayClass):
 
         return parts
 
-    def get_file_name(self, directory, snapshot_index):
-        '''
-        Get name (with relative path) of file to read in.
-        If multiple files per snapshot, get name of 0th one.
-
-        Parameters
-        ----------
-        directory: string : directory to check for files
-        snapshot_index : int : index of snapshot
-
-        Returns
-        -------
-        file name (with relative path): string
-        '''
-        directory = ut.io.get_path(directory)
-
-        path_names, file_indices = ut.io.get_file_names(
-            directory + self.snapshot_name_base, (int, float))
-
-        if snapshot_index < 0:
-            snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
-        elif snapshot_index not in file_indices:
-            raise ValueError('cannot find snapshot index = {} in: {}'.format(
-                             snapshot_index, path_names))
-
-        path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
-
-        if self.file_extension in path_name:
-            # got actual file, so good to go
-            path_file_name = path_name
-        else:
-            # got snapshot directory with multiple files, return only 0th one
-            path_file_names = ut.io.get_file_names(path_name + '/' + self.snapshot_name_base)
-            if len(path_file_names) and '.0.' in path_file_names[0]:
-                path_file_name = path_file_names[0]
-            else:
-                raise ValueError('cannot find 0th snapshot file in ' + path_file_names)
-
-        return path_file_name
-
-    def read_snapshot_times(self, directory='.'):
-        '''
-        Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
-        Return as dictionary.
-
-        Parameters
-        ----------
-        directory : string : directory of snapshot time file
-
-        Returns
-        -------
-        Snapshot : dictionary of snapshot information
-        '''
-        directory = ut.io.get_path(directory)
-
-        Snapshot = ut.simulation.SnapshotClass()
-
-        try:
-            try:
-                Snapshot.read_snapshots('snapshot_times.txt', directory)
-            except IOError:
-                Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
-        except Exception:
-            raise IOError('cannot find file of snapshot times in {}'.format(directory))
-
-        self.is_first_print = True
-
-        return Snapshot
-
     def read_header(
         self, snapshot_number_kind='index', snapshot_number=600, simulation_directory='.',
         snapshot_directory='output/', simulation_name=''):
@@ -623,10 +546,9 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_number
 
-        # get snapshot file name
-        file_name = self.get_file_name(snapshot_directory, snapshot_index)
+        file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
-        self.say('* reading header from: {}'.format(file_name.replace('./', '')), end='\n')
+        self.say('* read header from: {}'.format(file_name.replace('./', '')), end='\n')
 
         # open snapshot file
         with h5py.File(file_name, 'r') as file_in:
@@ -637,8 +559,8 @@ class ReadClass(ut.io.SayClass):
                 header[prop_name] = header_in[prop_name_in]  # transfer to custom header dict
 
         # determine whether simulation is cosmological
-        if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] < 1 and
-                0 < header['omega_lambda'] < 1):
+        if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] <= 1 and
+                0 < header['omega_lambda'] <= 1):
             header['is.cosmological'] = True
         else:
             header['is.cosmological'] = False
@@ -806,17 +728,16 @@ class ReadClass(ut.io.SayClass):
             header = self.read_header(
                 'index', snapshot_index, simulation_directory, snapshot_directory)
 
-        # get snapshot file name
-        file_name = self.get_file_name(snapshot_directory, snapshot_index)
+        file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
         # open snapshot file
         with h5py.File(file_name, 'r') as file_in:
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
             if header['file.number.per.snapshot'] == 1:
-                self.say('* reading particles from: {}'.format(file_name))
+                self.say('* read particles from: {}'.format(file_name.strip('./')))
             else:
-                self.say('* reading particles')
+                self.say('* read particles')
 
             # initialize arrays to store each property for each species
             for spec_name in self.species_names_read:
@@ -894,7 +815,7 @@ class ReadClass(ut.io.SayClass):
 
                 if ignore_flag:
                     prop_names_print.sort()
-                    self.say('reading {:6}: {}'.format(spec_name, prop_names_print))
+                    self.say('read {:6}: {}'.format(spec_name, prop_names_print))
 
                 # special case: particle mass is fixed and given in mass array in header
                 if 'Masses' in property_names and 'Masses' not in part_in:
@@ -1057,7 +978,7 @@ class ReadClass(ut.io.SayClass):
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
                 molecular_weights = mus * ut.const.proton_mass
                 part[spec_name]['temperature'] *= (
-                    ut.const.centi_per_kilo ** 2 * (self.eos - 1) * molecular_weights /
+                    ut.const.centi_per_kilo ** 2 * (self.gas_eos - 1) * molecular_weights /
                     ut.const.boltzmann)
                 del(helium_mass_fracs, ys_helium, mus, molecular_weights)
 
@@ -1082,7 +1003,149 @@ class ReadClass(ut.io.SayClass):
                     part[spec_name][prop_name] = part[spec_name][prop_name][
                         ::particle_subsample_factor]
 
-    def check_sanity(self, part):
+    def get_snapshot_file_name(self, directory, snapshot_index):
+        '''
+        Get name (with relative path) of file to read in.
+        If multiple files per snapshot, get name of 0th one.
+
+        Parameters
+        ----------
+        directory: string : directory to check for files
+        snapshot_index : int : index of snapshot
+
+        Returns
+        -------
+        file name (with relative path): string
+        '''
+        directory = ut.io.get_path(directory)
+
+        path_names, file_indices = ut.io.get_file_names(
+            directory + self.snapshot_name_base, (int, float))
+
+        if snapshot_index < 0:
+            snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
+        elif snapshot_index not in file_indices:
+            raise ValueError('cannot find snapshot index = {} in: {}'.format(
+                             snapshot_index, path_names))
+
+        path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
+
+        if self.file_extension in path_name:
+            # got actual file, so good to go
+            path_file_name = path_name
+        else:
+            # got snapshot directory with multiple files, return only 0th one
+            path_file_names = ut.io.get_file_names(path_name + '/' + self.snapshot_name_base)
+            if len(path_file_names) and '.0.' in path_file_names[0]:
+                path_file_name = path_file_names[0]
+            else:
+                raise ValueError('cannot find 0th snapshot file in ' + path_file_names)
+
+        return path_file_name
+
+    def read_snapshot_times(self, directory='.'):
+        '''
+        Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
+        Return as dictionary.
+
+        Parameters
+        ----------
+        directory : string : directory of snapshot time file
+
+        Returns
+        -------
+        Snapshot : dictionary of snapshot information
+        '''
+        directory = ut.io.get_path(directory)
+
+        Snapshot = ut.simulation.SnapshotClass()
+
+        try:
+            try:
+                Snapshot.read_snapshots('snapshot_times.txt', directory)
+            except IOError:
+                Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
+        except Exception:
+            raise IOError('cannot find file of snapshot times in {}'.format(directory))
+
+        self.is_first_print = True
+
+        return Snapshot
+
+    def get_cosmology(
+        self, directory='.', omega_lambda=None, omega_matter=None, omega_baryon=None, hubble=None,
+        sigma_8=None, n_s=None):
+        '''
+        Get cosmological parameters, stored in Cosmology class.
+        Read cosmological parameters from MUSIC initial condition config file.
+        If cannot find file, assume AGORA cosmology as default.
+
+        Parameters
+        ----------
+        directory : string : directory of simulation (where directory of initial conditions is)
+
+        Returns
+        -------
+        Cosmology : cosmology class, which also stores cosmological parameters
+        '''
+        def get_check_value(line, value_test=None):
+            frac_dif_max = 0.01
+            value = float(line.split('=')[-1].strip())
+            if 'h0' in line:
+                value /= 100
+            if value_test is not None:
+                frac_dif = np.abs((value - value_test) / value)
+                if frac_dif > frac_dif_max:
+                    print('! read {}, but previously assigned = {}'.format(line, value_test))
+            return value
+
+        if directory:
+            # find MUSIC file, assuming named *.conf
+            try:
+                file_name_find = ut.io.get_path(directory) + '*/*.conf'
+                file_name = ut.io.get_file_names(file_name_find)[0]
+                self.say('* read cosmological parameters from: {}\n'.format(
+                    file_name.strip('./')))
+                # read cosmological parameters
+                with open(file_name, 'r') as file_in:
+                    for line in file_in:
+                        line = line.lower().strip().strip('\n')  # ensure lowercase for safety
+                        if 'omega_l' in line:
+                            omega_lambda = get_check_value(line, omega_lambda)
+                        elif 'omega_m' in line:
+                            omega_matter = get_check_value(line, omega_matter)
+                        elif 'omega_b' in line:
+                            omega_baryon = get_check_value(line, omega_baryon)
+                        elif 'h0' in line:
+                            hubble = get_check_value(line, hubble)
+                        elif 'sigma_8' in line:
+                            sigma_8 = get_check_value(line, sigma_8)
+                        elif 'nspec' in line:
+                            n_s = get_check_value(line, n_s)
+
+            except ValueError:
+                self.say('! cannot find MUSIC config file: {}'.format(file_name_find.strip('./')))
+
+        # AGORA box (use as default, if cannot find MUSIC config file)
+        if omega_baryon is None or sigma_8 is None or n_s is None:
+            self.say('! missing cosmological parameters, assuming values from AGORA box:')
+            if omega_baryon is None:
+                omega_baryon = 0.0455
+                self.say('assuming omega_baryon = {}'.format(omega_baryon))
+            if sigma_8 is None:
+                sigma_8 = 0.807
+                self.say('assuming sigma_8 = {}'.format(sigma_8))
+            if n_s is None:
+                n_s = 0.961
+                self.say('assuming n_s = {}'.format(n_s))
+            self.say('')
+
+        Cosmology = ut.cosmology.CosmologyClass(
+            omega_lambda, omega_matter, omega_baryon, hubble, sigma_8, n_s)
+
+        return Cosmology
+
+    def check_properties(self, part):
         '''
         Checks sanity of particle properties, print warning if they are outside given limits.
 
@@ -1221,6 +1284,30 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
+    def assign_orbit(
+        self, part, species=['star'], center_position=None, center_velocity=None,
+        include_hubble_flow=True):
+        '''
+        Assign derived orbital properties wrt single center to species.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles at snapshot
+        species : string or list : particle species to compute
+        center_position : array : center position to use
+        center_velocity : array : center velocity to use
+        include_hubble_flow : boolean : whether to include hubble flow
+        '''
+        species = ut.particle.parse_species(part, species)
+
+        orb = ut.particle.get_orbit_dictionary(
+            part, species, center_position, center_velocity,
+            include_hubble_flow=include_hubble_flow, scalarize=False)
+
+        for spec_name in species:
+            for prop in orb[spec_name]:
+                part[spec_name]['host.' + prop] = orb[spec_name][prop]
+
     # write to file ----------
     def rewrite_snapshot(
         self, species_names='gas', action='delete', value_adjust=None,
@@ -1256,9 +1343,8 @@ class ReadClass(ut.io.SayClass):
         Snapshot = self.read_snapshot_times(simulation_directory)
         snapshot_index = Snapshot.parse_snapshot_number(snapshot_number_kind, snapshot_number)
 
-        # get file name
-        file_name = self.get_file_name(snapshot_directory, snapshot_index)
-        self.say('* reading header from: ' + file_name.replace('./', ''), end='\n\n')
+        file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        self.say('* read header from: ' + file_name.replace('./', ''), end='\n\n')
 
         ## read header ----------
         # open snapshot file and parse header
@@ -1271,7 +1357,7 @@ class ReadClass(ut.io.SayClass):
                 file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
                 file_in = h5py.File(file_name_i, 'r+')
 
-                self.say('reading particles from: ' + file_name_i.split('/')[-1])
+                self.say('read particles from: ' + file_name_i.split('/')[-1])
 
                 if 'delete' in action:
                     part_number_in_file = header['NumPart_ThisFile']
@@ -1317,33 +1403,6 @@ Read = ReadClass()
 
 
 #===================================================================================================
-# assign additional properties
-#===================================================================================================
-def assign_orbit(
-    part, species=['star'], center_position=None, center_velocity=None, include_hubble_flow=True):
-    '''
-    Assign derived orbital properties wrt single center to species.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    species : string or list : particle species to compute
-    center_position : array : center position to use
-    center_velocity : array : center velocity to use
-    include_hubble_flow : boolean : whether to include hubble flow
-    '''
-    species = ut.particle.parse_species(part, species)
-
-    orb = ut.particle.get_orbit_dictionary(
-        part, species, center_position, center_velocity,
-        include_hubble_flow=include_hubble_flow, scalarize=False)
-
-    for spec_name in species:
-        for prop in orb[spec_name]:
-            part[spec_name]['host.' + prop] = orb[spec_name][prop]
-
-
-#===================================================================================================
 # write Efficient Binary Format (EBF) file for Galaxia
 #===================================================================================================
 def write_ebf_file(part=None, distance_limits=[0, 300]):
@@ -1360,7 +1419,7 @@ def write_ebf_file(part=None, distance_limits=[0, 300]):
     if part is None:
         part = Read.read_snapshots('star', 'redshift', 0, element_indices=None, assign_center=True)
 
-    assign_orbit(part, 'star')
+    Read.assign_orbit(part, 'star')
 
     # get particles within the selection region
     part_indices = ut.particle.get_indices_within_distances(part, 'star', distance_limits)

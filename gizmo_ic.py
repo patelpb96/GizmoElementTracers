@@ -298,7 +298,7 @@ def write_initial_points(
         'matter', part_ini.snapshot['redshift'], 'kpc comoving')
     if part_ini.info['has.baryons']:
         # subtract baryonic mass
-        density_ini *= part_ini.Cosmology['omega_dark'] / part_ini.Cosmology['omega_matter']
+        density_ini *= part_ini.Cosmology['omega_dm'] / part_ini.Cosmology['omega_matter']
 
     # convex hull
     volume_ini_chull = ut.coordinate.get_volume_of_convex_hull(positions_ini)

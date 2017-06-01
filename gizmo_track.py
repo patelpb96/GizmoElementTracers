@@ -92,7 +92,7 @@ class IndexPointerClass(ut.io.SayClass):
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 spec_name, 'redshift', 0, property_names=property_names_read, element_indices=[0],
-                assign_center=False, check_sanity=False)
+                assign_center=False, check_properties=False)
 
         # older snapshot files do not have id.child - use abundance of total metals instead
         if match_prop_name == 'id.child' and 'id.child' not in part[spec_name]:
@@ -151,7 +151,7 @@ class IndexPointerClass(ut.io.SayClass):
             part_at_snap = Read.read_snapshots(
                 spec_name, 'index', snapshot_index,
                 property_names=['id', match_prop_name, test_prop_name], element_indices=[0],
-                assign_center=False, check_sanity=False)
+                assign_center=False, check_properties=False)
 
             # assign pointer from particle id to its index in list
             ut.particle.assign_id_to_index(
@@ -323,7 +323,7 @@ class HostDistanceClass(IndexPointerClass):
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 spec_name, 'redshift', 0, property_names=property_names_read, element_indices=[0],
-                force_float32=True, assign_center=False, check_sanity=False)
+                force_float32=True, assign_center=False, check_properties=False)
 
         # get list of particles to assign
         if part_indices is None or not len(part_indices):
@@ -363,7 +363,7 @@ class HostDistanceClass(IndexPointerClass):
                 Read = gizmo_io.ReadClass()
                 part_at_snap = Read.read_snapshots(
                     spec_name, 'index', snapshot_index, property_names=['position', 'mass', 'id'],
-                    force_float32=True, assign_center=True, check_sanity=True)
+                    force_float32=True, assign_center=True, check_properties=True)
 
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
