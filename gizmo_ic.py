@@ -7,7 +7,7 @@ to initial time.
 
 Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
-@author: awetzel
+@author: Andrew Wetzel
 '''
 
 
@@ -124,18 +124,18 @@ class ReadClass(ut.io.SayClass):
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
 
-        rockstar_io.assign_lowres_mass(hal, parts[0], mass_limits)
+        rockstar_io.Read.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
 
     def read_particles(
-        self, property_names=['position', 'mass', 'id'], sort_dark_by_id=True, force_float32=False):
+        self, properties=['position', 'mass', 'id'], sort_dark_by_id=True, force_float32=False):
         '''
         Read particles from final and initial snapshots.
 
         Parameters
         ----------
-        property_names : string or list : name[s] of particle properties to read
+        properties : string or list : name[s] of particle properties to read
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
 
@@ -149,14 +149,14 @@ class ReadClass(ut.io.SayClass):
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 'all', 'redshift', snapshot_redshift, self.simulation_directory,
-                property_names=property_names, assign_center=False,
-                sort_dark_by_id=sort_dark_by_id, force_float32=force_float32)
+                properties=properties, assign_center=False, sort_dark_by_id=sort_dark_by_id,
+                force_float32=force_float32)
 
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
-                for spec_name in part:
-                    self.say('assigning id-to-index to species: {}'.format(spec_name))
-                    ut.catalog.assign_id_to_index(part[spec_name], 'id', 0)
+                for spec in part:
+                    self.say('assigning id-to-index to species: {}'.format(spec))
+                    ut.catalog.assign_id_to_index(part[spec], 'id', 0)
 
             parts.append(part)
 
@@ -177,7 +177,7 @@ class ReadClass(ut.io.SayClass):
             'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=False,
             sort_host_first=False)
 
-        rockstar_io.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
+        rockstar_io.Read.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
 
         return hal
 
@@ -226,29 +226,28 @@ def write_initial_points(
         part_fin, part_ini = part_ini, part_fin
 
     # determine which species are in catalog
-    spec_names = ['dark', 'dark.2', 'dark.3', 'dark.4', 'dark.5', 'dark.6']
-    for spec_name in list(spec_names):
-        if spec_name not in part_fin:
-            spec_names.remove(spec_name)
+    species = ['dark', 'dark.2', 'dark.3', 'dark.4', 'dark.5', 'dark.6']
+    for spec in list(species):
+        if spec not in part_fin:
+            species.remove(spec)
             continue
 
         # sanity check
-        if 'id.to.index' not in part_ini[spec_name]:
-            if np.min(part_fin[spec_name]['id'] == part_ini[spec_name]['id']) == False:
-                Say.say('! species = {}: ids in final and initial catalogs not match'.format(
-                        spec_name))
+        if 'id.to.index' not in part_ini[spec]:
+            if np.min(part_fin[spec]['id'] == part_ini[spec]['id']) == False:
+                Say.say('! species = {}: ids not match in final v initial catalogs'.format(spec))
                 return
 
     # sanity check
     if dark_mass:
-        if spec_names != ['dark']:
+        if species != ['dark']:
             raise ValueError(
                 'input dark_mass = {:.3e} Msun, but catalog contains species = {}'.format(
-                    dark_mass, spec_names))
+                    dark_mass, species))
         if scale_to_halo_radius and not halo_radius:
             raise ValueError('cannot determine halo_radius without mass in particle catalog')
 
-    Say.say('using species: {}'.format(spec_names))
+    Say.say('using species: {}'.format(species))
 
     center_position = ut.particle.parse_property(part_fin, 'position', center_position)
 
@@ -262,30 +261,30 @@ def write_initial_points(
     mass_select = 0
     positions_ini = []
     spec_select_number = []
-    for spec_name in spec_names:
+    for spec in species:
         distances = ut.coordinate.get_distances(
-            'scalar', part_fin[spec_name]['position'], center_position,
+            'scalar', part_fin[spec]['position'], center_position,
             part_fin.info['box.length']) * part_fin.snapshot['scalefactor']  # [kpc physical]
 
         indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
         # if id-to-index array is in species dictionary
         # assume id not sorted, so have to convert between id and index
-        if 'id.to.index' in part_ini[spec_name]:
-            ids = part_fin[spec_name]['id'][indices_fin]
-            indices_ini = part_ini[spec_name]['id.to.index'][ids]
+        if 'id.to.index' in part_ini[spec]:
+            ids = part_fin[spec]['id'][indices_fin]
+            indices_ini = part_ini[spec]['id.to.index'][ids]
         else:
             indices_ini = indices_fin
 
-        positions_ini.extend(part_ini[spec_name]['position'][indices_ini])
+        positions_ini.extend(part_ini[spec]['position'][indices_ini])
 
-        if 'mass' in part_ini[spec_name]:
-            mass_select += part_ini[spec_name]['mass'][indices_ini].sum()
+        if 'mass' in part_ini[spec]:
+            mass_select += part_ini[spec]['mass'][indices_ini].sum()
         elif dark_mass:
             mass_select += dark_mass * indices_ini.size
         else:
             raise ValueError(
-                'no mass for species = {} but also no input dark_mass'.format(spec_name))
+                'no mass for species = {} but also no input dark_mass'.format(spec))
 
         spec_select_number.append(indices_ini.size)
 
@@ -330,9 +329,8 @@ def write_initial_points(
                         distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
         Write.write('# number of particles in selection region at final time = {}'.format(
                     np.sum(spec_select_number)))
-        for spec_i in range(len(spec_names)):
-            spec_name = spec_names[spec_i]
-            Write.write('  species {:6}: number = {}'.format(spec_name, spec_select_number[spec_i]))
+        for spec_i, spec in enumerate(species):
+            Write.write('  species {:6}: number = {}'.format(spec, spec_select_number[spec_i]))
         Write.write('# mass of all dark-matter particles:')
         if 'mass' in part_ini['dark']:
             mass_dark_all = part_ini['dark']['mass'].sum()

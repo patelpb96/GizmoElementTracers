@@ -15,7 +15,7 @@ from numpy import log10, Inf  # @UnusedImport
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import colors
-from matplotlib.ticker import AutoMinorLocator, AutoLocator
+from matplotlib.ticker import AutoMinorLocator
 # local ----
 import utilities as ut
 
@@ -29,16 +29,17 @@ class SpeciesProfileClass(ut.io.SayClass):
     property for given particle species.
     '''
     def get_profiles(
-        self, part, species=['all'], prop_name='', prop_statistic='sum', weight_by_mass=False,
+        self, part, species=['all'],
+        property_name='', property_statistic='sum', weight_by_mass=False,
         DistanceBin=None, center_position=None, center_velocity=None, rotation=None,
-        other_axis_distance_limits=None, other_prop_limits={}, part_indicess=None):
+        other_axis_distance_limits=None, property_select={}, part_indicess=None):
         '''
         Parameters
         ----------
         part : dict : catalog of particles
-        species : string or list : species to compute total mass of
-        prop_name : string : name of property to get statistics of
-        prop_statistic : string : statistic to get profile of
+        species : string or list : name[s] of particle species to compute total mass of
+        property_name : string : name of property to get statistics of
+        property_statistic : string : statistic to get profile of
         weight_by_mass : boolean : whether to weight property by species mass
         DistanceBin : class : distance bin class
         center_position : array : position of center
@@ -48,7 +49,7 @@ class SpeciesProfileClass(ut.io.SayClass):
           (b) if True, will rotate to align with principal axes stored in species dictionary
         other_axis_distance_limits : float :
             min and max distances along other axis[s] to keep particles [kpc physical]
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : (other) properties to select on: names as keys and limits as values
         part_indicess : array (species number x particle number) :
             indices of particles from which to select
 
@@ -56,18 +57,19 @@ class SpeciesProfileClass(ut.io.SayClass):
         -------
         pros : dict : dictionary of profiles for each particle species
         '''
-        if 'sum' in prop_statistic or 'vel.circ' in prop_statistic or 'density' in prop_statistic:
+        if ('sum' in property_statistic or 'vel.circ' in property_statistic or
+                'density' in property_statistic):
             pros = self.get_sum_profiles(
-                part, species, prop_name, DistanceBin, center_position, rotation,
-                other_axis_distance_limits, other_prop_limits, part_indicess)
+                part, species, property_name, DistanceBin, center_position, rotation,
+                other_axis_distance_limits, property_select, part_indicess)
         else:
             pros = self.get_statistics_profiles(
-                part, species, prop_name, weight_by_mass, DistanceBin, center_position,
-                center_velocity, rotation, other_axis_distance_limits, other_prop_limits,
+                part, species, property_name, weight_by_mass, DistanceBin, center_position,
+                center_velocity, rotation, other_axis_distance_limits, property_select,
                 part_indicess)
 
         for k in pros:
-            if '.cum' in prop_statistic or 'vel.circ' in prop_statistic:
+            if '.cum' in property_statistic or 'vel.circ' in property_statistic:
                 pros[k]['distance'] = pros[k]['distance.cum']
                 pros[k]['log distance'] = pros[k]['log distance.cum']
             else:
@@ -77,8 +79,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         return pros
 
     def get_sum_profiles(
-        self, part, species=['all'], prop_name='mass', DistanceBin=None, center_position=None,
-        rotation=None, other_axis_distance_limits=None, other_prop_limits={}, part_indicess=None):
+        self, part, species=['all'], property_name='mass', DistanceBin=None, center_position=None,
+        rotation=None, other_axis_distance_limits=None, property_select={}, part_indicess=None):
         '''
         Get profiles of summed quantity (such as mass or density) for given property for each
         particle species.
@@ -86,8 +88,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        species : string or list : species to compute total mass of
-        prop_name : string : property to get sum of
+        species : string or list : name[s] of particle species to compute total mass of
+        property_name : string : property to get sum of
         DistanceBin : class : distance bin class
         center_position : list : center position
         rotation : boolean or array : whether to rotate particles - two options:
@@ -95,7 +97,7 @@ class SpeciesProfileClass(ut.io.SayClass):
           (b) if True, will rotate to align with principal axes stored in species dictionary
         other_axis_distance_limits : float :
             min and max distances along other axis[s] to keep particles [kpc physical]
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : (other) properties to select on: names as keys and limits as values
         part_indicess : array (species number x particle number) :
             indices of particles from which to select
 
@@ -103,14 +105,14 @@ class SpeciesProfileClass(ut.io.SayClass):
         -------
         pros : dict : dictionary of profiles for each particle species
         '''
-        if 'gas' in species and 'consume.time' in prop_name:
+        if 'gas' in species and 'consume.time' in property_name:
             pros_mass = self.get_sum_profiles(
                 part, species, 'mass', DistanceBin, center_position, rotation,
-                other_axis_distance_limits, other_prop_limits, part_indicess)
+                other_axis_distance_limits, property_select, part_indicess)
 
             pros_sfr = self.get_sum_profiles(
                 part, species, 'sfr', DistanceBin, center_position, rotation,
-                other_axis_distance_limits, other_prop_limits, part_indicess)
+                other_axis_distance_limits, property_select, part_indicess)
 
             pros = pros_sfr
             for k in pros_sfr['gas']:
@@ -135,32 +137,32 @@ class SpeciesProfileClass(ut.io.SayClass):
 
         assert 0 < DistanceBin.dimension_number <= 3
 
-        for spec_i, spec_name in enumerate(species):
+        for spec_i, spec in enumerate(species):
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
-                part_indices = ut.array.get_arange(part[spec_name].prop(prop_name))
+                part_indices = ut.array.get_arange(part[spec].prop(property_name))
 
-            if other_prop_limits:
+            if property_select:
                 part_indices = ut.catalog.get_indices_catalog(
-                    part[spec_name], other_prop_limits, part_indices)
+                    part[spec], property_select, part_indices)
 
-            prop_values = part[spec_name].prop(prop_name, part_indices)
+            prop_values = part[spec].prop(property_name, part_indices)
 
             if DistanceBin.dimension_number == 3:
                 distances = ut.coordinate.get_distances(
-                    'scalar', part[spec_name]['position'][part_indices], center_position,
+                    'scalar', part[spec]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             elif DistanceBin.dimension_number in [1, 2]:
                 if rotation is not None and len(rotation):
                     rotation_vectors = rotation
-                elif (part[spec_name].principal_axes_vectors is not None and
-                      len(part[spec_name].principal_axes_vectors)):
-                    rotation_vectors = part[spec_name].principal_axes_vectors
+                elif (part[spec].principal_axes_vectors is not None and
+                      len(part[spec].principal_axes_vectors)):
+                    rotation_vectors = part[spec].principal_axes_vectors
                 else:
                     raise ValueError('want 2-D or 1-D profile but no means to define rotation')
 
                 distancess = ut.particle.get_distances_wrt_center(
-                    part, spec_name, 'rotated.2d', center_position, rotation_vectors, None,
+                    part, spec, 'rotated.2d', center_position, rotation_vectors, None,
                     part_indices, scalarize=True)
                 distancess = np.abs(distancess)  # ensure positive definite
 
@@ -179,72 +181,72 @@ class SpeciesProfileClass(ut.io.SayClass):
                     distances = distances[masks]
                     prop_values = prop_values[masks]
 
-            pros[spec_name] = DistanceBin.get_sum_profile(distances, prop_values)
+            pros[spec] = DistanceBin.get_sum_profile(distances, prop_values)
 
         props = [pro_prop for pro_prop in pros[species[0]] if 'distance' not in pro_prop]
         props_dist = [pro_prop for pro_prop in pros[species[0]] if 'distance' in pro_prop]
 
-        if prop_name == 'mass':
+        if property_name == 'mass':
             # create dictionary for baryonic mass
             if 'star' in species or 'gas' in species:
-                spec_name_new = 'baryon'
-                pros[spec_name_new] = {}
-                for spec_name in np.intersect1d(species, ['star', 'gas']):
+                spec_new = 'baryon'
+                pros[spec_new] = {}
+                for spec in np.intersect1d(species, ['star', 'gas']):
                     for pro_prop in props:
-                        if pro_prop not in pros[spec_name_new]:
-                            pros[spec_name_new][pro_prop] = np.array(pros[spec_name][pro_prop])
+                        if pro_prop not in pros[spec_new]:
+                            pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
                         elif 'log' in pro_prop:
-                            pros[spec_name_new][pro_prop] = ut.math.get_log(
-                                10 ** pros[spec_name_new][pro_prop] +
-                                10 ** pros[spec_name][pro_prop])
+                            pros[spec_new][pro_prop] = ut.math.get_log(
+                                10 ** pros[spec_new][pro_prop] +
+                                10 ** pros[spec][pro_prop])
                         else:
-                            pros[spec_name_new][pro_prop] += pros[spec_name][pro_prop]
+                            pros[spec_new][pro_prop] += pros[spec][pro_prop]
 
                 for pro_prop in props_dist:
-                    pros[spec_name_new][pro_prop] = pros[species[0]][pro_prop]
-                species.append(spec_name_new)
+                    pros[spec_new][pro_prop] = pros[species[0]][pro_prop]
+                species.append(spec_new)
 
             if len(species) > 1:
                 # create dictionary for total mass
-                spec_name_new = 'total'
-                pros[spec_name_new] = {}
-                for spec_name in np.setdiff1d(species, ['baryon', 'total']):
+                spec_new = 'total'
+                pros[spec_new] = {}
+                for spec in np.setdiff1d(species, ['baryon', 'total']):
                     for pro_prop in props:
-                        if pro_prop not in pros[spec_name_new]:
-                            pros[spec_name_new][pro_prop] = np.array(pros[spec_name][pro_prop])
+                        if pro_prop not in pros[spec_new]:
+                            pros[spec_new][pro_prop] = np.array(pros[spec][pro_prop])
                         elif 'log' in pro_prop:
-                            pros[spec_name_new][pro_prop] = ut.math.get_log(
-                                10 ** pros[spec_name_new][pro_prop] +
-                                10 ** pros[spec_name][pro_prop])
+                            pros[spec_new][pro_prop] = ut.math.get_log(
+                                10 ** pros[spec_new][pro_prop] +
+                                10 ** pros[spec][pro_prop])
                         else:
-                            pros[spec_name_new][pro_prop] += pros[spec_name][pro_prop]
+                            pros[spec_new][pro_prop] += pros[spec][pro_prop]
 
                 for pro_prop in props_dist:
-                    pros[spec_name_new][pro_prop] = pros[species[0]][pro_prop]
-                species.append(spec_name_new)
+                    pros[spec_new][pro_prop] = pros[species[0]][pro_prop]
+                species.append(spec_new)
 
                 # create mass fraction wrt total mass
-                for spec_name in np.setdiff1d(species, ['total']):
+                for spec in np.setdiff1d(species, ['total']):
                     for pro_prop in ['sum', 'sum.cum']:
-                        pros[spec_name][pro_prop + '.fraction'] = Fraction.get_fraction(
-                            pros[spec_name][pro_prop], pros['total'][pro_prop])
+                        pros[spec][pro_prop + '.fraction'] = Fraction.get_fraction(
+                            pros[spec][pro_prop], pros['total'][pro_prop])
 
-                        if spec_name == 'baryon':
+                        if spec == 'baryon':
                             # units of cosmic baryon fraction
-                            pros[spec_name][pro_prop + '.fraction'] /= (
+                            pros[spec][pro_prop + '.fraction'] /= (
                                 part.Cosmology['omega_baryon'] / part.Cosmology['omega_matter'])
 
             # create circular velocity = sqrt (G m(< r) / r)
-            for spec_name in species:
-                pros[spec_name]['vel.circ'] = ut.halo_property.get_circular_velocity(
-                    pros[spec_name]['sum.cum'], pros[spec_name]['distance.cum'])
+            for spec in species:
+                pros[spec]['vel.circ'] = ut.halo_property.get_circular_velocity(
+                    pros[spec]['sum.cum'], pros[spec]['distance.cum'])
 
         return pros
 
     def get_statistics_profiles(
-        self, part, species=['all'], prop_name='', weight_by_mass=True, DistanceBin=None,
+        self, part, species=['all'], property_name='', weight_by_mass=True, DistanceBin=None,
         center_position=None, center_velocity=None, rotation=None, other_axis_distance_limits=None,
-        other_prop_limits={}, part_indicess=None):
+        property_select={}, part_indicess=None):
         '''
         Get profiles of statistics (such as median, average) for given property for each
         particle species.
@@ -252,8 +254,8 @@ class SpeciesProfileClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        species : string or list : species to compute total mass of
-        prop_name : string : name of property to get statistics of
+        species : string or list : name[s] of particle species to compute total mass of
+        property_name : string : name of property to get statistics of
         weight_by_mass : boolean : whether to weight property by species mass
         DistanceBin : class : distance bin class
         center_position : array : position of center
@@ -263,7 +265,7 @@ class SpeciesProfileClass(ut.io.SayClass):
           (b) if True, will rotate to align with principal axes stored in species dictionary
         other_axis_distance_limits : float :
             min and max distances along other axis[s] to keep particles [kpc physical]
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : (other) properties to select on: names as keys and limits as values
         part_indicess : array or list : indices of particles from which to select
 
         Returns
@@ -276,64 +278,64 @@ class SpeciesProfileClass(ut.io.SayClass):
 
         center_position = ut.particle.parse_property(part, 'position', center_position)
         part_indicess = ut.particle.parse_property(species, 'indices', part_indicess)
-        if 'velocity' in prop_name:
+        if 'velocity' in property_name:
             center_velocity = ut.particle.parse_property(part, 'velocity', center_velocity)
 
         assert 0 < DistanceBin.dimension_number <= 3
 
-        for spec_i, spec_name in enumerate(species):
-            prop_name_test = prop_name
-            if 'velocity' in prop_name_test:
-                prop_name_test = 'velocity'  # treat velocity specially because compile below
-            assert part[spec_name].prop(prop_name_test) is not None
+        for spec_i, spec in enumerate(species):
+            prop_test = property_name
+            if 'velocity' in prop_test:
+                prop_test = 'velocity'  # treat velocity specially because compile below
+            assert part[spec].prop(prop_test) is not None
 
             part_indices = part_indicess[spec_i]
             if part_indices is None or not len(part_indices):
-                part_indices = ut.array.get_arange(part[spec_name].prop(prop_name))
+                part_indices = ut.array.get_arange(part[spec].prop(property_name))
 
-            if other_prop_limits:
+            if property_select:
                 part_indices = ut.catalog.get_indices_catalog(
-                    part[spec_name], other_prop_limits, part_indices)
+                    part[spec], property_select, part_indices)
 
             masses = None
             if weight_by_mass:
-                masses = part[spec_name].prop('mass', part_indices)
+                masses = part[spec].prop('mass', part_indices)
 
-            if 'velocity' in prop_name:
+            if 'velocity' in property_name:
                 distance_vectors = ut.coordinate.get_distances(
-                    'vector', part[spec_name]['position'][part_indices], center_position,
+                    'vector', part[spec]['position'][part_indices], center_position,
                     part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
 
                 velocity_vectors = ut.coordinate.get_velocity_differences(
-                    'vector', part[spec_name]['velocity'][part_indices], center_velocity, True,
-                    part[spec_name]['position'][part_indices], center_position,
+                    'vector', part[spec]['velocity'][part_indices], center_velocity, True,
+                    part[spec]['position'][part_indices], center_position,
                     part.snapshot['scalefactor'], part.snapshot['time.hubble'],
                     part.info['box.length'])
 
                 pro = DistanceBin.get_velocity_profile(distance_vectors, velocity_vectors, masses)
 
-                pros[spec_name] = pro[prop_name.replace('host.', '')]
+                pros[spec] = pro[property_name.replace('host.', '')]
                 for prop in pro:
                     if 'velocity' not in prop:
-                        pros[spec_name][prop] = pro[prop]
+                        pros[spec][prop] = pro[prop]
             else:
-                prop_values = part[spec_name].prop(prop_name, part_indices)
+                prop_values = part[spec].prop(property_name, part_indices)
 
                 if DistanceBin.dimension_number == 3:
                     distances = ut.coordinate.get_distances(
-                        'scalar', part[spec_name]['position'][part_indices], center_position,
+                        'scalar', part[spec]['position'][part_indices], center_position,
                         part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
                 elif DistanceBin.dimension_number in [1, 2]:
                     if rotation is not None and len(rotation):
                         rotation_vectors = rotation
-                    elif (part[spec_name].principal_axes_vectors is not None and
-                          len(part[spec_name].principal_axes_vectors)):
-                        rotation_vectors = part[spec_name].principal_axes_vectors
+                    elif (part[spec].principal_axes_vectors is not None and
+                          len(part[spec].principal_axes_vectors)):
+                        rotation_vectors = part[spec].principal_axes_vectors
                     else:
                         raise ValueError('want 2-D or 1-D profile but no means to define rotation')
 
                     distancess = ut.particle.get_distances_wrt_center(
-                        part, spec_name, 'rotated.2d', center_position, rotation_vectors, None,
+                        part, spec, 'rotated.2d', center_position, rotation_vectors, None,
                         part_indices, scalarize=True)
                     distancess = np.abs(distancess)
 
@@ -353,8 +355,7 @@ class SpeciesProfileClass(ut.io.SayClass):
                         masses = masses[masks]
                         prop_values = prop_values[masks]
 
-                pros[spec_name] = DistanceBin.get_statistics_profile(
-                    distances, prop_values, masses)
+                pros[spec] = DistanceBin.get_statistics_profile(distances, prop_values, masses)
 
         return pros
 
@@ -362,22 +363,22 @@ class SpeciesProfileClass(ut.io.SayClass):
 #===================================================================================================
 # diagnostic
 #===================================================================================================
-def print_properties_statistics(part, species_names='all'):
+def print_properties_statistics(part, species='all'):
     '''
     For each property of each species in particle catalog, print its range and median.
 
     Parameters
     ----------
     part : dict : catalog of particles (use this instead of reading in)
-    species_names : string or list : species to print
+    species : string or list : name[s] of particle species to print
     '''
     Say = ut.io.SayClass(print_properties_statistics)
 
-    species_names = ut.array.arrayize(species_names)
-    if 'all' in species_names:
-        species_names = ['dark.2', 'dark', 'star', 'gas']
+    species = ut.array.arrayize(species)
+    if 'all' in species:
+        species = ['dark.2', 'dark', 'star', 'gas']
 
-    species_names_print = [s for s in species_names if s in list(part)]
+    species_print = [s for s in species if s in list(part)]
 
     species_property_dict = collections.OrderedDict()
     species_property_dict['dark.2'] = ['id', 'position', 'velocity', 'mass']
@@ -393,13 +394,13 @@ def print_properties_statistics(part, species_names='all'):
     #Statistic = ut.statistic.StatisticClass()
 
     Say.say('printing minimum, median, maximum')
-    for spec_name in species_names_print:
-        Say.say('\n* {}'.format(spec_name))
-        for prop_name in species_property_dict[spec_name]:
+    for spec in species_print:
+        Say.say('\n* {}'.format(spec))
+        for prop in species_property_dict[spec]:
             try:
-                prop_values = part[spec_name].prop(prop_name)
+                prop_values = part[spec].prop(prop)
             except ValueError:
-                Say.say('{} not in catalog'.format(prop_name))
+                Say.say('{} not in catalog'.format(prop))
                 continue
 
             #Statistic.stat = Statistic.get_statistic_dict(prop_values)
@@ -413,11 +414,10 @@ def print_properties_statistics(part, species_names='all'):
                 number_format = '{:.1e}'
 
             print_string = '{}:  {},  {},  {}'.format(
-                prop_name, number_format, number_format, number_format)
+                prop, number_format, number_format, number_format)
 
-            Say.say(
-                print_string.format(
-                    prop_values.min(), np.median(prop_values), prop_values.max()))
+            Say.say(print_string.format(
+                prop_values.min(), np.median(prop_values), prop_values.max()))
 
 
 def plot_mass_contamination(
@@ -463,30 +463,28 @@ def plot_mass_contamination(
 
     profile_mass = collections.OrderedDict()
     profile_mass[species_reference] = {}
-    for spec_name in species_test:
-        profile_mass[spec_name] = {}
+    for spec in species_test:
+        profile_mass[spec] = {}
 
     profile_mass_ratio = {}
     profile_number = {}
 
-    for spec_name in profile_mass:
+    for spec in profile_mass:
         distances = ut.coordinate.get_distances(
-            'scalar', part[spec_name]['position'], center_position, part.info['box.length'])
-        distances *= part.snapshot['scalefactor']  # convert to [kpc physical]
+            'scalar', part[spec]['position'], center_position, part.info['box.length']
+        ) * part.snapshot['scalefactor']  # [kpc physical]
         if scale_to_halo_radius:
             distances /= halo_radius
-        profile_mass[spec_name] = DistanceBin.get_sum_profile(
-            distances, part[spec_name]['mass'])
+        profile_mass[spec] = DistanceBin.get_sum_profile(
+            distances, part[spec]['mass'])
 
-    for spec_name in species_test:
-        mass_ratio_bin = profile_mass[spec_name]['sum'] / profile_mass[species_reference]['sum']
-        mass_ratio_cum = (profile_mass[spec_name]['sum.cum'] /
-                          profile_mass[species_reference]['sum.cum'])
-        profile_mass_ratio[spec_name] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
-        profile_number[spec_name] = {
-            'bin': np.int64(np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])),
-            'cum': np.int64(np.round(profile_mass[spec_name]['sum.cum'] /
-                                     part[spec_name]['mass'][0])),
+    for spec in species_test:
+        mass_ratio_bin = profile_mass[spec]['sum'] / profile_mass[species_reference]['sum']
+        mass_ratio_cum = profile_mass[spec]['sum.cum'] / profile_mass[spec]['sum.cum']
+        profile_mass_ratio[spec] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
+        profile_number[spec] = {
+            'bin': np.int64(np.round(profile_mass[spec]['sum'] / part[spec]['mass'][0])),
+            'cum': np.int64(np.round(profile_mass[spec]['sum.cum'] / part[spec]['mass'][0])),
         }
 
     # print diagnostics
@@ -497,11 +495,11 @@ def plot_mass_contamination(
         distances_phys = profile_mass[species_test[0]]['distance.cum']
         distances_halo = distances_phys / halo_radius
 
-    species_dark = [spec_name for spec_name in species_test if 'dark' in spec_name]
+    species_dark = [spec for spec in species_test if 'dark' in spec]
 
-    for spec_name in species_dark:
-        Say.say(spec_name)
-        if profile_mass[spec_name]['sum.cum'][-1] == 0:
+    for spec in species_dark:
+        Say.say(spec)
+        if profile_mass[spec]['sum.cum'][-1] == 0:
             Say.say('  none. yay!')
             continue
 
@@ -511,8 +509,8 @@ def plot_mass_contamination(
             print_string = '  d < {:.2f} kpc, d/R_halo < {:.2f}: '
         print_string += 'mass_frac = {:.3f}, mass = {:.2e}, number = {:.0f}'
 
-        for dist_i in range(profile_mass[spec_name]['sum.cum'].size):
-            if profile_mass[spec_name]['sum.cum'][dist_i] > 0:
+        for dist_i in range(profile_mass[spec]['sum.cum'].size):
+            if profile_mass[spec]['sum.cum'][dist_i] > 0:
                 if scale_to_halo_radius:
                     distance_0 = distances_halo[dist_i]
                     distance_1 = distances_phys[dist_i]
@@ -522,36 +520,37 @@ def plot_mass_contamination(
 
                 Say.say(print_string.format(
                         distance_0, distance_1,
-                        profile_mass_ratio[spec_name]['cum'][dist_i],
-                        profile_mass[spec_name]['sum.cum'][dist_i],
-                        profile_number[spec_name]['cum'][dist_i]))
+                        profile_mass_ratio[spec]['cum'][dist_i],
+                        profile_mass[spec]['sum.cum'][dist_i],
+                        profile_number[spec]['cum'][dist_i]))
 
-                if spec_name != 'dark.2':
+                if spec != 'dark.2':
                     # print only 1 distance bin for lower-resolution particles
                     break
 
     print()
     print('contamination summary')
-    spec_name = 'dark.2'
+    species = 'dark.2'
     dist_i_halo = np.searchsorted(distances_phys, halo_radius)
     print('* {} {} particles within R_halo'.format(
-          profile_number[spec_name]['cum'][dist_i_halo], spec_name))
-    dist_i = np.where(profile_number[spec_name]['cum'] > 0)[0][0]
+          profile_number[species]['cum'][dist_i_halo], species))
+    dist_i = np.where(profile_number[species]['cum'] > 0)[0][0]
     print('* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
-          spec_name, distances_phys[dist_i], distances_halo[dist_i]))
-    dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.001)[0][0]
+          species, distances_phys[dist_i], distances_halo[dist_i]))
+    dist_i = np.where(profile_mass_ratio[species]['cum'] > 0.001)[0][0]
     print('* {} mass_ratio = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
-          spec_name, distances_phys[dist_i], distances_halo[dist_i]))
-    dist_i = np.where(profile_mass_ratio[spec_name]['cum'] > 0.01)[0][0]
+          species, distances_phys[dist_i], distances_halo[dist_i]))
+    dist_i = np.where(profile_mass_ratio[species]['cum'] > 0.01)[0][0]
     print('* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
-          spec_name, distances_phys[dist_i], distances_halo[dist_i]))
-    for spec_name in species_dark:
-        if spec_name != 'dark.2' and profile_number[spec_name]['cum'][dist_i_halo] > 0:
+          species, distances_phys[dist_i], distances_halo[dist_i]))
+
+    for spec in species_dark:
+        if species != 'dark.2' and profile_number[spec]['cum'][dist_i_halo] > 0:
             print('! {} {} particles within R_halo'.format(
-                  profile_number[spec_name]['cum'][dist_i_halo], spec_name))
-            dist_i = np.where(profile_number[spec_name]['cum'] > 0)[0][0]
+                  profile_number[species]['cum'][dist_i_halo], species))
+            dist_i = np.where(profile_number[spec]['cum'] > 0)[0][0]
             print('! {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
-                  spec_name, distances_phys[dist_i], distances_halo[dist_i]))
+                  species, distances_phys[dist_i], distances_halo[dist_i]))
     print()
 
     if write_plot is None:
@@ -581,10 +580,10 @@ def plot_mass_contamination(
             x_ref = halo_radius
         subplot.plot([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-    for spec_i, spec_name in enumerate(species_test):
+    for spec_i, spec in enumerate(species_test):
         subplot.plot(
-            DistanceBin.mids, profile_mass_ratio[spec_name]['bin'], color=colors[spec_i], alpha=0.7,
-            label=spec_name)
+            DistanceBin.mids, profile_mass_ratio[spec]['bin'], color=colors[spec_i], alpha=0.7,
+            label=species)
 
     ut.plot.make_legends(subplot, 'best')
 
@@ -627,8 +626,8 @@ def plot_mass_contamination_halo(
 
 
 def plot_metal_v_distance(
-    parts, spec_name='gas',
-    metal_kind='massfraction.metals', axis_y_scaling='log', axis_y_limits=[None, None],
+    parts, species_name='gas',
+    metal_name='massfraction.metals', axis_y_scaling='log', axis_y_limits=[None, None],
     distance_limits=[10, 3000], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log',
     halo_radius=None, scale_to_halo_radius=False, center_positions=None,
@@ -639,8 +638,8 @@ def plot_metal_v_distance(
     Parameters
     ----------
     part : dict or list : catalog[s] of particles at snapshot
-    spec_name : string : particle species
-    metal_kind : string : 'massfraction.X' or 'mass.X'
+    species : string : name of particle species
+    metal_name : string : 'massfraction.X' or 'mass.X'
     axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
@@ -670,23 +669,23 @@ def plot_metal_v_distance(
     metal_values = []
     for part_i, part in enumerate(parts):
         distances = ut.coordinate.get_distances(
-            'scalar', part[spec_name]['position'], center_positions[part_i],
+            'scalar', part[species_name]['position'], center_positions[part_i],
             part.info['box.length'])
         distances *= part.snapshot['scalefactor']  # convert to [kpc physical]
 
-        metal_mass_kind = metal_kind.replace('massfraction.', 'mass.')
-        metal_masses = part[spec_name].prop(metal_mass_kind)
+        metal_mass_kind = metal_name.replace('massfraction.', 'mass.')
+        metal_masses = part[species_name].prop(metal_mass_kind)
 
         pro_metal = DistanceBin.get_sum_profile(distances, metal_masses, get_fraction=True)
 
-        if 'massfraction' in metal_kind:
-            pro_mass = DistanceBin.get_sum_profile(distances, part[spec_name]['mass'])
-            if '.cum' in metal_kind:
+        if 'massfraction' in metal_name:
+            pro_mass = DistanceBin.get_sum_profile(distances, part[species_name]['mass'])
+            if '.cum' in metal_name:
                 metal_values.append(pro_metal['sum.cum'] / pro_mass['sum.cum'])
             else:
                 metal_values.append(pro_metal['sum'] / pro_mass['sum'])
-        elif 'mass' in metal_kind:
-            if '.cum' in metal_kind:
+        elif 'mass' in metal_name:
+            if '.cum' in metal_name:
                 metal_values.append(pro_metal['sum.cum'])
             else:
                 metal_values.append(pro_metal['sum'])
@@ -699,14 +698,14 @@ def plot_metal_v_distance(
         subplot, distance_scaling, distance_limits, None,
         axis_y_scaling, axis_y_limits, metal_values)
 
-    metal_mass_label = 'M_{{\\rm Z,{}}}'.format(spec_name)
+    metal_mass_label = 'M_{{\\rm Z,{}}}'.format(species_name)
     radius_label = '(r)'
-    if '.cum' in metal_kind:
+    if '.cum' in metal_name:
         radius_label = '(< r)'
-    if 'massfraction' in metal_kind:
+    if 'massfraction' in metal_name:
         axis_y_label = '${}{} \, / \, M_{{\\rm {}}}{}$'.format(
-            metal_mass_label, radius_label, spec_name, radius_label)
-    elif 'mass' in metal_kind:
+            metal_mass_label, radius_label, species_name, radius_label)
+    elif 'mass' in metal_name:
         # axis_y_label = '${}(< r) \, / \, M_{{\\rm Z,tot}}$'.format(metal_mass_label)
         axis_y_label = '${}{} \, [M_\odot]$'.format(metal_mass_label, radius_label)
     #axis_y_label = '$Z \, / \, Z_\odot$'
@@ -742,7 +741,7 @@ def plot_metal_v_distance(
     if halo_radius and scale_to_halo_radius:
         distance_name += '.' + virial_kind
     plot_name = ut.plot.get_file_name(
-        'mass.ratio', distance_name, spec_name, snapshot_dict=part.snapshot)
+        'mass.ratio', distance_name, species_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
@@ -754,11 +753,11 @@ class ImageClass(ut.io.SayClass):
     Plot 2-D image[s], save values, write to file.
     '''
     def plot_image(
-        self, part, spec_name='dark', weight_prop_name='mass', image_kind='histogram',
-        dimen_indices_plot=[0, 1, 2], dimen_indices_select=[0, 1, 2],
+        self, part, species_name='dark', weight_name='mass', image_kind='histogram',
+        dimensions_plot=[0, 1, 2], dimensions_select=[0, 1, 2],
         distances_max=1000, distance_bin_width=1, distance_bin_number=None,
         center_position=None, rotation=None,
-        other_prop_limits={}, part_indices=None, subsample_factor=None,
+        property_select={}, part_indices=None, subsample_factor=None,
         use_column_units=None, image_limits=[None, None],
         background_color='black',
         hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
@@ -770,12 +769,12 @@ class ImageClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        spec_name : string : particle species to plot
-        weight_prop_name : string : property to weight positions by
+        species : string : name of particle species to plot
+        weight_name : string : property to weight positions by
         image_kind : string : 'histogram', 'histogram.3d', 'points'
-        dimen_indices_plot : list : which dimensions to plot
+        dimensions_plot : list : which dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
-        dimen_indices_select : list : which dimensions to use to select particles
+        dimensions_select : list : which dimensions to use to select particles
             note : use this to set selection 'depth' of an image
         distances_max : float or array : distance[s] from center to plot and/or cut
         distance_bin_width : float : length pixel
@@ -784,7 +783,7 @@ class ImageClass(ut.io.SayClass):
         rotation : boolean or array : whether to rotate particles - two options:
           (a) if input array of eigen-vectors, will define rotation axes
           (b) if True, will rotate to align with principal axes defined by input species
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : (other) properties to select on: names as keys and limits as values
         part_indices : array : input selection indices for particles
         subsample_factor : int : factor by which periodically to sub-sample particles
         use_column_units : boolean : whether to convert to particle number / cm^2
@@ -801,12 +800,12 @@ class ImageClass(ut.io.SayClass):
         '''
         dimen_label = {0: 'x', 1: 'y', 2: 'z'}
 
-        if dimen_indices_select is None or not len(dimen_indices_select):
-            dimen_indices_select = dimen_indices_plot
+        if dimensions_select is None or not len(dimensions_select):
+            dimensions_select = dimensions_plot
 
         if np.isscalar(distances_max):
             distances_max = [distances_max for dimen_i in
-                             range(part[spec_name]['position'].shape[1])]
+                             range(part[species_name]['position'].shape[1])]
         distances_max = np.array(distances_max, dtype=np.float64)
 
         position_limits = []
@@ -815,19 +814,19 @@ class ImageClass(ut.io.SayClass):
         position_limits = np.array(position_limits)
 
         if part_indices is None or not len(part_indices):
-            part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
+            part_indices = ut.array.get_arange(part[species_name]['position'].shape[0])
 
-        if other_prop_limits:
+        if property_select:
             part_indices = ut.catalog.get_indices_catalog(
-                part[spec_name], other_prop_limits, part_indices)
+                part[species_name], property_select, part_indices)
 
         if subsample_factor is not None and subsample_factor > 1:
             part_indices = part_indices[::subsample_factor]
 
-        positions = np.array(part[spec_name]['position'][part_indices])
+        positions = np.array(part[species_name]['position'][part_indices])
         weights = None
-        if weight_prop_name:
-            weights = part[spec_name].prop(weight_prop_name, part_indices)
+        if weight_name:
+            weights = part[species_name].prop(weight_name, part_indices)
 
         center_position = ut.particle.parse_property(part, 'position', center_position)
 
@@ -837,8 +836,8 @@ class ImageClass(ut.io.SayClass):
             positions *= part.snapshot['scalefactor']
 
             # initialize masks
-            masks = (positions[:, dimen_indices_select[0]] <= distances_max[0])
-            for dimen_i in dimen_indices_select:
+            masks = (positions[:, dimensions_select[0]] <= distances_max[0])
+            for dimen_i in dimensions_select:
                 masks *= (
                     (positions[:, dimen_i] >= -distances_max[dimen_i]) *
                     (positions[:, dimen_i] <= distances_max[dimen_i])
@@ -850,10 +849,10 @@ class ImageClass(ut.io.SayClass):
 
             if rotation is not None:
                 # rotate image
-                if (rotation is True and part[spec_name].principal_axes_vectors is not None and
-                        len(part[spec_name].principal_axes_vectors)):
+                if (rotation is True and part[species_name].principal_axes_vectors is not None and
+                        len(part[species_name].principal_axes_vectors)):
                     # rotate to align with stored principal axes
-                    rotation_vectors = part[spec_name].principal_axes_vectors
+                    rotation_vectors = part[species_name].principal_axes_vectors
 
                 else:
                     # compute from particles within image limits
@@ -865,7 +864,7 @@ class ImageClass(ut.io.SayClass):
 
         if distance_bin_width is not None and distance_bin_width > 0:
             position_bin_number = int(
-                np.round(2 * np.max(distances_max[dimen_indices_plot]) / distance_bin_width))
+                np.round(2 * np.max(distances_max[dimensions_plot]) / distance_bin_width))
         elif distance_bin_number is not None and distance_bin_number > 0:
             position_bin_number = 2 * distance_bin_number
         else:
@@ -886,8 +885,8 @@ class ImageClass(ut.io.SayClass):
             hal_radiuss = hal[hal_radius_kind][hal_indices]
 
             # initialize masks
-            masks = (hal_positions[:, dimen_indices_select[0]] <= distances_max[0])
-            for dimen_i in dimen_indices_select:
+            masks = (hal_positions[:, dimensions_select[0]] <= distances_max[0])
+            for dimen_i in dimensions_select:
                 masks *= (
                     (hal_positions[:, dimen_i] >= -distances_max[dimen_i]) *
                     (hal_positions[:, dimen_i] <= distances_max[dimen_i])
@@ -904,11 +903,11 @@ class ImageClass(ut.io.SayClass):
 
         # set color map
         if background_color == 'black':
-            if 'dark' in spec_name:
+            if 'dark' in species_name:
                 color_map = plt.get_cmap('bbw')
-            elif spec_name == 'gas':
+            elif species_name == 'gas':
                 color_map = plt.cm.afmhot  # @UndefinedVariable
-            elif spec_name == 'star':
+            elif species_name == 'star':
                 #color_map = plt.get_cmap('byw')
                 color_map = plt.cm.afmhot  # @UndefinedVariable
         elif background_color == 'white':
@@ -920,22 +919,22 @@ class ImageClass(ut.io.SayClass):
         #interpolation='bicubic'
         #interpolation='gaussian'
 
-        if len(dimen_indices_plot) == 2:
+        if len(dimensions_plot) == 2:
             fig, subplot = ut.plot.make_figure(
                 figure_index, left=0.22, right=0.98, bottom=0.15, top=0.98,
                 background_color=background_color)
 
-            subplot.set_xlim(position_limits[dimen_indices_plot[0]])
-            subplot.set_ylim(position_limits[dimen_indices_plot[1]])
+            subplot.set_xlim(position_limits[dimensions_plot[0]])
+            subplot.set_ylim(position_limits[dimensions_plot[1]])
 
             subplot.set_xlabel('{} $\\left[ {{\\rm kpc}} \\right]$'.format(
-                dimen_label[dimen_indices_plot[0]]))
+                dimen_label[dimensions_plot[0]]))
             subplot.set_ylabel('{} $\\left[ {{\\rm kpc}} \\right]$'.format(
-                dimen_label[dimen_indices_plot[1]]))
+                dimen_label[dimensions_plot[1]]))
 
             if 'histogram' in image_kind:
                 hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
-                    image_kind, dimen_indices_plot, position_bin_number, position_limits, positions,
+                    image_kind, dimensions_plot, position_bin_number, position_limits, positions,
                     weights, use_column_units)
 
                 image_limits_use = hist_limits
@@ -952,7 +951,7 @@ class ImageClass(ut.io.SayClass):
                     cmap=color_map,
                     aspect='auto',
                     interpolation=interpolation,
-                    extent=np.concatenate(position_limits[dimen_indices_plot]),
+                    extent=np.concatenate(position_limits[dimensions_plot]),
                     vmin=image_limits[0], vmax=image_limits[1],
                 )
                 #"""
@@ -960,7 +959,7 @@ class ImageClass(ut.io.SayClass):
                 # standard method
                 """
                 hist_valuess, hist_xs, hist_ys, _Image = subplot.hist2d(
-                    positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+                    positions[:, dimensions_plot[0]], positions[:, dimensions_plot[1]],
                     weights=weights, range=position_limits, bins=position_bin_number,
                     norm=colors.LogNorm(),
                     cmap=color_map,
@@ -987,7 +986,7 @@ class ImageClass(ut.io.SayClass):
 
             elif image_kind == 'points':
                 subplot.scatter(
-                    positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
+                    positions[:, dimensions_plot[0]], positions[:, dimensions_plot[1]],
                     marker='o', c=weights)
                 #, markersize=2.0, markeredgecolor='red', markeredgewidth=0,
                 # color='red', alpha=0.02)
@@ -999,19 +998,19 @@ class ImageClass(ut.io.SayClass):
                 for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
                     print(hal_position, hal_radius)
                     circle = plt.Circle(
-                        hal_position[dimen_indices_plot], hal_radius, color='w', linewidth=1,
+                        hal_position[dimensions_plot], hal_radius, color='w', linewidth=1,
                         fill=False)
                     subplot.add_artist(circle)
 
-        elif len(dimen_indices_plot) == 3:
+        elif len(dimensions_plot) == 3:
             fig, subplots = ut.plot.make_figure(
                 figure_index, [2, 2], left=0.22, right=0.97, bottom=0.16, top=0.97,
                 background_color=background_color)
 
-            plot_dimen_iss = [
-                [dimen_indices_plot[0], dimen_indices_plot[1]],
-                [dimen_indices_plot[0], dimen_indices_plot[2]],
-                [dimen_indices_plot[1], dimen_indices_plot[2]],
+            plot_dimension_iss = [
+                [dimensions_plot[0], dimensions_plot[1]],
+                [dimensions_plot[0], dimensions_plot[2]],
+                [dimensions_plot[1], dimensions_plot[2]],
             ]
 
             subplot_iss = [
@@ -1021,12 +1020,12 @@ class ImageClass(ut.io.SayClass):
             ]
 
             histogram_valuesss = []
-            for plot_i, plot_dimen_is in enumerate(plot_dimen_iss):
+            for plot_i, plot_dimension_is in enumerate(plot_dimension_iss):
                 subplot_is = subplot_iss[plot_i]
                 subplot = subplots[subplot_is[0], subplot_is[1]]
 
                 hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
-                    image_kind, plot_dimen_is, position_bin_number, position_limits, positions,
+                    image_kind, plot_dimension_is, position_bin_number, position_limits, positions,
                     weights, use_column_units)
 
                 histogram_valuesss.append(hist_valuess)
@@ -1039,17 +1038,17 @@ class ImageClass(ut.io.SayClass):
                         image_limits_use[1] = image_limits[1]
 
                 # ensure that tick labels do not overlap
-                subplot.set_xlim(position_limits[plot_dimen_is[0]])
-                subplot.set_ylim(position_limits[plot_dimen_is[1]])
+                subplot.set_xlim(position_limits[plot_dimension_is[0]])
+                subplot.set_ylim(position_limits[plot_dimension_is[1]])
 
                 units_label = ' $\\left[ {\\rm kpc} \\right]$'
                 if subplot_is == [0, 0]:
-                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + units_label)
+                    subplot.set_ylabel(dimen_label[plot_dimension_is[1]] + units_label)
                 elif subplot_is == [1, 0]:
-                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + units_label)
-                    subplot.set_ylabel(dimen_label[plot_dimen_is[1]] + units_label)
+                    subplot.set_xlabel(dimen_label[plot_dimension_is[0]] + units_label)
+                    subplot.set_ylabel(dimen_label[plot_dimension_is[1]] + units_label)
                 elif subplot_is == [1, 1]:
-                    subplot.set_xlabel(dimen_label[plot_dimen_is[0]] + units_label)
+                    subplot.set_xlabel(dimen_label[plot_dimension_is[0]] + units_label)
 
                 _Image = subplot.imshow(
                     hist_valuess.transpose(),
@@ -1057,14 +1056,14 @@ class ImageClass(ut.io.SayClass):
                     cmap=color_map,
                     #aspect='auto',
                     interpolation=interpolation,
-                    extent=np.concatenate(position_limits[plot_dimen_is]),
+                    extent=np.concatenate(position_limits[plot_dimension_is]),
                     vmin=image_limits[0], vmax=image_limits[1],
                 )
 
                 # default method
                 """
                 hist_valuess, hist_xs, hist_ys, _Image = subplot.hist2d(
-                    positions[:, plot_dimen_is[0]], positions[:, plot_dimen_is[1]],
+                    positions[:, plot_dimension_is[0]], positions[:, plot_dimension_is[1]],
                     norm=colors.LogNorm(),
                     weights=weights,
                     range=position_limits, bins=position_bin_number,
@@ -1078,7 +1077,7 @@ class ImageClass(ut.io.SayClass):
                 if hal is not None:
                     for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
                         circle = plt.Circle(
-                            hal_position[plot_dimen_is], hal_radius, linewidth=1, fill=False)
+                            hal_position[plot_dimension_is], hal_radius, linewidth=1, fill=False)
                         subplot.add_artist(circle)
 
                     circle = plt.Circle((0, 0), 10, color='black', fill=False)
@@ -1094,13 +1093,13 @@ class ImageClass(ut.io.SayClass):
         if add_simulation_name:
             prefix = part.info['simulation.name']
 
-        prop_name = 'position'
-        for dimen_i in dimen_indices_plot:
-            prop_name += '.' + dimen_label[dimen_i]
-        prop_name += '_d.{:.0f}'.format(np.max(distances_max[dimen_indices_plot]))
+        prop = 'position'
+        for dimen_i in dimensions_plot:
+            prop += '.' + dimen_label[dimen_i]
+        prop += '_d.{:.0f}'.format(np.max(distances_max[dimensions_plot]))
 
         plot_name = ut.plot.get_file_name(
-            weight_prop_name, prop_name, spec_name, 'redshift', part.snapshot, prefix=prefix)
+            weight_name, prop, species_name, 'redshift', part.snapshot, prefix=prefix)
 
         if 'histogram' in image_kind:
             plot_name += '_i.{:.1f}-{:.1f}'.format(
@@ -1114,7 +1113,7 @@ class ImageClass(ut.io.SayClass):
         self.plot_name = plot_name
 
     def get_histogram(
-        self, image_kind, dimen_indices_plot, position_bin_number, position_limits, positions,
+        self, image_kind, dimensions_plot, position_bin_number, position_limits, positions,
         weights, use_column_units):
         '''
         Get 2-D histogram, either by summing all partiles along 3rd dimension or computing the
@@ -1123,7 +1122,7 @@ class ImageClass(ut.io.SayClass):
         Parameters
         ----------
         image_kind : string : 'histogram', 'histogram.3d'
-        dimen_indices_plot : list : which dimensions to plot
+        dimensions_plot : list : indices of dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
         position_bin_number : number of pixels/bins across image
         position_limits : list or list of lists : min and max values of position to compute
@@ -1140,16 +1139,16 @@ class ImageClass(ut.io.SayClass):
             hist_valuess /= (
                 np.diff(hist_xs)[0] * np.diff(hist_ys)[0] * np.diff(hist_zs)[0])
 
-            dimen_project = np.setdiff1d([0, 1, 2], dimen_indices_plot)
+            dimension_project = np.setdiff1d([0, 1, 2], dimensions_plot)
 
             # compute maximum density
-            hist_valuess = np.max(hist_valuess, dimen_project)
+            hist_valuess = np.max(hist_valuess, dimension_project)
 
         else:
             # project along single dimension
             hist_valuess, hist_xs, hist_ys = np.histogram2d(
-                positions[:, dimen_indices_plot[0]], positions[:, dimen_indices_plot[1]],
-                position_bin_number, position_limits[dimen_indices_plot],
+                positions[:, dimensions_plot[0]], positions[:, dimensions_plot[1]],
+                position_bin_number, position_limits[dimensions_plot],
                 weights=weights, normed=False,
             )
 
@@ -1203,11 +1202,11 @@ Image = ImageClass()
 # general property analysis
 #===================================================================================================
 def plot_property_distribution(
-    parts, spec_name='gas',
-    prop_name='density', prop_limits=[], prop_bin_width=None, prop_bin_number=100,
-    prop_scaling='log', prop_statistic='probability',
+    parts, species_name='gas',
+    property_name='density', property_limits=[], property_bin_width=None, property_bin_number=100,
+    property_scaling='log', property_statistic='probability',
     distance_limits=[], center_positions=None, center_velocities=None,
-    other_prop_limits={}, part_indicess=None,
+    property_select={}, part_indicess=None,
     axis_y_limits=[], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -1216,18 +1215,18 @@ def plot_property_distribution(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    spec_name : string : particle species
-    prop_name : string : property name
-    prop_limits : list : min and max limits of property
-    prop_bin_width : float : width of property bin (use this or prop_bin_number)
-    prop_bin_number : int : number of property bins within limits (use this or prop_bin_width)
-    prop_scaling : string : scaling of property: 'log', 'linear'
-    prop_statistic : string : statistic to plot:
+    species : string : name of particle species
+    property_name : string : property name
+    property_limits : list : min and max limits of property
+    property_bin_width : float : width of property bin (use this or property_bin_number)
+    property_bin_number : int : number of bins within limits (use this or property_bin_width)
+    property_scaling : string : scaling of property: 'log', 'linear'
+    property_statistic : string : statistic to plot:
         'probability', 'probability.cum', 'histogram', 'histogram.cum'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
     center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
+    property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
     axis_y_scaling : string : 'log', 'linear'
@@ -1242,7 +1241,7 @@ def plot_property_distribution(
 
     center_positions = ut.particle.parse_property(parts, 'position', center_positions)
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
-    if 'velocity' in prop_name:
+    if 'velocity' in property_name:
         center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
 
     Stat = ut.statistic.StatisticClass()
@@ -1251,30 +1250,30 @@ def plot_property_distribution(
         if part_indicess[part_i] is not None and len(part_indicess[part_i]):
             part_indices = part_indicess[part_i]
         else:
-            part_indices = ut.array.get_arange(part[spec_name]['position'].shape[0])
+            part_indices = ut.array.get_arange(part[species_name]['position'].shape[0])
 
-        if other_prop_limits:
+        if property_select:
             part_indices = ut.catalog.get_indices_catalog(
-                part[spec_name], other_prop_limits, part_indices)
+                part[species_name], property_select, part_indices)
 
         if distance_limits:
             distances = ut.coordinate.get_distances(
-                'scalar', part[spec_name]['position'][part_indices], center_positions[part_i],
+                'scalar', part[species_name]['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
-        if 'velocity' in prop_name:
+        if 'velocity' in property_name:
             orb = ut.particle.get_orbit_dictionary(
-                part, spec_name, center_positions[part_i], center_velocities[part_i], part_indices,
-                include_hubble_flow=True, scalarize=True)
-            prop_values = orb[prop_name]
+                part, species_name, center_positions[part_i], center_velocities[part_i],
+                part_indices, include_hubble_flow=True, scalarize=True)
+            prop_values = orb[property_name]
         else:
-            prop_values = part[spec_name].prop(prop_name, part_indices)
+            prop_values = part[species_name].prop(property_name, part_indices)
 
-        Say.say('keeping {} {} particles'.format(prop_values.size, spec_name))
+        Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
 
         Stat.append_to_dictionary(
-            prop_values, prop_limits, prop_bin_width, prop_bin_number, prop_scaling)
+            prop_values, property_limits, property_bin_width, property_bin_number, property_scaling)
 
         Stat.print_statistics(-1)
         print()
@@ -1284,36 +1283,37 @@ def plot_property_distribution(
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
 
-    y_values = np.array([Stat.distr[prop_statistic][part_i] for part_i in range(len(parts))])
+    y_values = np.array([Stat.distr[property_statistic][part_i] for part_i in range(len(parts))])
 
     ut.plot.set_axes_scaling_limits(
-        subplot, prop_scaling, prop_limits, prop_values)
+        subplot, property_scaling, property_limits, prop_values)
     ut.plot.set_axes_scaling_limits(
         subplot, None, None, None, axis_y_scaling, axis_y_limits, y_values)
 
-    axis_x_label = ut.plot.Label.get_label(prop_name, species=spec_name, get_words=True)
+    axis_x_label = ut.plot.Label.get_label(property_name, species_name=species_name, get_words=True)
     subplot.set_xlabel(axis_x_label)
-    axis_y_label = ut.plot.Label.get_label(prop_name, prop_statistic, spec_name, get_units=False)
+    axis_y_label = ut.plot.Label.get_label(
+        property_name, property_statistic, species_name, get_units=False)
     subplot.set_ylabel(axis_y_label)
 
     for part_i, part in enumerate(parts):
-        subplot.plot(Stat.distr['bin.mid'][part_i], Stat.distr[prop_statistic][part_i],
+        subplot.plot(Stat.distr['bin.mid'][part_i], Stat.distr[property_statistic][part_i],
                      color=colors[part_i], alpha=0.8, label=part.info['simulation.name'])
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
     plot_name = ut.plot.get_file_name(
-        prop_name, 'distribution', spec_name, snapshot_dict=part.snapshot)
+        property_name, 'distribution', species_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 def plot_property_v_property(
-    part, spec_name='gas',
-    x_prop_name='log number.density', x_prop_limits=[], x_prop_scaling='linear',
-    y_prop_name='log temperature', y_prop_limits=[], y_prop_scaling='linear',
-    prop_bin_number=150, weight_by_mass=True, cut_percent=0,
+    part, species_name='gas',
+    x_property_name='log number.density', x_property_limits=[], x_property_scaling='linear',
+    y_property_name='log temperature', y_property_limits=[], y_property_scaling='linear',
+    property_bin_number=150, weight_by_mass=True, cut_percent=0,
     host_distance_limits=[0, 300], center_position=None,
-    other_prop_limits={}, part_indices=None, draw_statistics=False,
+    property_select={}, part_indices=None, draw_statistics=False,
     write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
     '''
     Plot property v property.
@@ -1321,18 +1321,18 @@ def plot_property_v_property(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    spec_name : string : particle species
-    x_prop_name : string : property name for x-axis
-    x_prop_limits : list : min and max limits to impose on x_prop_name
-    x_prop_scaling : string : 'log', 'linear'
-    y_prop_name : string : property name for y-axis
-    y_prop_limits : list : min and max limits to impose on y_prop_name
-    y_prop_scaling : string : 'log', 'linear'
-    prop_bin_number : int : number of bins for histogram along each axis
+    species : string : name of particle species
+    x_property_name : string : property name for x-axis
+    x_property_limits : list : min and max limits to impose on x_property_name
+    x_property_scaling : string : 'log', 'linear'
+    y_property_name : string : property name for y-axis
+    y_property_limits : list : min and max limits to impose on y_property_name
+    y_property_scaling : string : 'log', 'linear'
+    property_bin_number : int : number of bins for histogram along each axis
     weight_by_mass : boolean : whether to weight property by particle mass
     host_distance_limits : list : min and max limits for distance from galaxy
     center_position : array : position of galaxy center
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
+    property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indices : array : indices of particles from which to select
     draw_statistics : boolean : whether to draw statistics (such as median) on figure
     write_plot : boolean : whether to write figure to file
@@ -1345,33 +1345,33 @@ def plot_property_v_property(
     center_position = ut.particle.parse_property(part, 'position', center_position)
 
     if part_indices is None or not len(part_indices):
-        part_indices = ut.array.get_arange(part[spec_name].prop(x_prop_name))
+        part_indices = ut.array.get_arange(part[species_name].prop(x_property_name))
 
-    if other_prop_limits:
+    if property_select:
         part_indices = ut.catalog.get_indices_catalog(
-            part[spec_name], other_prop_limits, part_indices)
+            part[species_name], property_select, part_indices)
 
     if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
-            'scalar', center_position, part[spec_name]['position'][part_indices],
+            'scalar', center_position, part[species_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scalefactor']
         print(distances)
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
     print(part_indices)
 
-    x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
-    y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
+    x_prop_values = part[species_name].prop(x_property_name, part_indices)
+    y_prop_values = part[species_name].prop(y_property_name, part_indices)
     masses = None
     if weight_by_mass:
-        masses = part[spec_name].prop('mass', part_indices)
+        masses = part[species_name].prop('mass', part_indices)
 
     part_indices = ut.array.get_arange(part_indices)
 
-    if x_prop_limits:
-        part_indices = ut.array.get_indices(x_prop_values, x_prop_limits, part_indices)
+    if x_property_limits:
+        part_indices = ut.array.get_indices(x_prop_values, x_property_limits, part_indices)
 
-    if y_prop_limits:
-        part_indices = ut.array.get_indices(y_prop_values, y_prop_limits, part_indices)
+    if y_property_limits:
+        part_indices = ut.array.get_indices(y_prop_values, y_property_limits, part_indices)
 
     if cut_percent > 0:
         x_limits = ut.array.get_limits(x_prop_values[part_indices], cut_percent=cut_percent)
@@ -1387,26 +1387,29 @@ def plot_property_v_property(
     Say.say('keeping {} particles'.format(x_prop_values.size))
 
     if draw_statistics:
-        stat_bin_number = int(np.round(prop_bin_number / 10))
-        Bin = ut.binning.BinClass(x_prop_limits, None, stat_bin_number, False, x_prop_scaling)
+        stat_bin_number = int(np.round(property_bin_number / 10))
+        Bin = ut.binning.BinClass(
+            x_property_limits, None, stat_bin_number, False, x_property_scaling)
         stat = Bin.get_statistics_of_array(x_prop_values, y_prop_values)
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
 
     axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
-        subplot, x_prop_scaling, x_prop_limits, x_prop_values,
-        y_prop_scaling, y_prop_limits, y_prop_values)
+        subplot, x_property_scaling, x_property_limits, x_prop_values,
+        y_property_scaling, y_property_limits, y_prop_values)
 
-    if 'log' in x_prop_scaling:
+    if 'log' in x_property_scaling:
         x_prop_values = ut.math.get_log(x_prop_values)
-    if 'log' in y_prop_scaling:
+    if 'log' in y_property_scaling:
         y_prop_values = ut.math.get_log(y_prop_values)
 
-    axis_x_label = ut.plot.Label.get_label(x_prop_name, species=spec_name, get_words=True)
+    axis_x_label = ut.plot.Label.get_label(
+        x_property_name, species_name=species_name, get_words=True)
     subplot.set_xlabel(axis_x_label)
 
-    axis_y_label = ut.plot.Label.get_label(y_prop_name, species=spec_name, get_words=True)
+    axis_y_label = ut.plot.Label.get_label(
+        y_property_name, species_name=species_name, get_words=True)
     subplot.set_ylabel(axis_y_label)
 
     color_map = plt.cm.inferno_r  # @UndefinedVariable
@@ -1415,14 +1418,14 @@ def plot_property_v_property(
 
     #"""
     _valuess, _xs, _ys, _Image = plt.hist2d(
-        x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
+        x_prop_values, y_prop_values, property_bin_number, [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(), weights=masses,
         cmin=None, cmax=None, cmap=color_map,
     )
 
     """
     valuess, _xs, _ys = np.histogram2d(
-        x_prop_values, y_prop_values, prop_bin_number,
+        x_prop_values, y_prop_values, property_bin_number,
         [axis_x_limits, axis_y_limits],
         normed=False, weights=masses)
 
@@ -1446,9 +1449,8 @@ def plot_property_v_property(
 
     # distance legend
     if host_distance_limits is not None and len(host_distance_limits):
-        label = ut.plot.Label.get_label('radius', prop_limits=host_distance_limits)
-        subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label], loc='best', handlelength=0)
+        label = ut.plot.Label.get_label('radius', property_limits=host_distance_limits)
+        ut.plot.make_label_legend(subplot, label, 'best')
 
     if add_simulation_name:
         prefix = part.info['simulation.name']
@@ -1456,191 +1458,33 @@ def plot_property_v_property(
         prefix = ''
 
     plot_name = ut.plot.get_file_name(
-        y_prop_name, x_prop_name, spec_name, snapshot_dict=part.snapshot,
+        y_property_name, x_property_name, species_name, snapshot_dict=part.snapshot,
         host_distance_limits=host_distance_limits, prefix=prefix)
 
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
-
-
-"""
-def plot_property_v_property_v_distance(
-    part, spec_name='star',
-    x_prop_name='metallicity.fe', x_prop_limits=[], x_prop_scaling='linear',
-    y_prop_name='metallicity.alpha - metallicity.fe', y_prop_limits=[], y_prop_scaling='linear',
-    prop_bin_number=100, weight_by_mass=True, cut_percent=0,
-    distance_limitss=[[0, 300], [0, 3]], distance_bin_widths=[2, 3],
-    distance_bin_numbers=[None, None], distance_scaling='log',
-    other_prop_limits={}, part_indices=None, draw_statistics=False,
-    write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
-    '''
-    Plot property v property.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles at snapshot
-    spec_name : string : particle species
-    x_prop_name : string : property name for x-axis
-    x_prop_limits : list : min and max limits to impose on x_prop_name
-    x_prop_scaling : string : 'log', 'linear'
-    y_prop_name : string : property name for y-axis
-    y_prop_limits : list : min and max limits to impose on y_prop_name
-    y_prop_scaling : string : 'log', 'linear'
-    prop_bin_number : int : number of bins for histogram along each axis
-    weight_by_mass : boolean : whether to weight property by particle mass
-    host_distance_limits : list : min and max limits for distance from galaxy
-    center_position : array : position of galaxy center
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
-    part_indices : array : indices of particles from which to select
-    draw_statistics : boolean : whether to draw statistics (such as median) on figure
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
-    add_simulation_name : boolean : whether to add name of simulation to figure name
-    figure_index : int : index of figure for matplotlib
-    '''
-    Say = ut.io.SayClass(plot_property_v_property)
-
-    center_position = ut.particle.parse_property(part, 'position', center_position)
-
-    if part_indices is None or not len(part_indices):
-        part_indices = ut.array.get_arange(part[spec_name].prop(x_prop_name))
-
-    if other_prop_limits:
-        part_indices = ut.catalog.get_indices_catalog(
-            part[spec_name], other_prop_limits, part_indices)
-
-    if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
-        distances = ut.coordinate.get_distances(
-            'scalar', center_position, part[spec_name]['position'][part_indices],
-            part.info['box.length']) * part.snapshot['scalefactor']
-        print(distances)
-        part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
-    print(part_indices)
-
-    x_prop_values = part[spec_name].prop(x_prop_name, part_indices)
-    y_prop_values = part[spec_name].prop(y_prop_name, part_indices)
-    masses = None
-    if weight_by_mass:
-        masses = part[spec_name].prop('mass', part_indices)
-
-    part_indices = ut.array.get_arange(part_indices)
-
-    if x_prop_limits:
-        part_indices = ut.array.get_indices(x_prop_values, x_prop_limits, part_indices)
-
-    if y_prop_limits:
-        part_indices = ut.array.get_indices(y_prop_values, y_prop_limits, part_indices)
-
-    if cut_percent > 0:
-        x_limits = ut.array.get_limits(x_prop_values[part_indices], cut_percent=cut_percent)
-        y_limits = ut.array.get_limits(y_prop_values[part_indices], cut_percent=cut_percent)
-        part_indices = ut.array.get_indices(x_prop_values, x_limits, part_indices)
-        part_indices = ut.array.get_indices(y_prop_values, y_limits, part_indices)
-
-    x_prop_values = x_prop_values[part_indices]
-    y_prop_values = y_prop_values[part_indices]
-    if weight_by_mass:
-        masses = masses[part_indices]
-
-    Say.say('keeping {} particles'.format(x_prop_values.size))
-
-    if draw_statistics:
-        stat_bin_number = int(np.round(prop_bin_number / 10))
-        Bin = ut.binning.BinClass(x_prop_limits, None, stat_bin_number, False, x_prop_scaling)
-        stat = Bin.get_statistics_of_array(x_prop_values, y_prop_values)
-
-    # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index)
-
-    axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
-        subplot, x_prop_scaling, x_prop_limits, x_prop_values,
-        y_prop_scaling, y_prop_limits, y_prop_values)
-
-    if 'log' in x_prop_scaling:
-        x_prop_values = ut.math.get_log(x_prop_values)
-    if 'log' in y_prop_scaling:
-        y_prop_values = ut.math.get_log(y_prop_values)
-
-    axis_x_label = ut.plot.Label.get_label(x_prop_name, species=spec_name, get_words=True)
-    subplot.set_xlabel(axis_x_label)
-
-    axis_y_label = ut.plot.Label.get_label(y_prop_name, species=spec_name, get_words=True)
-    subplot.set_ylabel(axis_y_label)
-
-    color_map = plt.cm.inferno_r  # @UndefinedVariable
-    #color_map = plt.cm.gist_heat_r  # @UndefinedVariable
-    #color_map = plt.cm.afmhot_r  # @UndefinedVariable
-
-    #'''
-    _valuess, _xs, _ys, _Image = plt.hist2d(
-        x_prop_values, y_prop_values, prop_bin_number, [axis_x_limits, axis_y_limits],
-        norm=colors.LogNorm(), weights=masses,
-        cmin=None, cmax=None, cmap=color_map,
-    )
-
-    '''
-    valuess, _xs, _ys = np.histogram2d(
-        x_prop_values, y_prop_values, prop_bin_number,
-        [axis_x_limits, axis_y_limits],
-        normed=False, weights=masses)
-
-    subplot.imshow(
-        valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
-        aspect='auto',
-        interpolation='nearest',
-        #interpolation='none',
-        extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
-        #vmin=valuess.min(), vmax=valuess.max(),
-        #label=label,
-    )
-    '''
-    #plt.colorbar()
-
-    if draw_statistics:
-        print(stat['bin.mid'])
-        subplot.plot(stat['bin.mid'], stat['median'], color='black', linestyle='-', alpha=0.4)
-        subplot.plot(stat['bin.mid'], stat['percent.16'], color='black', linestyle='--', alpha=0.3)
-        subplot.plot(stat['bin.mid'], stat['percent.84'], color='black', linestyle='--', alpha=0.3)
-
-    # distance legend
-    if host_distance_limits is not None and len(host_distance_limits):
-        label = ut.plot.Label.get_label('radius', prop_limits=host_distance_limits)
-        subplot.legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')], [label], loc='best', handlelength=0)
-
-    if add_simulation_name:
-        prefix = part.info['simulation.name']
-    else:
-        prefix = ''
-
-    plot_name = ut.plot.get_file_name(
-        y_prop_name, x_prop_name, spec_name, snapshot_dict=part.snapshot,
-        host_distance_limits=host_distance_limits, prefix=prefix)
-
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
-"""
 
 
 def plot_property_v_distance(
-    parts, species='dark',
-    prop_name='mass', prop_statistic='sum', prop_scaling='log', weight_by_mass=False,
-    prop_limits=[],
+    parts, species_name='dark',
+    property_name='mass', property_statistic='sum', property_scaling='log', weight_by_mass=False,
+    property_limits=[],
     distance_limits=[0.1, 300], distance_bin_width=0.02, distance_bin_number=None,
     distance_scaling='log', dimension_number=3, rotation=None, other_axis_distance_limits=None,
     center_positions=None, center_velocities=None,
-    other_prop_limits={}, part_indicess=None,
+    property_select={}, part_indicess=None,
     distance_reference=None, plot_nfw=False,
     get_values=False, write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
-    species : string or list : species to compute total mass of
+    species_name : string : name of particle species to compute total mass of
         options: 'dark', 'star', 'gas', 'baryon', 'total'
-    prop_name : string : property to get profile of
-    prop_statistic : string : statistic/type to plot:
+    property_name : string : property to get profile of
+    property_statistic : string : statistic/type to plot:
         'sum, sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction,
         median, average'
-    prop_scaling : string : scaling for property (y-axis): 'log', 'linear'
+    property_scaling : string : scaling for property (y-axis): 'log', 'linear'
     weight_by_mass : boolean : whether to weight property by particle mass
-    prop_limits : list : limits to impose on y-axis
+    property_limits : list : limits to impose on y-axis
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
     distance_bin_number : int : number of bins between limits
@@ -1654,7 +1498,7 @@ def plot_property_v_distance(
         min and max distances along other axis[s] to keep particles [kpc physical]
     center_positions : array or list of arrays : position of center for each particle catalog
     center_velocities : array or list of arrays : velocity of center for each particle catalog
-    other_prop_limits : dict : dictionary with properties as keys and limits as values
+    property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     distance_reference : float : reference distance at which to draw vertical line
     plot_nfw : boolean : whether to overplot NFW profile: density ~ 1 / r
@@ -1667,7 +1511,7 @@ def plot_property_v_distance(
         parts = [parts]
 
     center_positions = ut.particle.parse_property(parts, 'position', center_positions)
-    if 'velocity' in prop_name:
+    if 'velocity' in property_name:
         center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
     else:
         center_velocities = [center_velocities for _ in center_positions]
@@ -1682,44 +1526,46 @@ def plot_property_v_distance(
 
     for part_i, part in enumerate(parts):
         pros_part = SpeciesProfile.get_profiles(
-            part, species, prop_name, prop_statistic, weight_by_mass, DistanceBin,
+            part, species_name, property_name, property_statistic, weight_by_mass, DistanceBin,
             center_positions[part_i], center_velocities[part_i], rotation,
-            other_axis_distance_limits, other_prop_limits, part_indicess[part_i])
+            other_axis_distance_limits, property_select, part_indicess[part_i])
 
         pros.append(pros_part)
 
         #if part_i > 0:
-        #    print(pros[part_i][prop_name] / pros[0][prop_name])
+        #    print(pros[part_i][property_name] / pros[0][property_name])
 
-        #print(pros_part[species][prop_statistic])
+        #print(pros_part[species_name][property_statistic])
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
     #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
-    y_values = [pro[species][prop_statistic] for pro in pros]
+    y_values = [pro[species_name][property_statistic] for pro in pros]
     _axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
-        subplot, distance_scaling, distance_limits, None, prop_scaling, prop_limits, y_values)
+        subplot, distance_scaling, distance_limits, None,
+        property_scaling, property_limits, y_values)
 
     axis_x_label = ut.plot.Label.get_label('radius', get_words=True)
     subplot.set_xlabel(axis_x_label)
 
-    if prop_statistic == 'vel.circ':
-        label_prop_name = 'vel.circ'
+    if property_statistic == 'vel.circ':
+        label_property_name = 'vel.circ'
     else:
-        label_prop_name = prop_name
+        label_property_name = property_name
     axis_y_label = ut.plot.Label.get_label(
-        label_prop_name, prop_statistic, species, dimension_number=dimension_number)
+        label_property_name, property_statistic, species_name, dimension_number=dimension_number)
     subplot.set_ylabel(axis_y_label)
 
     colors = ut.plot.get_colors(len(parts))
 
-    if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
-        if 'fraction' in prop_statistic:
+    if ('fraction' in property_statistic or 'beta' in property_name or
+            'velocity.rad' in property_name):
+        if 'fraction' in property_statistic:
             y_values = [1, 1]
-        elif 'beta' in prop_name:
+        elif 'beta' in property_name:
             y_values = [0, 0]
-        elif 'velocity.rad' in prop_name:
+        elif 'velocity.rad' in property_name:
             y_values = [0, 0]
         subplot.plot(
             distance_limits, y_values, color='black', linestyle=':', alpha=0.3)
@@ -1730,10 +1576,11 @@ def plot_property_v_distance(
 
     if plot_nfw:
         pro = pros[0]
-        distances_nfw = pro[species]['distance']
+        distances_nfw = pro[species_name]['distance']
         # normalize to outermost distance bin
-        densities_nfw = np.ones(pro[species]['distance'].size) * pro[species][prop_statistic][-1]
-        densities_nfw *= pro[species]['distance'][-1] / pro[species]['distance']
+        densities_nfw = (np.ones(pro[species_name]['distance'].size) *
+                         pro[species_name][property_statistic][-1])
+        densities_nfw *= pro[species_name]['distance'][-1] / pro[species_name]['distance']
         subplot.plot(distances_nfw, densities_nfw, color='black', linestyle=':', alpha=0.6)
 
     # plot profiles
@@ -1744,17 +1591,18 @@ def plot_property_v_distance(
         alpha = 0.7
         linewidth = None
 
-    print(pros[0][species]['distance'])
+    print(pros[0][species_name]['distance'])
     for part_i, pro in enumerate(pros):
-        print(pro[species][prop_statistic])
+        print(pro[species_name][property_statistic])
         color = colors[part_i]
 
         label = parts[part_i].info['simulation.name']
         if len(pros) > 1 and parts[0].info['simulation.name'] == parts[1].info['simulation.name']:
             label = '$z={:.1f}$'.format(parts[part_i].snapshot['redshift'])
 
-        masks = pro[species][prop_statistic] != 0  # plot only non-zero values
-        subplot.plot(pro[species]['distance'][masks], pro[species][prop_statistic][masks],
+        masks = pro[species_name][property_statistic] != 0  # plot only non-zero values
+        subplot.plot(pro[species_name]['distance'][masks],
+                     pro[species_name][property_statistic][masks],
                      color=color, alpha=alpha, linewidth=linewidth, label=label)
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
@@ -1766,7 +1614,8 @@ def plot_property_v_distance(
         distance_name += '.1d'
 
     plot_name = ut.plot.get_file_name(
-        prop_name + '.' + prop_statistic, distance_name, species, snapshot_dict=part.snapshot)
+        property_name + '.' + property_statistic, distance_name, species_name,
+        snapshot_dict=part.snapshot)
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
@@ -1782,7 +1631,7 @@ def plot_property_v_distance(
 # properties of halos
 #===================================================================================================
 def assign_vel_circ_at_radius(
-    part, hal, radius=0.6, sort_prop_name='vel.circ.max', sort_prop_value_min=20,
+    part, hal, radius=0.6, sort_property_name='vel.circ.max', sort_property_value_min=20,
     halo_number_max=100, host_distance_limits=[1, 310]):
     '''
     .
@@ -1791,10 +1640,10 @@ def assign_vel_circ_at_radius(
 
     his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
     his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
-    his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_value_min, Inf], his)
+    his = ut.array.get_indices(hal[sort_property_name], [sort_property_value_min, Inf], his)
     Say.say('{} halos within limits'.format(his.size))
 
-    his = his[np.argsort(hal[sort_prop_name][his])]
+    his = his[np.argsort(hal[sort_property_name][his])]
     his = his[::-1][: halo_number_max]
 
     mass_key = 'vel.circ.rad.{:.1f}'.format(radius)
@@ -1814,7 +1663,7 @@ def plot_vel_circ_v_radius_halos(
     pros=None,
     gal=None,
     total_mass_limits=None, star_mass_limits=[1e5, Inf], host_distance_limits=[1, 310],
-    sort_prop_name='vel.circ.max', sort_prop_value_min=15, halo_number_max=20,
+    sort_property_name='vel.circ.max', sort_property_value_min=15, halo_number_max=20,
     vel_circ_limits=[0, 50], vel_circ_scaling='linear',
     radius_limits=[0.1, 3], radius_bin_width=0.1, radius_bin_number=None, radius_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
@@ -1845,13 +1694,14 @@ def plot_vel_circ_v_radius_halos(
             if 'star.indices' in hal:
                 his = ut.array.get_indices(hal['star.mass'], star_mass_limits, his)
             else:
-                his = ut.array.get_indices(hal[sort_prop_name], [sort_prop_value_min, Inf], his)
-                his = his[np.argsort(hal[sort_prop_name][his])[::-1]]
+                his = ut.array.get_indices(
+                    hal[sort_property_name], [sort_property_value_min, Inf], his)
+                his = his[np.argsort(hal[sort_property_name][his])[::-1]]
                 his = his[: halo_number_max]
 
                 Say.say('{} halos with {} [min, max] = [{:.3f}, {:.3f}]'.format(
-                        his.size, sort_prop_name,
-                        hal[sort_prop_name][his[0]], hal[sort_prop_name][his[-1]]))
+                        his.size, sort_property_name,
+                        hal[sort_property_name][his[0]], hal[sort_property_name][his[-1]]))
 
             hiss.append(his)
 
@@ -1887,9 +1737,9 @@ def plot_property_v_distance_halos(
     parts=None, hals=None, part_indicesss=None, hal_indicess=None,
     pros=None,
     gal=None, gal_indices=None,
-    species='total',
-    prop_name='mass', prop_statistic='vel.circ', prop_scaling='linear', weight_by_mass=False,
-    prop_limits=[],
+    species_name='total',
+    property_name='mass', property_statistic='vel.circ', property_scaling='linear',
+    weight_by_mass=False, property_limits=[],
     distance_limits=[0.1, 3], distance_bin_width=0.1, distance_bin_number=None,
     distance_scaling='log', dimension_number=3,
     distance_reference=None,
@@ -1901,14 +1751,14 @@ def plot_property_v_distance_halos(
     hal_indicess : array (halo catalog number x halo number) : indices of halos to plot
     gal : dict : catalog of observed galaxies
     gal_indices : array : indices of galaxies to plot
-    species : string or list : species to compute total mass of
+    species : string : name of particle species to compute total mass of
         options: 'dark', 'star', 'gas', 'baryon', 'total'
-    prop_name : string : property to get profile of
-    prop_statistic : string : statistic/type to plot:
+    property_name : string : property to get profile of
+    property_statistic : string : statistic/type to plot:
         'sum', sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction, median, ave'
-    prop_scaling : string : scaling for property (y-axis): 'log', 'linear'
+    property_scaling : string : scaling for property (y-axis): 'log', 'linear'
     weight_by_mass : boolean : whether to weight property by particle mass
-    prop_limits : list : limits to impose on y-axis
+    property_limits : list : limits to impose on y-axis
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
     distance_bin_number : int : number of bins between limits
@@ -1946,10 +1796,10 @@ def plot_property_v_distance_halos(
                 part = parts[cat_i]
                 hal_indices = hal_indicess[cat_i]
 
-                if species == 'star' and hal['star.position'].max() > 0:
+                if species_name == 'star' and hal['star.position'].max() > 0:
                     position_kind = 'star.position'
                     velocity_kind = 'star.velocity'
-                elif species == 'dark' and hal['dark.position'].max() > 0:
+                elif species_name == 'dark' and hal['dark.position'].max() > 0:
                     position_kind = 'dark.position'
                     velocity_kind = 'dark.velocity'
                 else:
@@ -1963,7 +1813,7 @@ def plot_property_v_distance_halos(
                 for hal_i in hal_indices:
                     if part_indicesss is not None:
                         part_indices = part_indicesss[cat_i][hal_i]
-                    elif species == 'star' and 'star.indices' in hal:
+                    elif species_name == 'star' and 'star.indices' in hal:
                         part_indices = hal['star.indices'][hal_i]
                     #elif species == 'dark' and 'dark.indices' in hal:
                     #    part_indices = hal['dark.indices'][hal_i]
@@ -1971,8 +1821,8 @@ def plot_property_v_distance_halos(
                         part_indices = None
 
                     pro_hal = SpeciesProfile.get_profiles(
-                        part, species, prop_name, prop_statistic, weight_by_mass, DistanceBin,
-                        hal[position_kind][hal_i], hal[velocity_kind][hal_i],
+                        part, species_name, property_name, property_statistic, weight_by_mass,
+                        DistanceBin, hal[position_kind][hal_i], hal[velocity_kind][hal_i],
                         part_indicess=part_indices)
 
                     pros_cat.append(pro_hal)
@@ -1985,10 +1835,11 @@ def plot_property_v_distance_halos(
     y_values = []
     for pro_cat in pros:
         for pro_hal in pro_cat:
-            y_values.append(pro_hal[species][prop_statistic])
+            y_values.append(pro_hal[species_name][property_statistic])
 
     ut.plot.set_axes_scaling_limits(
-        subplot, distance_scaling, distance_limits, None, prop_scaling, prop_limits, y_values)
+        subplot, distance_scaling, distance_limits, None,
+        property_scaling, property_limits, y_values)
 
     if 'log' in distance_scaling:
         subplot.xaxis.set_ticks([0.1, 0.2, 0.3, 0.5, 1, 2])
@@ -2001,27 +1852,28 @@ def plot_property_v_distance_halos(
     axis_x_label = ut.plot.Label.get_label('radius', get_words=True)
     subplot.set_xlabel(axis_x_label)
 
-    if prop_statistic in ['vel.circ']:
-        label_prop_name = prop_statistic
+    if property_statistic in ['vel.circ']:
+        label_property_name = property_statistic
     else:
-        label_prop_name = prop_name
+        label_property_name = property_name
     axis_y_label = ut.plot.Label.get_label(
-        label_prop_name, prop_statistic, species, dimension_number=dimension_number)
+        label_property_name, property_statistic, species_name, dimension_number=dimension_number)
     subplot.set_ylabel(axis_y_label)
 
     # draw reference values
-    if 'fraction' in prop_statistic or 'beta' in prop_name or 'velocity.rad' in prop_name:
-        if 'fraction' in prop_statistic:
+    if ('fraction' in property_statistic or 'beta' in property_name or
+            'velocity.rad' in property_name):
+        if 'fraction' in property_statistic:
             y_values = [1, 1]
-        elif 'beta' in prop_name:
+        elif 'beta' in property_name:
             y_values = [0, 0]
-        elif 'velocity.rad' in prop_name:
+        elif 'velocity.rad' in property_name:
             y_values = [0, 0]
         subplot.plot(
             distance_limits, y_values, color='black', linestyle=':', alpha=0.5, linewidth=2)
 
     if distance_reference is not None:
-        subplot.plot([distance_reference, distance_reference], prop_limits,
+        subplot.plot([distance_reference, distance_reference], property_limits,
                      color='black', linestyle=':', alpha=0.6)
 
     # draw halos
@@ -2033,22 +1885,24 @@ def plot_property_v_distance_halos(
                 color = colors[cat_i]
                 linewidth = 1.9
                 alpha = 0.5
-                if pros[cat_i][hal_ii][species][prop_statistic][0] > 12.5:  # dark vel.circ
+
+                if pros[cat_i][hal_ii][species_name][property_statistic][0] > 12.5:  # dark vel.circ
                     color = ut.plot.get_color('blue.lite')
                     linewidth = 3.0
                     alpha = 0.8
-                if species == 'star':
+
+                if species_name == 'star':
                     linewidth = 2.0
                     alpha = 0.6
                     color = ut.plot.get_color('orange.mid')
-                    if pros[cat_i][hal_ii][species][prop_statistic][-1] > 27:
+                    if pros[cat_i][hal_ii][species_name][property_statistic][-1] > 27:
                         color = ut.plot.get_color('orange.lite')
                         linewidth = 3.5
                         alpha = 0.9
 
                 subplot.plot(
-                    pros[cat_i][hal_ii][species]['distance'],
-                    pros[cat_i][hal_ii][species][prop_statistic],
+                    pros[cat_i][hal_ii][species_name]['distance'],
+                    pros[cat_i][hal_ii][species_name][property_statistic],
                     color=color,
                     linestyle='-', alpha=alpha, linewidth=linewidth,
                     #label=parts[part_i].info['simulation.name'],
@@ -2073,7 +1927,7 @@ def plot_property_v_distance_halos(
     if parts is not None:
         snapshot_dict = parts[0].snapshot
     plot_name = ut.plot.get_file_name(
-        prop_name + '.' + prop_statistic, 'dist', species, snapshot_dict=snapshot_dict)
+        property_name + '.' + property_statistic, 'dist', species_name, snapshot_dict=snapshot_dict)
     plot_name = plot_name.replace('.sum', '')
     plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
     plot_name = plot_name.replace('mass.density', 'density')
@@ -2149,7 +2003,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
     def get_star_form_history(
         self, part, time_kind='redshift', time_limits=[0, 8], time_width=0.1, time_scaling='linear',
-        distance_limits=None, center_position=None, other_prop_limits=None, part_indices=None):
+        distance_limits=None, center_position=None, property_select={}, part_indices=None):
         '''
         Get array of times and star-formation rate at each time.
 
@@ -2162,7 +2016,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_scaling : string : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of galaxy distance to select star particles
         center_position : list : position of galaxy centers [kpc comoving]
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : dictionary with property names as keys and limits as values
         part_indices : array : indices of star particles to select
 
         Returns
@@ -2174,9 +2028,9 @@ class StarFormHistoryClass(ut.io.SayClass):
         if part_indices is None:
             part_indices = ut.array.get_arange(part[species]['mass'])
 
-        if other_prop_limits:
+        if property_select:
             part_indices = ut.catalog.get_indices_catalog(
-                part['star'], other_prop_limits, part_indices)
+                part['star'], property_select, part_indices)
 
         center_position = ut.particle.parse_property(part, 'position', center_position)
 
@@ -2232,7 +2086,7 @@ class StarFormHistoryClass(ut.io.SayClass):
     def plot_star_form_history(
         self, parts=None, sfh_kind='form.rate',
         time_kind='time.lookback', time_limits=[0, 13], time_width=0.2, time_scaling='linear',
-        distance_limits=[0, 10], center_positions=None, other_prop_limits={}, part_indicess=None,
+        distance_limits=[0, 10], center_positions=None, property_select={}, part_indicess=None,
         sfh_limits=[], sfh_scaling='log',
         write_plot=False, plot_directory='.', figure_index=1):
         '''
@@ -2250,7 +2104,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_scaling : string : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of distance to select star particles
         center_positions : list or list of lists : position[s] of galaxy centers [kpc comoving]
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : properties to select on: names as keys and limits as values
         part_indicess : array : part_indices of particles from which to select
         sfh_limits : list : min and max limits for y-axis
         sfh_scaling : string : scaling of y-axis: 'log', 'linear'
@@ -2273,7 +2127,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         for part_i, part in enumerate(parts):
             sfh_p = self.get_star_form_history(
                 part, time_kind, time_limits, time_width, time_scaling,
-                distance_limits, center_positions[part_i], other_prop_limits, part_indicess[part_i])
+                distance_limits, center_positions[part_i], property_select, part_indicess[part_i])
 
             if part_i == 0:
                 for k in sfh_p:
@@ -2330,7 +2184,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
     def plot_star_form_history_galaxies(
         self, part=None, hal=None, gal=None,
-        mass_kind='star.mass.part', mass_limits=[1e5, 1e9], other_prop_limits={}, hal_indices=None,
+        mass_kind='star.mass.part', mass_limits=[1e5, 1e9], property_select={}, hal_indices=None,
         sfh_kind='mass.normalized', sfh_limits=[], sfh_scaling='linear',
         time_kind='time.lookback', time_limits=[13.7, 0], time_width=0.2, time_scaling='linear',
         write_plot=False, plot_directory='.', figure_index=1):
@@ -2345,7 +2199,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         gal : dict : catalog of galaxies in the Local Group with SFHs
         mass_kind : string : mass kind by which to select halos
         mass_limits : list : min and max limits to impose on mass_kind
-        other_prop_limits : dict : dictionary with properties as keys and limits as values
+        property_select : dict : properties to select on: names as keys and limits as values
         hal_indices : index or array : index[s] of halo[s] whose particles to plot
         sfh_kind : string : star form kind to plot:
             'rate', 'rate.specific', 'mass', 'mass.normalized'
@@ -2374,8 +2228,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             if mass_limits is not None and len(mass_limits):
                 hal_indices = ut.array.get_indices(hal.prop(mass_kind), mass_limits, hal_indices)
 
-            if other_prop_limits:
-                hal_indices = ut.catalog.get_indices_catalog(hal, other_prop_limits, hal_indices)
+            if property_select:
+                hal_indices = ut.catalog.get_indices_catalog(hal, property_select, hal_indices)
 
             hal_indices = hal_indices[np.argsort(hal.prop(mass_kind, hal_indices))]
 
@@ -2491,8 +2345,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             time_kind_file_name = None
 
         host_distance_limits = None
-        if 'host.distance' in other_prop_limits:
-            host_distance_limits = other_prop_limits['host.distance']
+        if 'host.distance' in property_select:
+            host_distance_limits = property_select['host.distance']
 
         plot_name = ut.plot.get_file_name(
             sfh_kind, time_kind, 'star', time_kind_file_name, snapshot_dict,
@@ -2678,8 +2532,7 @@ def explore_galaxy(
 
 
 def plot_density_profile_halo(
-    part,
-    species='star',
+    part, species_name='star',
     hal=None, hal_index=None, center_position=None,
     distance_limits=[0.1, 2], distance_bin_width=0.1, distance_bin_number=None,
     write_plot=False, plot_directory='.', figure_index=1):
@@ -2689,7 +2542,7 @@ def plot_density_profile_halo(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species : string or list : particle species to plot
+    species : string : name of particle species to plot
     hal : dict : catalog of halos at snapshot
     hal_index : int : index of halo in catalog
     center_position : array : position to center profile (to use instead of halo position)
@@ -2721,7 +2574,7 @@ def plot_density_profile_halo(
         distance_reference = None
 
     plot_property_v_distance(
-        parts, species, 'mass', 'density', 'log', False, None,
+        parts, species_name, 'mass', 'density', 'log', False, None,
         distance_limits, distance_bin_width, distance_bin_number, distance_scaling,
         dimension_number,
         center_positions=center_positions, part_indicess=None,
@@ -2731,7 +2584,7 @@ def plot_density_profile_halo(
 
 def plot_density_profiles_halos(
     part, hal, hal_indices,
-    species='dark', density_limits=None,
+    species_name='dark', density_limits=None,
     distance_limits=[0.05, 1], distance_bin_width=0.2, distance_bin_number=None,
     plot_only_members=False,
     write_plot=False, plot_directory='.', figure_index=0):
@@ -2748,14 +2601,14 @@ def plot_density_profiles_halos(
         if 'star.position' in hal:
             center_positions.append(hal.prop('star.position', hal_i))
             if plot_only_members:
-                part_indicess.append(hal.prop(species + '.indices', hal_i))
+                part_indicess.append(hal.prop(species_name + '.indices', hal_i))
         else:
             center_positions.append(hal.prop('position', hal_i))
             if plot_only_members:
-                part_indicess.append(hal.prop(species + '.indices', hal_i))
+                part_indicess.append(hal.prop(species_name + '.indices', hal_i))
 
     plot_property_v_distance(
-        parts, species, 'mass', 'density', 'log', False, density_limits,
+        parts, species_name, 'mass', 'density', 'log', False, density_limits,
         distance_limits, distance_bin_width, distance_bin_number, 'log', 3,
         center_positions=center_positions, part_indicess=part_indicess,
         write_plot=write_plot, plot_directory=plot_directory, figure_index=figure_index)
@@ -2774,7 +2627,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     simulation_directory : string : root directory of simulation
     redshifts : array-like : redshifts at which to get properties
         'all' = read and store all snapshots
-    species : string or list : species to read and get properties of
+    species : string or list : name[s] of species to read and get properties of
 
     Returns
     -------
@@ -2799,11 +2652,11 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
         'time.lookback': [],
     }
 
-    for spec_name in species:
-        gal['{}.position'.format(spec_name)] = []
+    for spec in species:
+        gal['{}.position'.format(spec)] = []
         for mass_percent in mass_percents:
-            gal['{}.radius.{:.0f}'.format(spec_name, mass_percent)] = []
-            gal['{}.mass.{:.0f}'.format(spec_name, mass_percent)] = []
+            gal['{}.radius.{:.0f}'.format(spec, mass_percent)] = []
+            gal['{}.mass.{:.0f}'.format(spec, mass_percent)] = []
 
     if redshifts == 'all' or redshifts is None or redshifts == []:
         Snapshot = ut.simulation.SnapshotClass()
@@ -2817,7 +2670,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 
     for _zi, redshift in enumerate(redshifts):
         part = Read.read_snapshots(
-            species, 'redshift', redshift, simulation_directory, property_names=properties_read,
+            species, 'redshift', redshift, simulation_directory, properties=properties_read,
             force_float32=True)
 
         for k in ['index', 'redshift', 'scalefactor', 'time', 'time.lookback']:
@@ -2826,12 +2679,14 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
         # get position and velocity
         gal['star.position'].append(part.center_position)
 
-        for spec_name in species:
+        for spec in species:
             for mass_percent in mass_percents:
                 gal_prop = ut.particle.get_galaxy_properties(
-                    part, spec_name, 'mass.percent', mass_percent, star_distance_max)
-                gal['{}.radius.{:.0f}'.format(spec_name, mass_percent)].append(gal_prop['radius'])
-                gal['{}.mass.{:.0f}'.format(spec_name, mass_percent)].append(gal_prop['radius'])
+                    part, spec, 'mass.percent', mass_percent, star_distance_max)
+                k = '{}.radius.{:.0f}'.format(spec, mass_percent)
+                gal[k].append(gal_prop['radius'])
+                k = '{}.mass.{:.0f}'.format(spec, mass_percent)
+                gal[k].append(gal_prop['radius'])
 
     for prop in gal:
         gal[prop] = np.array(gal[prop])
@@ -2843,7 +2698,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 
 def plot_galaxy_property_v_time(
     gals=None, sfhs=None, Cosmology=None,
-    prop_name='star.mass',
+    property_name='star.mass',
     time_kind='redshift', time_limits=[0, 8], time_scaling='linear', snapshot_subsample_factor=1,
     axis_y_limits=[], axis_y_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
@@ -2855,7 +2710,7 @@ def plot_galaxy_property_v_time(
     ----------
     gals : dict : tabulated dictionary of host galaxy properties
     sfhs : dict : tabulated dictinnary of star-formation histories (computed at single snapshot)
-    prop_name : string : star formation history kind to plot:
+    property_name : string : name of star formation history property to plot:
         'rate', 'rate.specific', 'mass', 'mass.normalized'
     time_kind : string : time kind to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to get
@@ -2890,7 +2745,7 @@ def plot_galaxy_property_v_time(
 
     y_values = []
     if gals is not None:
-        y_values.append(gals[0][prop_name])
+        y_values.append(gals[0][property_name])
     if sfhs is not None:
         y_values.append(sfhs[0][time_kind])
     subplot.set_ylim(ut.plot.get_axis_limits(y_values, axis_y_scaling, axis_y_limits))
@@ -2906,7 +2761,7 @@ def plot_galaxy_property_v_time(
         for _gal_i, gal in enumerate(gals):
             subplot.plot(
                 gal[time_kind][::snapshot_subsample_factor],
-                gal[prop_name][::snapshot_subsample_factor],
+                gal[property_name][::snapshot_subsample_factor],
                 linewidth=3.0, alpha=0.9,
                 #color=colors[gal_i],
                 color=ut.plot.get_color('blue.mid'),
@@ -2925,7 +2780,7 @@ def plot_galaxy_property_v_time(
 
     ut.plot.make_legends(subplot)
 
-    plot_name = 'galaxy_{}_v_{}'.format(prop_name, time_kind)
+    plot_name = 'galaxy_{}_v_{}'.format(property_name, time_kind)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
@@ -2958,7 +2813,7 @@ def get_galaxy_mass_profiles_v_redshift(
     star_distance_max = 20
     dark_distance_max = 50
 
-    profile_spec_name = 'star'
+    profile_species_name = 'star'
     profile_mass_percents = [50, 90]
 
     gal = {
@@ -3001,12 +2856,12 @@ def get_galaxy_mass_profiles_v_redshift(
         gal['radius.minor.' + mass_percent_name] = []  # stellar R_{50,90} along minor axis
         gal['mass.minor.' + mass_percent_name] = []  # associated stellar mass [M_sun]
 
-    for zi, redshift in enumerate(redshifts):
+    for z_i, redshift in enumerate(redshifts):
         if parts is not None and len(parts):
-            part = parts[zi]
+            part = parts[z_i]
         else:
             part = Read.read_snapshots(
-                species_read, 'redshift', redshift, directory, property_names=properties_read,
+                species_read, 'redshift', redshift, directory, properties=properties_read,
                 force_float32=True)
 
         for k in ['index', 'redshift', 'scalefactor', 'time', 'time.lookback']:
@@ -3022,10 +2877,10 @@ def get_galaxy_mass_profiles_v_redshift(
 
         # get radius_90 as fiducial
         gal_90 = ut.particle.get_galaxy_properties(
-            part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max)
+            part, profile_species_name, 'mass.percent', mass_percent, star_distance_max)
 
         rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
-            part, profile_spec_name, gal_90['radius'], scalarize=True)
+            part, profile_species_name, gal_90['radius'], scalarize=True)
 
         gal['rotation.tensor'].append(rotation_vectors)
         gal['axis.ratio'].append(axis_ratios)
@@ -3034,51 +2889,51 @@ def get_galaxy_mass_profiles_v_redshift(
             mass_percent_name = '{:.0f}'.format(mass_percent)
 
             gal = ut.particle.get_galaxy_properties(
-                part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max)
+                part, profile_species_name, 'mass.percent', mass_percent, star_distance_max)
             gal['radius.3d.' + mass_percent_name].append(gal['radius'])
             gal['mass.3d.' + mass_percent_name].append(gal['mass'])
 
             gal_minor = ut.particle.get_galaxy_properties(
-                part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max,
+                part, profile_species_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='minor', rotation_vectors=rotation_vectors,
                 other_axis_distance_limits=[0, gal_90['radius']])
             gal['radius.minor.' + mass_percent_name].append(gal_minor['radius'])
             gal['mass.minor.' + mass_percent_name].append(gal_minor['mass'])
 
             gal_major = ut.particle.get_galaxy_properties(
-                part, profile_spec_name, 'mass.percent', mass_percent, star_distance_max,
+                part, profile_species_name, 'mass.percent', mass_percent, star_distance_max,
                 axis_kind='major', rotation_vectors=rotation_vectors,
                 other_axis_distance_limits=[0, gal_minor['radius']])
             gal['radius.major.' + mass_percent_name].append(gal_major['radius'])
             gal['mass.major.' + mass_percent_name].append(gal_major['radius'])
 
         pro = plot_property_v_distance(
-            part, profile_spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, None, 'log', 3, get_values=True)
         for k in ['distance', 'density']:
-            gal['profile.3d.' + k].append(pro[profile_spec_name][k])
+            gal['profile.3d.' + k].append(pro[profile_species_name][k])
 
         pro = plot_property_v_distance(
-            part, profile_spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, None, 'log', 2,
             rotation_vectors=rotation_vectors, other_axis_distance_limits=[0, 1], get_values=True)
         for k in ['distance', 'density']:
-            gal['profile.major.' + k].append(pro[profile_spec_name][k])
+            gal['profile.major.' + k].append(pro[profile_species_name][k])
 
         pro = plot_property_v_distance(
-            part, profile_spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, None, 'log', 1,
             rotation_vectors=rotation_vectors, other_axis_distance_limits=[0, 0.05],
             get_values=True)
         for k in ['distance', 'density']:
-            gal['profile.minor.bulge.' + k].append(pro[profile_spec_name][k])
+            gal['profile.minor.bulge.' + k].append(pro[profile_species_name][k])
 
         pro = plot_property_v_distance(
-            part, profile_spec_name, 'mass', 'density', 'log', False, None,
+            part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, None, 'log', 1,
             rotation_vectors=rotation_vectors, other_axis_distance_limits=[1, 10], get_values=True)
         for k in ['distance', 'density']:
-            gal['profile.minor.disk.' + k].append(pro[profile_spec_name][k])
+            gal['profile.minor.disk.' + k].append(pro[profile_species_name][k])
 
     for prop in gal:
         gal[prop] = np.array(gal[prop])
@@ -3100,24 +2955,24 @@ def print_galaxy_mass_v_redshift(gal):
     print('r_50[kpc phys] star_mass_50[M_sun] gas_mass_50[M_sun] dark_mass_50[M_sun] ', end='')
     print('r_90[kpc phys] star_mass_90[M_sun] gas_mass_90[M_sun] dark_mass_90[M_sun]', end='\n')
 
-    for ti in range(gal['redshift'].size):
+    for z_i in range(gal['redshift'].size):
         print('{:.5f} {:.5f} {:.5f} '.format(
-              gal['redshift'][ti], gal['scalefactor'][ti], gal['time'][ti]), end='')
+              gal['redshift'][z_i], gal['scalefactor'][z_i], gal['time'][z_i]), end='')
         print('{:.3f} {:.3f} {:.3f} '.format(
-              gal['star.position'][ti][0], gal['star.position'][ti][1],
-              gal['star.position'][ti][2]), end='')
+              gal['star.position'][z_i][0], gal['star.position'][z_i][1],
+              gal['star.position'][z_i][2]), end='')
         print('{:.3f} {:.3f} {:.3f} '.format(
-              gal['star.velocity'][ti][0], gal['star.velocity'][ti][1],
-              gal['star.velocity'][ti][2]), end='')
+              gal['star.velocity'][z_i][0], gal['star.velocity'][z_i][1],
+              gal['star.velocity'][z_i][2]), end='')
         print('{:.3f} {:.3f} {:.3f} '.format(
-              gal['dark.velocity'][ti][0], gal['dark.velocity'][ti][1],
-              gal['dark.velocity'][ti][2]), end='')
+              gal['dark.velocity'][z_i][0], gal['dark.velocity'][z_i][1],
+              gal['dark.velocity'][z_i][2]), end='')
         print('{:.3e} {:.3e} {:.3e} {:.3e} '.format(
-              gal['radius.50'][ti], gal['star.mass.50'][ti], gal['gas.mass.50'][ti],
-              gal['dark.mass.50'][ti]), end='')
+              gal['radius.50'][z_i], gal['star.mass.50'][z_i], gal['gas.mass.50'][z_i],
+              gal['dark.mass.50'][z_i]), end='')
         print('{:.3e} {:.3e} {:.3e} {:.3e}'.format(
-              gal['radius.90'][ti], gal['star.mass.90'][ti], gal['gas.mass.90'][ti],
-              gal['dark.mass.90'][ti]), end='\n')
+              gal['radius.90'][z_i], gal['star.mass.90'][z_i], gal['gas.mass.90'][z_i],
+              gal['dark.mass.90'][z_i]), end='\n')
 
 
 #===================================================================================================
@@ -3131,7 +2986,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         Set directories and names of simulations to read.
         '''
-        self.property_names = ['mass', 'position', 'form.scalefactor', 'massfraction']
+        self.properties = ['mass', 'position', 'form.scalefactor', 'massfraction']
         self.galaxy_radius_limits = [0, 12]
         self.plot_directory = ut.io.get_path(plot_directory)
 
@@ -3155,7 +3010,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         parts : list : list of dictionaries of particles at snapshot
         simulation_directories : list : list of simulation directories and name/label for figure
         redshifts : float or list
-        species : string or list : particle species to read
+        species : string or list : name[s] of particle species to read
         distance_bin_width : float : width of distance bin
         '''
         distance_limits_galaxy = [0.1, 30]
@@ -3176,7 +3031,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 from . import gizmo_io
                 Read = gizmo_io.ReadClass()
                 parts = Read.read_simulations(
-                    simulation_directories, species, redshift, self.property_names)
+                    simulation_directories, species, redshift, self.properties)
 
             self.print_masses_sizes(parts, None, redshifts, ['star'], distance_max=15)
 
@@ -3199,90 +3054,90 @@ class CompareSimulationsClass(ut.io.SayClass):
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-            prop_name = 'dark'
-            if prop_name in parts[0]:
+            prop = 'dark'
+            if prop in parts[0]:
                 plot_property_v_distance(
-                    parts, prop_name, 'mass', 'sum.cum', 'log', False, [None, None],
+                    parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
                     distance_limits_halo, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop_name, 'mass', 'density', 'log', False, [None, None],
+                    parts, prop, 'mass', 'density', 'log', False, [None, None],
                     distance_limits_galaxy, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-            prop_name = 'gas'
-            if prop_name in parts[0]:
+            prop = 'gas'
+            if prop in parts[0]:
                 plot_property_v_distance(
-                    parts, prop_name, 'mass', 'sum.cum', 'log', False, [None, None],
+                    parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
                     distance_limits_halo, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop_name, 'metallicity.total', 'median', 'linear', True, [None, None],
+                    parts, prop, 'metallicity.total', 'median', 'linear', True, [None, None],
                     distance_limits_galaxy, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
-                    parts, prop_name, 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
+                    parts, prop, 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
                     'probability', distance_limits_halo, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 """
-                if 'velocity' in parts[0][prop_name]:
+                if 'velocity' in parts[0][prop]:
                     plot_property_v_distance(
-                        parts, prop_name, 'host.velocity.rad', 'average', 'linear', True,
+                        parts, prop, 'host.velocity.rad', 'average', 'linear', True,
                         [None, None], distance_limits_halo, 0.25,
                         write_plot=True, plot_directory=self.plot_directory,
                     )
                 """
 
-            prop_name = 'star'
-            if prop_name in parts[0]:
+            prop = 'star'
+            if prop in parts[0]:
                 plot_property_v_distance(
-                    parts, prop_name, 'mass', 'sum.cum', 'log', False, [None, None],
+                    parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
                     distance_limits_halo, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop_name, 'mass', 'density', 'log', False, [None, None],
+                    parts, prop, 'mass', 'density', 'log', False, [None, None],
                     distance_limits_galaxy, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop_name, 'metallicity.fe', 'median', 'linear', True,
+                    parts, prop, 'metallicity.fe', 'median', 'linear', True,
                     [None, None], distance_limits_galaxy, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop_name, 'metallicity.mg - metallicity.fe', 'median', 'linear', True,
+                    parts, prop, 'metallicity.mg - metallicity.fe', 'median', 'linear', True,
                     [None, None], distance_limits_galaxy, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
-                    parts, prop_name, 'metallicity.fe', [-4, 1.3], 0.1, None, 'linear',
+                    parts, prop, 'metallicity.fe', [-4, 1.3], 0.1, None, 'linear',
                     'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
-                    parts, prop_name, 'metallicity.mg - metallicity.fe', [-1.7, 0.6], 0.1, None,
+                    parts, prop, 'metallicity.mg - metallicity.fe', [-1.7, 0.6], 0.1, None,
                     'linear', 'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-                if 'form.scalefactor' in parts[0][prop_name] and redshift <= 5:
+                if 'form.scalefactor' in parts[0][prop] and redshift <= 5:
                     plot_property_v_distance(
-                        parts, prop_name, 'age', 'average', 'linear', True,
+                        parts, prop, 'age', 'average', 'linear', True,
                         [None, None], distance_limits_galaxy, distance_bin_width,
                         write_plot=True, plot_directory=self.plot_directory,
                     )
@@ -3319,7 +3174,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         parts : list : dictionaries of particles at snapshot
         simulation_directories : list : list of simulation directories and name/label for figure
         redshifts : float or list
-        species : string or list : particle species to read
+        species : string or list : name[s] of particle species to read
         prop_bin_number : int : number of bins along each dimension for histogram
         '''
         plot_directory = self.plot_directory + 'property_2d'
@@ -3339,13 +3194,13 @@ class CompareSimulationsClass(ut.io.SayClass):
                 from . import gizmo_io
                 Read = gizmo_io.ReadClass()
                 parts = Read.read_simulations(
-                    simulation_directories, species, redshift, self.property_names)
+                    simulation_directories, species, redshift, self.properties)
 
             for part in parts:
-                spec_name = 'star'
-                if spec_name in parts[0]:
+                species_name = 'star'
+                if species_name in parts[0]:
                     plot_property_v_property(
-                        part, spec_name,
+                        part, species_name,
                         'metallicity.fe', [-3, 1], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
                         prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
@@ -3353,7 +3208,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
                     plot_property_v_property(
-                        part, spec_name,
+                        part, species_name,
                         'age', [0, 13.5], 'linear',
                         'metallicity.fe', [-3, 1], 'linear',
                         prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
@@ -3361,22 +3216,22 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
                     plot_property_v_property(
-                        part, spec_name,
+                        part, species_name,
                         'age', [0, 13.5], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
                         prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=True,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
-                #spec_name = 'gas'
-                #if spec_name in parts[0]:
-                #    plot_property_v_property(
-                #        part, spec_name,
-                #        'number.density', [-4, 4], 'log',
-                #        'temperature', y_prop_limits=[10, 1e7], 'log',
-                #        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
-                #        draw_statistics=False,
-                #        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+                species_name = 'gas'
+                if 0:  # species_name in parts[0]:
+                    plot_property_v_property(
+                        part, species_name,
+                        'number.density', [-4, 4], 'log',
+                        'temperature', [10, 1e7], 'log',
+                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        draw_statistics=False,
+                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
     def plot_images(
         self, parts=None, simulation_directories=None,
@@ -3396,14 +3251,13 @@ class CompareSimulationsClass(ut.io.SayClass):
         parts : list : list of particle dictionaries at snapshot
         simulation_directories : list : list of simulation directories and name/label for figure
         redshifts : float or list
-        species : string or list : particle species to read
+        species : string or list : name[s] of particle species to plot
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
         image_limits : list : min and max limits for image dyanmic range
         align_principal_axes : boolean : whether to align plot axes with principal axes
         '''
-        property_names = ['mass', 'position']
-        spec_names = ['star', 'gas']
+        properties = ['mass', 'position']
         plot_directory = self.plot_directory + 'image'
 
         if isinstance(parts, dict):
@@ -3411,6 +3265,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         if np.isscalar(redshifts):
             redshifts = [redshifts]
+
+        if np.isscalar(species):
+            species = [species]
+        species_read = list(species)
+        if 'star' not in species_read:
+            species_read.append('star')
 
         if parts is not None and len(redshifts) > 1:
             self.say('! input particles at single snapshot but also input more than one redshift')
@@ -3421,19 +3281,18 @@ class CompareSimulationsClass(ut.io.SayClass):
                 from . import gizmo_io
                 Read = gizmo_io.ReadClass()
                 parts = Read.read_simulations(
-                    simulation_directories, species, redshift, property_names)
+                    simulation_directories, species_read, redshift, properties)
 
             for part in parts:
-                for spec_name in spec_names:
-                    if spec_name in part:
-                        Image.plot_image(
-                            part, spec_name, 'mass', 'histogram',
-                            [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
-                            rotation=align_principal_axes, image_limits=image_limits,
-                            background_color='black',
-                            write_plot=True, plot_directory=plot_directory,
-                            add_simulation_name=True,
-                        )
+                for spec in ut.array.get_list_combined(species, part):
+                    Image.plot_image(
+                        part, spec, 'mass', 'histogram',
+                        [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                        rotation=align_principal_axes, image_limits=image_limits,
+                        background_color='black',
+                        write_plot=True, plot_directory=plot_directory,
+                        add_simulation_name=True,
+                    )
 
     def print_masses_sizes(
         self, parts=None, simulation_directories=None,
@@ -3451,12 +3310,11 @@ class CompareSimulationsClass(ut.io.SayClass):
         parts : list : list of particle dictionaries at snapshot
         simulation_directories : list : list of simulation directories and name/label for figure
         redshifts : float or list
-        species : string or list : particle species to read
+        species : string or list : name[s] of particle species to read and analyze
         distance_max : float : maximum distance from center to plot
         align_principal_axes : boolean : whether to align plot axes with principal axes
         '''
-        property_names = ['mass', 'position']
-        spec_names = ['star']
+        properties = ['mass', 'position']
         mass_fraction = 90
 
         if isinstance(parts, dict):
@@ -3474,23 +3332,23 @@ class CompareSimulationsClass(ut.io.SayClass):
                 from . import gizmo_io
                 Read = gizmo_io.ReadClass()
                 parts = Read.read_simulations(
-                    simulation_directories, species, redshift, property_names)
+                    simulation_directories, species, redshift, properties)
 
             gals = []
-            for spec_name in spec_names:
+            for spec in species:
                 for part in parts:
                     gal = ut.particle.get_galaxy_properties(
-                        part, spec_name, 'mass.percent', mass_fraction, distance_max,
+                        part, spec, 'mass.percent', mass_fraction, distance_max,
                         axis_kind='both', principal_axes_distance_max=distance_max)
                     gals.append(gal)
 
-                self.say('\n# species = {}'.format(spec_name))
+                self.say('\n# species = {}'.format(spec))
 
                 for part_i, part in enumerate(parts):
                     gal = gals[part_i]
                     self.say('\n{}'.format(part.info['simulation.name']))
                     self.say('* M_{},{} = {:.2e} Msun ({:.2f})'.format(
-                             spec_name, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']))
+                             spec, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']))
                     string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
                     self.say(string.format(
                              mass_fraction, gal['radius.major'],
@@ -3526,17 +3384,17 @@ def compare_resolution(
 
     if parts is None:
         parts = []
-        for simulation_dir, simulation_name in simulation_names:
+        for simulation_directory, simulation_name in simulation_names:
             for redshift in redshifts:
                 assign_center = True
-                if 'res880' in simulation_dir:
+                if 'res880' in simulation_directory:
                     assign_center = False
                 Read = gizmo_io.ReadClass()
                 part = Read.read_snapshots(
-                    'dark', 'redshift', redshift, simulation_dir, simulation_name=simulation_name,
-                    property_names=['position', 'mass'], assign_center=assign_center,
-                    force_float32=True)
-                if 'res880' in simulation_dir:
+                    'dark', 'redshift', redshift, simulation_directory,
+                    simulation_name=simulation_name, properties=['position', 'mass'],
+                    assign_center=assign_center, force_float32=True)
+                if 'res880' in simulation_directory:
                     part.center_position = np.array(
                         [41820.015, 44151.745, 46272.818], dtype=np.float32)
                 if len(redshifts) > 1:

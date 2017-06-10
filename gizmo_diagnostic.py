@@ -224,16 +224,16 @@ def print_run_times_ratios(
 
 
 def print_properties_statistics(
-    species_names='all', snapshot_number_kind='index', snapshot_number=600,
+    species='all', snapshot_value_kind='index', snapshot_value=600,
     simulation_directory='.', snapshot_directory='output/'):
     '''
     For each property of each species in particle catalog, print range and median.
 
     Parameters
     ----------
-    species_names : string or list : species to print
-    snapshot_number_kind : string : input snapshot number kind: index, redshift
-    snapshot_number : int or float : index (number) of snapshot file
+    species : string or list : name[s] of particle species to print
+    snapshot_value_kind : string : input snapshot number kind: index, redshift
+    snapshot_value : int or float : index (number) of snapshot file
     simulation_directory : root directory of simulation
     snapshot_directory: string : directory of snapshot files within simulation_directory
 
@@ -241,17 +241,17 @@ def print_properties_statistics(
     -------
     part : dict : catalog of particles
     '''
-    species_names = ut.array.arrayize(species_names)
-    if 'all' in species_names:
-        species_names = ['dark.2', 'dark', 'star', 'gas']
+    species = ut.array.arrayize(species)
+    if 'all' in species:
+        species = ['dark.2', 'dark', 'star', 'gas']
 
     Read = gizmo_io.ReadClass()
     part = Read.read_snapshots(
-        species_names, snapshot_number_kind, snapshot_number, simulation_directory,
+        species, snapshot_value_kind, snapshot_value, simulation_directory,
         snapshot_directory, '', None, None, assign_center=False,
         separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
 
-    gizmo_analysis.print_properties_statistics(part, species_names)
+    gizmo_analysis.print_properties_statistics(part, species)
 
 
 def print_properties_snapshots(
@@ -285,24 +285,24 @@ def print_properties_snapshots(
     species_read = species_property_dict.keys()
 
     properties_read = []
-    for spec_name in species_property_dict:
-        prop_names = species_property_dict[spec_name]
-        if np.isscalar(prop_names):
-            prop_names = [prop_names]
+    for spec in species_property_dict:
+        properties = species_property_dict[spec]
+        if np.isscalar(properties):
+            properties = [properties]
 
         prop_dict = {}
-        for prop_name in species_property_dict[spec_name]:
-            prop_dict[prop_name] = []
+        for prop in species_property_dict[spec]:
+            prop_dict[prop] = []
 
-            prop_name_read = prop_name.replace('.number', '')
-            if prop_name_read not in properties_read:
-                properties_read.append(prop_name_read)
+            prop_read = prop.replace('.number', '')
+            if prop_read not in properties_read:
+                properties_read.append(prop_read)
 
-            if '.number' in prop_name and 'massfraction' not in properties_read:
+            if '.number' in prop and 'massfraction' not in properties_read:
                 properties_read.append('massfraction')
 
         # re-assign property list as dictionary so can store list of values
-        species_property_dict[spec_name] = prop_dict
+        species_property_dict[spec] = prop_dict
 
     for snapshot_i in Snapshot['index']:
         try:
@@ -312,28 +312,27 @@ def print_properties_snapshots(
                 properties_read, element_indices, assign_center=False, sort_dark_by_id=False,
                 force_float32=False)
 
-            for spec_name in species_property_dict:
-                for prop_name in species_property_dict[spec_name]:
+            for spec in species_property_dict:
+                for prop in species_property_dict[spec]:
                     try:
-                        prop_ext = property_statistic[prop_name]['function'](
-                            part[spec_name].prop(prop_name))
-                        species_property_dict[spec_name][prop_name].append(prop_ext)
+                        prop_ext = property_statistic[prop]['function'](part[spec].prop(prop))
+                        species_property_dict[spec][prop].append(prop_ext)
                     except Exception:
-                        Say.say('! {} {} not in particle dictionary'.format(spec_name, prop_name))
+                        Say.say('! {} {} not in particle dictionary'.format(spec, prop))
         except Exception:
             Say.say('! cannot read snapshot index {} in {}'.format(
                     snapshot_i, simulation_directory + snapshot_directory))
 
     Statistic = ut.statistic.StatisticClass()
 
-    for spec_name in species_property_dict:
-        for prop_name in species_property_dict[spec_name]:
-            prop_func_name = property_statistic[prop_name]['function.name']
-            prop_values = np.array(species_property_dict[spec_name][prop_name])
+    for spec in species_property_dict:
+        for prop in species_property_dict[prop]:
+            prop_func_name = property_statistic[prop]['function.name']
+            prop_values = np.array(species_property_dict[spec][prop])
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
-            Say.say('\n{} {} {}:'.format(spec_name, prop_name, prop_func_name))
+            Say.say('\n{} {} {}:'.format(spec, prop, prop_func_name))
             for stat_name in ['min', 'percent.16', 'median', 'percent.84', 'max']:
                 Say.say('{:10s} = {:.3f}'.format(stat_name, Statistic.stat[stat_name]))
 
@@ -359,7 +358,7 @@ def plot_contamination(redshift=0, directory='.'):
     Read = gizmo_io.ReadClass()
     part = Read.read_snapshots(
         ['dark', 'dark.2'], 'redshift', redshift, directory,
-        property_names=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
+        properties=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
 
     halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
 

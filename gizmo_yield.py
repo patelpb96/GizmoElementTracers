@@ -12,7 +12,6 @@ from __future__ import absolute_import, division, print_function
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
-from matplotlib import pyplot as plt
 # local ----
 import utilities as ut
 
@@ -169,7 +168,7 @@ def plot_nucleosynthetic_yields(
     yield_indices = np.arange(yield_indices.size)
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, left=0.17, right=0.96, top=0.94, bottom=0.14)
+    _fig, subplot = ut.plot.make_figure(figure_index)
     subplots = [subplot]
 
     colors = ut.plot.get_colors(yield_indices.size, use_black=False)
@@ -185,10 +184,8 @@ def plot_nucleosynthetic_yields(
             y_label = 'yield (mass fraction)'
         else:
             y_label = 'yield $\\left[ {\\rm M}_\odot \\right]$'
-        subplots[si].set_ylabel(y_label, fontsize=28)
-        subplots[si].set_xlabel('element', fontsize=28)
-        #fig.set_ylabel(y_label, fontsize=26)
-        #fig.set_xlabel('element', fontsize=26)
+        subplots[si].set_ylabel(y_label)
+        subplots[si].set_xlabel('element')
 
         for yi in yield_indices:
             if yield_values[yi] > 0:
@@ -199,12 +196,8 @@ def plot_nucleosynthetic_yields(
 
         subplots[si].set_title(title_dict[event_kind])
 
-        # metallicity legend
-        subplots[si].legend(
-            [plt.Line2D((0, 0), (0, 0), linestyle='')],
-            ['$\\left[ Z / {\\rm Z}_\odot={:.3f} \\right]$'.format(star_metallicity)],
-            loc='best', handlelength=0,
-        )
+        ut.plot.make_label_legend(
+            subplots[si], '$\\left[ Z / {\\rm Z}_\odot={:.3f} \\right]$'.format(star_metallicity))
 
     plot_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)

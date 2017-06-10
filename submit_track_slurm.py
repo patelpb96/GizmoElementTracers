@@ -31,7 +31,7 @@ from utilities.basic import io as ut_io
 from gizmo import gizmo_track
 
 
-species = 'star'  # which particle species to track
+species_name = 'star'  # which particle species to track
 
 
 ScriptPrint = ut_io.ScriptPrintClass('slurm')
@@ -47,11 +47,11 @@ os.sys.stdout.flush()
 
 # execute
 if 'indices' in function_kind:
-    IndexPointer = gizmo_track.IndexPointerClass(species)
-    IndexPointer.write_index_pointer(match_prop_name='id.child', test_prop_name='form.scalefactor')
+    IndexPointer = gizmo_track.IndexPointerClass(species_name)
+    IndexPointer.write_index_pointer(match_property='id.child', test_property='form.scalefactor')
 
 if 'distance' in function_kind:
-    HostDistance = gizmo_track.HostDistanceClass(species)
+    HostDistance = gizmo_track.HostDistanceClass(species_name)
     HostDistance.write_form_host_distance()
 
 ScriptPrint.print_final()
