@@ -604,7 +604,7 @@ class ReadClass(ut.io.SayClass):
 
             if header['particle.numbers.total'][spec_id] > 0:
                 read_particle_number += header['particle.numbers.total'][spec_id]
-            else:
+            elif spec in self.species_read:
                 self.species_read.remove(spec)
 
         if read_particle_number <= 0:
@@ -868,18 +868,19 @@ class ReadClass(ut.io.SayClass):
                             part[spec][prop][
                                 part_index_lo:part_index_hi] = header['particle.masses'][spec_id]
 
-                        for prop_in in ut.array.get_list_combined(part_in, properties):
-                            prop = property_dict[prop_in]
-                            if len(part_in[prop_in].shape) == 1:
-                                part[spec][prop][part_index_lo:part_index_hi] = part_in[prop_in]
-                            elif len(part_in[prop_in].shape) == 2:
-                                if (prop_in == 'Metallicity' and element_indices is not None and
-                                        element_indices != 'all'):
-                                    prop_in = part_in[prop_in][:, element_indices]
-                                else:
-                                    prop_in = part_in[prop_in]
+                        for prop_in in part_in:
+                            if prop_in in properties:
+                                prop = property_dict[prop_in]
+                                if len(part_in[prop_in].shape) == 1:
+                                    part[spec][prop][part_index_lo:part_index_hi] = part_in[prop_in]
+                                elif len(part_in[prop_in].shape) == 2:
+                                    if (prop_in == 'Metallicity' and element_indices is not None and
+                                            element_indices != 'all'):
+                                        prop_in = part_in[prop_in][:, element_indices]
+                                    else:
+                                        prop_in = part_in[prop_in]
 
-                                part[spec][prop][part_index_lo:part_index_hi, :] = prop_in
+                                    part[spec][prop][part_index_lo:part_index_hi, :] = prop_in
 
                         part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 

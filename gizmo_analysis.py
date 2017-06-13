@@ -3165,7 +3165,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def plot_properties_2d(
         self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', prop_bin_number=100):
+        species='all', property_bin_number=100):
         '''
         Plot property v property for each simulation at each redshift.
 
@@ -3175,7 +3175,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         simulation_directories : list : list of simulation directories and name/label for figure
         redshifts : float or list
         species : string or list : name[s] of particle species to read
-        prop_bin_number : int : number of bins along each dimension for histogram
+        property_bin_number : int : number of bins along each dimension for histogram
         '''
         plot_directory = self.plot_directory + 'property_2d'
 
@@ -3203,7 +3203,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         part, species_name,
                         'metallicity.fe', [-3, 1], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
-                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=True,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
@@ -3211,7 +3211,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         part, species_name,
                         'age', [0, 13.5], 'linear',
                         'metallicity.fe', [-3, 1], 'linear',
-                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=True,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
@@ -3219,7 +3219,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         part, species_name,
                         'age', [0, 13.5], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
-                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=True,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
@@ -3229,7 +3229,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         part, species_name,
                         'number.density', [-4, 4], 'log',
                         'temperature', [10, 1e7], 'log',
-                        prop_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=False,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
