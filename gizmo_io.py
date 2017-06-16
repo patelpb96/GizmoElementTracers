@@ -14,7 +14,7 @@ import h5py
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
-import utilities as ut
+import wutilities as ut
 
 
 #===================================================================================================
@@ -334,6 +334,9 @@ class ReadClass(ut.io.SayClass):
                     self.say('! not recognize input species = {}'.format(spec))
         self.species_read = list(species)
 
+        if snapshot_name_base[-1] != '*':    snapshot_name_base += '*'
+        self.snapshot_name_base = snapshot_name_base
+
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
@@ -388,6 +391,7 @@ class ReadClass(ut.io.SayClass):
                 'index': snapshot_index,
                 'redshift': header['redshift'],
                 'scalefactor': header['scalefactor'],
+                'scale-factor':header['scalefactor'],  #added by SGK for compatibility w/ KEB libs
                 'time': time,
                 'time.lookback': Cosmology.get_time(0) - time,
                 'time.hubble': ut.const.Gyr_per_sec / Cosmology.get_hubble_parameter(0),
@@ -505,6 +509,86 @@ class ReadClass(ut.io.SayClass):
                 print('{}: star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
 
         return parts
+
+    # def get_file_name(self, directory, snapshot_index):
+    #     '''
+    #     Get name (with relative path) of file to read in.
+    #     If multiple files per snapshot, get name of 0th one.
+
+    #     Parameters
+    #     ----------
+    #     directory: string : directory to check for files
+    #     snapshot_index : int : index of snapshot
+
+    #     Returns
+    #     -------
+    #     file name (with relative path): string
+    #     '''
+    #     directory = ut.io.get_path(directory)
+
+    #     path_names, file_indices = ut.io.get_file_names(
+    #         directory + self.snapshot_name_base, (int, float))
+
+    #     if snapshot_index < 0:
+    #         snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
+    #     elif snapshot_index not in file_indices:
+    #         raise ValueError('cannot find snapshot index = {} in: {}'.format(
+    #                          snapshot_index, path_names))
+
+    #     path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
+
+    #     if self.file_extension in path_name:
+    #         # got actual file, so good to go
+    #         path_file_name = path_name
+    #     else:
+    #         # got snapshot directory with multiple files, return only 0th one
+    #         path_file_names = ut.io.get_file_names(path_name + '/' + self.snapshot_name_base)
+    #         if len(path_file_names) and '.0.' in path_file_names[0]:
+    #             path_file_name = path_file_names[0]
+    #         else:
+    #             raise ValueError('cannot find 0th snapshot file in ' + path_file_names)
+
+    #     return path_file_name
+ 
+    # def read_snapshot_times(self, directory='.'):
+    #     '''
+    #     Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
+    #     Return as dictionary.
+
+    #     Parameters
+    #     ----------
+    #     directory : string : directory of snapshot time file
+
+    #     Returns
+    #     -------
+    #     Snapshot : dictionary of snapshot information
+    #     '''
+    #     directory = ut.io.get_path(directory)
+
+    #     Snapshot = ut.simulation.SnapshotClass()
+
+    #     # try:
+    #     #     try:
+    #     #         Snapshot.read_snapshots('snapshot_times.txt', directory)
+    #     #     except:
+    #     #         Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
+    #     # except:
+    #     #     raise ValueError('cannot find file of snapshot times in {}'.format(directory))
+    #     import os
+    #     if os.path.isfile(ut.io.get_path(directory) + 'snapshot_times.txt'):
+    #         Snapshot.read_snapshots('snapshot_times.txt', directory)
+    #     elif os.path.isfile(ut.io.get_path(directory) + 'snapshot_scale-factors.txt'):
+    #         Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
+    #     elif os.path.isfile(ut.io.get_path(directory+'/../') + 'snapshot_times.txt'):
+    #         Snapshot.read_snapshots('snapshot_times.txt', directory+'/../')
+    #     elif os.path.isfile(ut.io.get_path(directory+'/../') + 'snapshot_scale-factors.txt'):
+    #         Snapshot.read_snapshots('snapshot_scale-factors.txt', directory+'/../')
+    #     else:
+    #         raise ValueError('cannot find file of snapshot times in {} or in {}'.format(directory,directory+'/../'))
+
+    #     self.is_first_print = True
+
+    #     return Snapshot
 
     def read_header(
         self, snapshot_value_kind='index', snapshot_value=600, simulation_directory='.',
@@ -813,6 +897,9 @@ class ReadClass(ut.io.SayClass):
                         prop_in_dtype = part_in[prop_in].dtype
                         if force_float32 and prop_in_dtype == 'float64':
                             prop_in_dtype = np.float32
+                        else:
+                            if prop_name == 'mass':
+                                prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec][prop] = np.zeros(prop_shape, prop_in_dtype) - 1
@@ -1071,13 +1158,25 @@ class ReadClass(ut.io.SayClass):
 
         Snapshot = ut.simulation.SnapshotClass()
 
-        try:
-            try:
-                Snapshot.read_snapshots('snapshot_times.txt', directory)
-            except IOError:
-                Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
-        except Exception:
-            raise IOError('cannot find file of snapshot times in {}'.format(directory))
+
+        if os.path.isfile(ut.io.get_path(directory) + 'snapshot_times.txt'):
+            Snapshot.read_snapshots('snapshot_times.txt', directory)
+        elif os.path.isfile(ut.io.get_path(directory) + 'snapshot_scale-factors.txt'):
+            Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
+        elif os.path.isfile(ut.io.get_path(directory+'/../') + 'snapshot_times.txt'):
+            Snapshot.read_snapshots('snapshot_times.txt', directory+'/../')
+        elif os.path.isfile(ut.io.get_path(directory+'/../') + 'snapshot_scale-factors.txt'):
+            Snapshot.read_snapshots('snapshot_scale-factors.txt', directory+'/../')
+        else:
+            raise ValueError('cannot find file of snapshot times in {} or in {}'.format(directory,directory+'/../'))
+
+        # try:
+        #     try:
+        #         Snapshot.read_snapshots('snapshot_times.txt', directory)
+        #     except IOError:
+        #         Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
+        # except Exception:
+        #     raise IOError('cannot find file of snapshot times in {}'.format(directory))
 
         self.is_first_print = True
 

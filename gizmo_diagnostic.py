@@ -16,7 +16,7 @@ import sys
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
-import utilities as ut
+import wutilities as ut
 from . import gizmo_io
 from . import gizmo_analysis
 

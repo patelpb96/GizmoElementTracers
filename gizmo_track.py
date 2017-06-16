@@ -14,7 +14,8 @@ import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
-import utilities as ut
+import wutilities as ut
+#from gizmo_analysis import gizmo_io
 from . import gizmo_io
 
 
@@ -25,6 +26,26 @@ TRACK_DIRECTORY = 'track/'
 #===================================================================================================
 # utility
 #===================================================================================================
+def assign_star_form_snapshot(part):
+    '''
+    Assign to each star particle the index of the snapshot after it formed,
+    to be able to track it back as far as possible.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    '''
+    # increase formation time slightly for safety, because scale-factors of snapshots that are
+    # actually written do not exactly coincide with input list of snapshot scale-factors
+    padding_factor = (1 + 1e-7)
+
+    form_scalefactors = np.array(part['star']['form.scalefactor'])
+    form_scalefactors[form_scalefactors < 1] *= padding_factor
+
+    part['star']['form.index'] = part.Snapshot.get_snapshot_indices(
+        'scalefactor', form_scalefactors, round_kind='up')
+
+
 class IndexPointerClass(ut.io.SayClass):
     '''
     Compute particle index pointers for tracking particles across time.
@@ -327,17 +348,34 @@ class HostDistanceClass(IndexPointerClass):
 
         for snapshot_index in snapshot_indices:
             part_indices_form = part_indices[
-                part[self.species_name].prop('form.snapshot', part_indices) == snapshot_index]
+                part[self.species_name].prop('form.snapshot', part_indices) <= snapshot_index]
 
             self.say('\n# {} to assign at snapshot {}'.format(
                      part_indices_form.size, snapshot_index))
 
             if part_indices_form.size:
                 Read = gizmo_io.ReadClass()
-                part_at_snap = Read.read_snapshots(
-                    self.species_name, 'index', snapshot_index,
-                    properties=['position', 'mass', 'id'], force_float32=True, assign_center=True,
-                    check_properties=True)
+                if center_position_function is None:
+                    part_at_snap = Read.read_snapshots(
+                        self.species_name, 'index', snapshot_index,
+                        properties=['position', 'mass', 'id'], force_float32=True, assign_center=True,
+                        check_properties=True)
+                else:
+                    part_at_snap = Read.read_snapshots(
+                        self.species_name, 'index', snapshot_index,
+                        properties=['position', 'mass', 'id'], force_float32=True, assign_center=False,
+                        check_properties=True)
+                
+                    #interpolate the center from the information that I have.
+                    #if before first timestep, use first timestep; if after last, use last
+                    scalefactor = part_at_snap.snapshot['scalefactor']
+                    if scalefactor < center_position_function.x.min():
+                        part_at_snap.center_position = center_position_function.y[:,0]
+                    elif scalefactor > center_position_function.x.max():
+                        part_at_snap.center_position = center_position_function.y[:,-1]
+                    else:
+                        part_at_snap.center_position = center_position_function(scalefactor)
+                
 
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
@@ -453,15 +491,38 @@ HostDistance = HostDistanceClass()
 # run from command line
 #===================================================================================================
 if __name__ == '__main__':
+    usage = "usage:  python {} <function: indices, distances, or indices+distances> [4 column text file with a, x, y, z in comoving kpc] [track directory=track]".format(sys.argv[0])
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: indices, distances, indices+distances')
+        raise ValueError(usage)
 
     function_kind = str(sys.argv[1])
 
     assert ('indices' in function_kind or 'distances' in function_kind)
 
+    if len(sys.argv) < 3:
+        print("Hope you analyzing an isolated run; letting the read function assign centers.")
+        center_position_function = None
+
+    else:
+        print("Reading scale factor\tx\ty\tz for the host from {}.  Values should be in comoving kpc.".format(sys.argv[2]))
+        from scipy.interpolate import interp1d
+        from numpy import loadtxt
+        scale,x,y,z = np.loadtxt(str(sys.argv[2]),unpack=True)
+        center_position_function = interp1d(scale,np.vstack((x,y,z)),kind='cubic')
+
+    if len(sys.argv) < 4:
+        print("track directory will be the default, 'track/'")
+    else:
+        TRACK_DIRECTORY = sys.argv[3]
+        if not TRACK_DIRECTORY.endswith('/'):   TRACK_DIRECTORY+='/'
+        print("saving outputs to {}".format(TRACK_DIRECTORY))
+
+    #redefine existing classes with the correct output directory
+    IndexPointer = IndexPointerClass(directory=TRACK_DIRECTORY)
+    HostDistance = HostDistanceClass(directory=TRACK_DIRECTORY)
+
     if 'indices' in function_kind:
         IndexPointer.write_index_pointer()
 
     if 'distances' in function_kind:
-        HostDistance.write_form_host_distance()
+        HostDistance.write_form_host_distance(center_position_function=center_position_function)

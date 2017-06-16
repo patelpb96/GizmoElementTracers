@@ -18,7 +18,7 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 from scipy import spatial
 # local ----
-import utilities as ut
+import wutilities as ut
 from . import gizmo_io
 
 
