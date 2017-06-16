@@ -11,6 +11,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 from __future__ import absolute_import, division, print_function  # python 2 compatibility
 import collections
 import h5py
+import os
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
@@ -248,6 +249,7 @@ class ReadClass(ut.io.SayClass):
 
         snapshot_name_base : string : name base of snapshot file/directory
         '''
+        if not snapshot_name_base.endswith('*'):    snapshot_name_base += '*'
         self.snapshot_name_base = snapshot_name_base
         self.file_extension = '.hdf5'
 
@@ -274,7 +276,7 @@ class ReadClass(ut.io.SayClass):
 
     def read_snapshots(
         self, species='all',
-        snapshot_value_kind='index', snapshot_values=600,
+        snapshot_value_kind='index', snapshot_values=600,#snapshot_name_base='snap*',
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         properties='all', element_indices=None, particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
@@ -334,8 +336,8 @@ class ReadClass(ut.io.SayClass):
                     self.say('! not recognize input species = {}'.format(spec))
         self.species_read = list(species)
 
-        if snapshot_name_base[-1] != '*':    snapshot_name_base += '*'
-        self.snapshot_name_base = snapshot_name_base
+        #if snapshot_name_base[-1] != '*':    snapshot_name_base += '*'
+        #self.snapshot_name_base = snapshot_name_base
 
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
@@ -897,9 +899,9 @@ class ReadClass(ut.io.SayClass):
                         prop_in_dtype = part_in[prop_in].dtype
                         if force_float32 and prop_in_dtype == 'float64':
                             prop_in_dtype = np.float32
-                        else:
-                            if prop_name == 'mass':
-                                prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
+                        #else:
+                        #    if prop_name == 'mass':
+                        #        prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec][prop] = np.zeros(prop_shape, prop_in_dtype) - 1
