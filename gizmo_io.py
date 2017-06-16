@@ -899,9 +899,9 @@ class ReadClass(ut.io.SayClass):
                         prop_in_dtype = part_in[prop_in].dtype
                         if force_float32 and prop_in_dtype == 'float64':
                             prop_in_dtype = np.float32
-                        #else:
-                        #    if prop_name == 'mass':
-                        #        prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
+                        else:
+                            if prop == 'mass':
+                                prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec][prop] = np.zeros(prop_shape, prop_in_dtype) - 1
