@@ -6,12 +6,12 @@ Instructions for install:
 4. run python setup.py develop
 
 In commands, that is:
-mkdir $DIR
-cd $DIR
-hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis-sgk
-mv gizmo_analysis-SGK/setup.py .
-mv gizmo_analysis-SGK gizmo_analysis
-python setup.py develop
+* mkdir $DIR
+* cd $DIR
+* hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis-sgk
+* mv gizmo_analysis-SGK/setup.py .
+* mv gizmo_analysis-SGK gizmo_analysis
+* python setup.py develop
 
 
 # Description
