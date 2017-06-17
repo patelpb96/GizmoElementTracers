@@ -7,10 +7,15 @@ Instructions for install:
 
 In commands, that is:
 * mkdir $DIR
+
 * cd $DIR
+
 * hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis-sgk
+
 * mv gizmo_analysis-SGK/setup.py .
+
 * mv gizmo_analysis-SGK gizmo_analysis
+
 * python setup.py develop
 
 
