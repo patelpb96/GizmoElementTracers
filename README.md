@@ -1,3 +1,19 @@
+Instructions for install:  
+
+1. create a directory $DIR
+2. clone gizmo_analysis-SGK into $DIR
+3. move setup.py from gizmo_analysis-SGK into $DIR and rename gizmo_analysis-SGK to gizmo_analysis
+4. run python setup.py develop
+
+In commands, that is:
+mkdir $DIR
+cd $DIR
+hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis-sgk
+mv gizmo_analysis-SGK/setup.py .
+mv gizmo_analysis-SGK gizmo_analysis
+python setup.py develop
+
+
 # Description
 
 Python package for running and analyzing Gizmo simulations.
