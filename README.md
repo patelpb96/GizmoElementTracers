@@ -19,6 +19,8 @@ python setup.py develop
 
 ```
 
+You'll then be able to import gizmo_analysis.<whatever>
+
 
 # Description
 
