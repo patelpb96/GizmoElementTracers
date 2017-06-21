@@ -712,14 +712,14 @@ class ReadClass(ut.io.SayClass):
         else:
             if np.isscalar(properties):
                 properties = [properties]  # ensure is list
-            # make safe list of prop names to read in
+            # make safe list of properties to read
             properties_temp = []
             for prop in list(properties):
                 prop = str.lower(prop)
                 if 'massfraction' in prop or 'metallicity' in prop:
                     prop = 'massfraction'  # this has several aliases, so ensure default name
                 for prop_in in property_dict:
-                    if prop == str.lower(prop_in) or prop == str.lower(property_dict[prop_in]):
+                    if prop in [str.lower(prop_in), str.lower(property_dict[prop_in])]:
                         properties_temp.append(prop_in)
             properties = properties_temp
             del(properties_temp)
@@ -774,13 +774,12 @@ class ReadClass(ut.io.SayClass):
                 if part_numbers_in_file[spec_id] <= 0:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
-                        raise ValueError(
-                            '! no {} particles in single-file snapshot'.format(spec))
+                        raise ValueError('! no {} particles in single-file snapshot'.format(spec))
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
                         file_name = file_name.replace('.0.', '.{}.'.format(file_i))
-                        # open snapshot file
+                        # try each snapshot file
                         with h5py.File(file_name, 'r') as file_in_i:
                             part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
                             if part_numbers_in_file_i[spec_id] > 0:
@@ -789,14 +788,13 @@ class ReadClass(ut.io.SayClass):
                                 break
                     else:
                         # tried all files and still did not find particles of species
-                        raise ValueError(
-                            '! no {} particles in any snapshot files'.format(spec))
+                        raise ValueError('! no {} particles in any snapshot files'.format(spec))
                 else:
                     part_in = file_in['PartType' + str(spec_id)]
 
                 props_print = []
-                ignore_flag = False
-                for prop_in in part_in:
+                ignore_flag = False  # whether ignored any properties in the file
+                for prop_in in part_in.keys():
                     if prop_in in properties:
                         prop = property_dict[prop_in]
 
@@ -868,7 +866,7 @@ class ReadClass(ut.io.SayClass):
                             part[spec][prop][
                                 part_index_lo:part_index_hi] = header['particle.masses'][spec_id]
 
-                        for prop_in in part_in:
+                        for prop_in in part_in.keys():
                             if prop_in in properties:
                                 prop = property_dict[prop_in]
                                 if len(part_in[prop_in].shape) == 1:
