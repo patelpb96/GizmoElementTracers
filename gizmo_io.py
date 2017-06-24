@@ -1202,8 +1202,7 @@ class ReadClass(ut.io.SayClass):
                             '! warning: {} {} [min, med, max] = [{}, {}, {}]'.format(
                                 spec, prop,
                                 ut.io.get_string_from_numbers(part[spec][prop].min(), 3),
-                                ut.io.get_string_from_numbers(
-                                    np.median(part[spec][prop]), 3),
+                                ut.io.get_string_from_numbers(np.median(part[spec][prop]), 3),
                                 ut.io.get_string_from_numbers(part[spec][prop].max(), 3))
                         )
 

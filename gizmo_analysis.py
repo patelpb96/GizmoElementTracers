@@ -2327,7 +2327,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             for hal_ii, hal_i in enumerate(hal_indices):
                 linewidth = 2.5 + 0.1 * hal_ii
                 #linewidth = 3.0
-                mass = ut.io.get_string_from_numbers(sfh['mass'][hal_ii][-1], 1, exponential=True)
+                mass = ut.io.get_string_from_numbers(
+                    sfh['mass'][hal_ii][-1], 1, force_exponential=True)
                 label = '${}\,{{\\rm M}}_\odot$'.format(mass)
                 subplot.plot(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                              linewidth=linewidth, color=colors[hal_ii], alpha=0.55, label=label)
