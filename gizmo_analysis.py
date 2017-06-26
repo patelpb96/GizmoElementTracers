@@ -638,7 +638,7 @@ def plot_metal_v_distance(
     Parameters
     ----------
     part : dict or list : catalog[s] of particles at snapshot
-    species : string : name of particle species
+    species_name : string : name of particle species
     metal_name : string : 'massfraction.X' or 'mass.X'
     axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
     distance_limits : list : min and max limits for distance from galaxy
@@ -769,7 +769,7 @@ class ImageClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        species : string : name of particle species to plot
+        species_name : string : name of particle species to plot
         weight_name : string : property to weight positions by
         image_kind : string : 'histogram', 'histogram.3d', 'points'
         dimensions_plot : list : which dimensions to plot
@@ -1215,7 +1215,7 @@ def plot_property_distribution(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species : string : name of particle species
+    species_name : string : name of particle species
     property_name : string : property name
     property_limits : list : min and max limits of property
     property_bin_width : float : width of property bin (use this or property_bin_number)
@@ -1321,7 +1321,7 @@ def plot_property_v_property(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species : string : name of particle species
+    species_name : string : name of particle species
     x_property_name : string : property name for x-axis
     x_property_limits : list : min and max limits to impose on x_property_name
     x_property_scaling : string : 'log', 'linear'
@@ -1751,7 +1751,7 @@ def plot_property_v_distance_halos(
     hal_indicess : array (halo catalog number x halo number) : indices of halos to plot
     gal : dict : catalog of observed galaxies
     gal_indices : array : indices of galaxies to plot
-    species : string : name of particle species to compute total mass of
+    species_name : string : name of particle species to compute total mass of
         options: 'dark', 'star', 'gas', 'baryon', 'total'
     property_name : string : property to get profile of
     property_statistic : string : statistic/type to plot:
@@ -2543,7 +2543,7 @@ def plot_density_profile_halo(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species : string : name of particle species to plot
+    species_name : string : name of particle species to plot
     hal : dict : catalog of halos at snapshot
     hal_index : int : index of halo in catalog
     center_position : array : position to center profile (to use instead of halo position)

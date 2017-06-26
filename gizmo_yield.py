@@ -112,8 +112,7 @@ def get_nucleosynthetic_yields(
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
         # rates from Mannucci, Della Valle & Panagia 2006
         # in Gizmo, these occur starting 37.53 Myr after formation, with rate / M_sun =
-        # 5.3e-14 + 1.6e-11 * exp(-0.5 * ((star_age - 0.05) / 0.01) *
-        #                         ((star_age - 0.05) / 0.01)) yr ^ -1
+        # 5.3e-14 + 1.6e-11 * exp(-0.5 * ((age - 0.05) / 0.01) * ((age - 0.05) / 0.01)) yr^-1
         ejecta_mass = 1.4  # [M_sun]
 
         yield_dict['metals'] = 1.4
