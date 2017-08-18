@@ -480,11 +480,11 @@ def plot_mass_contamination(
 
     for spec in species_test:
         mass_ratio_bin = profile_mass[spec]['sum'] / profile_mass[species_reference]['sum']
-        mass_ratio_cum = profile_mass[spec]['sum.cum'] / profile_mass[spec]['sum.cum']
-        profile_mass_ratio[spec] = {'bin': mass_ratio_bin, 'cum': mass_ratio_cum}
+        mass_ratio_cum = profile_mass[spec]['sum.cum'] / profile_mass[species_reference]['sum.cum']
+        profile_mass_ratio[spec] = {'bin': mass_ratio_bin, 'sum.cum': mass_ratio_cum}
         profile_number[spec] = {
             'bin': np.int64(np.round(profile_mass[spec]['sum'] / part[spec]['mass'][0])),
-            'cum': np.int64(np.round(profile_mass[spec]['sum.cum'] / part[spec]['mass'][0])),
+            'sum.cum': np.int64(np.round(profile_mass[spec]['sum.cum'] / part[spec]['mass'][0])),
         }
 
     # print diagnostics
@@ -520,9 +520,9 @@ def plot_mass_contamination(
 
                 Say.say(print_string.format(
                         distance_0, distance_1,
-                        profile_mass_ratio[spec]['cum'][dist_i],
+                        profile_mass_ratio[spec]['sum.cum'][dist_i],
                         profile_mass[spec]['sum.cum'][dist_i],
-                        profile_number[spec]['cum'][dist_i]))
+                        profile_number[spec]['sum.cum'][dist_i]))
 
                 if spec != 'dark.2':
                     # print only 1 distance bin for lower-resolution particles
@@ -1355,9 +1355,7 @@ def plot_property_v_property(
         distances = ut.coordinate.get_distances(
             'scalar', center_position, part[species_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scalefactor']
-        print(distances)
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
-    print(part_indices)
 
     x_prop_values = part[species_name].prop(x_property_name, part_indices)
     y_prop_values = part[species_name].prop(y_property_name, part_indices)
@@ -1592,6 +1590,7 @@ def plot_property_v_distance(
         linewidth = None
 
     print(pros[0][species_name]['distance'])
+
     for part_i, pro in enumerate(pros):
         print(pro[species_name][property_statistic])
         color = colors[part_i]
@@ -1625,6 +1624,113 @@ def plot_property_v_distance(
         if len(parts) == 1:
             pros = pros[0]
         return pros
+
+
+def plot_velocity_distribution_of_halo(
+    parts, species_name='star',
+    property_name='velocity.tan', property_limits=[], property_bin_width=None,
+    property_bin_number=100,
+    property_scaling='linear', property_statistic='probability',
+    distance_limits=[70, 90], center_positions=None, center_velocities=None,
+    property_select={}, part_indicess=None,
+    axis_y_limits=[], axis_y_scaling='linear',
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    Plot distribution of velocities.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles at snapshot
+    species_name : string : name of particle species
+    property_name : string : property name
+    property_limits : list : min and max limits of property
+    property_bin_width : float : width of property bin (use this or property_bin_number)
+    property_bin_number : int : number of bins within limits (use this or property_bin_width)
+    property_scaling : string : scaling of property: 'log', 'linear'
+    property_statistic : string : statistic to plot:
+        'probability', 'probability.cum', 'histogram', 'histogram.cum'
+    distance_limits : list : min and max limits for distance from galaxy
+    center_positions : array or list of arrays : position[s] of galaxy center[s]
+    center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
+    property_select : dict : (other) properties to select on: names as keys and limits as values
+    part_indicess : array or list of arrays : indices of particles from which to select
+    axis_y_limits : list : min and max limits for y-axis
+    axis_y_scaling : string : 'log', 'linear'
+    write_plot : boolean : whether to write figure to file
+    plot_directory : string : directory to write figure file
+    figure_index : int : index of figure for matplotlib
+    '''
+    Say = ut.io.SayClass(plot_property_distribution)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
+    if 'velocity' in property_name:
+        center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+
+    Stat = ut.statistic.StatisticClass()
+
+    for part_i, part in enumerate(parts):
+        if part_indicess[part_i] is not None and len(part_indicess[part_i]):
+            part_indices = part_indicess[part_i]
+        else:
+            part_indices = ut.array.get_arange(part[species_name]['position'].shape[0])
+
+        if property_select:
+            part_indices = ut.catalog.get_indices_catalog(
+                part[species_name], property_select, part_indices)
+
+        if distance_limits:
+            distances = ut.coordinate.get_distances(
+                'scalar', part[species_name]['position'][part_indices], center_positions[part_i],
+                part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
+            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
+
+        if 'velocity' in property_name:
+            orb = ut.particle.get_orbit_dictionary(
+                part, species_name, center_positions[part_i], center_velocities[part_i],
+                part_indices, include_hubble_flow=True, scalarize=True)
+            prop_values = orb[property_name]
+        else:
+            prop_values = part[species_name].prop(property_name, part_indices)
+
+        Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
+
+        Stat.append_to_dictionary(
+            prop_values, property_limits, property_bin_width, property_bin_number, property_scaling)
+
+        #Stat.print_statistics(-1)
+        #print()
+
+    colors = ut.plot.get_colors(len(parts))
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    y_values = np.array([Stat.distr[property_statistic][part_i] for part_i in range(len(parts))])
+
+    ut.plot.set_axes_scaling_limits(
+        subplot, property_scaling, property_limits, prop_values)
+    ut.plot.set_axes_scaling_limits(
+        subplot, None, None, None, axis_y_scaling, axis_y_limits, y_values)
+
+    axis_x_label = ut.plot.Label.get_label(property_name, species_name=species_name, get_words=True)
+    subplot.set_xlabel(axis_x_label)
+    axis_y_label = ut.plot.Label.get_label(
+        property_name, property_statistic, species_name, get_units=False)
+    subplot.set_ylabel(axis_y_label)
+
+    for part_i, part in enumerate(parts):
+        subplot.plot(Stat.distr['bin.mid'][part_i], Stat.distr[property_statistic][part_i],
+                     color=colors[part_i], alpha=0.8, label=part.info['simulation.name'])
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    plot_name = ut.plot.get_file_name(
+        property_name, 'distribution', species_name, snapshot_dict=part.snapshot)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
 #===================================================================================================
@@ -2983,12 +3089,18 @@ class CompareSimulationsClass(ut.io.SayClass):
     '''
     Plot different simulations for comparison.
     '''
-    def __init__(self, plot_directory='plot'):
+    def __init__(
+        self, galaxy_radius_limits=[0, 12], galaxy_profile_radius_limits=[0.1, 30],
+        halo_profile_radius_limits=[0.5, 300], plot_directory='plot',):
         '''
         Set directories and names of simulations to read.
         '''
         self.properties = ['mass', 'position', 'form.scalefactor', 'massfraction']
-        self.galaxy_radius_limits = [0, 12]
+
+        self.galaxy_radius_limits = galaxy_radius_limits
+        self.galaxy_profile_radius_limits = galaxy_profile_radius_limits
+        self.halo_profile_radius_limits = halo_profile_radius_limits
+
         self.plot_directory = ut.io.get_path(plot_directory)
 
         self.simulation_names = [
@@ -3014,9 +3126,6 @@ class CompareSimulationsClass(ut.io.SayClass):
         species : string or list : name[s] of particle species to read
         distance_bin_width : float : width of distance bin
         '''
-        distance_limits_galaxy = [0.1, 30]
-        distance_limits_halo = [0.5, 300]
-
         if isinstance(parts, dict):
             parts = [parts]
 
@@ -3039,13 +3148,13 @@ class CompareSimulationsClass(ut.io.SayClass):
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
                     parts, 'total', 'mass', 'vel.circ', 'linear', False, [0, None],
-                    [0.1, 300], distance_bin_width,
+                    [0.1, self.halo_profile_radius_limits[1]], distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
                     parts, 'total', 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width,
+                    self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
@@ -3059,13 +3168,13 @@ class CompareSimulationsClass(ut.io.SayClass):
             if prop in parts[0]:
                 plot_property_v_distance(
                     parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width,
+                    self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
                     parts, prop, 'mass', 'density', 'log', False, [None, None],
-                    distance_limits_galaxy, distance_bin_width,
+                    self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
@@ -3073,19 +3182,19 @@ class CompareSimulationsClass(ut.io.SayClass):
             if prop in parts[0]:
                 plot_property_v_distance(
                     parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width,
+                    self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
                     parts, prop, 'metallicity.total', 'median', 'linear', True, [None, None],
-                    distance_limits_galaxy, distance_bin_width,
+                    self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
                     parts, prop, 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
-                    'probability', distance_limits_halo, axis_y_limits=[1e-4, None],
+                    'probability', self.halo_profile_radius_limits, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
@@ -3093,7 +3202,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 if 'velocity' in parts[0][prop]:
                     plot_property_v_distance(
                         parts, prop, 'host.velocity.rad', 'average', 'linear', True,
-                        [None, None], distance_limits_halo, 0.25,
+                        [None, None], self.halo_profile_radius_limits, 0.25,
                         write_plot=True, plot_directory=self.plot_directory,
                     )
                 """
@@ -3102,25 +3211,25 @@ class CompareSimulationsClass(ut.io.SayClass):
             if prop in parts[0]:
                 plot_property_v_distance(
                     parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
-                    distance_limits_halo, distance_bin_width,
+                    self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
                     parts, prop, 'mass', 'density', 'log', False, [None, None],
-                    distance_limits_galaxy, distance_bin_width,
+                    self.galaxy_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
                     parts, prop, 'metallicity.fe', 'median', 'linear', True,
-                    [None, None], distance_limits_galaxy, distance_bin_width,
+                    [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
                     parts, prop, 'metallicity.mg - metallicity.fe', 'median', 'linear', True,
-                    [None, None], distance_limits_galaxy, distance_bin_width,
+                    [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
@@ -3139,7 +3248,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 if 'form.scalefactor' in parts[0][prop] and redshift <= 5:
                     plot_property_v_distance(
                         parts, prop, 'age', 'average', 'linear', True,
-                        [None, None], distance_limits_galaxy, distance_bin_width,
+                        [None, None], self.galaxy_radius_limits, distance_bin_width,
                         write_plot=True, plot_directory=self.plot_directory,
                     )
 
@@ -3205,7 +3314,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'metallicity.fe', [-3, 1], 'linear',
                         'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
                         property_bin_number, host_distance_limits=self.galaxy_radius_limits,
-                        draw_statistics=True,
+                        draw_statistics=False,
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
                     plot_property_v_property(

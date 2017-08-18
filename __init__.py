@@ -6,3 +6,4 @@ from . import gizmo_ic as ic
 from . import gizmo_diagnostic as diagnostic
 from . import gizmo_file as file
 from . import gizmo_track as track
+from . import gizmo_star as star

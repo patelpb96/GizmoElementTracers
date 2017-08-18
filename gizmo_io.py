@@ -278,7 +278,9 @@ class ReadClass(ut.io.SayClass):
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         properties='all', element_indices=None, particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
-        assign_center=True, assign_principal_axes=False, check_properties=True):
+        assign_center=True, assign_principal_axes=False, assign_orbit=False,
+        assign_form_host_distance=False,
+        check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
         Return as dictionary class.
@@ -312,6 +314,9 @@ class ReadClass(ut.io.SayClass):
         force_float32 : boolean : whether to force all floats to 32-bit, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
+        assign_orbit : booelan : whether to assign derived orbital properties wrt galaxy/halo center
+        assign_form_host_distance : boolean :
+            whether to assign distance from host galaxy at formation to stars
         check_properties : boolean : whether to check sanity of particle properties after read in
 
         Returns
@@ -415,6 +420,18 @@ class ReadClass(ut.io.SayClass):
                 part[spec].principal_axes_vectors = []
             if assign_center and assign_principal_axes:
                 self.assign_principal_axes(part)
+
+            # store derived orbital properties wrt center of galaxy/halo
+            if (assign_orbit and 'star' in species and
+                    ('velocity' in properties or properties is 'all')):
+                self.assign_orbit(part, 'star')
+
+            # assign distance from host galaxy at formation to stars
+            if assign_form_host_distance and 'star' in species:
+                from . import gizmo_track
+                HostDistance = gizmo_track.HostDistanceClass(
+                    'star', simulation_directory + 'track/')
+                HostDistance.io_form_host_distance(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
@@ -621,7 +638,9 @@ class ReadClass(ut.io.SayClass):
 
         # assign simulation name
         if not simulation_name and simulation_directory != './':
-            simulation_name = simulation_directory.strip('/')
+            simulation_name = simulation_directory.split('/')[-2]
+            simulation_name = simulation_name.replace('_', ' ')
+            simulation_name = simulation_name.replace('res', 'r')
         header['simulation.name'] = simulation_name
 
         header['catalog.kind'] = 'particle'
@@ -1305,6 +1324,8 @@ class ReadClass(ut.io.SayClass):
         include_hubble_flow : boolean : whether to include hubble flow
         '''
         species = ut.particle.parse_species(part, species)
+
+        self.say('* assigning orbital properties wrt galaxy/halo to {}'.format(species))
 
         orb = ut.particle.get_orbit_dictionary(
             part, species, center_position, center_velocity,
