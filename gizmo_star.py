@@ -100,7 +100,7 @@ class SupernovaIIClass:
 
         return numbers
 
-    def get_mass_fraction(self, age_min=0, age_maxs=99):
+    def get_mass_fraction(self, age_min=0, age_maxs=99, element_name='', metallicity=1.0):
         '''
         Get fractional mass loss via supernova ejecta (eject mass per M_sun) in age interval[s].
 
@@ -108,12 +108,20 @@ class SupernovaIIClass:
         ----------
         age_min : float : min age of stellar population [Myr]
         age_maxs : float or array : max age[s] of stellar population [Myr]
+        element_name : boolean : name of element to get yield of
+        metallicity : float : metallicity of star (for Nitrogen yield)
 
         Returns
         -------
         masses : float : total eject mass[es] per M_sun
         '''
-        return self.ejecta_mass * self.get_number(age_min, age_maxs)
+        mass_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs)
+
+        if element_name:
+            element_yields = get_nucleosynthetic_yields('supernova.ii', metallicity, normalize=True)
+            mass_fractions *= element_yields[element_name]
+
+        return mass_fractions
 
 
 SupernovaII = SupernovaIIClass()
@@ -201,7 +209,8 @@ class SupernovaIaClass:
 
         return numbers
 
-    def get_mass_fraction(self, age_min=0, age_maxs=99, kind='mannucci', ia_age_min=37.53):
+    def get_mass_fraction(
+        self, age_min=0, age_maxs=99, kind='mannucci', ia_age_min=37.53, element_name=''):
         '''
         Get fractional mass loss via supernova ejecta (eject mass per M_sun) in age interval[s].
 
@@ -211,12 +220,19 @@ class SupernovaIaClass:
         age_maxs : float or array : max age[s] of stellar population [Myr]
         kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
         ia_age_min : float : minimum age for Ia to occur [Myr]
+        element_name : string : name of element to get yield of
 
         Returns
         -------
         masses : float or array : total eject mass[es] per M_sun
         '''
-        return self.ejecta_mass * self.get_number(age_min, age_maxs, kind, ia_age_min)
+        mass_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs, kind, ia_age_min)
+
+        if element_name:
+            element_yields = get_nucleosynthetic_yields('supernova.ia', normalize=True)
+            mass_fractions *= element_yields[element_name]
+
+        return mass_fractions
 
 
 SupernovaIa = SupernovaIaClass()
@@ -294,7 +310,7 @@ class StellarWindClass:
         return rates
 
     def get_mass_fraction(
-        self, age_min=0, age_maxs=99, metallicity=1, metal_mass_fraction=None):
+        self, age_min=0, age_maxs=99, metallicity=1, metal_mass_fraction=None, element_name=''):
         '''
         Get fractional mass loss via stellar winds in age interval[s].
 
@@ -304,6 +320,7 @@ class StellarWindClass:
         age_maxs : float or array : max age[s] of stellar population [Myr]
         metallicity : float : total abundace of metals wrt Solar
         metal_mass_fraction : float : mass fration of all metals (everything not H, He)
+        element_name : string : name of element to get yield of
 
         Returns
         -------
@@ -312,18 +329,22 @@ class StellarWindClass:
         #age_bin_width = 0.01  # [Myr]
 
         if np.isscalar(age_maxs):
-            masses = integrate.quad(
+            mass_fractions = integrate.quad(
                 self.get_rate, age_min, age_maxs, (metallicity, metal_mass_fraction))[0]
         else:
-            masses = np.zeros(len(age_maxs))
+            mass_fractions = np.zeros(len(age_maxs))
             for age_i, age in enumerate(age_maxs):
-                masses[age_i] = integrate.quad(
+                mass_fractions[age_i] = integrate.quad(
                     self.get_rate, age_min, age, (metallicity, metal_mass_fraction))[0]
                 # this method is more stable for piece-wise (discontinuous) function
                 #ages = np.arange(age_min, age + age_bin_width, age_bin_width)
-                #masses[age_i] = self.get_rate(ages).sum() * age_bin_width
+                #mass_fractions[age_i] = self.get_rate(ages).sum() * age_bin_width
 
-        return masses
+        if element_name:
+            element_yields = get_nucleosynthetic_yields('wind', metallicity, normalize=True)
+            mass_fractions *= element_yields[element_name]
+
+        return mass_fractions
 
 
 StellarWind = StellarWindClass()
@@ -418,39 +439,52 @@ class MassLossClass:
 MassLoss = MassLossClass()
 
 
-def plot_supernova_rates(
+def plot_supernova_v_age(
     age_limits=[1, 3000], age_bin_width=1, age_scaling='log',
-    rate_limits=[None, None], rate_scaling='log',
+    y_axis_kind='rate', y_axis_limits=[None, None], y_axis_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
-    Plot rates of supernova, core-collapse and Ia.
+    Plot rates or cumulative numbers of supernova (core-collapse and Ia) per M_sun.
 
     Parameters
     ----------
     age_limits : list : min and max limits of age of stellar population [Myr]
     age_bin_width : float : width of stellar age bin [Myr]
     age_scaling : string : 'log' or 'linear'
-    rate_limits : list : min and max limits to impose on y-axis
-    rate_scaling : string : 'log' or 'linear'
+    y_axis_limits : string : 'rate' or 'number'
+    y_axis_limits : list : min and max limits to impose on y-axis
+    y_axis_scaling : string : 'log' or 'linear'
     write_plot : boolean : whether to write plot to file
     plot_directory : string : where to write plot file
     figure_index : int : index for matplotlib window
     '''
+    assert y_axis_kind in ['rate', 'number']
+
     AgeBin = ut.binning.BinClass(age_limits, age_bin_width, include_max=True)
 
-    supernova_II_rates = SupernovaII.get_rate(AgeBin.mins)
-    supernova_Ia_rates_mannucci = SupernovaIa.get_rate(AgeBin.mins, 'mannucci')
-    supernova_Ia_rates_maoz = SupernovaIa.get_rate(AgeBin.mins, 'maoz')
+    if y_axis_kind == 'rate':
+        supernova_II_rates = SupernovaII.get_rate(AgeBin.mins)
+        supernova_Ia_rates_mannucci = SupernovaIa.get_rate(AgeBin.mins, 'mannucci')
+        supernova_Ia_rates_maoz = SupernovaIa.get_rate(AgeBin.mins, 'maoz')
+    elif y_axis_kind == 'number':
+        supernova_II_rates = SupernovaII.get_number(min(age_limits), AgeBin.maxs)
+        supernova_Ia_rates_mannucci = SupernovaIa.get_number(
+            min(age_limits), AgeBin.maxs, 'mannucci')
+        supernova_Ia_rates_maoz = SupernovaIa.get_number(
+            min(age_limits), AgeBin.maxs, 'maoz')
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
 
     ut.plot.set_axes_scaling_limits(
-        subplot, age_scaling, age_limits, None, rate_scaling, rate_limits,
+        subplot, age_scaling, age_limits, None, y_axis_scaling, y_axis_limits,
         [supernova_II_rates, supernova_Ia_rates_mannucci, supernova_Ia_rates_maoz])
 
     subplot.set_xlabel('star age $\\left[ {\\rm Myr} \\right]$')
-    subplot.set_ylabel('supernova rate $\\left[ {\\rm Myr}^{-1} \\right]$')
+    if y_axis_kind == 'rate':
+        subplot.set_ylabel('SN rate $\\left[ {\\rm Myr}^{-1} {\\rm M}_\odot^{-1} \\right]$')
+    elif y_axis_kind == 'number':
+        subplot.set_ylabel('SN number $\\left[ {\\rm M}_\odot^{-1} \\right]$')
 
     colors = ut.plot.get_colors(3, use_black=False)
 
@@ -460,13 +494,17 @@ def plot_supernova_rates(
 
     ut.plot.make_legends(subplot, 'best')
 
-    plot_name = 'supernova.rates'
+    if y_axis_kind == 'rate':
+        plot_name = 'supernova.rate_v_time'
+    elif y_axis_kind == 'number':
+        plot_name = 'supernova.number.cum_v_time'
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
-def plot_mass_loss(
-    age_limits=[0.5, 4000], age_bin_width=0.01, age_scaling='log',
+def plot_mass_loss_v_age(
+    age_limits=[1, 10000], age_bin_width=0.01, age_scaling='log',
     mass_loss_kind='rate', mass_loss_limits=[None, None], mass_loss_scaling='log',
+    element_name='',
     metallicity=1, metal_mass_fraction=None,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -477,9 +515,10 @@ def plot_mass_loss(
     age_limits : list : min and max limits of age of stellar population [Myr]
     age_bin_width : float : width of stellar age bin [Myr]
     age_scaling : string : 'log' or 'linear'
-    mass_loss_kind : string : 'rate' or 'total'
+    mass_loss_kind : string : 'rate' or 'cumulative'
     mass_loss_limits : list : min and max limits to impose on y-axis
     mass_loss_scaling : string : 'log' or 'linear'
+    element_name : string : name of element to get yield of (if None, compute total mass loss)
     metallicity : float : total abundace of metals wrt Solar
     metal_mass_fraction : float : mass fration of all metals (everything not H, He)
     write_plot : boolean : whether to write plot to file
@@ -488,7 +527,7 @@ def plot_mass_loss(
     '''
     Ia_kind = 'mannucci'
 
-    assert mass_loss_kind in ['rate', 'total']
+    assert mass_loss_kind in ['rate', 'cumulative']
 
     AgeBin = ut.binning.BinClass(age_limits, age_bin_width, scaling=age_scaling, include_max=True)
 
@@ -497,9 +536,12 @@ def plot_mass_loss(
         supernova_Ia = SupernovaIa.get_rate(AgeBin.mins, Ia_kind) * SupernovaIa.ejecta_mass
         wind = StellarWind.get_rate(AgeBin.mins, metallicity, metal_mass_fraction)
     else:
-        supernova_II = SupernovaII.get_mass_fraction(0, AgeBin.mins)
-        supernova_Ia = SupernovaIa.get_mass_fraction(0, AgeBin.mins, Ia_kind)
-        wind = StellarWind.get_mass_fraction(0, AgeBin.mins, metallicity, metal_mass_fraction)
+        supernova_II = SupernovaII.get_mass_fraction(0, AgeBin.mins, element_name, metallicity)
+        supernova_Ia = SupernovaIa.get_mass_fraction(
+            0, AgeBin.mins, Ia_kind, element_name=element_name)
+        wind = StellarWind.get_mass_fraction(
+            0, AgeBin.mins, metallicity, metal_mass_fraction, element_name)
+
     total = supernova_II + supernova_Ia + wind
 
     # plot ----------
@@ -513,7 +555,10 @@ def plot_mass_loss(
     if mass_loss_kind == 'rate':
         subplot.set_ylabel('mass loss rate $\\left[ {\\rm Myr}^{-1} \\right]$')
     else:
-        subplot.set_ylabel('fractional mass loss')
+        y_axis_label = 'fractional mass loss'
+        if element_name:
+            y_axis_label = '{} yield per ${{\\rm M}}_\odot$'.format(element_name)
+        subplot.set_ylabel(y_axis_label)
 
     colors = ut.plot.get_colors(3, use_black=False)
 
@@ -550,7 +595,7 @@ def get_nucleosynthetic_yields(
     yields : ordered dictionary : yield mass [M_sun] or mass fraction for each element
         can covert to regular dictionary via dict(yields) or list of values via yields.values()
     '''
-    sun_metal_mass_fraction = 0.02  # total metal mass fraction of sun that Gizmo assumes
+    sun_metal_mass_fraction = 0.02  # total metal mass fraction of Sun that Gizmo assumes
 
     yield_dict = collections.OrderedDict()
     yield_dict['metals'] = 0.0
@@ -609,7 +654,7 @@ def get_nucleosynthetic_yields(
 
         yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
 
-        # nitrogen yield strongly depends on initial metallicity of star
+        # nitrogen yield depends on initial metallicity of star
         if star_metal_mass_fraction < 0.033:
             yield_dict['nitrogen'] *= star_metal_mass_fraction / sun_metal_mass_fraction
         else:

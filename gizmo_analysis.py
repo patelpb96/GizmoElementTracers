@@ -3394,7 +3394,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     simulation_directories, species_read, redshift, properties)
 
             for part in parts:
-                for spec in ut.array.get_list_combined(species, part):
+                for spec in ut.array.get_list_combined(species, part, 'intersect'):
                     Image.plot_image(
                         part, spec, 'mass', 'histogram',
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
