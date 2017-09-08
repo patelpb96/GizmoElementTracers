@@ -32,15 +32,16 @@ def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
     snapshot_index_limits : list : min and max snapshot indices to consider deleting
     directory : string : directory of snapshots
     '''
-    # 60 snapshots
+    # 65 snapshots
     snapshot_indices_keep = [
-        0, 1, 2,
-        11, 15, 20, 23, 26, 29, 33, 37, 41, 46, 52, 59, 67, 77, 88,
-        102, 120, 124, 128, 133, 137, 142, 148, 153, 159, 165, 172, 179, 187, 195,
-        214, 225, 236, 248, 262, 277, 294,
+        0, 20, 26, 33, 41, 52, 55, 57, 60, 64, 67, 71, 75, 79, 83, 88, 91, 93, 96, 99,
+        102, 105, 109, 112, 116, 120, 124, 128, 133, 137,
+        142, 148, 153, 159, 165, 172, 179, 187, 195,
+        204, 214, 225, 236, 248, 262, 277, 294,
         312, 332, 356, 382,
         412, 446, 486,
-        509, 534, 539, 544, 550, 555, 561, 567, 573, 579, 585, 600
+        534, 539, 544, 550, 555, 561, 567, 573, 579, 585,
+        600
     ]
 
     if snapshot_index_limits is None or not len(snapshot_index_limits):

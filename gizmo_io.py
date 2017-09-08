@@ -94,8 +94,8 @@ class ParticleDictionaryClass(dict):
                             prop_values = prop_values / self.prop(prop_name, indices)
                     else:
                         masks = self.prop(prop_name, indices) != 0
-                        prop_values[masks] = (prop_values[masks] /
-                                              self.prop(prop_name, indices)[masks])
+                        prop_values[masks] = (
+                            prop_values[masks] / self.prop(prop_name, indices)[masks])
                         masks = self.prop(prop_name, indices) == 0
                         prop_values[masks] = np.nan
                 if '*' in property_name:
@@ -171,7 +171,7 @@ class ParticleDictionaryClass(dict):
         # elemental abundance
         if 'massfraction.' in property_name or 'metallicity.' in property_name:
             # special cases
-            if 'massfraction.hydrogen' in property_name:
+            if 'massfraction.hydrogen' in property_name or property_name == 'massfraction.h':
                 # special case: mass fraction of hydrogen (excluding helium and metals)
                 values = (1 - self.prop('massfraction', indices)[:, 0] -
                           self.prop('massfraction', indices)[:, 1])
