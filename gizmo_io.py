@@ -242,13 +242,11 @@ class ReadClass(ut.io.SayClass):
     '''
     Read Gizmo snapshot.
     '''
-    def __init__(self, snapshot_name_base='snap*'):
+    def __init__(self):
         '''
         Set properties for snapshot file names.
-
-        snapshot_name_base : string : name base of snapshot file/directory
         '''
-        self.snapshot_name_base = snapshot_name_base
+        self.snapshot_name_base = 'snap*[!txt]'
         self.file_extension = '.hdf5'
 
         self.gas_eos = 5 / 3  # gas equation of state

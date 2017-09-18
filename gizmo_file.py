@@ -22,7 +22,7 @@ import utilities as ut
 #===================================================================================================
 # delete files
 #===================================================================================================
-def delete_snapshots(snapshot_index_limits=[3, 599], directory='.'):
+def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
     '''
     Delete all snapshots within snapshot_index_limits in given directory,
     except for those in snapshot_indices_keep list below.
@@ -134,12 +134,12 @@ if __name__ == '__main__':
             raise ValueError(
                 'imports: machine_name directory snapshot_kind snapshot_time_file_name')
 
-    machine_name = str(sys.argv[2])
-    from_directory = str(sys.argv[3])
-    snapshot_kind = str(sys.argv[4])
-    snapshot_time_file_name = str(sys.argv[5])
+        machine_name = str(sys.argv[2])
+        from_directory = str(sys.argv[3])
+        snapshot_kind = str(sys.argv[4])
+        snapshot_time_file_name = str(sys.argv[5])
 
-    Snapshot = ut.simulation.SnapshotClass()
-    Snapshot.read_snapshots(snapshot_time_file_name)
+        Snapshot = ut.simulation.SnapshotClass()
+        Snapshot.read_snapshots(snapshot_time_file_name)
 
-    transfer_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])
+        transfer_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])
