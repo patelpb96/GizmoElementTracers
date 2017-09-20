@@ -256,14 +256,12 @@ class ReadClass(ut.io.SayClass):
         self.species_dict = collections.OrderedDict()
         # dark-matter species
         self.species_dict['dark'] = 1  # dark matter at highest resolution
-        self.species_dict['dark.2'] = 2  # lower-resolution dark matter across all resolutions
-        #self.species_dict['dark.3'] = 3
-        #self.species_dict['dark.4'] = 5
+        self.species_dict['dark.2'] = 2  # dark matter at all lower resolutions
         # baryon species
         self.species_dict['gas'] = 0
         self.species_dict['star'] = 4
-        # other - these ids overlap with above, so have to comment in if using them
         self.species_dict['blackhole'] = 5
+        # swap these in for non-cosmological simulations
         #self.species_dict['bulge'] = 2
         #self.species_dict['disk'] = 3
 
@@ -718,7 +716,10 @@ class ReadClass(ut.io.SayClass):
 
             ## black hole particles ----------
             'BH_Mass': 'bh.mass',
-            'BH_Mdot': 'form.rate'
+            'BH_Mdot': 'accretion.rate',
+            'BH_Mass_AlphaDisk': 'disk.mass',
+            'BH_AccretionLength': 'accretion.length',
+            'BH_NProgs': 'prog.number',
         }
 
         part = ut.array.DictClass()  # dictionary class to store properties for particle species
