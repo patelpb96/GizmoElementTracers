@@ -19,6 +19,19 @@ from numpy import log10, Inf  # @UnusedImport
 import utilities as ut
 
 
+# default subset to keep for FIRE (61 snapshots)
+snapshot_indices_subset = [
+    0, 20, 26, 33, 41, 52, 55, 57, 60, 64, 67, 71, 75, 79, 83, 88, 91, 93, 96, 99,
+    102, 105, 109, 112, 116, 120, 124, 128, 133, 137,
+    142, 148, 153, 159, 165, 172, 179, 187, 195,
+    204, 214, 225, 236, 248, 262, 277, 294,
+    312, 332, 356, 382,
+    412, 446, 486,
+    534, 561, 567, 573, 579, 585,
+    600
+]
+
+
 #===================================================================================================
 # delete files
 #===================================================================================================
@@ -32,18 +45,6 @@ def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
     snapshot_index_limits : list : min and max snapshot indices to consider deleting
     directory : string : directory of snapshots
     '''
-    # 65 snapshots
-    snapshot_indices_keep = [
-        0, 20, 26, 33, 41, 52, 55, 57, 60, 64, 67, 71, 75, 79, 83, 88, 91, 93, 96, 99,
-        102, 105, 109, 112, 116, 120, 124, 128, 133, 137,
-        142, 148, 153, 159, 165, 172, 179, 187, 195,
-        204, 214, 225, 236, 248, 262, 277, 294,
-        312, 332, 356, 382,
-        412, 446, 486,
-        534, 539, 544, 550, 555, 561, 567, 573, 579, 585,
-        600
-    ]
-
     if snapshot_index_limits is None or not len(snapshot_index_limits):
         snapshot_index_limits = [1, Inf]
 
@@ -58,7 +59,7 @@ def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
         for snapshot_name in snapshot_names:
             snapshot_index = ut.io.get_numbers_in_string(snapshot_name)[0]
 
-            if (snapshot_index not in snapshot_indices_keep and
+            if (snapshot_index not in snapshot_indices_subset and
                     snapshot_index >= min(snapshot_index_limits) and
                     snapshot_index <= max(snapshot_index_limits)):
 
@@ -70,8 +71,8 @@ def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
 # transfer files
 #===================================================================================================
 def transfer_snapshots(
-    machine_name='stampede', from_directory='$STAMPEDE_FIRE/m12/m12i/m12i_res7000/output',
-    snapshot_indices=[600], to_directory='.'):
+    machine_name='stampede', directory_from='$STAMPEDE_FIRE/m12/m12i/m12i_res7000/output',
+    snapshot_indices=[600], directory_to='.'):
     '''
     Transfer snapshot file[s] or directory[s] from remote machine to local.
 
@@ -81,9 +82,9 @@ def transfer_snapshots(
         examples: 'stampede', 'pfe', 'ranch', 'lou'
         these assume that you have aliased these names in your .ssh/config
         else you need to supply, for example <username>@stampede.tacc.xsede.org
-    from_directory : string : directory of snapshot file[s] on remote machine
+    directory_from : string : directory of snapshot file[s] on remote machine
     snapshot_indices : int or list : index[s] of snapshots to transfer
-    to_directory : string : local directory to put snapshots
+    directory_to : string : local directory to put snapshots
     '''
     snapshot_name_base = 'snap*_{:03d}*'
 
@@ -94,17 +95,71 @@ def transfer_snapshots(
     #elif machine_name == 'ranch':
     #    from_directory = '$RANCH_HOME/stampede/' + from_directory
 
-    from_directory = ut.io.get_path(from_directory)
+    directory_from = ut.io.get_path(directory_from)
 
     if np.isscalar(snapshot_indices):
         snapshot_indices = [snapshot_indices]
 
     snapshot_path_names = ''
     for snapshot_index in snapshot_indices:
-        snapshot_path_names += from_directory + snapshot_name_base.format(snapshot_index) + ' '
+        snapshot_path_names += directory_from + snapshot_name_base.format(snapshot_index) + ' '
 
-    os.system('rsync -ahvP --size-only {}:"{}" {}'.format(
-              machine_name, snapshot_path_names, to_directory))
+    os.system('rsync -ahvP --size-only --exclude=*~ {}:"{}" {}'.format(
+              machine_name, snapshot_path_names, directory_to))
+
+
+#===================================================================================================
+# transfer whole simulation
+#===================================================================================================
+def rsync_simulation(
+    directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE',
+    directory_to='/scratch/projects/xsede/GalaxiesOnFIRE'):
+    '''
+    Use rsync to copy simulation.
+
+    Parameters
+    ----------
+    directory_from : string : directory of snapshot file[s] on remote machine
+    directory_to : string : local directory to put snapshots
+    '''
+    excludes = [
+        'output/',
+
+        'ewald_spc_table_64_dbl.dat',
+        'spcool_tables/',
+        'TREECOOL',
+
+        'energy.txt',
+        'balance.txt',
+        'GasReturn.txt',
+        'HIIheating.txt',
+        'MomWinds.txt',
+        'SNeIIheating.txt',
+
+        '*.bak',
+        '*.err',
+        '*.pyc',
+        '*.o',
+        '*.pro',
+        '*.perl',
+        '.ipynb_checkpoints',
+        '.slurm',
+        '.DS_Store',
+        '*~',
+        '._*',
+        '#*#',
+    ]
+
+    directory_from = ut.io.get_path(directory_from)
+    directory_to = ut.io.get_path(directory_to)
+
+    command = 'rsync -ahvP --size-only --exclude=*~'
+
+    arguments = ''
+    for exclude in excludes:
+        arguments += '--exclude="{}" '.format(exclude)
+
+    os.system(command + arguments + directory_from + directory_to + '.')
 
 
 #===================================================================================================

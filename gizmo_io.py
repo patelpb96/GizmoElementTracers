@@ -23,7 +23,9 @@ import utilities as ut
 class ParticleDictionaryClass(dict):
     '''
     Dictionary class to store particle data.
-    Allows greater flexibility for producing derived quantities.
+    This functions like a normal dictionary in terms of storing default properties of particles,
+    but it also allows greater flexibility, storing additional meta-data (such as snapshot
+    information and cosmological parameters) and calling derived quantities via .prop().
     '''
     def __init__(self):
         # use to translate between element name and index in element table
@@ -46,17 +48,17 @@ class ParticleDictionaryClass(dict):
     def prop(self, property_name='', indices=None):
         '''
         Get property, either from self dictionary or derive.
-        If several properties, need to provide mathematical relationship, for example:
-        'log temperature', 'temperature / density', 'abs position'
+        Can compute basic mathematical manipulations, for example:
+            'log temperature', 'temperature / density', 'abs position'
 
         Parameters
         ----------
         property_name : string : name of property
-        indices : array : indices to select on
+        indices : array : indices of particles to select
 
         Returns
         -------
-        values : float or array : convertes values as float (for scalar) or numpy array
+        values : float or array : depending on dimensionality of input indices
         '''
         ## parsing general to all catalogs ----------
         property_name = property_name.strip()  # strip white space
@@ -118,7 +120,7 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ----------
-        if 'form.' in property_name or property_name == 'age':
+        if ('form.' in property_name or property_name == 'age') and 'distance' not in property_name:
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 # look-back time (stellar age) to formation
                 values = self.snapshot['time'] - self.prop('form.time', indices)
@@ -213,20 +215,42 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        # distance wrt galaxy/halo center
-        if 'distance' in property_name:
-            # 3-D distance vector
-            values = ut.coordinate.get_distances(
-                'vector', self.prop('position', indices), self.center_position,
-                self.info['box.length']) * self.snapshot['scalefactor']  # [kpc physical]
+        # distance/velocity wrt host galaxy/halo center
+        if 'host.' in property_name:
+            if 'distance' in property_name:
+                if 'form.' in property_name:
+                    # 3-D distance vector at formation
+                    values = self.prop('form.host.distance.3d', indices)
+
+                else:
+                    # 3-D distance vector now
+                    values = ut.coordinate.get_distances(
+                        'vector', self.prop('position', indices), self.center_position,
+                        self.info['box.length']) * self.snapshot['scalefactor']  # [kpc physical]
+
+            elif 'velocity' in property_name:
+                # caveat: this does *not* include Hubble flow or correct for periodic boundaries
+                # that requires input of positions as well, so need to use utility functions
+                values = ut.coordinate.get_velocity_differences(
+                    'vector', self.prop('velocity', indices), self.center_velocity,
+                    include_hubble_flow=False)
 
             if 'principal' in property_name:
-                # align with principal axes
-                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes_vectors)
+                # align with host principal axes
+                values = ut.coordinate.get_coordinates_rotated(
+                    values, self.principal_axes_vectors)
 
-                if '2d' in property_name:
-                    # compute distances along major axes and minor axis (R and Z)
-                    values = ut.coordinate.get_distances_major_minor(values)
+            if '2d' in property_name:
+                # convert to be along major axes and minor axis (R and Z)
+                # value along R is positive definite, along Z is signed
+                values = ut.coordinate.get_distances_major_minor(values)
+            elif '1d' in property_name:
+                # compute scalar distance
+                if len(values.shape) == 1:
+                    shape_pos = 0
+                else:
+                    shape_pos = 1
+                values = np.sqrt(np.sum(values ** 2, shape_pos))
 
             return values
 
@@ -240,13 +264,17 @@ class ParticleDictionaryClass(dict):
 #===================================================================================================
 class ReadClass(ut.io.SayClass):
     '''
-    Read Gizmo snapshot.
+    Read Gizmo snapshot[s].
     '''
-    def __init__(self):
+    def __init__(self, cosmological=True):
         '''
-        Set properties for snapshot file names.
+        Set properties for snapshot files.
+
+        Parameters
+        ----------
+        cosmological : boolean : whether simulation is cosmological
         '''
-        self.snapshot_name_base = 'snap*[!txt]'
+        self.snapshot_name_base = 'snap*[!txt]'  # avoid accidentally reading snapshot indices file
         self.file_extension = '.hdf5'
 
         self.gas_eos = 5 / 3  # gas equation of state
@@ -261,9 +289,11 @@ class ReadClass(ut.io.SayClass):
         self.species_dict['gas'] = 0
         self.species_dict['star'] = 4
         self.species_dict['blackhole'] = 5
+
         # swap these in for non-cosmological simulations
-        #self.species_dict['bulge'] = 2
-        #self.species_dict['disk'] = 3
+        if not cosmological:
+            self.species_dict['bulge'] = 2
+            self.species_dict['disk'] = 3
 
         self.species_all = tuple(self.species_dict.keys())
         self.species_read = list(self.species_all)
@@ -279,7 +309,9 @@ class ReadClass(ut.io.SayClass):
         check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
-        Return as dictionary class.
+        Can read single snapshot or multiple snapshots.
+        If single snapshot, return as dictionary class;
+        if multiple snapshots, return as list of dictionary classes.
 
         Parameters
         ----------
@@ -301,7 +333,7 @@ class ReadClass(ut.io.SayClass):
         properties : string or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_dict
-        element_indices : int or list : indices of elements to keep
+        element_indices : int or list : indices of elemental abundances to keep
             note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         separate_dark_lowres : boolean :
@@ -535,7 +567,7 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        header : dict : header dictionary
+        header : dictionary class : header dictionary
         '''
         # convert name in snapshot's header dictionary to custom name preference
         header_dict = {
@@ -667,7 +699,7 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        part : dict : catalog of particles
+        part : dictionary class : catalog of particles
         '''
         # convert name in snapshot's particle dictionary to custon name preference
         # if comment out any prop, will not read it
@@ -913,7 +945,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : particle dictionary class
+        part : dictionary class : particle dictionary class
         header : dict : header dictionary
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
         separate_dark_lowres : boolean :
@@ -1042,7 +1074,7 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        file name (with relative path): string
+        path_file_name : string : file name (with relative path)
         '''
         directory = ut.io.get_path(directory)
 
@@ -1081,7 +1113,7 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        Snapshot : dictionary of snapshot information
+        Snapshot : dictionary class : snapshot information
         '''
         directory = ut.io.get_path(directory)
 
@@ -1113,7 +1145,7 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        Cosmology : cosmology class, which also stores cosmological parameters
+        Cosmology : class : stores cosmological parameters and functions
         '''
         def get_check_value(line, value_test=None):
             frac_dif_max = 0.01
@@ -1178,7 +1210,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles
+        part : dictionary class : catalog of particles
         '''
         # limits of sanity
         prop_limit_dict = {
@@ -1233,7 +1265,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles
+        part : dictionary class : catalog of particles
         method : string : method of centering: 'center-of-mass', 'potential'
         compare_centers : boolean : whether to compare centers via center-of-mass v potential
         '''
@@ -1282,7 +1314,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles
+        part : dictionary class : catalog of particles
         distance_max : float : maximum distance to select particles [kpc physical]
         mass_percent : float : keep particles within the distance that encloses mass percent
             [0, 100] of all particles within distance_max
@@ -1316,7 +1348,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at snapshot
+        part : dictionary class : catalog of particles at snapshot
         species : string or list : particle species to compute
         center_position : array : center position to use
         center_velocity : array : center velocity to use
@@ -1437,7 +1469,7 @@ def write_ebf_file(part=None, distance_limits=[0, 300]):
 
     Parameters
     ----------
-    part : dict : catalog of particles at snapshot
+    part : dictionary class : catalog of particles at snapshot
     distance_limits : list : min and max distance from center to keep particles [kpc physical]
     '''
     import ebf  # @UnresolvedImport
