@@ -193,22 +193,22 @@ def plot_mass_contamination(
     species = 'dark.2'
     dist_i_halo = np.searchsorted(distances_phys, halo_radius)
     print('* {} {} particles within R_halo'.format(
-          profile_number[species]['cum'][dist_i_halo], species))
-    dist_i = np.where(profile_number[species]['cum'] > 0)[0][0]
+          profile_number[species]['sum.cum'][dist_i_halo], species))
+    dist_i = np.where(profile_number[species]['sum.cum'] > 0)[0][0]
     print('* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
           species, distances_phys[dist_i], distances_halo[dist_i]))
-    dist_i = np.where(profile_mass_ratio[species]['cum'] > 0.001)[0][0]
+    dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.001)[0][0]
     print('* {} mass_ratio = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           species, distances_phys[dist_i], distances_halo[dist_i]))
-    dist_i = np.where(profile_mass_ratio[species]['cum'] > 0.01)[0][0]
+    dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.01)[0][0]
     print('* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           species, distances_phys[dist_i], distances_halo[dist_i]))
 
     for spec in species_dark:
-        if species != 'dark.2' and profile_number[spec]['cum'][dist_i_halo] > 0:
+        if species != 'dark.2' and profile_number[spec]['sum.cum'][dist_i_halo] > 0:
             print('! {} {} particles within R_halo'.format(
-                  profile_number[species]['cum'][dist_i_halo], species))
-            dist_i = np.where(profile_number[spec]['cum'] > 0)[0][0]
+                  profile_number[species]['sum.cum'][dist_i_halo], species))
+            dist_i = np.where(profile_number[spec]['sum.cum'] > 0)[0][0]
             print('! {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
                   species, distances_phys[dist_i], distances_halo[dist_i]))
     print()
