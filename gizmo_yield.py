@@ -82,7 +82,7 @@ def get_nucleosynthetic_yields(
     elif event_kind == 'supernova.ii':
         # yields from Nomoto et al 2006, IMF averaged
         # rates from Starburst99
-        # in Gizmo, these occur from 3.4 to 37.53 Myr after formation
+        # in Gizmo core-collapse occur 3.4 to 37.53 Myr after formation
         # from 3.4 to 10.37 Myr, rate / M_sun = 5.408e-10 yr ^ -1
         # from 10.37 to 37.53 Myr, rate / M_sun = 2.516e-10 yr ^ -1
         ejecta_mass = 10.5  # [M_sun]
