@@ -81,7 +81,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
 # simulation diagnostic
 #===================================================================================================
 def print_run_times(
-    simulation_directory='.', output_directory='output/', cpu_number=None,
+    simulation_directory='.', output_directory='output/', core_number=None,
     runtime_file_name='gizmo.out', wall_time_restart=0,
     scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]):
     '''
@@ -92,7 +92,7 @@ def print_run_times(
     ----------
     simulation_directory : string : directory of simulation
     output_directory : string : directory of output files within simulation directory
-    cpu_number : int : total number of CPUs (input instead of reading from run-time file)
+    core_number : int : total number of CPU cores (input instead of reading from run-time file)
     runtime_file_name : string : name of run-time file (set in submission script) to read CPU number
     wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
     scalefactors : array-like : list of scale-factors at which to print run times
@@ -144,15 +144,15 @@ def print_run_times(
 
     wall_times /= 3600  # convert to [hr]
 
-    if not cpu_number:
+    if not core_number:
         # get cpu number from run-time file
         mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
-        cpu_number = mpi_number * omp_number
-        print('# cpu = {} (mpi = {}, omp = {})'.format(cpu_number, mpi_number, omp_number))
+        core_number = mpi_number * omp_number
+        print('# cpu = {} (mpi = {}, omp = {})'.format(core_number, mpi_number, omp_number))
     else:
-        print('# cpu = {}'.format(cpu_number))
+        print('# cpu = {}'.format(core_number))
 
-    cpu_times = wall_times * cpu_number
+    cpu_times = wall_times * core_number
 
     # sanity check - simulation might not have run to all input scale-factors
     scalefactors = scalefactors[: wall_times.size]
@@ -375,104 +375,136 @@ def plot_contamination(redshift=0, directory='.'):
 # simulation performance and scaling
 #===================================================================================================
 def plot_scaling(
-    scaling_kind='strong', resolution='res880', time_kind='cpu',
+    scaling_kind='strong', resolution='res7100', time_kind='core',
     axis_x_scaling='log', axis_y_scaling='linear', write_plot=False, plot_directory='.'):
     '''
-    Print simulation run times (all or CPU).
+    Print simulation run times (wall or core).
     'speedup' := WT(1 CPU) / WT(N CPU) =
     'efficiency' := WT(1 CPU) / WT(N CPU) / N = CT(1 CPU) / CT(N CPU)
 
     Parameters
     ----------
     scaling_kind : string : 'strong', 'weak'
-    time_kind : string : 'cpu', 'wall', 'speedup', 'efficiency'
+    time_kind : string : 'node', 'core', 'wall', 'speedup', 'efficiency'
     axis_x_scaling : string : scaling along x-axis: 'log', 'linear'
     axis_y_scaling : string : scaling along y-axis: 'log', 'linear'
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to write plot file
     '''
     weak_dark = {
-        'res46000': {'particle.number': 8.82e6, 'cpu.number': 64,
-                     'cpu.time': 385, 'wall.time': 6.0},
-        'res7000': {'particle.number': 7.05e7, 'cpu.number': 512,
-                    'cpu.time': 7135, 'wall.time': 13.9},
-        'res880': {'particle.number': 5.64e8, 'cpu.number': 2048,
-                   'cpu.time': 154355, 'wall.time': 75.4},
+        'res57000': {'particle.number': 8.82e6, 'core.number': 64,
+                     'core.time': 385, 'wall.time': 6.0},
+        'res7100': {'particle.number': 7.05e7, 'core.number': 512,
+                    'core.time': 7135, 'wall.time': 13.9},
+        'res880': {'particle.number': 5.64e8, 'core.number': 2048,
+                   'core.time': 154355, 'wall.time': 75.4},
     }
 
+    # stampede
+    """
     weak_baryon = {
-        'res450000': {'particle.number': 1.10e6 * 2, 'cpu.number': 32,
-                      'cpu.time': 1003, 'wall.time': 31.34 * 1.5},
-        'res56000': {'particle.number': 8.82e6 * 2, 'cpu.number': 512,
-                     'cpu.time': 33143, 'wall.time': 64.73},
-        'res7000': {'particle.number': 7.05e7 * 2, 'cpu.number': 2048,
-                    'cpu.time': 1092193, 'wall.time': 350.88},
-        #'res880': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
-        #           'cpu.time': 568228, 'wall.time': 69.4},
+        'res450000': {'particle.number': 1.10e6 * 2, 'core.number': 32,
+                      'core.time': 1003, 'wall.time': 31.34 * 1.5},
+        'res57000': {'particle.number': 8.82e6 * 2, 'core.number': 512,
+                     'core.time': 33143, 'wall.time': 64.73},
+        'res7100': {'particle.number': 7.05e7 * 2, 'core.number': 2048,
+                    'core.time': 1092193, 'wall.time': 350.88},
+        #'res880': {'particle.number': 5.64e8 * 2, 'core.number': 8192,
+        #           'core.time': 568228, 'wall.time': 69.4},
         # projected
-        #'res880': {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
-        #           'cpu.time': 1.95e7, 'wall.time': 2380},
+        #'res880': {'particle.number': 5.64e8 * 2, 'core.number': 8192,
+        #           'core.time': 1.95e7, 'wall.time': 2380},
     }
+    """
+
+    # conversion to stampede 2
+    weak_baryon = collections.OrderedDict()
+    weak_baryon['res450000'] = {
+        'particle.number': 1.10e6 * 2, 'node.number': 1, 'node.time': 73, 'wall.time': 73}
+    weak_baryon['res57000'] = {
+        'particle.number': 8.82e6 * 2, 'node.number': 8, 'node.time': 1904, 'wall.time': 239}
+    weak_baryon['res7100'] = {
+        'particle.number': 7.05e7 * 2, 'node.number': 64, 'node.time': 52000, 'wall.time': 821}
 
     strong_baryon = collections.OrderedDict()
-    strong_baryon['res880'] = collections.OrderedDict()
-    strong_baryon['res880'][2048] = {'particle.number': 5.64e8 * 2, 'cpu.number': 2048,
-                                     'wall.time': 15.55, 'cpu.time': 31850}
-    strong_baryon['res880'][4096] = {'particle.number': 5.64e8 * 2, 'cpu.number': 4096,
-                                     'wall.time': 8.64, 'cpu.time': 35389}
-    strong_baryon['res880'][8192] = {'particle.number': 5.64e8 * 2, 'cpu.number': 8192,
-                                     'wall.time': 4.96, 'cpu.time': 40632}
-    strong_baryon['res880'][16384] = {'particle.number': 5.64e8 * 2, 'cpu.number': 16384,
-                                      'wall.time': 4.57, 'cpu.time': 74875}
 
-    # did not have time to run these, so just scale down from res880
+    # convert from running to scale-factor = 0.068 to 0.1 via 2x
+    strong_baryon['res880'] = {
+        'particle.number': 5.64e8 * 2,
+        'core.number': np.array([2048, 4096, 8192, 16384]),
+        'node.number': np.array([128, 256, 512, 1024]),
+        'wall.time': np.array([15.55, 8.64, 4.96, 4.57]) * 2,
+        'core.time': np.array([31850, 35389, 40632, 74875]) * 2,
+    }
+
+    # did not have time to run these, so scale down from res880
     # scaled to run time to z = 3 using 2048
-    strong_baryon['res7000'] = collections.OrderedDict()
-    strong_baryon['res7000'][512] = {'particle.number': 7e7 * 2, 'cpu.number': 512,
-                                     'wall.time': 72.23, 'cpu.time': 36984}
-    strong_baryon['res7000'][1024] = {'particle.number': 7e7 * 2, 'cpu.number': 1024,
-                                      'wall.time': 40.13, 'cpu.time': 41093}
-    strong_baryon['res7000'][2048] = {'particle.number': 7e7 * 2, 'cpu.number': 2048,
-                                      'wall.time': 23.04, 'cpu.time': 47182}
-    strong_baryon['res7000'][4096] = {'particle.number': 7e7 * 2, 'cpu.number': 4096,
-                                      'wall.time': 21.22, 'cpu.time': 86945}
+    # stampede
+    """
+    strong_baryon['res7100'] = {
+        'particle.number': 7e7 * 2,
+        'node.number': np.array([32, 64, 128, 256]),
+        'core.number': np.array([512, 1024, 2048, 4096]),
+        'wall.time': np.array([72.23, 40.13, 23.04, 21.22]),
+        'core.time': np.array([36984, 41093, 47182, 86945]),
+        'node.time': np.array([2312, 2568, 2949, 5434]),
+    }
+    """
 
-    # conversion from running to scale-factor = 0.068 to 0.1 via 2x
-    for cpu_num in strong_baryon['res880']:
-        strong_baryon['res880'][cpu_num]['cpu.time'] *= 2
-        strong_baryon['res880'][cpu_num]['wall.time'] *= 2
+    # conversion to stampede 2
+    # half the number of nodes and multipy node time by 1.17, multiply wall time by 2.34
+    # based on res57000 simulation to z = 0
+    strong_baryon['res7100'] = {
+        'particle.number': 7e7 * 2,
+        'node.number': np.array([16, 32, 64, 128]),
+        'core.number': np.array([2048, 4096, 8192, 16384]),
+        'wall.time': np.array([72.23, 40.13, 23.04, 21.22]) * 2.34,
+        'core.time': np.array([36984, 41093, 47182, 86945]) * 1.17,
+        'node.time': np.array([2312, 2568, 2949, 5434]) * 1.17,
+    }
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(1, left=0.22, right=0.95, top=0.96, bottom=0.16)
 
     if scaling_kind == 'strong':
         strong = strong_baryon[resolution]
-        cpu_numbers = [cpu_num for cpu_num in strong]
-        wall_time_ref = strong[2048]['wall.time'] * 2048
 
-        if time_kind == 'cpu':
-            times = [strong[cpu_num]['cpu.time'] for cpu_num in strong]
+        if time_kind == 'core':
+            times = strong['core.time']
+        if time_kind == 'node':
+            times = strong['node.time']
         elif time_kind == 'wall':
-            times = [strong[cpu_num]['wall.time'] for cpu_num in strong]
+            times = strong['wall.time']
         elif time_kind == 'speedup':
-            times = [wall_time_ref / strong[cpu_num]['wall.time'] for cpu_num in strong]
+            times = strong['wall.time'][0] / strong['wall.time']
         elif time_kind == 'efficiency':
-            times = [wall_time_ref / strong[cpu_num]['wall.time'] / cpu_num for cpu_num in strong]
+            times = strong['wall.time'][0] / strong['wall.time']
 
-        subplot.set_xlabel('core number')
+        #subplot.set_xlabel('number of cores')
+        subplot.set_xlabel('number of nodes')
 
         if resolution == 'res880':
             axis_x_limits = [1e2, 1.9e4]
-        elif resolution == 'res7000':
-            axis_x_limits = [3e2, 1e4]
+        elif resolution == 'res7100':
+            #axis_x_limits = [3e2, 1e4]
+            axis_x_limits = [10, 200]
 
-        if time_kind == 'cpu':
+        axis_x_kind = 'core.number'
+        if time_kind == 'core':
             if resolution == 'res880':
                 axis_y_limits = [0, 1.6e5]
                 subplot.set_ylabel('CPU time to $z = 9$ [hr]')
-            elif resolution == 'res7000':
+            elif resolution == 'res7100':
                 axis_y_limits = [0, 1e5]
                 subplot.set_ylabel('CPU time to $z = 3$ [hr]')
+        elif time_kind == 'node':
+            axis_x_kind = 'node.number'
+            if resolution == 'res880':
+                axis_y_limits = [0, 1e4]
+                subplot.set_ylabel('node time to $z = 9$ [hr]')
+            elif resolution == 'res7100':
+                axis_y_limits = [0, 8000]
+                subplot.set_ylabel('node-hours to $z = 3$')
         elif time_kind == 'wall':
             axis_y_limits = [0, 35]
             subplot.set_ylabel('wall time to $z = 9$ [hr]')
@@ -486,7 +518,7 @@ def plot_scaling(
         ut.plot.set_axes_scaling_limits(
             subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits)
 
-        subplot.plot(cpu_numbers, times, '*-', linewidth=2.0, color='blue')
+        subplot.plot(strong[axis_x_kind], times, '*-', linewidth=2.0, color='blue')
 
         if time_kind == 'speedup':
             subplot.plot([0, 3e4], [0, 3e4], '--', linewidth=1.5, color='black')
@@ -494,63 +526,59 @@ def plot_scaling(
         if resolution == 'res880':
             subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
                          transform=subplot.transAxes)
-        elif resolution == 'res7000':
+        elif resolution == 'res7100':
             subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.5e8', color='black',
                          transform=subplot.transAxes)
 
     elif scaling_kind == 'weak':
-        dm_particle_numbers = np.array(
-            [weak_dark[cpu_num]['particle.number'] for cpu_num in sorted(weak_dark.keys())])
-        mfm_particle_numbers = np.array(
-            [weak_baryon[cpu_num]['particle.number'] for cpu_num in sorted(weak_baryon.keys())])
+        #dm_particle_numbers = np.array(
+        #    [weak_dark[core_num]['particle.number'] for core_num in sorted(weak_dark.keys())])
+        baryon_particle_numbers = np.array(
+            [weak_baryon[i]['particle.number'] for i in weak_baryon])
 
-        if time_kind == 'cpu':
-            dm_times = np.array(
-                [weak_dark[cpu_num]['cpu.time'] for cpu_num in sorted(weak_dark.keys())])
-            mfm_times = np.array(
-                [weak_baryon[cpu_num]['cpu.time'] for cpu_num in sorted(weak_baryon.keys())])
+        if time_kind == 'node':
+            #dm_times = np.array(
+            #    [weak_dark[core_num]['core.time'] for core_num in sorted(weak_dark.keys())])
+            baryon_times = np.array([weak_baryon[i]['node.time'] for i in weak_baryon])
         elif time_kind == 'wall':
             #resolutinon_ref = 'res880'
-            resolutinon_ref = 'res7000'
+            resolutinon_ref = 'res7100'
             ratio_ref = (weak_baryon[resolutinon_ref]['particle.number'] /
-                         weak_baryon[resolutinon_ref]['cpu.number'])
-            dm_times = np.array(
-                [weak_dark[cpu_num]['wall.time'] * ratio_ref /
-                 (weak_dark[cpu_num]['particle.number'] / weak_dark[cpu_num]['cpu.number'])
-                 for cpu_num in sorted(weak_dark.keys())])
-            mfm_times = np.array(
-                [weak_baryon[cpu_num]['wall.time'] *
-                 ratio_ref / (weak_baryon[cpu_num]['particle.number'] /
-                              weak_baryon[cpu_num]['cpu.number'])
-                 for cpu_num in sorted(weak_baryon.keys())])
+                         weak_baryon[resolutinon_ref]['node.number'])
+            #dm_times = np.array(
+            #    [weak_dark[core_num]['wall.time'] * ratio_ref /
+            #     (weak_dark[core_num]['particle.number'] / weak_dark[core_num]['core.number'])
+            #     for core_num in sorted(weak_dark.keys())])
+            baryon_times = np.array([weak_baryon[i]['wall.time'] for i in weak_baryon])
 
-        subplot.set_xlabel('particle number')
+        subplot.set_xlabel('number of particles')
 
         #axis_x_limits = [6e6, 1.5e9]
         axis_x_limits = [1e6, 2e8]
 
-        if time_kind == 'cpu':
-            axis_y_limits = [5e2, 2e6]
-            subplot.set_ylabel('CPU time to $z = 0$ [hr]')
+        if time_kind == 'node':
+            axis_y_limits = [10, 2e5]
+            subplot.set_ylabel('node-hours to $z = 0$')
         elif time_kind == 'wall':
             axis_y_limits = [10, 1000]
             subplot.set_ylabel('wall time to $z = 0$ [hr]')
             subplot.text(
                 0.05, 0.05,
-                'weak scaling:\nfixed particles / core = {:.1e}'.format(ratio_ref),
+                'weak scaling:\nparticles / node = {:.1e}'.format(ratio_ref),
                 color='black', transform=subplot.transAxes,
             )
 
         ut.plot.set_axes_scaling_limits(
             subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits)
 
-        subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
-        #subplot.plot(mfm_particle_numbers[:-1], mfm_times[:-1], '*-', linewidth=2.0, color='blue')
+        #subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
+        #subplot.plot(mfm_particlgizmoe_numbers[:-1], mfm_times[:-1], '*-', linewidth=2.0,
+        #color='blue')
         #subplot.plot(mfm_particle_numbers[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
         #             alpha=0.7)
-        subplot.plot(mfm_particle_numbers, mfm_times, '*-', linewidth=2.0, color='blue')
+        subplot.plot(baryon_particle_numbers, baryon_times, '*-', linewidth=2.0, color='blue')
 
-    plot_name = 'test'
+    plot_name = 'scaling'
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 

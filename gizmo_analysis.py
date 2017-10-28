@@ -495,7 +495,37 @@ class ImageClass(ut.io.SayClass):
             positions -= center_position
             positions *= part.snapshot['scalefactor']
 
-            # initialize masks
+            if rotation is not None:
+                # rotate image
+                if rotation is True:
+                    # rotate according to principal axes
+                    if (part[species_name].principal_axes_vectors is not None and
+                            len(part[species_name].principal_axes_vectors)):
+                        # rotate to align with stored principal axes
+                        rotation_vectors = part[species_name].principal_axes_vectors
+                    else:
+                        # compute principal axes using all particles originally within image limits
+                        masks = (positions[:, dimensions_select[0]] <= distances_max[0])
+                        for dimen_i in dimensions_select:
+                            masks *= (
+                                (positions[:, dimen_i] >= -distances_max[dimen_i]) *
+                                (positions[:, dimen_i] <= distances_max[dimen_i])
+                            )
+                        rotation_vectors = ut.coordinate.get_principal_axes(
+                            positions[masks], weights[masks])[0]
+                elif len(rotation):
+                    # assume input rotation vectors
+                    rotation_vectors = np.asarray(rotation)
+                    if (np.ndim(rotation_vectors) != 2 or
+                            rotation_vectors.shape[0] != positions.shape[1] or
+                            rotation_vectors.shape[1] != positions.shape[1]):
+                        raise ValueError('wrong shape for rotation = {}'.format(rotation))
+                else:
+                    raise ValueError('cannot parse rotation = {}'.format(rotation))
+
+                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
+
+            # keep only particles within distance limits
             masks = (positions[:, dimensions_select[0]] <= distances_max[0])
             for dimen_i in dimensions_select:
                 masks *= (
@@ -506,19 +536,6 @@ class ImageClass(ut.io.SayClass):
             positions = positions[masks]
             if weights is not None:
                 weights = weights[masks]
-
-            if rotation is not None:
-                # rotate image
-                if (rotation is True and part[species_name].principal_axes_vectors is not None and
-                        len(part[species_name].principal_axes_vectors)):
-                    # rotate to align with stored principal axes
-                    rotation_vectors = part[species_name].principal_axes_vectors
-
-                else:
-                    # compute from particles within image limits
-                    rotation_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
-
-                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
         else:
             raise ValueError('need to input center position')
 
