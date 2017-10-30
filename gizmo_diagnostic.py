@@ -145,12 +145,12 @@ def print_run_times(
     wall_times /= 3600  # convert to [hr]
 
     if not core_number:
-        # get cpu number from run-time file
+        # get core number from run-time file
         mpi_number, omp_number = get_cpu_numbers(simulation_directory, runtime_file_name)
         core_number = mpi_number * omp_number
-        print('# cpu = {} (mpi = {}, omp = {})'.format(core_number, mpi_number, omp_number))
+        print('# core = {} (mpi = {}, omp = {})'.format(core_number, mpi_number, omp_number))
     else:
-        print('# cpu = {}'.format(core_number))
+        print('# core = {}'.format(core_number))
 
     cpu_times = wall_times * core_number
 
