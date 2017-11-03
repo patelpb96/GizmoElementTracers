@@ -82,8 +82,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
 #===================================================================================================
 def print_run_times(
     simulation_directory='.', output_directory='output/', core_number=None,
-    runtime_file_name='gizmo.out', wall_time_restart=0,
-    scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]):
+    runtime_file_name='gizmo.out', wall_time_restart=0, scalefactors=[]):
     '''
     Print wall [and CPU] times (based on average per MPI task from cpu.txt) at scale-factors,
     for Gizmo simulation.
@@ -109,12 +108,15 @@ def print_run_times(
         return scalefactor_string
 
     file_name = 'cpu.txt'
+    if scalefactors is None or (not np.isscalar(scalefactors) and not len(scalefactors)):
+        scalefactors = [
+            0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]
+    scalefactors = ut.array.arrayize(scalefactors)
 
     file_path_name = (ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) +
                       file_name)
     file_in = open(file_path_name, 'r')
 
-    scalefactors = ut.array.arrayize(scalefactors)
     wall_times = []
 
     i = 0
@@ -597,36 +599,32 @@ if __name__ == '__main__':
     directory = '.'
 
     if 'runtime' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
         wall_time_restart = 0
-        if len(sys.argv) > 3:
-            wall_time_restart = float(sys.argv[3])
+        if len(sys.argv) > 2:
+            wall_time_restart = float(sys.argv[2])
 
-        _ = print_run_times(directory, wall_time_restart=wall_time_restart)
+        scalefactors = None  # use default
+        if len(sys.argv) > 3:
+            scalefactor_width = 0.05
+            scalefactor_min = float(sys.argv[3])
+            if len(sys.argv) > 4:
+                scalefactor_width = float(sys.argv[4])
+            scalefactors = np.arange(scalefactor_min, 1.01, scalefactor_width)
+
+        _ = print_run_times(wall_time_restart=wall_time_restart, scalefactors=scalefactors)
 
     elif 'properties' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
-        print_properties_statistics('all', directory)
+        print_properties_statistics('all')
 
     elif 'extrema' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
-        print_properties_snapshots(directory)
+        print_properties_snapshots()
 
     elif 'contamination' in function_kind:
-        if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
-
         snapshot_redshift = 0
-        if len(sys.argv) > 3:
-            snapshot_redshift = float(sys.argv[3])
+        if len(sys.argv) > 2:
+            snapshot_redshift = float(sys.argv[2])
 
-        plot_contamination(snapshot_redshift, directory)
+        plot_contamination(snapshot_redshift)
 
     else:
         print('! not recognize function')
