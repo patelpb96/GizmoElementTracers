@@ -605,8 +605,8 @@ if __name__ == '__main__':
 
         scalefactors = None  # use default
         if len(sys.argv) > 3:
-            scalefactor_width = 0.05
             scalefactor_min = float(sys.argv[3])
+            scalefactor_width = 0.05
             if len(sys.argv) > 4:
                 scalefactor_width = float(sys.argv[4])
             scalefactors = np.arange(scalefactor_min, 1.01, scalefactor_width)

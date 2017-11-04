@@ -277,8 +277,8 @@ class HostDistanceClass(IndexPointerClass):
         self.species_name = species_name
         self.directory = directory
 
-        # star formation host distance kinds to write/read
-        self.host_distance_kinds = ['form.host.distance', 'form.host.distance.3d']
+        # star formation host distances to write/read
+        self.host_distance_kind = 'form.host.distance'
 
     def write_form_host_distance(
         self, part=None, snapshot_indices=[], part_indices=None):
@@ -313,14 +313,8 @@ class HostDistanceClass(IndexPointerClass):
 
         # store properties as 32-bit and initialize to nan
         particle_number = part[self.species_name]['position'].shape[0]
-        for host_distance_kind in self.host_distance_kinds:
-            if '2d' in host_distance_kind:
-                shape = [particle_number, 2]
-            elif '3d' in host_distance_kind:
-                shape = [particle_number, 3]
-            else:
-                shape = particle_number
-            part[self.species_name][host_distance_kind] = np.zeros(shape, np.float32) + np.nan
+        part[self.species_name][self.host_distance_kind] = np.zeros(
+            [particle_number, 3], np.float32) + np.nan
 
         id_wrong_number_tot = 0
         id_none_number_tot = 0
@@ -370,48 +364,32 @@ class HostDistanceClass(IndexPointerClass):
                     part_at_snap.center_position,
                     part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
 
+                # compute galaxy radius
+                gal = ut.particle.get_galaxy_properties(
+                    part_at_snap, self.species_name, 'mass.percent', 90, distance_max=15,
+                    print_results=True)
+
+                # compute rotation vectors
+                rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
+                    part_at_snap, self.species_name, gal['radius'], scalarize=True,
+                    print_results=True)
+
                 # rotate to align with principal axes
-                for host_distance_kind in self.host_distance_kinds:
-                    if '3d' in host_distance_kind or '2d' in host_distance_kind:
-                        # compute galaxy radius
-                        gal = ut.particle.get_galaxy_properties(
-                            part_at_snap, self.species_name, 'mass.percent', 90, distance_max=15,
-                            print_results=True)
+                distance_vectors = ut.coordinate.get_coordinates_rotated(
+                    distance_vectors, rotation_vectors)
 
-                        # compute rotation vectors
-                        rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
-                            part_at_snap, self.species_name, gal['radius'], scalarize=True,
-                            print_results=True)
-
-                        # rotate to align with principal axes
-                        distance_vectors = ut.coordinate.get_coordinates_rotated(
-                            distance_vectors, rotation_vectors)
-
-                        break
-
-                # compute distances to store
-                for host_distance_kind in self.host_distance_kinds:
-                    if '3d' in host_distance_kind:
-                        # 3-D distance wrt host along principal axes [kpc physical]
-                        distances_t = distance_vectors
-
-                    elif '2d' in host_distance_kind:
-                        # distance along major axes and along minor axis [kpc physical]
-                        distances_t = ut.coordinate.get_distances_major_minor(distance_vectors)
-
-                    else:
-                        # total scalar distance wrt host [kpc physical]
-                        distances_t = np.sqrt(np.sum(distance_vectors ** 2, 1))
-
-                    part[self.species_name][host_distance_kind][part_indices_form] = distances_t
+                # assign 3-D distance wrt host along principal axes [kpc physical]
+                part[self.species_name][self.host_distance_kind][part_indices_form] = \
+                    distance_vectors
 
                 # continuously (re)write as go
                 self.io_form_host_distance(part, 'write')
 
     def io_form_host_distance(self, part, io_direction='read'):
         '''
-        Read or write, for each particle, its distance wrt the host galaxy center at the first
-        snapshot after it formed.
+        Read or write, for each particle, at the first snapshot after it formed,
+        its distance wrt the host galaxy center, aligned with the principal axes of the host galaxy
+        at that time.
         If read, assign to particle catalog.
 
         Parameters
@@ -425,8 +403,7 @@ class HostDistanceClass(IndexPointerClass):
             directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[self.species_name]['id']
-            for host_distance_kind in self.host_distance_kinds:
-                dict_out[host_distance_kind] = part[self.species_name][host_distance_kind]
+            dict_out[self.host_distance_kind] = part[self.species_name][self.host_distance_kind]
 
             ut.io.file_hdf5(directory + file_name, dict_out)
 
@@ -439,8 +416,16 @@ class HostDistanceClass(IndexPointerClass):
             if bad_id_number:
                 self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
-            for host_distance_kind in dict_in.keys():
-                part[self.species_name][host_distance_kind] = dict_in[host_distance_kind]
+            for prop in dict_in.keys():
+                if prop != 'id':
+                    part[self.species_name][prop] = dict_in[prop]
+
+            # fix old naming convention
+            # now keep only 3-D vector distance
+            if self.host_distance_kind + '.3d' in part[self.species_name]:
+                part[self.species_name][self.host_distance_kind] = \
+                    part[self.species_name][self.host_distance_kind + '.3d']
+                del(part[self.species_name][self.host_distance_kind + '.3d'])
 
         else:
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))

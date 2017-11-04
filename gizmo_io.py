@@ -219,11 +219,11 @@ class ParticleDictionaryClass(dict):
         if 'host.' in property_name:
             if 'distance' in property_name:
                 if 'form.' in property_name:
-                    # 3-D distance vector at formation
-                    values = self.prop('form.host.distance.3d', indices)
+                    # 3-D distance vector wrt host at formation
+                    values = self.prop('form.host.distance', indices)
 
                 else:
-                    # 3-D distance vector now
+                    # 3-D distance vector wrt host now
                     values = ut.coordinate.get_distances(
                         'vector', self.prop('position', indices), self.center_position,
                         self.info['box.length']) * self.snapshot['scalefactor']  # [kpc physical]
@@ -240,11 +240,13 @@ class ParticleDictionaryClass(dict):
                 values = ut.coordinate.get_coordinates_rotated(
                     values, self.principal_axes_vectors)
 
-            if '2d' in property_name:
-                # convert to be along major axes and minor axis (R and Z)
-                # value along R is positive definite, along Z is signed
-                values = ut.coordinate.get_distances_major_minor(values)
-            elif '1d' in property_name:
+            if 'cylindrical' in property_name:
+                # convert to cylindrical coordinates
+                # along major axes (R, positive definite), minor axis (Z, signed),
+                # and angle (phi, 0 to 2 * pi)
+                values = ut.coordinate.get_distances_cylindrical(values)
+
+            if 'scalar' in property_name:
                 # compute scalar distance
                 if len(values.shape) == 1:
                     shape_pos = 0

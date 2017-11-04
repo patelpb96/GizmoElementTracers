@@ -514,7 +514,7 @@ class ImageClass(ut.io.SayClass):
                         rotation_vectors = ut.coordinate.get_principal_axes(
                             positions[masks], weights[masks])[0]
                 elif len(rotation):
-                    # assume input rotation vectors
+                    # use input rotation vectors
                     rotation_vectors = np.asarray(rotation)
                     if (np.ndim(rotation_vectors) != 2 or
                             rotation_vectors.shape[0] != positions.shape[1] or
