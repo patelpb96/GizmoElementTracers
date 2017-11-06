@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #SBATCH --job-name=gizmo_track
 #SBATCH --partition=serial
 ##SBATCH --partition=development
-## Stampede node has 16 processors & 32 GB
+## Stampede node has 16 cores and 32 GB
+## Stampede2 node has 64 (useable) cores, each with 2 FP threads, so 128 total, and 96 GB
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
 #SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
@@ -35,13 +36,16 @@ species_name = 'star'  # which particle species to track
 
 
 ScriptPrint = ut_io.ScriptPrintClass('slurm')
+
+# print run-time and CPU information
 ScriptPrint.print_initial()
 
 # check if any input arguments
 if len(os.sys.argv) > 1:
     function_kind = str(os.sys.argv[1])
+    assert ['indices' in function_kind or 'distance' in function_kind]
 else:
-    function_kind = 'indices'  # default is to assign just index pointers
+    function_kind = 'indices'  # default is to assign only index pointers
 print('executing function[s]: {}'.format(function_kind))
 os.sys.stdout.flush()
 

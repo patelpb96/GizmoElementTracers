@@ -278,10 +278,9 @@ class HostDistanceClass(IndexPointerClass):
         self.directory = directory
 
         # star formation host distances to write/read
-        self.host_distance_kind = 'form.host.distance'
+        self.form_host_distance_kind = 'form.host.distance'
 
-    def write_form_host_distance(
-        self, part=None, snapshot_indices=[], part_indices=None):
+    def write_form_host_distance(self, part=None, snapshot_indices=[], part_indices=None):
         '''
         Assign to each particle its distance wrt the host galaxy center at the snapshot after
         it formed.
@@ -311,10 +310,13 @@ class HostDistanceClass(IndexPointerClass):
                 min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
         snapshot_indices = np.sort(snapshot_indices)[::-1]  # work backwards in time
 
-        # store properties as 32-bit and initialize to nan
+        # store particle properties as 32-bit and initialize to nan
         particle_number = part[self.species_name]['position'].shape[0]
-        part[self.species_name][self.host_distance_kind] = np.zeros(
+        part[self.species_name][self.form_host_distance_kind] = np.zeros(
             [particle_number, 3], np.float32) + np.nan
+        # store principal axes rotation vectors at each snapshot
+        part[self.species_name].principal_axes_vectors_at_snapshots = \
+            np.zeros([snapshot_indices.size, 3, 3]) + np.nan
 
         id_wrong_number_tot = 0
         id_none_number_tot = 0
@@ -364,22 +366,25 @@ class HostDistanceClass(IndexPointerClass):
                     part_at_snap.center_position,
                     part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
 
-                # compute galaxy radius
+                # compute host galaxy properties, including R_90
                 gal = ut.particle.get_galaxy_properties(
                     part_at_snap, self.species_name, 'mass.percent', 90, distance_max=15,
                     print_results=True)
 
-                # compute rotation vectors
+                # compute rotation vectors within R_90
                 rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
                     part_at_snap, self.species_name, gal['radius'], scalarize=True,
                     print_results=True)
+
+                # store rotation vectors
+                part[self.species_name].principal_axes_vectors[snapshot_index] = rotation_vectors
 
                 # rotate to align with principal axes
                 distance_vectors = ut.coordinate.get_coordinates_rotated(
                     distance_vectors, rotation_vectors)
 
                 # assign 3-D distance wrt host along principal axes [kpc physical]
-                part[self.species_name][self.host_distance_kind][part_indices_form] = \
+                part[self.species_name][self.form_host_distance_kind][part_indices_form] = \
                     distance_vectors
 
                 # continuously (re)write as go
@@ -403,7 +408,10 @@ class HostDistanceClass(IndexPointerClass):
             directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[self.species_name]['id']
-            dict_out[self.host_distance_kind] = part[self.species_name][self.host_distance_kind]
+            dict_out[self.form_host_distance_kind] = \
+                part[self.species_name][self.form_host_distance_kind]
+            dict_out['principal.axes.vectors'] = \
+                part[self.species_name].principal_axes_vectors_at_snapshots
 
             ut.io.file_hdf5(directory + file_name, dict_out)
 
@@ -417,15 +425,18 @@ class HostDistanceClass(IndexPointerClass):
                 self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
             for prop in dict_in.keys():
-                if prop != 'id':
+                if prop == 'id':
+                    pass
+                elif prop == 'principal.axes.vectors':
+                    part[self.species_name].principal_axes_vectors_at_snapshots = dict_in[prop]
+                else:
                     part[self.species_name][prop] = dict_in[prop]
 
-            # fix old naming convention
-            # now keep only 3-D vector distance
-            if self.host_distance_kind + '.3d' in part[self.species_name]:
-                part[self.species_name][self.host_distance_kind] = \
-                    part[self.species_name][self.host_distance_kind + '.3d']
-                del(part[self.species_name][self.host_distance_kind + '.3d'])
+            # fix naming convention in older files - keep only 3-D vector distance
+            if self.form_host_distance_kind + '.3d' in part[self.species_name]:
+                part[self.species_name][self.form_host_distance_kind] = \
+                    part[self.species_name][self.form_host_distance_kind + '.3d']
+                del(part[self.species_name][self.form_host_distance_kind + '.3d'])
 
         else:
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))

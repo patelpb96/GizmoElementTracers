@@ -237,8 +237,7 @@ class ParticleDictionaryClass(dict):
 
             if 'principal' in property_name:
                 # align with host principal axes
-                values = ut.coordinate.get_coordinates_rotated(
-                    values, self.principal_axes_vectors)
+                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes_vectors)
 
             if 'cylindrical' in property_name:
                 # convert to cylindrical coordinates
