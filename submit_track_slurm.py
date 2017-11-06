@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 #SBATCH --job-name=gizmo_track
-#SBATCH --partition=serial
-##SBATCH --partition=development
+#SBATCH --partition=normal
 ## Stampede node has 16 cores and 32 GB
 ## Stampede2 node has 64 (useable) cores, each with 2 FP threads, so 128 total, and 96 GB
 #SBATCH --nodes=1
