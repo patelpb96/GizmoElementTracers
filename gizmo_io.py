@@ -137,7 +137,8 @@ class ParticleDictionaryClass(dict):
                 # written snapshots do not exactly coincide with input scale-factors
                 padding_factor = (1 + 1e-7)
                 values = self.Snapshot.get_snapshot_indices(
-                    'scalefactor', np.clip(self['form.scalefactor'] * padding_factor, 0, 1),
+                    'scalefactor',
+                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
                     round_kind='up')
 
             return values

@@ -51,7 +51,7 @@ os.sys.stdout.flush()
 # execute
 if 'indices' in function_kind:
     IndexPointer = gizmo_track.IndexPointerClass(species_name)
-    IndexPointer.write_index_pointer(match_property='id.child', test_property='form.scalefactor')
+    IndexPointer.write_index_pointer()
 
 if 'distance' in function_kind:
     HostDistance = gizmo_track.HostDistanceClass(species_name)
