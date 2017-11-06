@@ -291,6 +291,8 @@ class HostDistanceClass(IndexPointerClass):
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         part_indices : array-like : list of particle indices to assign to
         '''
+        force_float32 = True
+
         if part is None:
             # read particles at z = 0 - all properties possibly relevant for matching
             properties_read = [
@@ -298,7 +300,7 @@ class HostDistanceClass(IndexPointerClass):
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 self.species_name, 'redshift', 0, properties=properties_read, element_indices=[0],
-                force_float32=True, assign_center=False, check_properties=False)
+                force_float32=force_float32, assign_center=False, check_properties=False)
 
         # get list of particles to assign
         if part_indices is None or not len(part_indices):
@@ -315,8 +317,9 @@ class HostDistanceClass(IndexPointerClass):
         part[self.species_name][self.form_host_distance_kind] = np.zeros(
             [particle_number, 3], np.float32) + np.nan
         # store principal axes rotation vectors at each snapshot
-        part[self.species_name].principal_axes_vectors_at_snapshots = \
-            np.zeros([snapshot_indices.size, 3, 3]) + np.nan
+        part[self.species_name].principal_axes_vectors_at_snapshots = (
+            np.zeros([snapshot_indices.size, 3, 3],
+                     dtype=part[self.species_name]['position'].dtype) + np.nan)
 
         id_wrong_number_tot = 0
         id_none_number_tot = 0
@@ -332,8 +335,8 @@ class HostDistanceClass(IndexPointerClass):
                 Read = gizmo_io.ReadClass()
                 part_at_snap = Read.read_snapshots(
                     self.species_name, 'index', snapshot_index,
-                    properties=['position', 'mass', 'id'], force_float32=True, assign_center=True,
-                    check_properties=True)
+                    properties=['position', 'mass', 'id'], force_float32=force_float32,
+                    assign_center=True, check_properties=True)
 
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
@@ -377,7 +380,8 @@ class HostDistanceClass(IndexPointerClass):
                     print_results=True)
 
                 # store rotation vectors
-                part[self.species_name].principal_axes_vectors[snapshot_index] = rotation_vectors
+                part[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = \
+                    rotation_vectors
 
                 # rotate to align with principal axes
                 distance_vectors = ut.coordinate.get_coordinates_rotated(
