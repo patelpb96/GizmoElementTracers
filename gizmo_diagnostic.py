@@ -199,7 +199,8 @@ def print_run_times_ratios(
 
     for d_i, directory in enumerate(simulation_directories):
         scalefactors, redshifts, wall_times, cpu_times = print_run_times(
-            directory, output_directory, runtime_file_name, scalefactors, wall_times_restart[d_i])
+            directory, output_directory, None, runtime_file_name, wall_times_restart[d_i],
+            scalefactors)
         wall_timess.append(wall_times)
         cpu_timess.append(cpu_times)
 
