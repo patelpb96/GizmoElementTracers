@@ -1388,7 +1388,7 @@ class ReadClass(ut.io.SayClass):
             'bulge' or 'disk' = stars for non-cosmological run
         action : string : what to do to snapshot file: 'delete', 'velocity'
         value_adjust : float : value by which to adjust property (if not deleting)
-        snapshot_value_kind : string : input snapshot number kind: index, redshift
+        snapshot_value_kind : string : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
@@ -1460,6 +1460,79 @@ class ReadClass(ut.io.SayClass):
 
 
 Read = ReadClass()
+
+
+#===================================================================================================
+# write snapshot text file
+#===================================================================================================
+def write_snapshot_text(part):
+    '''
+    Write snapshot to text file, one file per species.
+
+    Parameters
+    ----------
+    part : dictionary class : catalog of particles at snapshot
+    '''
+    spec_name = 'dark'
+    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+    part_spec = part[spec_name]
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(
+            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n')
+
+        for pi in range(len(part_spec['id'])):
+            file_out.write(
+                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f}\n'.format(
+                    part_spec['id'][pi], part_spec['mass'][pi],
+                    part_spec.prop('host.distance', pi)[0], part_spec.prop('host.distance', pi)[1],
+                    part_spec.prop('host.distance', pi)[2],
+                    part_spec.prop('host.velocity', pi)[0], part_spec.prop('host.velocity', pi)[1],
+                    part_spec.prop('host.velocity', pi)[2],
+                )
+            )
+
+    spec_name = 'gas'
+    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+    part_spec = part[spec_name]
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(
+            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s] ' +
+            'density[M_sun/kpc^3] temperature[K]\n')
+
+        for pi in range(len(part_spec['id'])):
+            file_out.write(
+                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.2e} {:.2e}\n'.format(
+                    part_spec['id'][pi], part_spec['mass'][pi],
+                    part_spec.prop('host.distance', pi)[0], part_spec.prop('host.distance', pi)[1],
+                    part_spec.prop('host.distance', pi)[2],
+                    part_spec.prop('host.velocity', pi)[0], part_spec.prop('host.velocity', pi)[1],
+                    part_spec.prop('host.velocity', pi)[2],
+                    part_spec['density'][pi], part_spec['temperature'][pi],
+                )
+            )
+
+    spec_name = 'star'
+    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+    part_spec = part[spec_name]
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(
+            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s] ' +
+            'age[Gyr]\n')
+
+        for pi in range(len(part_spec['id'])):
+            file_out.write(
+                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.3f}\n'.format(
+                    part_spec['id'][pi], part_spec['mass'][pi],
+                    part_spec.prop('host.distance', pi)[0], part_spec.prop('host.distance', pi)[1],
+                    part_spec.prop('host.distance', pi)[2],
+                    part_spec.prop('host.velocity', pi)[0], part_spec.prop('host.velocity', pi)[1],
+                    part_spec.prop('host.velocity', pi)[2],
+                    part_spec.prop('age', pi),
+                )
+            )
 
 
 #===================================================================================================

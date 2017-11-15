@@ -1192,16 +1192,15 @@ def plot_property_v_distance(
         center_velocities = [center_velocities for _ in center_positions]
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
-    DistanceBin = ut.binning.DistanceBinClass(
+    SpeciesProfile = ut.particle.SpeciesProfileClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
         dimension_number=dimension_number)
 
-    SpeciesProfile = ut.particle.SpeciesProfileClass()
     pros = []
 
     for part_i, part in enumerate(parts):
         pros_part = SpeciesProfile.get_profiles(
-            DistanceBin, part, species_name, property_name, property_statistic, weight_by_mass,
+            part, species_name, property_name, property_statistic, weight_by_mass,
             center_positions[part_i], center_velocities[part_i], rotation,
             other_axis_distance_limits, property_select, part_indicess[part_i])
 
@@ -1566,11 +1565,9 @@ def plot_property_v_distance_halos(
     distance_limits_bin = [distance_limits[0] - distance_bin_width,
                            distance_limits[1] + distance_bin_width]
 
-    DistanceBin = ut.binning.DistanceBinClass(
+    SpeciesProfile = ut.particle.SpeciesProfileClass(
         distance_scaling, distance_limits_bin, width=distance_bin_width,
         number=distance_bin_number, dimension_number=dimension_number)
-
-    SpeciesProfile = ut.particle.SpeciesProfileClass()
 
     if pros is None:
         pros = []
@@ -1604,7 +1601,7 @@ def plot_property_v_distance_halos(
                         part_indices = None
 
                     pro_hal = SpeciesProfile.get_profiles(
-                        DistanceBin, part, species_name, property_name, property_statistic,
+                        part, species_name, property_name, property_statistic,
                         weight_by_mass, hal[position_kind][hal_i], hal[velocity_kind][hal_i],
                         part_indicess=part_indices)
 
@@ -2780,14 +2777,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         self.plot_directory = ut.io.get_path(plot_directory)
 
-        self.simulation_names = [
-            ['m12i/m12i_res56000', 'm12i r56000'],
-            ['m12b/m12b_res56000', 'm12b r56000'],
-            ['m12m/m12m_res56000', 'm12m r56000'],
-            ['m12c/m12c_res56000', 'm12c r56000'],
-            ['m12f/m12f_res56000', 'm12f r56000'],
-            ['m12q/m12q_res56000', 'm12q r56000'],
-        ]
+        self.simulation_names = []
 
     def plot_properties(
         self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
