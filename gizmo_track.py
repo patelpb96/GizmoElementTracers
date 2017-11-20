@@ -386,7 +386,7 @@ class HostCoordinateClass(IndexPointerClass):
                     rotation_vectors
 
                 # compute coordinates
-                coordinate_vectors = []
+                coordinate_vectors = {}
                 prop = 'form.host.distance'
                 if prop in self.form_host_coordiante_kinds:
                     # 3-D distance wrt host along default x,y,z axes [kpc physical]
