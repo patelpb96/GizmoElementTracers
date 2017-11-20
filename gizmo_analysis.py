@@ -1213,7 +1213,6 @@ def plot_property_v_distance(
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     y_values = [pro[species_name][property_statistic] for pro in pros]
     _axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(

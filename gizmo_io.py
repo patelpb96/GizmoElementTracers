@@ -222,7 +222,6 @@ class ParticleDictionaryClass(dict):
                 if 'form.' in property_name:
                     # 3-D distance vector wrt host at formation
                     values = self.prop('form.host.distance', indices)
-
                 else:
                     # 3-D distance vector wrt host now
                     values = ut.coordinate.get_distances(
@@ -230,11 +229,15 @@ class ParticleDictionaryClass(dict):
                         self.info['box.length']) * self.snapshot['scalefactor']  # [kpc physical]
 
             elif 'velocity' in property_name:
-                # caveat: this does *not* include Hubble flow or correct for periodic boundaries
-                # that requires input of positions as well, so need to use utility functions
-                values = ut.coordinate.get_velocity_differences(
-                    'vector', self.prop('velocity', indices), self.center_velocity,
-                    include_hubble_flow=False)
+                if 'form.' in property_name:
+                    # 3-D velocity vectory wrt host at formation
+                    values = self.prop('form.host.velocity', indices)
+                else:
+                    # caveat: this does *not* include Hubble flow
+                    # that requires input of positions as well, so need to use utility functions
+                    values = ut.coordinate.get_velocity_differences(
+                        'vector', self.prop('velocity', indices), self.center_velocity,
+                        include_hubble_flow=False)
 
             if 'principal' in property_name:
                 # align with host principal axes
@@ -459,9 +462,9 @@ class ReadClass(ut.io.SayClass):
             # assign distance from host galaxy at formation to stars
             if assign_form_host_distance and 'star' in species:
                 from . import gizmo_track
-                HostDistance = gizmo_track.HostDistanceClass(
+                HostCoordinate = gizmo_track.HostCoordinateClass(
                     'star', simulation_directory + 'track/')
-                HostDistance.io_form_host_distance(part)
+                HostCoordinate.io_formation_coordinates_wrt_host(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
