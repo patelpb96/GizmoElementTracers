@@ -54,7 +54,7 @@ if 'indices' in function_kind:
     IndexPointer.write_index_pointer()
 
 if 'coordinates' in function_kind:
-    HostCoordinate = gizmo_track.HostCoordinateClass(species_name)
-    HostCoordinate.write_formation_coordinates()
+    HostCoordinates = gizmo_track.HostCoordinatesClass(species_name)
+    HostCoordinates.write_formation_coordinates()
 
 ScriptPrint.print_final()
