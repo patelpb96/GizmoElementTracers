@@ -462,7 +462,7 @@ class ReadClass(ut.io.SayClass):
             # assign distance from host galaxy at formation to stars
             if assign_formation_coordinates and 'star' in species:
                 from . import gizmo_track
-                HostCoordinate = gizmo_track.HostCoordinateClass(
+                HostCoordinate = gizmo_track.HostCoordinatesClass(
                     'star', simulation_directory + 'track/')
                 HostCoordinate.io_formation_coordinates(part)
 
