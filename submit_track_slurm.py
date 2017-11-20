@@ -55,6 +55,6 @@ if 'indices' in function_kind:
 
 if 'coordinates' in function_kind:
     HostCoordinate = gizmo_track.HostCoordinateClass(species_name)
-    HostCoordinate.write_formation_coordinates_wrt_host()
+    HostCoordinate.write_formation_coordinates()
 
 ScriptPrint.print_final()

@@ -262,10 +262,10 @@ class IndexPointerClass(ut.io.SayClass):
 IndexPointer = IndexPointerClass()
 
 
-class HostCoordinateClass(IndexPointerClass):
+class HostCoordinatesClass(IndexPointerClass):
     '''
-    Compute coordinates (distances and velocities) wrt the host galaxy center for particles across
-    time.
+    Compute coordinates (3D distances and 3D velocities) wrt the host galaxy center for particles
+    across time.
     '''
     def __init__(self, species_name='star', directory=TRACK_DIRECTORY):
         '''
@@ -277,10 +277,10 @@ class HostCoordinateClass(IndexPointerClass):
         self.species_name = species_name
         self.directory = directory
 
-        # kinds of distances and velocities to write/read
+        # names of distances and velocities to write/read
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def write_formation_coordinates_wrt_host(
+    def write_formation_coordinates(
         self, part=None, snapshot_indices=[], part_indices=None):
         '''
         Assign to each particle its coordiates (3D distances and 3D velocities) wrt the host
@@ -324,10 +324,16 @@ class HostCoordinateClass(IndexPointerClass):
         for prop in self.form_host_coordiante_kinds:
             part[self.species_name][prop] = np.zeros(
                 [particle_number, 3], coordinate_dtype) + np.nan
-        # store principal axes rotation vectors at each snapshot
+
+        # store center position and velocity of the host galaxy at each snapshot
+        part[self.species_name].center_position_at_snapshots = (
+            np.zeros([snapshot_indices.size, 3], coordinate_dtype) + np.nan)
+        part[self.species_name].center_velocity_at_snapshots = (
+            np.zeros([snapshot_indices.size, 3], coordinate_dtype) + np.nan)
+
+        # store principal axes rotation vectors of the host galaxy at each snapshot
         part[self.species_name].principal_axes_vectors_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3, 3],
-                     part[self.species_name]['position'].dtype) + np.nan)
+            np.zeros([snapshot_indices.size, 3, 3], coordinate_dtype) + np.nan)
 
         id_wrong_number_tot = 0
         id_none_number_tot = 0
@@ -376,10 +382,16 @@ class HostCoordinateClass(IndexPointerClass):
                     part_at_snap, self.species_name, 'mass.percent', 90, distance_max=15,
                     print_results=True)
 
-                # compute rotation vectors within R_90
+                # compute rotation vectors for principal axes within R_90
                 rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
                     part_at_snap, self.species_name, gal['radius'], scalarize=True,
                     print_results=True)
+
+                # store host galaxy center coordinates
+                part[self.species_name].center_position_at_snapshots[snapshot_index] = \
+                    part_at_snap.center_position
+                part[self.species_name].center_velocity_at_snapshots[snapshot_index] = \
+                    part_at_snap.center_velocity
 
                 # store rotation vectors
                 part[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = \
@@ -413,9 +425,9 @@ class HostCoordinateClass(IndexPointerClass):
                     part[self.species_name][prop][part_indices_form] = coordinate_vectors[prop]
 
                 # continuously (re)write as go
-                self.io_formation_coordinates_wrt_host(part, 'write')
+                self.io_formation_coordinates(part, 'write')
 
-    def io_formation_coordinates_wrt_host(self, part, io_direction='read'):
+    def io_formation_coordinates(self, part, io_direction='read'):
         '''
         Read or write, for each particle, at the first snapshot after it formed,
         its coordinates (distances and velocities) wrt the host galaxy center,
@@ -427,15 +439,16 @@ class HostCoordinateClass(IndexPointerClass):
         part : dict : catalog of particles at snapshot
         io_direction : string : 'read' or 'write'
         '''
-        file_name = '{}_form_coordinates_wrt_host_{:03d}'.format(
-            self.species_name, part.snapshot['index'])
+        file_name = '{}_form_coordinates_{:03d}'.format(self.species_name, part.snapshot['index'])
 
         if io_direction == 'write':
             directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[self.species_name]['id']
-            for prop in self.form_host_distance_kinds:
+            for prop in self.form_host_coordiante_kinds:
                 dict_out[prop] = part[self.species_name][prop]
+            dict_out['center.position'] = part[self.species_name].center_position_at_snapshots
+            dict_out['center.velocity'] = part[self.species_name].center_velocity_at_snapshots
             dict_out['principal.axes.vectors'] = \
                 part[self.species_name].principal_axes_vectors_at_snapshots
 
@@ -453,6 +466,10 @@ class HostCoordinateClass(IndexPointerClass):
             for prop in dict_in.keys():
                 if prop == 'id':
                     pass
+                elif prop == 'center.position':
+                    part[self.species_name].center_position_at_snapshots = dict_in[prop]
+                elif prop == 'center.velocity':
+                    part[self.species_name].center_velocity_at_snapshots = dict_in[prop]
                 elif prop == 'principal.axes.vectors':
                     part[self.species_name].principal_axes_vectors_at_snapshots = dict_in[prop]
                 else:
@@ -460,7 +477,7 @@ class HostCoordinateClass(IndexPointerClass):
                     part[self.species_name][prop] = dict_in[prop]
 
             # fix naming convention in older files - keep only 3-D vector distance
-            for prop in self.form_host_distance_kinds:
+            for prop in self.form_host_coordiante_kinds:
                 if prop + '.3d' in part[self.species_name]:
                     part[self.species_name][prop] = part[self.species_name][prop + '.3d']
                     del(part[self.species_name][prop + '.3d'])
@@ -469,7 +486,7 @@ class HostCoordinateClass(IndexPointerClass):
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))
 
 
-HostCoordinate = HostCoordinateClass()
+HostCoordinates = HostCoordinatesClass()
 
 
 #===================================================================================================
@@ -477,14 +494,14 @@ HostCoordinate = HostCoordinateClass()
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: indices, distances, indices+distances')
+        raise ValueError('specify function: indices, coordinates, indices+coordinates')
 
     function_kind = str(sys.argv[1])
 
-    assert ('indices' in function_kind or 'distances' in function_kind)
+    assert ('indices' in function_kind or 'coordinates' in function_kind)
 
     if 'indices' in function_kind:
         IndexPointer.write_index_pointer()
 
-    if 'distances' in function_kind:
-        HostCoordinate.write_formation_coordinates_wrt_host()
+    if 'coordinates' in function_kind:
+        HostCoordinates.write_formation_coordinates()

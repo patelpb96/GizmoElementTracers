@@ -310,7 +310,7 @@ class ReadClass(ut.io.SayClass):
         properties='all', element_indices=None, particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
         assign_center=True, assign_principal_axes=False, assign_orbit=False,
-        assign_form_host_distance=False,
+        assign_formation_coordinates=False,
         check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -348,8 +348,8 @@ class ReadClass(ut.io.SayClass):
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
         assign_orbit : booelan : whether to assign derived orbital properties wrt galaxy/halo center
-        assign_form_host_distance : boolean :
-            whether to assign distance from host galaxy at formation to stars
+        assign_formation_coordinates : boolean :
+            whether to assign coordindates wrt the host galaxy at formation to stars
         check_properties : boolean : whether to check sanity of particle properties after read in
 
         Returns
@@ -460,11 +460,11 @@ class ReadClass(ut.io.SayClass):
                 self.assign_orbit(part, 'star')
 
             # assign distance from host galaxy at formation to stars
-            if assign_form_host_distance and 'star' in species:
+            if assign_formation_coordinates and 'star' in species:
                 from . import gizmo_track
                 HostCoordinate = gizmo_track.HostCoordinateClass(
                     'star', simulation_directory + 'track/')
-                HostCoordinate.io_formation_coordinates_wrt_host(part)
+                HostCoordinate.io_formation_coordinates(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
