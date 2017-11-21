@@ -376,8 +376,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
 
-        Snapshot = self.read_snapshot_times(simulation_directory)
-
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
@@ -608,7 +607,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = self.read_snapshot_times(simulation_directory)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
             snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
@@ -789,7 +788,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = self.read_snapshot_times(simulation_directory)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
             snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
@@ -1107,35 +1106,6 @@ class ReadClass(ut.io.SayClass):
 
         return path_file_name
 
-    def read_snapshot_times(self, directory='.'):
-        '''
-        Read snapshot file that contains scale-factors[, redshifts, times, time spacings].
-        Return as dictionary.
-
-        Parameters
-        ----------
-        directory : string : directory of snapshot time file
-
-        Returns
-        -------
-        Snapshot : dictionary class : snapshot information
-        '''
-        directory = ut.io.get_path(directory)
-
-        Snapshot = ut.simulation.SnapshotClass()
-
-        try:
-            try:
-                Snapshot.read_snapshots('snapshot_times.txt', directory)
-            except IOError:
-                Snapshot.read_snapshots('snapshot_scale-factors.txt', directory)
-        except Exception:
-            raise IOError('cannot find file of snapshot times in {}'.format(directory))
-
-        self.is_first_print = True
-
-        return Snapshot
-
     def get_cosmology(
         self, directory='.', omega_lambda=None, omega_matter=None, omega_baryon=None, hubble=None,
         sigma_8=None, n_s=None):
@@ -1403,7 +1373,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        Snapshot = self.read_snapshot_times(simulation_directory)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
