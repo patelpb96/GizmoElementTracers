@@ -15,7 +15,7 @@ import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 from scipy import integrate
 # local ----
-import utilities as ut
+import wutilities as ut
 
 
 #===================================================================================================
