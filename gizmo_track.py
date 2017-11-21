@@ -74,8 +74,7 @@ class IndexPointerClass(ut.io.SayClass):
         match_property : string :
             some particles have the same id. this is the property to use to match them.
             options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
-        match_propery_tolerance : float :
-            tolerance for matching via match_property, if it is a float
+        match_propery_tolerance : float : tolerance for matching via match_property, if a float
         test_property : string : additional property to use to test matching
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         '''
@@ -284,9 +283,10 @@ class IndexPointerClass(ut.io.SayClass):
 IndexPointer = IndexPointerClass()
 
 
-class HostDistanceClass(IndexPointerClass):
+class HostCoordinatesClass(IndexPointerClass):
     '''
-    Compute distance wrt the host galaxy center for particles across time.
+    Compute coordinates (3D distances and 3D velocities) wrt the host galaxy center for particles
+    across time.
     '''
     def __init__(self, species_name='star', directory=TRACK_DIRECTORY):
         '''
@@ -298,14 +298,14 @@ class HostDistanceClass(IndexPointerClass):
         self.species_name = species_name
         self.directory = directory
 
-        # star formation host distance kinds to write/read
-        self.host_distance_kinds = ['form.host.distance', 'form.host.distance.3d']
+        # names of distances and velocities to write/read
+        self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def write_form_host_distance(
+    def write_formation_coordinates(
         self, part=None, snapshot_indices=[], part_indices=None):
         '''
-        Assign to each particle its distance wrt the host galaxy center at the snapshot after
-        it formed.
+        Assign to each particle its coordiates (3D distances and 3D velocities) wrt the host
+        galaxy center at the snapshot after it formed.
 
         Parameters
         ----------
@@ -313,14 +313,22 @@ class HostDistanceClass(IndexPointerClass):
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         part_indices : array-like : list of particle indices to assign to
         '''
+        # set numpy data type to store coordinates
+        coordinate_dtype = np.float32
+        if coordinate_dtype is np.float32:
+            force_float32 = True
+        else:
+            force_float32 = False
+
         if part is None:
             # read particles at z = 0 - all properties possibly relevant for matching
             properties_read = [
-                'position', 'mass', 'id', 'id.child', 'massfraction.metals', 'form.scalefactor']
+                'position', 'velocity', 'mass', 'id', 'id.child', 'massfraction.metals',
+                'form.scalefactor']
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 self.species_name, 'redshift', 0, properties=properties_read, element_indices=[0],
-                force_float32=True, assign_center=False, check_properties=False)
+                force_float32=force_float32, assign_center=False, check_properties=False)
 
         # get list of particles to assign
         if part_indices is None or not len(part_indices):
@@ -332,16 +340,21 @@ class HostDistanceClass(IndexPointerClass):
                 min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
         snapshot_indices = np.sort(snapshot_indices)[::-1]  # work backwards in time
 
-        # store properties as 32-bit and initialize to nan
+        # store particle properties and initialize to nan
         particle_number = part[self.species_name]['position'].shape[0]
-        for host_distance_kind in self.host_distance_kinds:
-            if '2d' in host_distance_kind:
-                shape = [particle_number, 2]
-            elif '3d' in host_distance_kind:
-                shape = [particle_number, 3]
-            else:
-                shape = particle_number
-            part[self.species_name][host_distance_kind] = np.zeros(shape, np.float32) + np.nan
+        for prop in self.form_host_coordiante_kinds:
+            part[self.species_name][prop] = np.zeros(
+                [particle_number, 3], coordinate_dtype) + np.nan
+
+        # store center position and velocity of the host galaxy at each snapshot
+        part[self.species_name].center_position_at_snapshots = (
+            np.zeros([snapshot_indices.size, 3], coordinate_dtype) + np.nan)
+        part[self.species_name].center_velocity_at_snapshots = (
+            np.zeros([snapshot_indices.size, 3], coordinate_dtype) + np.nan)
+
+        # store principal axes rotation vectors of the host galaxy at each snapshot
+        part[self.species_name].principal_axes_vectors_at_snapshots = (
+            np.zeros([snapshot_indices.size, 3, 3], coordinate_dtype) + np.nan)
 
         id_wrong_number_tot = 0
         id_none_number_tot = 0
@@ -358,13 +371,13 @@ class HostDistanceClass(IndexPointerClass):
                 if center_position_function is None:
                     part_at_snap = Read.read_snapshots(
                         self.species_name, 'index', snapshot_index,
-                        properties=['position', 'mass', 'id'], force_float32=True, assign_center=True,
-                        check_properties=True)
+                        properties=['position', 'velocity', 'mass', 'id'], force_float32=force_float32,
+                        assign_center=True, check_properties=True)
                 else:
                     part_at_snap = Read.read_snapshots(
                         self.species_name, 'index', snapshot_index,
-                        properties=['position', 'mass', 'id'], force_float32=True, assign_center=False,
-                        check_properties=True)
+                        properties=['position', 'velocity', 'mass', 'id'], force_float32=force_float32,
+                        assign_center=True, check_properties=True)
                 
                     #interpolate the center from the information that I have.
                     #if before first timestep, use first timestep; if after last, use last
@@ -376,7 +389,6 @@ class HostDistanceClass(IndexPointerClass):
                     else:
                         part_at_snap.center_position = center_position_function(scalefactor)
                 
-
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
                 else:
@@ -402,54 +414,61 @@ class HostDistanceClass(IndexPointerClass):
                              id_wrong_number, snapshot_index))
                     id_wrong_number_tot += id_wrong_number
 
-                # 3-D distance wrt host along default x,y,z axes [kpc physical]
-                distance_vectors = ut.coordinate.get_distances(
-                    'vector', part_at_snap[self.species_name]['position'][part_indices_at_snap],
-                    part_at_snap.center_position,
-                    part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
+                # compute host galaxy properties, including R_90
+                gal = ut.particle.get_galaxy_properties(
+                    part_at_snap, self.species_name, 'mass.percent', 90, distance_max=15,
+                    print_results=True)
 
-                # rotate to align with principal axes
-                for host_distance_kind in self.host_distance_kinds:
-                    if '3d' in host_distance_kind or '2d' in host_distance_kind:
-                        # compute galaxy radius
-                        gal = ut.particle.get_galaxy_properties(
-                            part_at_snap, self.species_name, 'mass.percent', 90, distance_max=15,
-                            print_results=True)
+                # compute rotation vectors for principal axes within R_90
+                rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
+                    part_at_snap, self.species_name, gal['radius'], scalarize=True,
+                    print_results=True)
 
-                        # compute rotation vectors
-                        rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
-                            part_at_snap, self.species_name, gal['radius'], scalarize=True,
-                            print_results=True)
+                # store host galaxy center coordinates
+                part[self.species_name].center_position_at_snapshots[snapshot_index] = \
+                    part_at_snap.center_position
+                part[self.species_name].center_velocity_at_snapshots[snapshot_index] = \
+                    part_at_snap.center_velocity
 
-                        # rotate to align with principal axes
-                        distance_vectors = ut.coordinate.get_coordinates_rotated(
-                            distance_vectors, rotation_vectors)
+                # store rotation vectors
+                part[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = \
+                    rotation_vectors
 
-                        break
+                # compute coordinates
+                coordinate_vectors = {}
+                prop = 'form.host.distance'
+                if prop in self.form_host_coordiante_kinds:
+                    # 3-D distance wrt host along default x,y,z axes [kpc physical]
+                    coordinate_vectors[prop] = ut.coordinate.get_distances(
+                        'vector', part_at_snap[self.species_name]['position'][part_indices_at_snap],
+                        part_at_snap.center_position,
+                        part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
 
-                # compute distances to store
-                for host_distance_kind in self.host_distance_kinds:
-                    if '3d' in host_distance_kind:
-                        # 3-D distance wrt host along principal axes [kpc physical]
-                        distances_t = distance_vectors
+                prop = 'form.host.velocity'
+                if prop in self.form_host_coordiante_kinds:
+                    # 3-D velocity wrt host along default x,y,z axes [km / s physical]
+                    # caveat: this does *not* include Hubble flow
+                    coordinate_vectors[prop] = ut.coordinate.get_velocity_differences(
+                        'vector', part_at_snap[self.species_name]['velocity'][part_indices_at_snap],
+                        part_at_snap.center_velocity, include_hubble_flow=False)
 
-                    elif '2d' in host_distance_kind:
-                        # distance along major axes and along minor axis [kpc physical]
-                        distances_t = ut.coordinate.get_distances_major_minor(distance_vectors)
+                # rotate coordinates to align with principal axes
+                for prop in self.form_host_coordiante_kinds:
+                    coordinate_vectors[prop] = ut.coordinate.get_coordinates_rotated(
+                        coordinate_vectors[prop], rotation_vectors)
 
-                    else:
-                        # total scalar distance wrt host [kpc physical]
-                        distances_t = np.sqrt(np.sum(distance_vectors ** 2, 1))
-
-                    part[self.species_name][host_distance_kind][part_indices_form] = distances_t
+                # assign 3-D coordinates wrt host along principal axes [kpc physical]
+                for prop in self.form_host_coordiante_kinds:
+                    part[self.species_name][prop][part_indices_form] = coordinate_vectors[prop]
 
                 # continuously (re)write as go
-                self.io_form_host_distance(part, 'write')
+                self.io_formation_coordinates(part, 'write')
 
-    def io_form_host_distance(self, part, io_direction='read'):
+    def io_formation_coordinates(self, part, io_direction='read'):
         '''
-        Read or write, for each particle, its distance wrt the host galaxy center at the first
-        snapshot after it formed.
+        Read or write, for each particle, at the first snapshot after it formed,
+        its coordinates (distances and velocities) wrt the host galaxy center,
+        aligned with the principal axes of the host galaxy at that time.
         If read, assign to particle catalog.
 
         Parameters
@@ -457,14 +476,18 @@ class HostDistanceClass(IndexPointerClass):
         part : dict : catalog of particles at snapshot
         io_direction : string : 'read' or 'write'
         '''
-        file_name = '{}_form_host_distance_{:03d}'.format(self.species_name, part.snapshot['index'])
+        file_name = '{}_form_coordinates_{:03d}'.format(self.species_name, part.snapshot['index'])
 
         if io_direction == 'write':
             directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[self.species_name]['id']
-            for host_distance_kind in self.host_distance_kinds:
-                dict_out[host_distance_kind] = part[self.species_name][host_distance_kind]
+            for prop in self.form_host_coordiante_kinds:
+                dict_out[prop] = part[self.species_name][prop]
+            dict_out['center.position'] = part[self.species_name].center_position_at_snapshots
+            dict_out['center.velocity'] = part[self.species_name].center_velocity_at_snapshots
+            dict_out['principal.axes.vectors'] = \
+                part[self.species_name].principal_axes_vectors_at_snapshots
 
             ut.io.file_hdf5(directory + file_name, dict_out)
 
@@ -477,14 +500,30 @@ class HostDistanceClass(IndexPointerClass):
             if bad_id_number:
                 self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
-            for host_distance_kind in dict_in.keys():
-                part[self.species_name][host_distance_kind] = dict_in[host_distance_kind]
+            for prop in dict_in.keys():
+                if prop == 'id':
+                    pass
+                elif prop == 'center.position':
+                    part[self.species_name].center_position_at_snapshots = dict_in[prop]
+                elif prop == 'center.velocity':
+                    part[self.species_name].center_velocity_at_snapshots = dict_in[prop]
+                elif prop == 'principal.axes.vectors':
+                    part[self.species_name].principal_axes_vectors_at_snapshots = dict_in[prop]
+                else:
+                    # store coordinates at formation
+                    part[self.species_name][prop] = dict_in[prop]
+
+            # fix naming convention in older files - keep only 3-D vector distance
+            for prop in self.form_host_coordiante_kinds:
+                if prop + '.3d' in part[self.species_name]:
+                    part[self.species_name][prop] = part[self.species_name][prop + '.3d']
+                    del(part[self.species_name][prop + '.3d'])
 
         else:
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))
 
 
-HostDistance = HostDistanceClass()
+HostCoordinates = HostCoordinatesClass()
 
 
 #===================================================================================================
@@ -497,7 +536,7 @@ if __name__ == '__main__':
 
     function_kind = str(sys.argv[1])
 
-    assert ('indices' in function_kind or 'distances' in function_kind)
+    assert ('indices' in function_kind or 'coordinates' in function_kind)
 
     if len(sys.argv) < 3:
         print("Hope you analyzing an isolated run; letting the read function assign centers.")
@@ -524,5 +563,6 @@ if __name__ == '__main__':
     if 'indices' in function_kind:
         IndexPointer.write_index_pointer()
 
-    if 'distances' in function_kind:
-        HostDistance.write_form_host_distance(center_position_function=center_position_function)
+    if 'coordinates' in function_kind:
+        HostCoordinates.write_formation_coordinates(center_position_function=center_position_function)
+

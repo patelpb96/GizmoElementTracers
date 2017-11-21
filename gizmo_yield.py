@@ -8,7 +8,7 @@ Masses in [M_sun].
 
 
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport

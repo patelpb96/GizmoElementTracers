@@ -138,7 +138,8 @@ class ParticleDictionaryClass(dict):
                 # written snapshots do not exactly coincide with input scale-factors
                 padding_factor = (1 + 1e-7)
                 values = self.Snapshot.get_snapshot_indices(
-                    'scalefactor', np.clip(self['form.scalefactor'] * padding_factor, 0, 1),
+                    'scalefactor',
+                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
                     round_kind='up')
 
             return values
@@ -220,32 +221,36 @@ class ParticleDictionaryClass(dict):
         if 'host.' in property_name:
             if 'distance' in property_name:
                 if 'form.' in property_name:
-                    # 3-D distance vector at formation
-                    values = self.prop('form.host.distance.3d', indices)
-
+                    # 3-D distance vector wrt host at formation
+                    values = self.prop('form.host.distance', indices)
                 else:
-                    # 3-D distance vector now
+                    # 3-D distance vector wrt host now
                     values = ut.coordinate.get_distances(
                         'vector', self.prop('position', indices), self.center_position,
                         self.info['box.length']) * self.snapshot['scalefactor']  # [kpc physical]
 
             elif 'velocity' in property_name:
-                # caveat: this does *not* include Hubble flow or correct for periodic boundaries
-                # that requires input of positions as well, so need to use utility functions
-                values = ut.coordinate.get_velocity_differences(
-                    'vector', self.prop('velocity', indices), self.center_velocity,
-                    include_hubble_flow=False)
+                if 'form.' in property_name:
+                    # 3-D velocity vectory wrt host at formation
+                    values = self.prop('form.host.velocity', indices)
+                else:
+                    # caveat: this does *not* include Hubble flow
+                    # that requires input of positions as well, so need to use utility functions
+                    values = ut.coordinate.get_velocity_differences(
+                        'vector', self.prop('velocity', indices), self.center_velocity,
+                        include_hubble_flow=False)
 
             if 'principal' in property_name:
                 # align with host principal axes
-                values = ut.coordinate.get_coordinates_rotated(
-                    values, self.principal_axes_vectors)
+                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes_vectors)
 
-            if '2d' in property_name:
-                # convert to be along major axes and minor axis (R and Z)
-                # value along R is positive definite, along Z is signed
-                values = ut.coordinate.get_distances_major_minor(values)
-            elif '1d' in property_name:
+            if 'cylindrical' in property_name:
+                # convert to cylindrical coordinates
+                # along major axes (R, positive definite), minor axis (Z, signed),
+                # and angle (phi, 0 to 2 * pi)
+                values = ut.coordinate.get_distances_cylindrical(values)
+
+            if 'scalar' in property_name:
                 # compute scalar distance
                 if len(values.shape) == 1:
                     shape_pos = 0
@@ -310,7 +315,7 @@ class ReadClass(ut.io.SayClass):
         properties='all', element_indices=None, particle_subsample_factor=0,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
         assign_center=True, assign_principal_axes=False, assign_orbit=False,
-        assign_form_host_distance=False,
+        assign_formation_coordinates=False,
         check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -348,8 +353,8 @@ class ReadClass(ut.io.SayClass):
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
         assign_orbit : booelan : whether to assign derived orbital properties wrt galaxy/halo center
-        assign_form_host_distance : boolean :
-            whether to assign distance from host galaxy at formation to stars
+        assign_formation_coordinates : boolean :
+            whether to assign coordindates wrt the host galaxy at formation to stars
         check_properties : boolean : whether to check sanity of particle properties after read in
 
         Returns
@@ -379,8 +384,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
 
-        Snapshot = self.read_snapshot_times(simulation_directory)
-
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
@@ -464,11 +468,11 @@ class ReadClass(ut.io.SayClass):
                 self.assign_orbit(part, 'star')
 
             # assign distance from host galaxy at formation to stars
-            if assign_form_host_distance and 'star' in species:
+            if assign_formation_coordinates and 'star' in species:
                 from . import gizmo_track
-                HostDistance = gizmo_track.HostDistanceClass(
+                HostCoordinate = gizmo_track.HostCoordinatesClass(
                     'star', simulation_directory + 'track/')
-                HostDistance.io_form_host_distance(part)
+                HostCoordinate.io_formation_coordinates(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
@@ -692,7 +696,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = self.read_snapshot_times(simulation_directory)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
             snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
@@ -873,7 +877,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = self.read_snapshot_times(simulation_directory)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
             snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
@@ -1490,7 +1494,7 @@ class ReadClass(ut.io.SayClass):
             'bulge' or 'disk' = stars for non-cosmological run
         action : string : what to do to snapshot file: 'delete', 'velocity'
         value_adjust : float : value by which to adjust property (if not deleting)
-        snapshot_value_kind : string : input snapshot number kind: index, redshift
+        snapshot_value_kind : string : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
@@ -1502,7 +1506,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        Snapshot = self.read_snapshot_times(simulation_directory)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
@@ -1562,6 +1566,79 @@ class ReadClass(ut.io.SayClass):
 
 
 Read = ReadClass()
+
+
+#===================================================================================================
+# write snapshot text file
+#===================================================================================================
+def write_snapshot_text(part):
+    '''
+    Write snapshot to text file, one file per species.
+
+    Parameters
+    ----------
+    part : dictionary class : catalog of particles at snapshot
+    '''
+    spec_name = 'dark'
+    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+    part_spec = part[spec_name]
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(
+            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n')
+
+        for pi in range(len(part_spec['id'])):
+            file_out.write(
+                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f}\n'.format(
+                    part_spec['id'][pi], part_spec['mass'][pi],
+                    part_spec.prop('host.distance', pi)[0], part_spec.prop('host.distance', pi)[1],
+                    part_spec.prop('host.distance', pi)[2],
+                    part_spec.prop('host.velocity', pi)[0], part_spec.prop('host.velocity', pi)[1],
+                    part_spec.prop('host.velocity', pi)[2],
+                )
+            )
+
+    spec_name = 'gas'
+    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+    part_spec = part[spec_name]
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(
+            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s] ' +
+            'density[M_sun/kpc^3] temperature[K]\n')
+
+        for pi in range(len(part_spec['id'])):
+            file_out.write(
+                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.2e} {:.2e}\n'.format(
+                    part_spec['id'][pi], part_spec['mass'][pi],
+                    part_spec.prop('host.distance', pi)[0], part_spec.prop('host.distance', pi)[1],
+                    part_spec.prop('host.distance', pi)[2],
+                    part_spec.prop('host.velocity', pi)[0], part_spec.prop('host.velocity', pi)[1],
+                    part_spec.prop('host.velocity', pi)[2],
+                    part_spec['density'][pi], part_spec['temperature'][pi],
+                )
+            )
+
+    spec_name = 'star'
+    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+    part_spec = part[spec_name]
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(
+            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s] ' +
+            'age[Gyr]\n')
+
+        for pi in range(len(part_spec['id'])):
+            file_out.write(
+                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.3f}\n'.format(
+                    part_spec['id'][pi], part_spec['mass'][pi],
+                    part_spec.prop('host.distance', pi)[0], part_spec.prop('host.distance', pi)[1],
+                    part_spec.prop('host.distance', pi)[2],
+                    part_spec.prop('host.velocity', pi)[0], part_spec.prop('host.velocity', pi)[1],
+                    part_spec.prop('host.velocity', pi)[2],
+                    part_spec.prop('age', pi),
+                )
+            )
 
 
 #===================================================================================================

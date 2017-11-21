@@ -496,7 +496,37 @@ class ImageClass(ut.io.SayClass):
             positions -= center_position
             positions *= part.snapshot['scalefactor']
 
-            # initialize masks
+            if rotation is not None:
+                # rotate image
+                if rotation is True:
+                    # rotate according to principal axes
+                    if (part[species_name].principal_axes_vectors is not None and
+                            len(part[species_name].principal_axes_vectors)):
+                        # rotate to align with stored principal axes
+                        rotation_vectors = part[species_name].principal_axes_vectors
+                    else:
+                        # compute principal axes using all particles originally within image limits
+                        masks = (positions[:, dimensions_select[0]] <= distances_max[0])
+                        for dimen_i in dimensions_select:
+                            masks *= (
+                                (positions[:, dimen_i] >= -distances_max[dimen_i]) *
+                                (positions[:, dimen_i] <= distances_max[dimen_i])
+                            )
+                        rotation_vectors = ut.coordinate.get_principal_axes(
+                            positions[masks], weights[masks])[0]
+                elif len(rotation):
+                    # use input rotation vectors
+                    rotation_vectors = np.asarray(rotation)
+                    if (np.ndim(rotation_vectors) != 2 or
+                            rotation_vectors.shape[0] != positions.shape[1] or
+                            rotation_vectors.shape[1] != positions.shape[1]):
+                        raise ValueError('wrong shape for rotation = {}'.format(rotation))
+                else:
+                    raise ValueError('cannot parse rotation = {}'.format(rotation))
+
+                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
+
+            # keep only particles within distance limits
             masks = (positions[:, dimensions_select[0]] <= distances_max[0])
             for dimen_i in dimensions_select:
                 masks *= (
@@ -507,19 +537,6 @@ class ImageClass(ut.io.SayClass):
             positions = positions[masks]
             if weights is not None:
                 weights = weights[masks]
-
-            if rotation is not None:
-                # rotate image
-                if (rotation is True and part[species_name].principal_axes_vectors is not None and
-                        len(part[species_name].principal_axes_vectors)):
-                    # rotate to align with stored principal axes
-                    rotation_vectors = part[species_name].principal_axes_vectors
-
-                else:
-                    # compute from particles within image limits
-                    rotation_vectors = ut.coordinate.get_principal_axes(positions, weights)[0]
-
-                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
         else:
             raise ValueError('need to input center position')
 
@@ -1176,16 +1193,15 @@ def plot_property_v_distance(
         center_velocities = [center_velocities for _ in center_positions]
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
-    DistanceBin = ut.binning.DistanceBinClass(
+    SpeciesProfile = ut.particle.SpeciesProfileClass(
         distance_scaling, distance_limits, width=distance_bin_width, number=distance_bin_number,
         dimension_number=dimension_number)
 
-    SpeciesProfile = ut.particle.SpeciesProfileClass()
     pros = []
 
     for part_i, part in enumerate(parts):
         pros_part = SpeciesProfile.get_profiles(
-            DistanceBin, part, species_name, property_name, property_statistic, weight_by_mass,
+            part, species_name, property_name, property_statistic, weight_by_mass,
             center_positions[part_i], center_velocities[part_i], rotation,
             other_axis_distance_limits, property_select, part_indicess[part_i])
 
@@ -1198,7 +1214,6 @@ def plot_property_v_distance(
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     y_values = [pro[species_name][property_statistic] for pro in pros]
     _axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
@@ -1550,11 +1565,9 @@ def plot_property_v_distance_halos(
     distance_limits_bin = [distance_limits[0] - distance_bin_width,
                            distance_limits[1] + distance_bin_width]
 
-    DistanceBin = ut.binning.DistanceBinClass(
+    SpeciesProfile = ut.particle.SpeciesProfileClass(
         distance_scaling, distance_limits_bin, width=distance_bin_width,
         number=distance_bin_number, dimension_number=dimension_number)
-
-    SpeciesProfile = ut.particle.SpeciesProfileClass()
 
     if pros is None:
         pros = []
@@ -1588,7 +1601,7 @@ def plot_property_v_distance_halos(
                         part_indices = None
 
                     pro_hal = SpeciesProfile.get_profiles(
-                        DistanceBin, part, species_name, property_name, property_statistic,
+                        part, species_name, property_name, property_statistic,
                         weight_by_mass, hal[position_kind][hal_i], hal[velocity_kind][hal_i],
                         part_indicess=part_indices)
 
@@ -2764,14 +2777,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         self.plot_directory = ut.io.get_path(plot_directory)
 
-        self.simulation_names = [
-            ['m12i/m12i_res56000', 'm12i r56000'],
-            ['m12b/m12b_res56000', 'm12b r56000'],
-            ['m12m/m12m_res56000', 'm12m r56000'],
-            ['m12c/m12c_res56000', 'm12c r56000'],
-            ['m12f/m12f_res56000', 'm12f r56000'],
-            ['m12q/m12q_res56000', 'm12q r56000'],
-        ]
+        self.simulation_names = []
 
     def plot_properties(
         self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
