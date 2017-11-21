@@ -703,6 +703,7 @@ class ReadClass(ut.io.SayClass):
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
+        self.is_first_print = True
         self.say('* read header from: {}'.format(file_name.replace('./', '')), end='\n')
 
         # open snapshot file
