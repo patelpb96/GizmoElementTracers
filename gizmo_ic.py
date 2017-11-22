@@ -15,7 +15,6 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 from __future__ import absolute_import, division, print_function
 import sys
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 from scipy import spatial
 # local ----
 import utilities as ut
@@ -110,7 +109,7 @@ class ReadClass(ut.io.SayClass):
         self.snapshot_redshifts = np.sort(snapshot_redshifts)
         self.simulation_directory = simulation_directory
 
-    def read_all(self, mass_limits=[1e11, Inf]):
+    def read_all(self, mass_limits=[1e11, np.Inf]):
         '''
         Read particles from final and initial snapshot and halos from final snapshot.
 
@@ -162,7 +161,7 @@ class ReadClass(ut.io.SayClass):
 
         return parts
 
-    def read_halos(self, mass_limits=[1e11, Inf]):
+    def read_halos(self, mass_limits=[1e11, np.Inf]):
         '''
         Read halos from final snapshot.
 
@@ -303,13 +302,17 @@ def write_initial_points(
     volume_ini_chull = ut.coordinate.get_volume_of_convex_hull(positions_ini)
     mass_ini_chull = volume_ini_chull * density_ini  # assume cosmic density within volume
 
-    # encompassing cube (relevant for MUSIC FFT)
-    position_dif_max = 0
+    # encompassing cube (relevant for MUSIC FFT) and cuboid
+    position_difs = []
     for dimen_i in range(positions_ini.shape[1]):
-        if poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min() > position_dif_max:
-            position_dif_max = poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min()
-    volume_ini_cube = position_dif_max ** 3
+        position_difs.append(poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min())
+    volume_ini_cube = max(position_difs) ** 3
     mass_ini_cube = volume_ini_cube * density_ini  # assume cosmic density within volume
+
+    volume_ini_cuboid = 1.
+    for dimen_i in range(positions_ini.shape[1]):
+        volume_ini_cuboid *= position_difs[dimen_i]
+    mass_ini_cuboid = volume_ini_cuboid * density_ini  # assume cosmic density within volume
 
     # MUSIC does not support header information in points file, so put in separate log file
     log_file_name = file_name.replace('.txt', '_log.txt')
@@ -344,6 +347,11 @@ def write_initial_points(
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                     volume_ini_chull * ut.const.mega_per_kilo ** 3))
 
+        Write.write('# within cuboid at initial time')
+        Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
+        Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_cuboid * ut.const.mega_per_kilo ** 3))
+
         Write.write('# within encompassing cube at initial time')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
@@ -351,12 +359,17 @@ def write_initial_points(
 
         Write.write('# initial position range')
         for dimen_i in range(positions_ini.shape[1]):
-            string = '  {} [min, max] = [{:.3f}, {:.3f}] kpc comoving, [{:.9f}, {:.9f}] box units'
+            string = ('  {} [min, max, wid] = [{:.3f}, {:.3f}, {:.3f}] kpc comoving' +
+                      ', [{:.9f}, {:.9f}, {:.9f}] box units')
+            width = np.max(poss_ini_limits[dimen_i]) - np.min(poss_ini_limits[dimen_i])
             Write.write(
                 string.format(
-                    dimen_i, np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]),
+                    dimen_i,
+                    np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]), width,
                     np.min(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
-                    np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length'])
+                    np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
+                    width / part_ini.info['box.length'],
+                )
             )
 
         positions_ini /= part_ini.info['box.length']  # renormalize to box units
