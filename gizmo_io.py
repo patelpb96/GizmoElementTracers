@@ -12,7 +12,6 @@ from __future__ import absolute_import, division, print_function  # python 2 com
 import collections
 import h5py
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 

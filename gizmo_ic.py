@@ -12,7 +12,7 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import sys
 import numpy as np
 from scipy import spatial
@@ -213,7 +213,7 @@ def write_initial_points(
         'particles', 'convex-hull', 'cube'
     dark_mass : float : dark-matter particle mass (if simulation has only DM, at single resolution)
     '''
-    file_name = 'ic_agora_mX_rad{:.0f}_points.txt'.format(distance_max)
+    file_name = 'ic_agora_mX_rad{:.1f}_points.txt'.format(distance_max)
 
     Say = ut.io.SayClass(write_initial_points)
 
@@ -347,28 +347,28 @@ def write_initial_points(
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                     volume_ini_chull * ut.const.mega_per_kilo ** 3))
 
-        Write.write('# within cuboid at initial time')
+        Write.write('# within encompassing cuboid at initial time')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                     volume_ini_cuboid * ut.const.mega_per_kilo ** 3))
 
-        Write.write('# within encompassing cube at initial time')
+        Write.write('# within encompassing cube at initial time (for MUSIC FFT)')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                     volume_ini_cube * ut.const.mega_per_kilo ** 3))
 
-        Write.write('# initial position range')
+        Write.write('# position range at initial time')
         for dimen_i in range(positions_ini.shape[1]):
-            string = ('  {} [min, max, wid] = [{:.3f}, {:.3f}, {:.3f}] kpc comoving' +
-                      ', [{:.9f}, {:.9f}, {:.9f}] box units')
-            width = np.max(poss_ini_limits[dimen_i]) - np.min(poss_ini_limits[dimen_i])
+            string = ('  {} [min, max, width] = [{:.2f}, {:.2f}, {:.2f}] kpc comoving\n' +
+                      '        [{:.9f}, {:.9f}, {:.9f}] box units')
+            pos_min = np.min(poss_ini_limits[dimen_i])
+            pos_max = np.max(poss_ini_limits[dimen_i])
+            pos_width = np.max(poss_ini_limits[dimen_i]) - np.min(poss_ini_limits[dimen_i])
             Write.write(
                 string.format(
-                    dimen_i,
-                    np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]), width,
-                    np.min(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
-                    np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
-                    width / part_ini.info['box.length'],
+                    dimen_i, pos_min, pos_max, pos_width,
+                    pos_min / part_ini.info['box.length'], pos_max / part_ini.info['box.length'],
+                    pos_width / part_ini.info['box.length']
                 )
             )
 

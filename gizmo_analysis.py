@@ -2604,9 +2604,9 @@ def get_galaxy_mass_profiles_v_redshift(
         'time.lookback': [],  # snapshot lookback time [Gyr]
 
         'star.position': [],  # position of galaxy (star) center [kpc comoving]
-        'star.velocity': [],  # center-of-mass velocity of stars within R_50 [km/s physical]
+        'star.velocity': [],  # center-of-mass velocity of stars within R_50 [km / s]
         'dark.position': [],  # position of DM center [kpc comoving]
-        'dark.velocity': [],  # center-of-mass velocity of DM within 0.5 * R_200m [km/s physical]
+        'dark.velocity': [],  # center-of-mass velocity of DM within 0.5 * R_200m [km / s]
 
         'rotation.tensor': [],  # rotation tensor of disk
         'axis.ratio': [],  # axis ratios of disk
