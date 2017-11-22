@@ -331,7 +331,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind : string :
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_values : int or float or list thereof :
-            index[s] or redshifts[s] or scale-factor[s] of snapshot file[s]
+            index[s] or redshift[s] or scale-factor[s] of snapshot[s]
         simulation_directory : string : directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
         simulation_name : string : name to store for future identification
@@ -475,7 +475,8 @@ class ReadClass(ut.io.SayClass):
         return parts
 
     def read_snapshots_simulations(
-        self, simulation_directories=[], species='all', redshift=0,
+        self, simulation_directories=[], species='all',
+        snapshot_value_kind='index', snapshot_value=600,
         properties='all', element_indices=[0, 1, 6, 10], force_float32=True,
         assign_principal_axes=False):
         '''
@@ -487,7 +488,9 @@ class ReadClass(ut.io.SayClass):
         directories : list or list of lists :
             list of simulation directories, or list of pairs of directory + simulation name
         species : string or list : name[s] of particle species to read
-        redshift : float
+        snapshot_value_kind : string :
+            input snapshot number kind: 'index', 'redshift', 'scalefactor'
+        snapshot_value : int or float : index or redshift or scale-factor of snapshot
         properties : string or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
         force_float32 : boolean : whether to force positions to be 32-bit
@@ -516,10 +519,10 @@ class ReadClass(ut.io.SayClass):
         for directory, simulation_name in simulation_directories:
             try:
                 _header = self.read_header(
-                    'redshift', redshift, directory, simulation_name=simulation_name)
+                    snapshot_value_kind, snapshot_value, directory, simulation_name=simulation_name)
             except Exception:
-                self.say('! could not read snapshot header at z = {:.3f} in {}'.format(
-                         redshift, directory))
+                self.say('! could not read snapshot header at {} = {:.3f} in {}'.format(
+                         snapshot_value_kind, snapshot_value, directory))
                 bad_snapshot_value += 1
 
         if bad_snapshot_value:
@@ -531,9 +534,10 @@ class ReadClass(ut.io.SayClass):
         for directory, simulation_name in simulation_directories:
             try:
                 part = self.read_snapshots(
-                    species, 'redshift', redshift, directory, simulation_name=simulation_name,
-                    properties=properties, element_indices=element_indices,
-                    force_float32=force_float32, assign_principal_axes=assign_principal_axes)
+                    species, snapshot_value_kind, snapshot_value, directory,
+                    simulation_name=simulation_name, properties=properties,
+                    element_indices=element_indices, force_float32=force_float32,
+                    assign_principal_axes=assign_principal_axes)
 
                 if 'velocity' in properties:
                     self.assign_orbit(part, 'gas')
@@ -542,11 +546,12 @@ class ReadClass(ut.io.SayClass):
                 directories_read.append(directory)
 
             except Exception:
-                self.say('! could not read snapshot at z = {:.3f} in {}'.format(
-                         redshift, directory))
+                self.say('! could not read snapshot at {} = {} in {}'.format(
+                         snapshot_value_kind, snapshot_value, directory))
 
         if not len(parts):
-            self.say('! could not read any snapshots at z = {:.3f}'.format(redshift))
+            self.say('! could not read any snapshots at {} = {}'.format(
+                     snapshot_value_kind, snapshot_value))
             return
 
         if 'mass' in properties and 'star' in part:
