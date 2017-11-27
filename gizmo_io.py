@@ -1199,7 +1199,7 @@ class ReadClass(ut.io.SayClass):
             'id.generation': [0, 4e9],
             'position': [0, 1e6],  # [kpc comoving]
             'velocity': [-1e5, 1e5],  # [km / s]
-            'mass': [9, 3e10],  # [M_sun]
+            'mass': [9, 1e11],  # [M_sun]
             'potential': [-1e9, 1e9],  # [M_sun]
             'temperature': [3, 1e9],  # [K]
             'density': [0, 1e14],  # [M_sun/kpc^3]
@@ -1240,7 +1240,7 @@ class ReadClass(ut.io.SayClass):
 
     def assign_center(self, part, method='center-of-mass', compare_centers=False):
         '''
-        Assign center position [kpc comoving] and velocity [km / s physical] to galaxy/halo,
+        Assign center position [kpc comoving] and velocity [km / s] to galaxy/halo,
         using stars for baryonic simulation or dark matter for dark matter simulation.
 
         Parameters

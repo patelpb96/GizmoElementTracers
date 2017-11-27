@@ -192,10 +192,14 @@ def plot_mass_contamination(
     print('contamination summary')
     species = 'dark.2'
     dist_i_halo = np.searchsorted(distances_phys, halo_radius)
-    print('* {} {} particles within R_halo'.format(
-          profile_number[species]['sum.cum'][dist_i_halo], species))
+    if profile_number[species]['sum.cum'][dist_i_halo] > 0:
+        print('* {} {} particles within R_halo'.format(
+              profile_number[species]['sum.cum'][dist_i_halo], species))
     dist_i = np.where(profile_number[species]['sum.cum'] > 0)[0][0]
     print('* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
+          species, distances_phys[dist_i], distances_halo[dist_i]))
+    dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.0001)[0][0]
+    print('* {} mass_ratio = 0.01% at d < {:.1f} kpc, {:.1f} R_halo'.format(
           species, distances_phys[dist_i], distances_halo[dist_i]))
     dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.001)[0][0]
     print('* {} mass_ratio = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
@@ -2731,7 +2735,7 @@ def print_galaxy_mass_v_redshift(gal):
     '''
     print('# redshift scale-factor time[Gyr] ', end='')
     print('star_position(x,y,z)[kpc comov] ', end='')
-    print('star_velocity(x,y,z)[km/s phys] dark_velocity(x,y,z)[km/s phys] ', end='')
+    print('star_velocity(x,y,z)[km/s] dark_velocity(x,y,z)[km/s] ', end='')
     print('r_50[kpc phys] star_mass_50[M_sun] gas_mass_50[M_sun] dark_mass_50[M_sun] ', end='')
     print('r_90[kpc phys] star_mass_90[M_sun] gas_mass_90[M_sun] dark_mass_90[M_sun]', end='\n')
 

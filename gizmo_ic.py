@@ -409,7 +409,7 @@ def write_initial_points_from_uniform(
     dark_mass : float : dark-matter particle mass (if simulation has only DM, at single resolution)
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
-        print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
+        print('! selection radius = {} seems odd. are you sure?'.format(distance_max))
 
     center_position = hal['position'][hal_index]
     halo_radius = hal['radius.' + virial_kind][hal_index]
@@ -441,7 +441,7 @@ def read_write_initial_points_from_zoom(
     simulation_directory : string : directory of simulation
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
-        print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
+        print('! selection radius = {} seems odd. are you sure?'.format(distance_max))
 
     Read = ReadClass(snapshot_redshifts, simulation_directory)
     parts = Read.read_particles()
