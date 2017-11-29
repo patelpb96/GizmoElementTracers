@@ -453,8 +453,7 @@ class ReadClass(ut.io.SayClass):
                 self.assign_principal_axes(part)
 
             # store derived orbital properties wrt center of galaxy/halo
-            if (assign_orbit and 'star' in species and
-                    ('velocity' in properties or properties is 'all')):
+            if assign_orbit and ('velocity' in properties or properties is 'all'):
                 self.assign_orbit(part, 'star')
 
             # assign distance from host galaxy at formation to stars
@@ -1321,7 +1320,7 @@ class ReadClass(ut.io.SayClass):
         print()
 
     def assign_orbit(
-        self, part, species=['star'], center_position=None, center_velocity=None,
+        self, part, species=[], center_position=None, center_velocity=None,
         include_hubble_flow=True):
         '''
         Assign derived orbital properties wrt single center to species.
@@ -1334,6 +1333,8 @@ class ReadClass(ut.io.SayClass):
         center_velocity : array : center velocity to use
         include_hubble_flow : boolean : whether to include hubble flow
         '''
+        if not species:
+            species = ['star', 'gas', 'dark']
         species = ut.particle.parse_species(part, species)
 
         self.say('* assigning orbital properties wrt galaxy/halo to {}'.format(species))

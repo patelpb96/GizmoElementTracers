@@ -22,74 +22,6 @@ from . import gizmo_io
 
 
 #===================================================================================================
-# analysis
-#===================================================================================================
-def print_contamination_in_box(
-    part, center_position=None, distance_limits=None, distance_bin_number=20,
-    distance_scaling='linear', geometry='cube'):
-    '''
-    Test contamination from low-resolution particles around center.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    center_position : array : 3-d position of center [kpc comoving]
-    distance_limits : float : maximum distance from center to check [kpc physical]
-    distance_bin_number : int : number of distance bins
-    distance_scaling : string : 'log', 'linear'
-    geometry : string : geometry of region: 'cube', 'sphere'
-    '''
-    Say = ut.io.SayClass(print_contamination_in_box)
-
-    Neighbor = ut.neighbor.NeighborClass()
-
-    if distance_limits is None:
-        distance_limits = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
-
-    if center_position is None:
-        center_position = np.zeros(part['position'].shape[1])
-        for dimension_i in range(part['position'].shape[1]):
-            center_position[dimension_i] = 0.5 * part.info['box.length']
-    print('center position = {}'.format(center_position))
-
-    DistanceBin = ut.binning.DistanceBinClass(
-        distance_scaling, distance_limits, number=distance_bin_number)
-
-    masses_unique = np.unique(part['mass'])
-    pis_all = ut.array.get_arange(part['mass'])
-    pis_contam = pis_all[part['mass'] != masses_unique.min()]
-
-    if geometry == 'sphere':
-        distances, neig_pis = Neighbor.get_neighbors(
-            center_position, part['position'], part['mass'].size,
-            distance_limits, part.info['box.length'], neig_ids=pis_all)
-        distances = distances[0]
-        neig_pis = neig_pis[0]
-    elif geometry == 'cube':
-        distance_vector = np.abs(ut.coordinate.get_distances(
-            'vector', part['position'], center_position, part.info['box.length']))
-
-    for dist_i in range(DistanceBin.number):
-        distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
-
-        if geometry == 'sphere':
-            pis_all_d = neig_pis[ut.array.get_indices(distances, distance_bin_limits)]
-        elif geometry == 'cube':
-            pis_all_d = np.array(pis_all)
-            for dimension_i in range(part['position'].shape[1]):
-                pis_all_d = ut.array.get_indices(
-                    distance_vector[:, dimension_i], distance_bin_limits, pis_all_d)
-
-        pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
-        frac = ut.math.Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
-        Say.say('distance = [{:.3f}, {:.3f}], fraction = {:.5f}'.format(
-                distance_bin_limits[0], distance_bin_limits[1], frac))
-
-        if frac >= 1:
-            break
-
-
-#===================================================================================================
 # read data
 #===================================================================================================
 class ReadClass(ut.io.SayClass):
@@ -452,6 +384,74 @@ def read_write_initial_points_from_zoom(
     write_initial_points(
         parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
         region_kind)
+
+
+#===================================================================================================
+# analysis
+#===================================================================================================
+def print_contamination_in_box(
+    part, center_position=None, distance_limits=None, distance_bin_number=20,
+    distance_scaling='linear', geometry='cube'):
+    '''
+    Test contamination from low-resolution particles around center.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles
+    center_position : array : 3-d position of center [kpc comoving]
+    distance_limits : float : maximum distance from center to check [kpc physical]
+    distance_bin_number : int : number of distance bins
+    distance_scaling : string : 'log', 'linear'
+    geometry : string : geometry of region: 'cube', 'sphere'
+    '''
+    Say = ut.io.SayClass(print_contamination_in_box)
+
+    Neighbor = ut.neighbor.NeighborClass()
+
+    if distance_limits is None:
+        distance_limits = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
+
+    if center_position is None:
+        center_position = np.zeros(part['position'].shape[1])
+        for dimension_i in range(part['position'].shape[1]):
+            center_position[dimension_i] = 0.5 * part.info['box.length']
+    print('center position = {}'.format(center_position))
+
+    DistanceBin = ut.binning.DistanceBinClass(
+        distance_scaling, distance_limits, number=distance_bin_number)
+
+    masses_unique = np.unique(part['mass'])
+    pis_all = ut.array.get_arange(part['mass'])
+    pis_contam = pis_all[part['mass'] != masses_unique.min()]
+
+    if geometry == 'sphere':
+        distances, neig_pis = Neighbor.get_neighbors(
+            center_position, part['position'], part['mass'].size,
+            distance_limits, part.info['box.length'], neig_ids=pis_all)
+        distances = distances[0]
+        neig_pis = neig_pis[0]
+    elif geometry == 'cube':
+        distance_vector = np.abs(ut.coordinate.get_distances(
+            'vector', part['position'], center_position, part.info['box.length']))
+
+    for dist_i in range(DistanceBin.number):
+        distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
+
+        if geometry == 'sphere':
+            pis_all_d = neig_pis[ut.array.get_indices(distances, distance_bin_limits)]
+        elif geometry == 'cube':
+            pis_all_d = np.array(pis_all)
+            for dimension_i in range(part['position'].shape[1]):
+                pis_all_d = ut.array.get_indices(
+                    distance_vector[:, dimension_i], distance_bin_limits, pis_all_d)
+
+        pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
+        frac = ut.math.Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
+        Say.say('distance = [{:.3f}, {:.3f}], fraction = {:.5f}'.format(
+                distance_bin_limits[0], distance_bin_limits[1], frac))
+
+        if frac >= 1:
+            break
 
 
 #===================================================================================================
