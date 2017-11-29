@@ -2753,7 +2753,7 @@ def print_galaxy_mass_v_redshift(gal):
 #===================================================================================================
 class CompareSimulationsClass(ut.io.SayClass):
     '''
-    Plot different simulations for comparison.
+    Analyze and plot different simulations for comparison.
     '''
     def __init__(
         self, galaxy_radius_limits=[0, 12], galaxy_profile_radius_limits=[0.1, 30],
@@ -2761,6 +2761,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         Set directories and names of simulations to read.
         '''
+        from . import gizmo_io
+        self.Read = gizmo_io.ReadClass()
+
         self.properties = ['mass', 'position', 'form.scalefactor', 'massfraction']
 
         self.galaxy_radius_limits = galaxy_radius_limits
@@ -2771,38 +2774,109 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         self.simulation_names = []
 
+    def plot_all(
+        self, parts=None, species=['star', 'gas', 'dark'], simulation_directories=None,
+        redshifts=[0]):
+        '''
+        Analyze and plot all quantities for all simulations at each redshift.
+
+        Parameters
+        ----------
+        parts : list : dictionaries of particles at snapshot
+        species : string or list : name[s] of particle species to read and analyze
+        simulation_directories : list : simulation directories and names/labels for figure
+        redshifts : float or list
+        '''
+        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
+
+        for redshift in redshifts:
+            if len(redshifts) > 1:
+                parts = self.Read.read_simulations(
+                    simulation_directories, species, redshift, self.properties)
+
+            if 'star' in species:
+                self.print_masses_sizes(parts, 'star', simulation_directories, redshifts)
+            self.plot_properties(parts, species, simulation_directories, redshifts)
+            self.plot_properties_2d(parts, species, simulation_directories, redshifts)
+            self.plot_images(parts, ['star', 'gas'], simulation_directories, redshifts)
+
+    def print_masses_sizes(
+        self, parts=None, species=['star'], simulation_directories=None,
+        redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
+                   0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
+                   0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
+                   0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
+                   0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
+        distance_max=15):
+        '''
+        Print 2-D sizes of galaxies.
+
+        Parameters
+        ----------
+        parts : list : dictionaries of particles at snapshot
+        species : string or list : name[s] of particle species to read and analyze
+        simulation_directories : list : simulation directories and names/labels for figure
+        redshifts : float or list
+        distance_max : float : maximum distance from center to plot
+        align_principal_axes : boolean : whether to align plot axes with principal axes
+        '''
+        properties = ['mass', 'position']
+        mass_fraction = 90
+
+        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
+
+        if parts is not None and redshifts is not None and len(redshifts) > 1:
+            self.say('! input particles at single snapshot but also input more than one redshift')
+            return
+
+        for redshift in redshifts:
+            if len(redshifts) > 1:
+                parts = self.Read.read_simulations(
+                    simulation_directories, species, redshift, properties)
+
+            gals = []
+            for spec in ut.array.get_list_combined(species, parts[0], 'intersect'):
+                for part in parts:
+                    gal = ut.particle.get_galaxy_properties(
+                        part, spec, 'mass.percent', mass_fraction, distance_max,
+                        axis_kind='both', principal_axes_distance_max=distance_max)
+                    gals.append(gal)
+
+                self.say('\n# species = {}'.format(spec))
+
+                for part_i, part in enumerate(parts):
+                    gal = gals[part_i]
+                    self.say('\n{}'.format(part.info['simulation.name']))
+                    self.say('* M_{},{} = {:.2e} Msun ({:.2f})'.format(
+                             spec, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']))
+                    string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
+                    self.say(string.format(
+                             mass_fraction, gal['radius.major'],
+                             gal['radius.major'] / gals[0]['radius.major'],
+                             mass_fraction, gal['radius.minor'],
+                             gal['radius.minor'] / gals[0]['radius.minor']))
+            print()
+
     def plot_properties(
-        self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', distance_bin_width=0.1):
+        self, parts=None, species=['star', 'gas', 'dark'], simulation_directories=None,
+        redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0], distance_bin_width=0.1):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
         Parameters
         ----------
-        parts : list : list of dictionaries of particles at snapshot
-        simulation_directories : list : list of simulation directories and name/label for figure
+        parts : list : dictionaries of particles at snapshot
+        species : string or list : name[s] of particle species to read and analyze
+        simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
-        species : string or list : name[s] of particle species to read
         distance_bin_width : float : width of distance bin
         '''
-        if isinstance(parts, dict):
-            parts = [parts]
-
-        if np.isscalar(redshifts):
-            redshifts = [redshifts]
-
-        if parts is not None and len(redshifts) > 1:
-            self.say('! input particles at single snapshot but also input more than one redshift')
-            return
+        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
 
         for redshift in redshifts:
-            if parts is None or len(redshifts) > 1:
-                from . import gizmo_io
-                Read = gizmo_io.ReadClass()
-                parts = Read.read_simulations(
+            if len(redshifts) > 1:
+                parts = self.Read.read_simulations(
                     simulation_directories, species, redshift, self.properties)
-
-            self.print_masses_sizes(parts, None, redshifts, ['star'], distance_max=15)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
@@ -2929,45 +3003,32 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=self.plot_directory,
                     )
 
-            self.plot_properties_2d(parts, redshifts=redshift)
-            self.plot_images(parts, redshifts=redshift)
-
     def plot_properties_2d(
-        self, parts=None, simulation_directories=None, redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        species='all', property_bin_number=100):
+        self, parts=None, species=['star', 'gas', 'dark'], simulation_directories=None,
+        redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0], property_bin_number=100):
         '''
         Plot property v property for each simulation at each redshift.
 
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        simulation_directories : list : list of simulation directories and name/label for figure
+        species : string or list : name[s] of particle species to read and analyze
+        simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
-        species : string or list : name[s] of particle species to read
         property_bin_number : int : number of bins along each dimension for histogram
         '''
         plot_directory = self.plot_directory + 'property_2d'
 
-        if isinstance(parts, dict):
-            parts = [parts]
-
-        if np.isscalar(redshifts):
-            redshifts = [redshifts]
-
-        if parts is not None and len(redshifts) > 1:
-            self.say('! input particles at single snapshot but also input more than one redshift')
-            return
+        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
 
         for redshift in redshifts:
-            if parts is None or len(redshifts) > 1:
-                from . import gizmo_io
-                Read = gizmo_io.ReadClass()
-                parts = Read.read_simulations(
+            if len(redshifts) > 1:
+                parts = self.Read.read_simulations(
                     simulation_directories, species, redshift, self.properties)
 
             for part in parts:
                 species_name = 'star'
-                if species_name in parts[0]:
+                if species_name in part:
                     plot_property_v_property(
                         part, species_name,
                         'metallicity.fe', [-3, 1], 'linear',
@@ -2993,7 +3054,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
                 species_name = 'gas'
-                if 0:  # species_name in parts[0]:
+                if 0:  # species_name in part:
                     plot_property_v_property(
                         part, species_name,
                         'number.density', [-4, 4], 'log',
@@ -3003,24 +3064,22 @@ class CompareSimulationsClass(ut.io.SayClass):
                         write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
 
     def plot_images(
-        self, parts=None, simulation_directories=None,
+        self, parts=None, species=['star', 'gas'], simulation_directories=None,
         redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
                    0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
                    0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
                    0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
                    0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
-        species=['star', 'gas'],
-        distance_max=21, distance_bin_width=0.05, image_limits=[10 ** 6, 10 ** 10.5],
-        align_principal_axes=True):
+        distance_max=21, distance_bin_width=0.05, align_principal_axes=True):
         '''
         Plot images of simulations at each snapshot.
 
         Parameters
         ----------
-        parts : list : list of particle dictionaries at snapshot
-        simulation_directories : list : list of simulation directories and name/label for figure
+        parts : list : dictionaries of particles at snapshot
+        species : string or list : name[s] of particle species to read and analyze
+        simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
-        species : string or list : name[s] of particle species to plot
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
         image_limits : list : min and max limits for image dyanmic range
@@ -3029,102 +3088,69 @@ class CompareSimulationsClass(ut.io.SayClass):
         properties = ['mass', 'position']
         plot_directory = self.plot_directory + 'image'
 
-        if isinstance(parts, dict):
-            parts = [parts]
-
-        if np.isscalar(redshifts):
-            redshifts = [redshifts]
-
-        if np.isscalar(species):
-            species = [species]
-        species_read = list(species)
-        if 'star' not in species_read:
-            species_read.append('star')
-
-        if parts is not None and len(redshifts) > 1:
-            self.say('! input particles at single snapshot but also input more than one redshift')
-            return
+        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
 
         for redshift in redshifts:
-            if parts is None or len(redshifts) > 1:
-                from . import gizmo_io
-                Read = gizmo_io.ReadClass()
-                parts = Read.read_simulations(
-                    simulation_directories, species_read, redshift, properties)
+            if len(redshifts) > 1:
+                parts = self.Read.read_simulations(
+                    simulation_directories, species, redshift, properties)
 
             for part in parts:
-                for spec in ut.array.get_list_combined(species, part, 'intersect'):
+                species_name = 'star'
+                if species_name in part:
                     Image.plot_image(
-                        part, spec, 'mass', 'histogram',
+                        part, species_name, 'mass', 'histogram',
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
-                        rotation=align_principal_axes, image_limits=image_limits,
+                        rotation=align_principal_axes, image_limits=[10 ** 6, 10 ** 10.5],
                         background_color='black',
                         write_plot=True, plot_directory=plot_directory,
                         add_simulation_name=True,
                     )
 
-    def print_masses_sizes(
-        self, parts=None, simulation_directories=None,
-        redshifts=[1.5, 1.4, 1.3, 1.2, 1.1, 1.0,
-                   0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3,
-                   0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
-                   0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
-                   0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
-        species=['star'], distance_max=15):
-        '''
-        Print 2-D sizes of galaxies.
+                species_name = 'gas'
+                if species_name in part:
+                    Image.plot_image(
+                        part, species_name, 'mass', 'histogram',
+                        [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                        rotation=align_principal_axes, image_limits=[10 ** 4, 10 ** 9],
+                        background_color='black',
+                        write_plot=True, plot_directory=plot_directory,
+                        add_simulation_name=True,
+                    )
 
-        Parameters
-        ----------
-        parts : list : list of particle dictionaries at snapshot
-        simulation_directories : list : list of simulation directories and name/label for figure
-        redshifts : float or list
+                species_name = 'dark'
+                if species_name in part:
+                    Image.plot_image(
+                        part, species_name, 'mass', 'histogram',
+                        [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
+                        rotation=align_principal_axes, image_limits=[10 ** 5.5, 10 ** 9],
+                        background_color='black',
+                        write_plot=True, plot_directory=plot_directory,
+                        add_simulation_name=True,
+                    )
+
+    def parse_inputs(self, parts=None, species=None, redshifts=None):
+        '''
+        parts : list : dictionaries of particles at snapshot
         species : string or list : name[s] of particle species to read and analyze
-        distance_max : float : maximum distance from center to plot
-        align_principal_axes : boolean : whether to align plot axes with principal axes
+        redshifts : float or list
         '''
-        properties = ['mass', 'position']
-        mass_fraction = 90
-
-        if isinstance(parts, dict):
+        if parts is not None and isinstance(parts, dict):
             parts = [parts]
 
-        if np.isscalar(redshifts):
+        if species is not None and np.isscalar(species):
+            species = [species]
+
+        if redshifts is not None and np.isscalar(redshifts):
             redshifts = [redshifts]
 
-        if parts is not None and len(redshifts) > 1:
+        if parts is not None and redshifts is not None and len(redshifts) > 1:
             self.say('! input particles at single snapshot but also input more than one redshift')
-            return
+            self.say('  analyzing just snapshot redshift = {:.3f}'.format(
+                parts[0].snapshot['redshift']))
+            redshifts = [parts[0].snapshot['redshift']]
 
-        for redshift in redshifts:
-            if parts is None or len(redshifts) > 1:
-                from . import gizmo_io
-                Read = gizmo_io.ReadClass()
-                parts = Read.read_simulations(
-                    simulation_directories, species, redshift, properties)
-
-            gals = []
-            for spec in species:
-                for part in parts:
-                    gal = ut.particle.get_galaxy_properties(
-                        part, spec, 'mass.percent', mass_fraction, distance_max,
-                        axis_kind='both', principal_axes_distance_max=distance_max)
-                    gals.append(gal)
-
-                self.say('\n# species = {}'.format(spec))
-
-                for part_i, part in enumerate(parts):
-                    gal = gals[part_i]
-                    self.say('\n{}'.format(part.info['simulation.name']))
-                    self.say('* M_{},{} = {:.2e} Msun ({:.2f})'.format(
-                             spec, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']))
-                    string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
-                    self.say(string.format(
-                             mass_fraction, gal['radius.major'],
-                             gal['radius.major'] / gals[0]['radius.major'],
-                             mass_fraction, gal['radius.minor'],
-                             gal['radius.minor'] / gals[0]['radius.minor']))
-            print()
+        return parts, species, redshifts
 
 
 CompareSimulations = CompareSimulationsClass()
