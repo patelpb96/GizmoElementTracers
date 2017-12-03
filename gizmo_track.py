@@ -388,6 +388,7 @@ class HostCoordinatesClass(IndexPointerClass):
                         part_at_snap.center_position = center_position_function.y[:,-1]
                     else:
                         part_at_snap.center_position = center_position_function(scalefactor)
+                    part_at_snap.center_velocity = ut.particle.get_center_velocity(part_at_snap)
                 
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
@@ -558,7 +559,7 @@ if __name__ == '__main__':
 
     #redefine existing classes with the correct output directory
     IndexPointer = IndexPointerClass(directory=TRACK_DIRECTORY)
-    HostDistance = HostDistanceClass(directory=TRACK_DIRECTORY)
+    HostCoordinates = HostCoordinatesClass(directory=TRACK_DIRECTORY)
 
     if 'indices' in function_kind:
         IndexPointer.write_index_pointer()
