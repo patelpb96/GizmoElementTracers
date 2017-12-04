@@ -447,7 +447,7 @@ class HostCoordinatesClass(IndexPointerClass):
 
                 prop = 'form.host.velocity'
                 if prop in self.form_host_coordiante_kinds:
-                    # 3-D velocity wrt host along default x,y,z axes [km / s physical]
+                    # 3-D velocity wrt host along default x,y,z axes [km / s]
                     # caveat: this does *not* include Hubble flow
                     coordinate_vectors[prop] = ut.coordinate.get_velocity_differences(
                         'vector', part_at_snap[self.species_name]['velocity'][part_indices_at_snap],
