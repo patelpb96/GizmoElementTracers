@@ -391,6 +391,7 @@ class HostCoordinatesClass(IndexPointerClass):
                         part_at_snap.center_position = center_position_function.y[:,-1]
                     else:
                         part_at_snap.center_position = center_position_function(scalefactor)
+                    part_at_snap.center_velocity = ut.particle.get_center_velocity(part_at_snap)
                 
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
@@ -449,7 +450,7 @@ class HostCoordinatesClass(IndexPointerClass):
 
                 prop = 'form.host.velocity'
                 if prop in self.form_host_coordiante_kinds:
-                    # 3-D velocity wrt host along default x,y,z axes [km / s physical]
+                    # 3-D velocity wrt host along default x,y,z axes [km / s]
                     # caveat: this does *not* include Hubble flow
                     coordinate_vectors[prop] = ut.coordinate.get_velocity_differences(
                         'vector', part_at_snap[self.species_name]['velocity'][part_indices_at_snap],
@@ -561,7 +562,7 @@ if __name__ == '__main__':
 
     #redefine existing classes with the correct output directory
     IndexPointer = IndexPointerClass(directory=TRACK_DIRECTORY)
-    HostDistance = HostDistanceClass(directory=TRACK_DIRECTORY)
+    HostCoordinates = HostCoordinatesClass(directory=TRACK_DIRECTORY)
 
     if 'indices' in function_kind:
         IndexPointer.write_index_pointer()
