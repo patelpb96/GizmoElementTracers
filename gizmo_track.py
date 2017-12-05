@@ -167,7 +167,10 @@ class IndexPointerClass(ut.io.SayClass):
 
                 try:
                     part_indices_at_snap = part_at_snap[self.species_name].id_to_index[part_id]
-                except IndexError:
+                except (IndexError,KeyError) as err:
+                    if type(err) == KeyError:
+                        self.say(" -- encountered a KeyError, instead of an index error, with part_id = {} and self.species_name = {}".format(
+                            self.species_name,part_id))
                     id_no_match_number += 1
                     continue
 
