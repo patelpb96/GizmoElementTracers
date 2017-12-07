@@ -244,12 +244,17 @@ class ParticleDictionaryClass(dict):
 
             if 'cylindrical' in property_name:
                 # convert to cylindrical coordinates
-                # along major axes (R, positive definite), minor axis (Z, signed),
-                # and angle (phi, 0 to 2 * pi)
-                values = ut.coordinate.get_distances_cylindrical(values)
+                if 'distance' in property_name:
+                    # along major axes (R, positive definite), minor axis (Z, signed),
+                    # angle (phi, 0 to 2 * pi)
+                    values = ut.coordinate.get_distances_cylindrical(values)
+                if 'velocity' in property_name:
+                    # along major axes (v_R), minor axis (v_Z), angular (v_phi)
+                    distance_vectors = self.prop('host.distance.principal')
+                    values = ut.coordinate.get_velocities_cylindrical(values, distance_vectors)
 
-            if 'scalar' in property_name:
-                # compute scalar distance
+            if 'total' in property_name or 'scalar' in property_name:
+                # compute total (scalar) distance / velocity
                 if len(values.shape) == 1:
                     shape_pos = 0
                 else:
@@ -1286,10 +1291,10 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
-    def assign_principal_axes(self, part, distance_max=30, mass_percent=90):
+    def assign_principal_axes(self, part, distance_max=20, mass_percent=90):
         '''
         Assign principal axes (rotation vectors defined by moment of inertia tensor) to galaxy/halo,
-        using stars for a baryonic simulation.
+        using stars for baryonic simulations.
 
         Parameters
         ----------

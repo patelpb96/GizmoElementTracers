@@ -34,9 +34,8 @@ from gizmo import gizmo_track
 species_name = 'star'  # which particle species to track
 
 
-ScriptPrint = ut_io.ScriptPrintClass('slurm')
-
 # print run-time and CPU information
+ScriptPrint = ut_io.ScriptPrintClass('slurm')
 ScriptPrint.print_initial()
 
 # check if any input arguments
