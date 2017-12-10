@@ -1504,7 +1504,7 @@ def plot_vel_circ_v_radius_halos(
         parts, hals, part_indicesss, hiss,
         None,
         gal, gal_indices,
-        'star', 'velocity.tot', 'std.cum', vel_circ_scaling, True, vel_circ_limits,
+        'star', 'velocity.total', 'std.cum', vel_circ_scaling, True, vel_circ_limits,
         radius_limits, radius_bin_width, radius_scaling, 3, False,
         write_plot, plot_directory, figure_index)
     """
@@ -2187,7 +2187,7 @@ def explore_galaxy(
                 write_plot=write_plot, plot_directory=plot_directory, figure_index=11)
 
             plot_property_distribution(
-                part, 'star', 'velocity.tot', [0, None], 2, None, 'linear', 'histogram',
+                part, 'star', 'velocity.total', [0, None], 2, None, 'linear', 'histogram',
                 [], hal.prop('star.position', hi), hal.prop('star.velocity', hi), {}, part_indices,
                 [0, None], 'linear', write_plot, plot_directory, figure_index=12)
 
@@ -2219,7 +2219,7 @@ def explore_galaxy(
             """
 
             plot_property_v_distance(
-                part, 'star', 'velocity.tot', 'std.cum', 'linear', True, None,
+                part, 'star', 'velocity.total', 'std.cum', 'linear', True, None,
                 [0.1, distance_max], 0.1, 'log', 3,
                 center_positions=hal.prop('star.position', hi),
                 center_velocities=hal.prop('star.velocity', hi),
@@ -2269,7 +2269,7 @@ def explore_galaxy(
 
             """
             plot_property_v_distance(
-                part, 'dark', 'velocity.tot', 'std.cum', 'linear', True, None,
+                part, 'dark', 'velocity.total', 'std.cum', 'linear', True, None,
                 [0.1, distance_max], 0.1, 'log', 3,
                 center_positions=center_position, center_velocities=center_velocity,
                 part_indicess=part_indices,
