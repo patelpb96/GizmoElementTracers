@@ -305,8 +305,8 @@ class HostCoordinatesClass(IndexPointerClass):
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
     def write_formation_coordinates(
-        self, part=None, snapshot_indices=[], part_indices=None),
-        center_position_function=None:
+        self, part=None, snapshot_indices=[], part_indices=None,
+        center_position_function=None):
         '''
         Assign to each particle its coordiates (3D distances and 3D velocities) wrt the host
         galaxy center at the snapshot after it formed.
