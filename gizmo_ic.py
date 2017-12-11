@@ -12,82 +12,13 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 
 
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import sys
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 from scipy import spatial
 # local ----
 import wutilities as ut
 from . import gizmo_io
-
-
-#===================================================================================================
-# analysis
-#===================================================================================================
-def print_contamination_in_box(
-    part, center_position=None, distance_limits=None, distance_bin_number=20,
-    distance_scaling='linear', geometry='cube'):
-    '''
-    Test contamination from low-resolution particles around center.
-
-    Parameters
-    ----------
-    part : dict : catalog of particles
-    center_position : array : 3-d position of center [kpc comoving]
-    distance_limits : float : maximum distance from center to check [kpc physical]
-    distance_bin_number : int : number of distance bins
-    distance_scaling : string : 'log', 'linear'
-    geometry : string : geometry of region: 'cube', 'sphere'
-    '''
-    Say = ut.io.SayClass(print_contamination_in_box)
-
-    Neighbor = ut.neighbor.NeighborClass()
-
-    if distance_limits is None:
-        distance_limits = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
-
-    if center_position is None:
-        center_position = np.zeros(part['position'].shape[1])
-        for dimension_i in range(part['position'].shape[1]):
-            center_position[dimension_i] = 0.5 * part.info['box.length']
-    print('center position = {}'.format(center_position))
-
-    DistanceBin = ut.binning.DistanceBinClass(
-        distance_scaling, distance_limits, number=distance_bin_number)
-
-    masses_unique = np.unique(part['mass'])
-    pis_all = ut.array.get_arange(part['mass'])
-    pis_contam = pis_all[part['mass'] != masses_unique.min()]
-
-    if geometry == 'sphere':
-        distances, neig_pis = Neighbor.get_neighbors(
-            center_position, part['position'], part['mass'].size,
-            distance_limits, part.info['box.length'], neig_ids=pis_all)
-        distances = distances[0]
-        neig_pis = neig_pis[0]
-    elif geometry == 'cube':
-        distance_vector = np.abs(ut.coordinate.get_distances(
-            'vector', part['position'], center_position, part.info['box.length']))
-
-    for dist_i in range(DistanceBin.number):
-        distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
-
-        if geometry == 'sphere':
-            pis_all_d = neig_pis[ut.array.get_indices(distances, distance_bin_limits)]
-        elif geometry == 'cube':
-            pis_all_d = np.array(pis_all)
-            for dimension_i in range(part['position'].shape[1]):
-                pis_all_d = ut.array.get_indices(
-                    distance_vector[:, dimension_i], distance_bin_limits, pis_all_d)
-
-        pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
-        frac = ut.math.Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
-        Say.say('distance = [{:.3f}, {:.3f}], fraction = {:.5f}'.format(
-                distance_bin_limits[0], distance_bin_limits[1], frac))
-
-        if frac >= 1:
-            break
 
 
 #===================================================================================================
@@ -110,7 +41,7 @@ class ReadClass(ut.io.SayClass):
         self.snapshot_redshifts = np.sort(snapshot_redshifts)
         self.simulation_directory = simulation_directory
 
-    def read_all(self, mass_limits=[1e11, Inf]):
+    def read_all(self, mass_limits=[1e11, np.Inf]):
         '''
         Read particles from final and initial snapshot and halos from final snapshot.
 
@@ -162,7 +93,7 @@ class ReadClass(ut.io.SayClass):
 
         return parts
 
-    def read_halos(self, mass_limits=[1e11, Inf]):
+    def read_halos(self, mass_limits=[1e11, np.Inf]):
         '''
         Read halos from final snapshot.
 
@@ -214,7 +145,7 @@ def write_initial_points(
         'particles', 'convex-hull', 'cube'
     dark_mass : float : dark-matter particle mass (if simulation has only DM, at single resolution)
     '''
-    file_name = 'ic_agora_mX_rad{:.0f}_points.txt'.format(distance_max)
+    file_name = 'ic_agora_mX_rad{:.1f}_points.txt'.format(distance_max)
 
     Say = ut.io.SayClass(write_initial_points)
 
@@ -303,13 +234,17 @@ def write_initial_points(
     volume_ini_chull = ut.coordinate.get_volume_of_convex_hull(positions_ini)
     mass_ini_chull = volume_ini_chull * density_ini  # assume cosmic density within volume
 
-    # encompassing cube (relevant for MUSIC FFT)
-    position_dif_max = 0
+    # encompassing cube (relevant for MUSIC FFT) and cuboid
+    position_difs = []
     for dimen_i in range(positions_ini.shape[1]):
-        if poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min() > position_dif_max:
-            position_dif_max = poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min()
-    volume_ini_cube = position_dif_max ** 3
+        position_difs.append(poss_ini_limits[dimen_i].max() - poss_ini_limits[dimen_i].min())
+    volume_ini_cube = max(position_difs) ** 3
     mass_ini_cube = volume_ini_cube * density_ini  # assume cosmic density within volume
+
+    volume_ini_cuboid = 1.
+    for dimen_i in range(positions_ini.shape[1]):
+        volume_ini_cuboid *= position_difs[dimen_i]
+    mass_ini_cuboid = volume_ini_cuboid * density_ini  # assume cosmic density within volume
 
     # MUSIC does not support header information in points file, so put in separate log file
     log_file_name = file_name.replace('.txt', '_log.txt')
@@ -344,19 +279,29 @@ def write_initial_points(
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                     volume_ini_chull * ut.const.mega_per_kilo ** 3))
 
-        Write.write('# within encompassing cube at initial time')
+        Write.write('# within encompassing cuboid at initial time')
+        Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
+        Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_cuboid * ut.const.mega_per_kilo ** 3))
+
+        Write.write('# within encompassing cube at initial time (for MUSIC FFT)')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
                     volume_ini_cube * ut.const.mega_per_kilo ** 3))
 
-        Write.write('# initial position range')
+        Write.write('# position range at initial time')
         for dimen_i in range(positions_ini.shape[1]):
-            string = '  {} [min, max] = [{:.3f}, {:.3f}] kpc comoving, [{:.9f}, {:.9f}] box units'
+            string = ('  {} [min, max, width] = [{:.2f}, {:.2f}, {:.2f}] kpc comoving\n' +
+                      '        [{:.9f}, {:.9f}, {:.9f}] box units')
+            pos_min = np.min(poss_ini_limits[dimen_i])
+            pos_max = np.max(poss_ini_limits[dimen_i])
+            pos_width = np.max(poss_ini_limits[dimen_i]) - np.min(poss_ini_limits[dimen_i])
             Write.write(
                 string.format(
-                    dimen_i, np.min(poss_ini_limits[dimen_i]), np.max(poss_ini_limits[dimen_i]),
-                    np.min(poss_ini_limits[dimen_i]) / part_ini.info['box.length'],
-                    np.max(poss_ini_limits[dimen_i]) / part_ini.info['box.length'])
+                    dimen_i, pos_min, pos_max, pos_width,
+                    pos_min / part_ini.info['box.length'], pos_max / part_ini.info['box.length'],
+                    pos_width / part_ini.info['box.length']
+                )
             )
 
         positions_ini /= part_ini.info['box.length']  # renormalize to box units
@@ -396,7 +341,7 @@ def write_initial_points_from_uniform(
     dark_mass : float : dark-matter particle mass (if simulation has only DM, at single resolution)
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
-        print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
+        print('! selection radius = {} seems odd. are you sure?'.format(distance_max))
 
     center_position = hal['position'][hal_index]
     halo_radius = hal['radius.' + virial_kind][hal_index]
@@ -428,7 +373,7 @@ def read_write_initial_points_from_zoom(
     simulation_directory : string : directory of simulation
     '''
     if scale_to_halo_radius and distance_max < 1 or distance_max > 100:
-        print('! selection radius = {} looks odd. are you sure?'.format(distance_max))
+        print('! selection radius = {} seems odd. are you sure?'.format(distance_max))
 
     Read = ReadClass(snapshot_redshifts, simulation_directory)
     parts = Read.read_particles()
@@ -439,6 +384,74 @@ def read_write_initial_points_from_zoom(
     write_initial_points(
         parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
         region_kind)
+
+
+#===================================================================================================
+# analysis
+#===================================================================================================
+def print_contamination_in_box(
+    part, center_position=None, distance_limits=None, distance_bin_number=20,
+    distance_scaling='linear', geometry='cube'):
+    '''
+    Test contamination from low-resolution particles around center.
+
+    Parameters
+    ----------
+    part : dict : catalog of particles
+    center_position : array : 3-d position of center [kpc comoving]
+    distance_limits : float : maximum distance from center to check [kpc physical]
+    distance_bin_number : int : number of distance bins
+    distance_scaling : string : 'log', 'linear'
+    geometry : string : geometry of region: 'cube', 'sphere'
+    '''
+    Say = ut.io.SayClass(print_contamination_in_box)
+
+    Neighbor = ut.neighbor.NeighborClass()
+
+    if distance_limits is None:
+        distance_limits = [0, 0.5 * (1 - 1e-5) * part.info['box.length']]
+
+    if center_position is None:
+        center_position = np.zeros(part['position'].shape[1])
+        for dimension_i in range(part['position'].shape[1]):
+            center_position[dimension_i] = 0.5 * part.info['box.length']
+    print('center position = {}'.format(center_position))
+
+    DistanceBin = ut.binning.DistanceBinClass(
+        distance_scaling, distance_limits, number=distance_bin_number)
+
+    masses_unique = np.unique(part['mass'])
+    pis_all = ut.array.get_arange(part['mass'])
+    pis_contam = pis_all[part['mass'] != masses_unique.min()]
+
+    if geometry == 'sphere':
+        distances, neig_pis = Neighbor.get_neighbors(
+            center_position, part['position'], part['mass'].size,
+            distance_limits, part.info['box.length'], neig_ids=pis_all)
+        distances = distances[0]
+        neig_pis = neig_pis[0]
+    elif geometry == 'cube':
+        distance_vector = np.abs(ut.coordinate.get_distances(
+            'vector', part['position'], center_position, part.info['box.length']))
+
+    for dist_i in range(DistanceBin.number):
+        distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
+
+        if geometry == 'sphere':
+            pis_all_d = neig_pis[ut.array.get_indices(distances, distance_bin_limits)]
+        elif geometry == 'cube':
+            pis_all_d = np.array(pis_all)
+            for dimension_i in range(part['position'].shape[1]):
+                pis_all_d = ut.array.get_indices(
+                    distance_vector[:, dimension_i], distance_bin_limits, pis_all_d)
+
+        pis_contam_d = np.intersect1d(pis_all_d, pis_contam)
+        frac = ut.math.Fraction.get_fraction(pis_contam_d.size, pis_all_d.size)
+        Say.say('distance = [{:.3f}, {:.3f}], fraction = {:.5f}'.format(
+                distance_bin_limits[0], distance_bin_limits[1], frac))
+
+        if frac >= 1:
+            break
 
 
 #===================================================================================================

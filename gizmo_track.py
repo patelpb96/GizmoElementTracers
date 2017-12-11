@@ -167,7 +167,10 @@ class IndexPointerClass(ut.io.SayClass):
 
                 try:
                     part_indices_at_snap = part_at_snap[self.species_name].id_to_index[part_id]
-                except IndexError:
+                except (IndexError,KeyError) as err:
+                    if type(err) == KeyError:
+                        self.say(" -- encountered a KeyError, instead of an index error, with part_id = {} and self.species_name = {}".format(
+                            self.species_name,part_id))
                     id_no_match_number += 1
                     continue
 
@@ -450,7 +453,7 @@ class HostCoordinatesClass(IndexPointerClass):
 
                 prop = 'form.host.velocity'
                 if prop in self.form_host_coordiante_kinds:
-                    # 3-D velocity wrt host along default x,y,z axes [km / s physical]
+                    # 3-D velocity wrt host along default x,y,z axes [km / s]
                     # caveat: this does *not* include Hubble flow
                     coordinate_vectors[prop] = ut.coordinate.get_velocity_differences(
                         'vector', part_at_snap[self.species_name]['velocity'][part_indices_at_snap],
