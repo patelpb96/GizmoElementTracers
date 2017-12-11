@@ -1,8 +1,8 @@
 Instructions for install:  
 
 1. create a directory $DIR
-2. clone gizmo_analysis-SGK into $DIR
-3. move setup.py from gizmo_analysis-SGK into $DIR
+2. clone gizmo_analysis into $DIR
+3. copy setup.py from gizmo_analysis into $DIR (moving it will give you hg issues when pulling updates in the future)
 4. run python setup.py develop
 
 In commands, that is:
@@ -13,7 +13,7 @@ In commands, that is:
 mkdir $DIR
 cd $DIR
 hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis
-mv gizmo_analysis/setup.py .
+cp gizmo_analysis/setup.py .
 python setup.py develop
 ```
 
