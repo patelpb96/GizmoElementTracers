@@ -302,7 +302,8 @@ class HostCoordinatesClass(IndexPointerClass):
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
     def write_formation_coordinates(
-        self, part=None, snapshot_indices=[], part_indices=None):
+        self, part=None, snapshot_indices=[], part_indices=None),
+        center_position_function=None:
         '''
         Assign to each particle its coordiates (3D distances and 3D velocities) wrt the host
         galaxy center at the snapshot after it formed.
@@ -312,6 +313,8 @@ class HostCoordinatesClass(IndexPointerClass):
         part : dict : catalog of particles at snapshot
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         part_indices : array-like : list of particle indices to assign to
+        center_position_function : a callable function/interpolation that returns the x,y,z center
+            (in physical kpc) for a given scale factor
         '''
         # set numpy data type to store coordinates
         coordinate_dtype = np.float32
