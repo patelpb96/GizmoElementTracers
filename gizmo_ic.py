@@ -194,7 +194,7 @@ def write_initial_points(
     spec_select_number = []
     for spec in species:
         distances = ut.coordinate.get_distances(
-            'scalar', part_fin[spec]['position'], center_position,
+            'total', part_fin[spec]['position'], center_position,
             part_fin.info['box.length']) * part_fin.snapshot['scalefactor']  # [kpc physical]
 
         indices_fin = ut.array.get_indices(distances, [0, distance_max])

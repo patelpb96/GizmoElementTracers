@@ -28,7 +28,7 @@ from __future__ import absolute_import, division, print_function  # python 2 com
 import os
 # local ----
 from utilities.basic import io as ut_io
-from gizmo import gizmo_track
+from gizmo_analysis import gizmo_track
 
 
 species_name = 'star'  # which particle species to track
