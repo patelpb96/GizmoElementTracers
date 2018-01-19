@@ -119,46 +119,6 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ----------
-        if ('form.' in property_name or property_name == 'age') and 'distance' not in property_name:
-            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
-                # look-back time (stellar age) to formation
-                values = self.snapshot['time'] - self.prop('form.time', indices)
-            elif 'time' in property_name:
-                # time (age of universe) of formation
-                values = self.Cosmology.get_time(
-                    self.prop('form.scalefactor', indices), 'scalefactor')
-            elif 'redshift' in property_name:
-                # redshift of formation
-                values = 1 / self.prop('form.scalefactor', indices) - 1
-            elif 'snapshot' in property_name:
-                # snapshot index immediately after formation
-                # increase formation scale-factor slightly for safety, because scale-factors of
-                # written snapshots do not exactly coincide with input scale-factors
-                padding_factor = (1 + 1e-7)
-                values = self.Snapshot.get_snapshot_indices(
-                    'scalefactor',
-                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
-                    round_kind='up')
-
-            return values
-
-        if 'number.density' in property_name:
-            values = (self.prop('density', indices) * ut.const.proton_per_sun *
-                      ut.const.kpc_per_cm ** 3)
-
-            if '.hydrogen' in property_name:
-                # number density of hydrogen, using actual hydrogen mass of each particle [cm ^ -3]
-                values = values * self.prop('massfraction.hydrogen', indices)
-            else:
-                # number density of 'hydrogen', assuming solar metallicity for particles [cm ^ -3]
-                values = values * ut.const.sun_hydrogen_mass_fraction
-
-            return values
-
-        if 'kernel.length' in property_name:
-            # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
-            return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
-
         if 'mass.' in property_name:
             # mass of individual element
             values = (self.prop('mass', indices) *
@@ -212,6 +172,46 @@ class ParticleDictionaryClass(dict):
             if 'metallicity.' in property_name:
                 values = ut.math.get_log(
                     values / ut.const.sun_composition[element_name]['massfraction'])
+
+            return values
+
+        if 'number.density' in property_name:
+            values = (self.prop('density', indices) * ut.const.proton_per_sun *
+                      ut.const.kpc_per_cm ** 3)
+
+            if '.hydrogen' in property_name:
+                # number density of hydrogen, using actual hydrogen mass of each particle [cm ^ -3]
+                values = values * self.prop('massfraction.hydrogen', indices)
+            else:
+                # number density of 'hydrogen', assuming solar metallicity for particles [cm ^ -3]
+                values = values * ut.const.sun_hydrogen_mass_fraction
+
+            return values
+
+        if 'kernel.length' in property_name:
+            # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
+            return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
+
+        if ('form.' in property_name or property_name == 'age') and 'distance' not in property_name:
+            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
+                # look-back time (stellar age) to formation
+                values = self.snapshot['time'] - self.prop('form.time', indices)
+            elif 'time' in property_name:
+                # time (age of universe) of formation
+                values = self.Cosmology.get_time(
+                    self.prop('form.scalefactor', indices), 'scalefactor')
+            elif 'redshift' in property_name:
+                # redshift of formation
+                values = 1 / self.prop('form.scalefactor', indices) - 1
+            elif 'snapshot' in property_name:
+                # snapshot index immediately after formation
+                # increase formation scale-factor slightly for safety, because scale-factors of
+                # written snapshots do not exactly coincide with input scale-factors
+                padding_factor = (1 + 1e-7)
+                values = self.Snapshot.get_snapshot_indices(
+                    'scalefactor',
+                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
+                    round_kind='up')
 
             return values
 
@@ -312,7 +312,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind='index', snapshot_values=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         properties='all', element_indices=None, particle_subsample_factor=0,
-        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
+        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=True,
         assign_center=True, assign_principal_axes=False, assign_orbit=False,
         assign_formation_coordinates=False,
         check_properties=True):
@@ -348,10 +348,10 @@ class ReadClass(ut.io.SayClass):
         separate_dark_lowres : boolean :
             whether to separate low-resolution dark matter into separate dicts according to mass
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
-        force_float32 : boolean : whether to force all floats to 32-bit, to save memory
+        force_float32 : boolean : whether to force all floats to be 32 bit, to save memory
         assign_center : boolean : whether to assign center position and velocity of galaxy/halo
         assign_principal_axes : boolean : whether to assign principal axes (moment of intertia)
-        assign_orbit : booelan : whether to assign derived orbital properties wrt galaxy/halo center
+        assign_orbit : booelan : whether to assign derived orbital properties wrt host galaxy/halo
         assign_formation_coordinates : boolean :
             whether to assign coordindates wrt the host galaxy at formation to stars
         check_properties : boolean : whether to check sanity of particle properties after read in
@@ -834,26 +834,26 @@ class ReadClass(ut.io.SayClass):
                         part[spec].element_pointer[element_index] = element_i
 
                 # check if snapshot file happens not to have particles of this species
-                if part_numbers_in_file[spec_id] <= 0:
+                if part_numbers_in_file[spec_id] > 0:
+                    part_in = file_in['PartType' + str(spec_id)]
+                else:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
                         raise ValueError('! no {} particles in single-file snapshot'.format(spec))
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
-                        file_name = file_name.replace('.0.', '.{}.'.format(file_i))
+                        file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
                         # try each snapshot file
-                        with h5py.File(file_name, 'r') as file_in_i:
-                            part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
-                            if part_numbers_in_file_i[spec_id] > 0:
-                                # found one!
-                                part_in = file_in_i['PartType' + str(spec_id)]
-                                break
+                        file_in_i = h5py.File(file_name_i, 'r')
+                        part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
+                        if part_numbers_in_file_i[spec_id] > 0:
+                            # found one
+                            part_in = file_in_i['PartType' + str(spec_id)]
+                            break
                     else:
                         # tried all files and still did not find particles of species
                         raise ValueError('! no {} particles in any snapshot files'.format(spec))
-                else:
-                    part_in = file_in['PartType' + str(spec_id)]
 
                 props_print = []
                 ignore_flag = False  # whether ignored any properties in the file
@@ -1291,7 +1291,7 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
-    def assign_principal_axes(self, part, distance_max=20, mass_percent=90):
+    def assign_principal_axes(self, part, distance_max=15, mass_percent=90):
         '''
         Assign principal axes (rotation vectors defined by moment of inertia tensor) to galaxy/halo,
         using stars for baryonic simulations.
