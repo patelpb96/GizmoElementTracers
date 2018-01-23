@@ -129,7 +129,7 @@ def plot_mass_contamination(
 
     for spec in profile_mass:
         distances = ut.coordinate.get_distances(
-            'scalar', part[spec]['position'], center_position, part.info['box.length']
+            'total', part[spec]['position'], center_position, part.info['box.length']
         ) * part.snapshot['scalefactor']  # [kpc physical]
         if scale_to_halo_radius:
             distances /= halo_radius
@@ -329,7 +329,7 @@ def plot_metal_v_distance(
     metal_values = []
     for part_i, part in enumerate(parts):
         distances = ut.coordinate.get_distances(
-            'scalar', part[species_name]['position'], center_positions[part_i],
+            'total', part[species_name]['position'], center_positions[part_i],
             part.info['box.length'])
         distances *= part.snapshot['scalefactor']  # convert to [kpc physical]
 
@@ -935,7 +935,7 @@ def plot_property_distribution(
 
         if distance_limits:
             distances = ut.coordinate.get_distances(
-                'scalar', part[species_name]['position'][part_indices], center_positions[part_i],
+                'total', part[species_name]['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
@@ -1030,7 +1030,7 @@ def plot_property_v_property(
 
     if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
-            'scalar', center_position, part[species_name]['position'][part_indices],
+            'total', center_position, part[species_name]['position'][part_indices],
             part.info['box.length']) * part.snapshot['scalefactor']
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
 
@@ -1147,8 +1147,9 @@ def plot_property_v_distance(
     dimension_number=3, rotation=None, other_axis_distance_limits=None,
     center_positions=None, center_velocities=None,
     property_select={}, part_indicess=None,
-    distance_reference=None, plot_nfw=False,
-    get_values=False, write_plot=False, plot_directory='.', figure_index=1):
+    distance_reference=None, plot_nfw=False, plot_fit=False, fit_distance_limits=[],
+    get_values=False,
+    write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
     species_name : string : name of particle species to compute total mass of
@@ -1176,6 +1177,8 @@ def plot_property_v_distance(
     part_indicess : array or list of arrays : indices of particles from which to select
     distance_reference : float : reference distance at which to draw vertical line
     plot_nfw : boolean : whether to overplot NFW profile: density ~ 1 / r
+    plot_fit : boolean : whether to overplot linear fit
+    fit_distance_limits : list : min and max distance for fit
     get_values : boolean : whether to return values plotted
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
@@ -1205,10 +1208,10 @@ def plot_property_v_distance(
 
         pros.append(pros_part)
 
-        #if part_i > 0:
-        #    print(pros[part_i][property_name] / pros[0][property_name])
-
-        #print(pros_part[species_name][property_statistic])
+    # print results
+    print(pros[0][species_name]['distance'])
+    for part_i, pro in enumerate(pros):
+        print(pro[species_name][property_statistic])
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
@@ -1263,10 +1266,7 @@ def plot_property_v_distance(
         alpha = 0.7
         linewidth = None
 
-    print(pros[0][species_name]['distance'])
-
     for part_i, pro in enumerate(pros):
-        print(pro[species_name][property_statistic])
         color = colors[part_i]
 
         label = parts[part_i].info['simulation.name']
@@ -1279,6 +1279,31 @@ def plot_property_v_distance(
                      color=color, alpha=alpha, linewidth=linewidth, label=label)
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    if plot_fit:
+        from scipy import stats
+
+        xs = pro[species_name]['distance']
+        if 'log' in distance_scaling:
+            xs = log10(xs)
+        ys = pro[species_name][property_statistic]
+        if 'log' in property_scaling:
+            ys = log10(ys)
+
+        masks = np.isfinite(xs)
+        if fit_distance_limits is not None and len(fit_distance_limits):
+            masks = (xs >= min(fit_distance_limits)) * (xs < max(fit_distance_limits))
+        slope, intercept, _r_value, _p_value, _std_err = stats.linregress(xs[masks], ys[masks])
+        print('# fit: slope = {:.3f}, intercept = {:.3f}'.format(slope, intercept))
+        if 'log' in property_scaling and 'log' not in distance_scaling:
+            print('  exponential scale length = {:.3f}'.format(-1 * np.log10(np.e) / slope))
+
+        ys_fit = intercept + slope * xs
+        if 'log' in distance_scaling:
+            xs = 10 ** xs
+        if 'log' in property_scaling:
+            ys_fit = 10 ** ys_fit
+        subplot.plot(xs, ys_fit, color='black', alpha=0.5, linewidth=3.5)
 
     distance_name = 'dist'
     if dimension_number == 2:
@@ -1358,7 +1383,7 @@ def plot_velocity_distribution_of_halo(
 
         if distance_limits:
             distances = ut.coordinate.get_distances(
-                'scalar', part[species_name]['position'][part_indices], center_positions[part_i],
+                'total', part[species_name]['position'][part_indices], center_positions[part_i],
                 part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
@@ -1606,7 +1631,6 @@ def plot_property_v_distance_halos(
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-    #, left=0.18, right=0.95, top=0.96, bottom=0.16)
 
     y_values = []
     for pro_cat in pros:
@@ -1813,7 +1837,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         if (center_position is not None and len(center_position) and
                 distance_limits is not None and len(distance_limits)):
             distances = ut.coordinate.get_distances(
-                'scalar', part['star']['position'][part_indices], center_position,
+                'total', part['star']['position'][part_indices], center_position,
                 part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
@@ -2159,7 +2183,7 @@ def explore_galaxy(
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
     '''
-    from rockstar import rockstar_analysis
+    from rockstar_analysis import rockstar_analysis
 
     rockstar_analysis.print_properties(hal, hal_index)
 

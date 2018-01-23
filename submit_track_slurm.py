@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 #SBATCH --job-name=gizmo_track
-#SBATCH --partition=normal
-## Stampede node has 16 cores and 32 GB
-## Stampede2 node has 64 (useable) cores, each with 2 FP threads, so 128 total, and 96 GB
+#SBATCH --partition=skx-normal    # SKX node: 48 cores x 2 FP threads = 96 threads, 192 GB
+##SBATCH --partition=normal    ## KNL node: 64 (useable) cores x 2 FP threads = 128 threads, 96 GB
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
 #SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
@@ -28,7 +27,7 @@ from __future__ import absolute_import, division, print_function  # python 2 com
 import os
 # local ----
 from utilities.basic import io as ut_io
-from gizmo import gizmo_track
+from gizmo_analysis import gizmo_track
 
 
 species_name = 'star'  # which particle species to track
@@ -56,4 +55,5 @@ if 'coordinates' in function_kind:
     HostCoordinates = gizmo_track.HostCoordinatesClass(species_name)
     HostCoordinates.write_formation_coordinates()
 
+# print run-time information
 ScriptPrint.print_final()
