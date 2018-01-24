@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+
 '''
 Read Gizmo snapshots.
 
@@ -41,7 +44,7 @@ The particle species in a cosmological simulation is:
     part['blackhole'] : black holes (if the snapshot contains them)
 
 
-Default/stored particle properties:
+Default/stored particle properties
 
 Access these via:
     part[species_name][property_name]
@@ -50,7 +53,7 @@ For example:
 
 All particle speices have the following properties:
     'id' : ID (indexing starts at 0)
-    'position' : 3-D position, along simulations's (arbitrary) x,y,z grid [Mpc comoving]
+    'position' : 3-D position, along simulations's (arbitrary) x,y,z grid [kpc comoving]
     'velocity' : 3-D velocity, along simulations's (arbitrary) x,y,z grid [km / s physical]
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km / s^2 physical]
@@ -85,7 +88,7 @@ Star particles also have:
   'form.scalefactor' : expansion scale factor when the star particle formed [0 to 1]
 
 
-Derived properties:
+Derived properties
 
 part is in fact a ParticleDictionaryClass that can compute derived properties on the fly.
 Call derived (or stored) properties via:
