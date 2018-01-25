@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
+
+
 '''
 Analyze Gizmo simulations.
 
-Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
-
 @author: Andrew Wetzel
+
+Masses in [M_sun], positions in [kpc comoving], distances and radii in [kpc physical].
 '''
 
 

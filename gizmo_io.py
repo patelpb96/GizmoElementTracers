@@ -9,7 +9,7 @@ Read Gizmo snapshots.
 
 Units
 
-Unless otherwise noted, all units are as follows:
+Unless otherwise noted, all quantities are in (combinations of) these units:
     Masses in [M_sun]
     Positions in [kpc comoving]
     Distances and radii in [kpc physical]
@@ -22,26 +22,27 @@ Reading a snapshot
 
 Within a simulation directory, read all particles in a snapshot at redshift 0 via:
     part = gizmo.io.Read.read_snapshots('all', 'redshift', 0)
-part is a dictionary, with a key for each species. So, access star particles via:
+part is a dictionary, with a key for each particle species. So, access star particle dictionary via:
     part['star']
-part['star'] is itself a dictionary, with each property as a key:
+part['star'] is dictionary, with each particle property as a key. For example:
     part['star']['mass']
 returns a numpy array of masses, one for each star particle, while
     part['star']['position']
-returns a numpy array of dimension: particle_number x 3
+returns a numpy array positions (of dimension particle_number x 3).
 
-If you want to compute and store the principal axes (via the star) of the primary galaxy:
+If you want the code to compute and store the principal axes (via the moment of inertia tensor),
+computing using the stellar distribution (disk) of the primary galaxy:
     part = gizmo.io.Read.read_snapshots('all', 'redshift', 0, assign_principal_axes=True)
 
 
 Particle species
 
-The particle species in a cosmological simulation is:
+The available particle species in a cosmological simulation are:
     part['gas'] : gas
     part['dark'] : dark matter at the highest resolution
     part['dark.2'] : dark matter at lower resolution (outside the zoom-in region)
     part['star'] : stars
-    part['blackhole'] : black holes (if the snapshot contains them)
+    part['blackhole'] : black holes (if the simulation contains them)
 
 
 Default/stored particle properties
@@ -51,7 +52,7 @@ Access these via:
 For example:
     part['star']['position']
 
-All particle speices have the following properties:
+All particle species have the following properties:
     'id' : ID (indexing starts at 0)
     'position' : 3-D position, along simulations's (arbitrary) x,y,z grid [kpc comoving]
     'velocity' : 3-D velocity, along simulations's (arbitrary) x,y,z grid [km / s physical]
@@ -65,7 +66,7 @@ Gas particles also have:
         (for consistency with force softening) [kpc physical]
     'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
     'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
-    'sfr' : star formation rate [M_sun / yr]
+    'sfr' : instantaneous star formation rate [M_sun / yr]
 
 Star and gas particles also have additional IDs (because they can split):
     'id.child' : child ID
@@ -79,10 +80,10 @@ Caveat: this allows a maximum of 30 generations, then its resets to 0.
 Thus, particles with id.child > 2^30 are not unique anymore.
 
 Star and gas particles also have:
-    'massfraction' : fraction of the particle's mass that is in various elemental abundances
-This is stored as an array for each particle, with indexes as follows:
-    0 = all metals (everything not H, He)
-    1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
+    'massfraction' : fraction of the mass that is in different elemental abundances,
+        stored as an array for each particle, with indexes as follows:
+        0 = all metals (everything not H, He)
+        1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
 
 Star particles also have:
   'form.scalefactor' : expansion scale factor when the star particle formed [0 to 1]
@@ -97,8 +98,10 @@ For example:
     part['star'].prop('metallicity.fe')
 You also can call stored properties via part[species_name].prop(property_name).
 It will know that it is a stored property and return as is.
+For example, part['star'].prop('position') is the same as part['star']['position'].
 
-See ParticleDictionaryClass.prop() for full parsing of derived properties. Some common examples:
+See ParticleDictionaryClass.prop() for full options for parsing of derived properties.
+Some useful examples:
 
     part[species_name].prop('host.distance') :
         3-D distance from primary galaxy center along simulation's (arbitrary) x,y,z [kpc physical]
@@ -107,9 +110,9 @@ See ParticleDictionaryClass.prop() for full parsing of derived properties. Some 
         3-D distance aligned with the principal (major, intermed, minor) axes of stars [kpc phys]
     part[species_name].prop('host.distance.principal.cylindrical') :
         same, but in cylindrical coordinates [kpc physical]:
-          first value is along the major axes (R, positive definite)
-          second value is vertical height wrt the disk (Z, signed)
-          third value is angle (phi, 0 to 2 * pi)
+            first value is along the major axes (R, positive definite)
+            second value is vertical height wrt the disk (Z, signed)
+            third value is angle (phi, 0 to 2 * pi)
 
     part[species_name].prop('host.velocity') :
         3-D velocity wrt primary galaxy center along simulation's (arbitrary) x,y,z axes [km / s]
@@ -127,18 +130,18 @@ See ParticleDictionaryClass.prop() for full parsing of derived properties. Some 
 
     part['gas'].prop('number.density') :
         gas number density, assuming solar metallicity [hydrogen atoms / cm^3]
-    part['gas'].prop('pressure') :
 
     part['gas' or 'star'].prop('metallicity.iron') :
-       iron abundance [Fe/H] := log10((mass_iron / mass_hydrogen)_particle /
-                                        (mass_iron / mass_hydrogen)_sun)
-       as scaled to Solar (Asplund et al 2009)
-    works for all abundances: 'metallicity.carbon', 'metallicity.magnesium', etc
-    also can compute arithmetic combinations:
+        iron abundance [Fe/H] :=
+            log10((mass_iron / mass_hydrogen)_particle / (mass_iron / mass_hydrogen)_sun)
+        as scaled to Solar (Asplund et al 2009)
+        this works for all abundances: 'metallicity.carbon', 'metallicity.magnesium', etc
     part['gas' or 'star'].prop('metallicity.magnesium - metallicity.iron') : [Mg/Fe]
+        also can compute arithmetic combinations
 
     part['gas' or 'star'].prop('mass.hydrogen') : total hydrogen mass in particle [M_sun]
-    part['gas' or 'star'].prop('mass.oxygen') : total oxygen mass in particle [M_sun], etc
+    part['gas' or 'star'].prop('mass.oxygen') : total oxygen mass in particle [M_sun]
+    etc
 '''
 
 
@@ -351,11 +354,11 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        # distance/velocity wrt host galaxy/halo center
+        # distance/velocity wrt center of host galaxy/halo
         if 'host.' in property_name:
             if 'distance' in property_name:
                 if 'form.' in property_name:
-                    # 3-D distance vector wrt host at formation
+                    # 3-D distance vector wrt primary host at formation
                     values = self.prop('form.host.distance', indices)
                 else:
                     # 3-D distance vector wrt host now
@@ -389,7 +392,7 @@ class ParticleDictionaryClass(dict):
                     distance_vectors = self.prop('host.distance.principal')
                     values = ut.coordinate.get_velocities_cylindrical(values, distance_vectors)
 
-            if 'total' in property_name or 'scalar' in property_name:
+            if 'total' in property_name:
                 # compute total (scalar) distance / velocity
                 if len(values.shape) == 1:
                     shape_pos = 0
