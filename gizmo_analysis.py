@@ -423,7 +423,7 @@ class ImageClass(ut.io.SayClass):
         use_column_units=None, image_limits=[None, None],
         background_color='black',
         hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-        write_plot=False, plot_directory='.', add_simulation_name=False, figure_index=1):
+        write_plot=False, plot_name='', figure_index=1):
         '''
         Plot image of the positions of given partcle species, using either a single panel for
         2 dimensions or 3 panels for all axis permutations.
@@ -456,7 +456,9 @@ class ImageClass(ut.io.SayClass):
         hal_position_kind : string : name of position to use for center of halo
         hal_radius_kind : string : name of radius to use for size of halo
         write_plot : boolean : whether to write figure to file
-        plot_directory : string : directory to write figure file
+        plot_name : string : name of file, including path (to override default naming scheme)
+            if plot_name ends in '/', assume that this is the directory,
+            and write file with default naming scheme in that directory
         add_simulation_name : boolean : whether to add name of simulation to figure name
         figure_index : int : index of figure for matplotlib
         '''
@@ -765,24 +767,32 @@ class ImageClass(ut.io.SayClass):
                 subplot.axis('equal')
                 #fig.gca().set_aspect('equal')
 
+            if part.info['simulation.name']:
+                ut.plot.make_label_legend(subplots[0, 1], part.info['simulation.name'])
+
             hist_valuess = np.array(histogram_valuesss)
 
-        # get file name
-        prefix = ''
-        if add_simulation_name:
+        # get name and directory for plot file
+        if plot_name and plot_name[-1] == '/':
+            plot_directory = plot_name
+            plot_name = ''
+        else:
+            plot_directory = '.'
+
+        if not plot_name:
             prefix = part.info['simulation.name']
 
-        prop = 'position'
-        for dimen_i in dimensions_plot:
-            prop += '.' + dimen_label[dimen_i]
-        prop += '_d.{:.0f}'.format(np.max(distances_max[dimensions_plot]))
+            prop = 'position'
+            for dimen_i in dimensions_plot:
+                prop += '.' + dimen_label[dimen_i]
+            prop += '_d.{:.0f}'.format(np.max(distances_max[dimensions_plot]))
 
-        plot_name = ut.plot.get_file_name(
-            weight_name, prop, species_name, 'redshift', part.snapshot, prefix=prefix)
+            plot_name = ut.plot.get_file_name(
+                weight_name, prop, species_name, 'redshift', part.snapshot, prefix=prefix)
 
-        if 'histogram' in image_kind:
-            plot_name += '_i.{:.1f}-{:.1f}'.format(
-                log10(image_limits_use[0]), log10(image_limits_use[1]))
+            if 'histogram' in image_kind:
+                plot_name += '_i.{:.1f}-{:.1f}'.format(
+                    log10(image_limits_use[0]), log10(image_limits_use[1]))
 
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
@@ -1150,7 +1160,7 @@ def plot_property_v_distance(
     center_positions=None, center_velocities=None,
     property_select={}, part_indicess=None,
     distance_reference=None, plot_nfw=False, plot_fit=False, fit_distance_limits=[],
-    get_values=False,
+    print_values=False, get_values=False,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
@@ -1181,6 +1191,7 @@ def plot_property_v_distance(
     plot_nfw : boolean : whether to overplot NFW profile: density ~ 1 / r
     plot_fit : boolean : whether to overplot linear fit
     fit_distance_limits : list : min and max distance for fit
+    print_values : boolean : whether to print values plotted
     get_values : boolean : whether to return values plotted
     write_plot : boolean : whether to write figure to file
     plot_directory : string : directory to write figure file
@@ -1210,10 +1221,11 @@ def plot_property_v_distance(
 
         pros.append(pros_part)
 
-    # print results
-    print(pros[0][species_name]['distance'])
-    for part_i, pro in enumerate(pros):
-        print(pro[species_name][property_statistic])
+    if print_values:
+        # print results
+        print(pros[0][species_name]['distance'])
+        for part_i, pro in enumerate(pros):
+            print(pro[species_name][property_statistic])
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
@@ -1296,9 +1308,11 @@ def plot_property_v_distance(
         if fit_distance_limits is not None and len(fit_distance_limits):
             masks = (xs >= min(fit_distance_limits)) * (xs < max(fit_distance_limits))
         slope, intercept, _r_value, _p_value, _std_err = stats.linregress(xs[masks], ys[masks])
-        print('# fit: slope = {:.3f}, intercept = {:.3f}'.format(slope, intercept))
+        print('# raw fit: slope = {:.3f}, intercept = {:.3f}'.format(slope, intercept))
         if 'log' in property_scaling and 'log' not in distance_scaling:
-            print('  exponential scale length = {:.3f}'.format(-1 * np.log10(np.e) / slope))
+            print('# exponential fit:')
+            print('  scale length = {:.3f} kpc'.format(-1 * np.log10(np.e) / slope))
+            print('  normalization = 10^{:.2f} Msun / kpc^2'.format(intercept))
 
         ys_fit = intercept + slope * xs
         if 'log' in distance_scaling:
