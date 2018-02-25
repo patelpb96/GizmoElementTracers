@@ -1678,7 +1678,7 @@ def write_ebf_file(part=None, distance_limits=[0, 300]):
     Read.assign_orbit(part, 'star')
 
     # get particles within the selection region
-    part_indices = ut.particle.get_indices_within_distances(part, 'star', distance_limits)
+    part_indices = ut.particle.get_indices_within_coordinates(part, 'star', distance_limits)
 
     # determine the plane of the stellar disk
     distance_max = 12  # [kpc physical]

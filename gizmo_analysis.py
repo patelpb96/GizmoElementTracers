@@ -1474,7 +1474,7 @@ def assign_vel_circ_at_radius(
     for hii, hi in enumerate(his):
         if hii > 0 and hii % 10 == 0:
             ut.io.print_flush(hii)
-        pis = ut.particle.get_indices_within_distances(
+        pis = ut.particle.get_indices_within_coordinates(
             part, 'dark', [0, radius], hal['position'][hi], scalarize=True)
         hal[mass_key][hi] = ut.halo_property.get_circular_velocity(pis.size * dark_mass, radius)
 
