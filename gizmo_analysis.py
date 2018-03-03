@@ -2218,13 +2218,13 @@ def explore_galaxy(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), part_indices=part_indices,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=10)
+                write_plot=write_plot, plot_name=plot_directory, figure_index=10)
 
             Image.plot_image(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi),
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=11)
+                write_plot=write_plot, plot_name=plot_directory, figure_index=11)
 
             plot_property_distribution(
                 part, 'star', 'velocity.total', [0, None], 2, None, 'linear', 'histogram',
@@ -2298,7 +2298,7 @@ def explore_galaxy(
                 part, 'dark', 'mass', 'histogram',
                 [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), background_color='black',
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
+                write_plot=write_plot, plot_name=plot_directory, figure_index=20)
 
             plot_property_v_distance(
                 part, 'dark', 'mass', 'density', 'log', False, None,
@@ -2334,13 +2334,13 @@ def explore_galaxy(
                     part, 'gas', 'mass', 'histogram',
                     [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                     hal.prop('star.position', hi), part_indices=part_indices,
-                    write_plot=write_plot, plot_directory=plot_directory, figure_index=30)
+                    write_plot=write_plot, plot_name=plot_directory, figure_index=30)
 
                 Image.plot_image(
                     part, 'gas', 'mass.neutral', 'histogram',
                     [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                     hal.prop('star.position', hi), part_indices=part_indices,
-                    write_plot=write_plot, plot_directory=plot_directory, figure_index=31)
+                    write_plot=write_plot, plot_name=plot_directory, figure_index=31)
             else:
                 fig = plt.figure(10)
                 fig.clf()
@@ -3144,8 +3144,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                         rotation=align_principal_axes, image_limits=[10 ** 6, 10 ** 10.5],
                         background_color='black',
-                        write_plot=True, plot_directory=plot_directory,
-                        add_simulation_name=True,
+                        write_plot=True, plot_name=plot_directory,
                     )
 
                 species_name = 'gas'
@@ -3155,8 +3154,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                         rotation=align_principal_axes, image_limits=[10 ** 4, 10 ** 9],
                         background_color='black',
-                        write_plot=True, plot_directory=plot_directory,
-                        add_simulation_name=True,
+                        write_plot=True, plot_name=plot_directory,
                     )
 
                 species_name = 'dark'
@@ -3166,8 +3164,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                         rotation=align_principal_axes, image_limits=[10 ** 5.5, 10 ** 9],
                         background_color='black',
-                        write_plot=True, plot_directory=plot_directory,
-                        add_simulation_name=True,
+                        write_plot=True, plot_name=plot_directory,
                     )
 
     def parse_inputs(self, parts=None, species=None, redshifts=None):
