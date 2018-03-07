@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 '''
 Read Gizmo snapshots.
 
@@ -144,7 +143,6 @@ Some useful examples:
     etc
 '''
 
-
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatibility
 import collections
@@ -164,6 +162,7 @@ class ParticleDictionaryClass(dict):
     but it also allows greater flexibility, storing additional meta-data (such as snapshot
     information and cosmological parameters) and calling derived quantities via .prop().
     '''
+
     def __init__(self):
         # use to translate between element name and index in element table
         self.element_dict = collections.OrderedDict()
@@ -389,7 +388,7 @@ class ParticleDictionaryClass(dict):
                     values = ut.coordinate.get_distances_cylindrical(values)
                 if 'velocity' in property_name:
                     # along major axes (v_R), minor axis (v_Z), angular (v_phi)
-                    distance_vectors = self.prop('host.distance.principal')
+                    distance_vectors = self.prop('host.distance.principal', indices)
                     values = ut.coordinate.get_velocities_cylindrical(values, distance_vectors)
 
             if 'total' in property_name:
@@ -414,6 +413,7 @@ class ReadClass(ut.io.SayClass):
     '''
     Read Gizmo snapshot[s].
     '''
+
     def __init__(self, cosmological=True):
         '''
         Set properties for snapshot files.
@@ -1270,6 +1270,7 @@ class ReadClass(ut.io.SayClass):
         -------
         Cosmology : class : stores cosmological parameters and functions
         '''
+
         def get_check_value(line, value_test=None):
             frac_dif_max = 0.01
             value = float(line.split('=')[-1].strip())
