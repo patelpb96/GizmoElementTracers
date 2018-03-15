@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 '''
 Analyze Gizmo simulations.
 
@@ -8,7 +7,6 @@ Analyze Gizmo simulations.
 
 Masses in [M_sun], positions in [kpc comoving], distances and radii in [kpc physical].
 '''
-
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
@@ -414,6 +412,7 @@ class ImageClass(ut.io.SayClass):
     '''
     Plot 2-D image[s], save values, write to file.
     '''
+
     def plot_image(
         self, part, species_name='dark', weight_name='mass', image_kind='histogram',
         dimensions_plot=[0, 1, 2], dimensions_select=[0, 1, 2],
@@ -2796,6 +2795,7 @@ class CompareSimulationsClass(ut.io.SayClass):
     '''
     Analyze and plot different simulations for comparison.
     '''
+
     def __init__(
         self, galaxy_radius_limits=[0, 12], galaxy_profile_radius_limits=[0.1, 30],
         halo_profile_radius_limits=[0.5, 300], plot_directory='plot',):

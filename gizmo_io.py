@@ -56,7 +56,7 @@ All particle species have the following properties:
     'position' : 3-D position, along simulations's (arbitrary) x,y,z grid [kpc comoving]
     'velocity' : 3-D velocity, along simulations's (arbitrary) x,y,z grid [km / s physical]
     'mass' : mass [M_sun]
-    'potential' : potential (computed via all particles in the box) [km / s^2 physical]
+    'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
 Gas particles also have:
     'temperature' : [K]
@@ -862,6 +862,7 @@ class ReadClass(ut.io.SayClass):
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
+            'Acceleration': 'acceleration',
             ## particles with adaptive smoothing
             #'AGS-Softening': 'smooth.length',  # for gas, this is same as SmoothingLength
 
@@ -1193,8 +1194,17 @@ class ReadClass(ut.io.SayClass):
                 del(helium_mass_fracs, ys_helium, mus, molecular_weights)
 
             if 'potential' in part[spec]:
-                # convert from [km / s^2 comoving] to [km / s^2 physical]
+                # convert to [km^2 / s^2 physical]
+                # TO CHECK: if Gizmo writes potential as m / r, in raw units?
+                # 1 / a conversion remains accurate, but might need to add:
+                # M *= 1e10 / header['hubble'] to get Msun
+                # r /= header['hubble'] to get kpc physical
+                # G conversion?
                 part[spec]['potential'] = part[spec]['potential'] / header['scalefactor']
+
+            #if 'acceleration' in part[spec]:
+            #    # convert to [km / s^2 physical]
+            #    part[spec]['acceleration'] = part[spec]['acceleration'] / header['scalefactor']
 
         # renormalize so potential max = 0
         renormalize_potential = False
@@ -1344,7 +1354,7 @@ class ReadClass(ut.io.SayClass):
             'position': [0, 1e6],  # [kpc comoving]
             'velocity': [-1e5, 1e5],  # [km / s]
             'mass': [9, 1e11],  # [M_sun]
-            'potential': [-1e9, 1e9],  # [M_sun]
+            'potential': [-1e9, 1e9],  # [km^2 / s^2]
             'temperature': [3, 1e9],  # [K]
             'density': [0, 1e14],  # [M_sun/kpc^3]
             'smooth.length': [0, 1e9],  # [kpc physical]
