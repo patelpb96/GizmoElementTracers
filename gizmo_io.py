@@ -1200,11 +1200,12 @@ class ReadClass(ut.io.SayClass):
                 # M *= 1e10 / header['hubble'] to get Msun
                 # r /= header['hubble'] to get kpc physical
                 # G conversion?
-                part[spec]['potential'] = part[spec]['potential'] / header['scalefactor']
+                part[spec]['potential'] /= header['scalefactor']
 
-            #if 'acceleration' in part[spec]:
-            #    # convert to [km / s^2 physical]
-            #    part[spec]['acceleration'] = part[spec]['acceleration'] / header['scalefactor']
+            if 'acceleration' in part[spec]:
+                # convert to [km / s^2 physical]
+                # consistent with v^2 / r at z = 0.5, need to check at z = 0
+                part[spec]['acceleration'] *= header['scalefactor']
 
         # renormalize so potential max = 0
         renormalize_potential = False
