@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 #SBATCH --job-name=gizmo_track
-#SBATCH --partition=skx-normal    # SKX node: 48 cores, 2 FP threads per core, 4 GB per core, 192 GB total
-##SBATCH --partition=normal    ## KNL node: 64 (useable) cores x 2 FP threads = 128 threads, 96 GB total
+#SBATCH --partition=skx-normal    # SKX node: 48 cores, 4 GB per core, 192 GB total
+##SBATCH --partition=normal    ## KNL node: 64 cores x 2 FP threads, 1.6 GB per core, 96 GB total
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
 #SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
@@ -13,14 +13,12 @@
 #SBATCH --mail-type=end
 #SBATCH --account=TG-AST140064
 
-
 '''
 Submit gizmo particle tracking to queue.
 Submit this script from within the primary directory of the simulation.
 
 @author: Andrew Wetzel
 '''
-
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
@@ -29,14 +27,11 @@ import os
 from utilities.basic import io as ut_io
 from gizmo_analysis import gizmo_track
 
-
 species_name = 'star'  # which particle species to track
-
 
 # print run-time and CPU information
 ScriptPrint = ut_io.ScriptPrintClass('slurm')
 ScriptPrint.print_initial()
-
 
 # check if any input arguments
 if len(os.sys.argv) > 1:
@@ -47,7 +42,6 @@ else:
 print('executing function[s]: {}'.format(function_kind))
 os.sys.stdout.flush()
 
-
 # execute
 if 'indices' in function_kind:
     IndexPointer = gizmo_track.IndexPointerClass(species_name)
@@ -56,7 +50,6 @@ if 'indices' in function_kind:
 if 'coordinates' in function_kind:
     HostCoordinates = gizmo_track.HostCoordinatesClass(species_name)
     HostCoordinates.write_formation_coordinates()
-
 
 # print run-time information
 ScriptPrint.print_final()

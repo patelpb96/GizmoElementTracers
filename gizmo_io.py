@@ -1195,7 +1195,7 @@ class ReadClass(ut.io.SayClass):
 
             if 'potential' in part[spec]:
                 # convert to [km^2 / s^2 physical]
-                # TO CHECK: if Gizmo writes potential as m / r, in raw units?
+                # TO DO: check if Gizmo writes potential as m / r, in raw units?
                 # 1 / a conversion remains accurate, but might need to add:
                 # M *= 1e10 / header['hubble'] to get Msun
                 # r /= header['hubble'] to get kpc physical
@@ -1204,8 +1204,8 @@ class ReadClass(ut.io.SayClass):
 
             if 'acceleration' in part[spec]:
                 # convert to [km / s^2 physical]
-                # consistent with v^2 / r at z = 0.5, need to check at z = 0
-                part[spec]['acceleration'] *= header['scalefactor']
+                # consistent with v^2 / r at z = 0.5, TO DO check at z = 0
+                part[spec]['acceleration'] /= header['hubble']
 
         # renormalize so potential max = 0
         renormalize_potential = False
