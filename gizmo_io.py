@@ -1205,7 +1205,7 @@ class ReadClass(ut.io.SayClass):
             if 'acceleration' in part[spec]:
                 # convert to [km / s^2 physical]
                 # consistent with v^2 / r at z = 0.5, TO DO check at z = 0
-                part[spec]['acceleration'] /= header['hubble']
+                part[spec]['acceleration'] *= header['hubble']
 
         # renormalize so potential max = 0
         renormalize_potential = False
