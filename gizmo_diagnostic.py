@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
-
 '''
 Diagnose Gizmo simulations.
 
 @author: Andrew Wetzel
 '''
-
 
 # system ----
 from __future__ import absolute_import, division, print_function
@@ -100,11 +98,16 @@ def print_run_times(
     -------
     scalefactors, redshifts, wall_times, cpu_times : arrays
     '''
+
     def get_scalefactor_string(scalefactor):
         if scalefactor == 1:
             scalefactor_string = '1'
+        elif np.abs(scalefactor % 0.1) < 0.01:
+            scalefactor_string = '{:.1f}'.format(scalefactor)
+        elif np.abs(scalefactor % 0.01) < 0.001:
+            scalefactor_string = '{:.2f}'.format(scalefactor)
         else:
-            scalefactor_string = '{}'.format(scalefactor)
+            scalefactor_string = '{:.3f}'.format(scalefactor)
         return scalefactor_string
 
     file_name = 'cpu.txt'
@@ -113,8 +116,8 @@ def print_run_times(
             0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]
     scalefactors = ut.array.arrayize(scalefactors)
 
-    file_path_name = (ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) +
-                      file_name)
+    file_path_name = (
+        ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name)
     file_in = open(file_path_name, 'r')
 
     wall_times = []
@@ -132,7 +135,6 @@ def print_run_times(
                 break
             else:
                 scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
-
         elif scalefactor in line:
             print_next_line = True
 
