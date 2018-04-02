@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 
-
 '''
 Generate initial condition points by selecting particles at final time and tracing them back
 to initial time.
 
-Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
-
 @author: Andrew Wetzel
-'''
 
+Masses in [M_sun], positions in [kpc comoving], distances and radii in [kpc physical].
+'''
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
@@ -28,6 +26,7 @@ class ReadClass(ut.io.SayClass):
     '''
     Read particles and halo catalog.
     '''
+
     def __init__(self, snapshot_redshifts=[0, 99], simulation_directory='.'):
         '''
         Read particles from final and initial snapshot and halos from final snapshot.
@@ -50,7 +49,7 @@ class ReadClass(ut.io.SayClass):
         parts : list : catalogs of particles at initial and final snapshots
         hal : list : catalog of halos at final snapshot
         '''
-        from rockstar import rockstar_io
+        from rockstar_analysis import rockstar_io
 
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
@@ -101,7 +100,7 @@ class ReadClass(ut.io.SayClass):
         -------
         hal : list : catalog of halos at final snapshot
         '''
-        from rockstar import rockstar_io
+        from rockstar_analysis import rockstar_io
 
         Read = rockstar_io.ReadClass()
         hal = Read.read_catalogs(

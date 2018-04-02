@@ -12,7 +12,7 @@ Unless otherwise noted, all quantities are in (combinations of) these units:
     Masses in [M_sun]
     Positions in [kpc comoving]
     Distances and radii in [kpc physical]
-    Velocities in [km / s physical]
+    Velocities in [km / s peculiar]
     Time in [Gyr]
     Elemental abundances (metallicities) in [(linear) mass fraction]
 
@@ -23,14 +23,14 @@ Within a simulation directory, read all particles in a snapshot at redshift 0 vi
     part = gizmo.io.Read.read_snapshots('all', 'redshift', 0)
 part is a dictionary, with a key for each particle species. So, access star particle dictionary via:
     part['star']
-part['star'] is dictionary, with each particle property as a key. For example:
+part['star'] is dictionary, with each property of particles as a key. For example:
     part['star']['mass']
 returns a numpy array of masses, one for each star particle, while
     part['star']['position']
-returns a numpy array positions (of dimension particle_number x 3).
+returns a numpy array of positions, of dimension particle_number x 3.
 
 If you want the code to compute and store the principal axes (via the moment of inertia tensor),
-computing using the stellar distribution (disk) of the primary galaxy:
+computed using the stellar distribution (disk) of the primary host galaxy:
     part = gizmo.io.Read.read_snapshots('all', 'redshift', 0, assign_principal_axes=True)
 
 
@@ -39,7 +39,7 @@ Particle species
 The available particle species in a cosmological simulation are:
     part['gas'] : gas
     part['dark'] : dark matter at the highest resolution
-    part['dark.2'] : dark matter at lower resolution (outside the zoom-in region)
+    part['dark.2'] : dark matter at lower resolution (outside of the zoom-in region)
     part['star'] : stars
     part['blackhole'] : black holes (if the simulation contains them)
 
@@ -54,7 +54,7 @@ For example:
 All particle species have the following properties:
     'id' : ID (indexing starts at 0)
     'position' : 3-D position, along simulations's (arbitrary) x,y,z grid [kpc comoving]
-    'velocity' : 3-D velocity, along simulations's (arbitrary) x,y,z grid [km / s physical]
+    'velocity' : 3-D velocity, along simulations's (arbitrary) x,y,z grid [km / s peculiar]
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
@@ -76,7 +76,7 @@ particle gets id.child += 2 ^ id.generation.
 Both particles then get id.generation += 1.
 Star particles inherit these from their progenitor gas particles.
 Caveat: this allows a maximum of 30 generations, then its resets to 0.
-Thus, particles with id.child > 2^30 are not unique anymore.
+Thus, particles with id.generation > 30 are not unique anymore.
 
 Star and gas particles also have:
     'massfraction' : fraction of the mass that is in different elemental abundances,
@@ -85,7 +85,7 @@ Star and gas particles also have:
         1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
 
 Star particles also have:
-  'form.scalefactor' : expansion scale factor when the star particle formed [0 to 1]
+  'form.scalefactor' : expansion scale-factor when the star particle formed [0 to 1]
 
 
 Derived properties
@@ -123,7 +123,7 @@ Some useful examples:
           first value is along the major axes (positive definite)
           second value is vertical velocity wrt the disk (signed)
 
-    part['star'].prop('form.time') : time (age of the Universe) when star particle formed [Gyr]
+    part['star'].prop('form.time') : time of the Universe when star particle formed [Gyr]
     part['star'].prop('age') :
         age of star particle at current snapshot (current_time - formation_time) [Gyr]
 
