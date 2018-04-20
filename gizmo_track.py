@@ -6,7 +6,6 @@ Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
 @author: Andrew Wetzel
 '''
 
-
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import sys
@@ -16,7 +15,6 @@ from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 from . import gizmo_io
-
 
 # default directory to store particle tracking files
 TRACK_DIRECTORY = 'track/'
@@ -29,6 +27,7 @@ class IndexPointerClass(ut.io.SayClass):
     '''
     Compute particle index pointers for tracking particles across time.
     '''
+
     def __init__(self, species_name='star', directory=TRACK_DIRECTORY):
         '''
         Parameters
@@ -223,8 +222,7 @@ class IndexPointerClass(ut.io.SayClass):
             self.say('! {} total have offset {}'.format(
                      test_prop_offset_number_tot, test_property))
 
-    def io_index_pointer(
-        self, part=None, snapshot_index=None, part_index_pointers=None):
+    def io_index_pointer(self, part=None, snapshot_index=None, part_index_pointers=None):
         '''
         Read or write, for each star particle, its index in the catalog at another snapshot.
 
@@ -267,6 +265,7 @@ class HostCoordinatesClass(IndexPointerClass):
     Compute coordinates (3D distances and 3D velocities) wrt the host galaxy center for particles
     across time.
     '''
+
     def __init__(self, species_name='star', directory=TRACK_DIRECTORY):
         '''
         Parameters
@@ -384,8 +383,7 @@ class HostCoordinatesClass(IndexPointerClass):
 
                 # compute rotation vectors for principal axes within R_90
                 rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
-                    part_at_snap, self.species_name, gal['radius'], scalarize=True,
-                    print_results=True)
+                    part_at_snap, self.species_name, gal['radius'])
 
                 # store host galaxy center coordinates
                 part[self.species_name].center_position_at_snapshots[snapshot_index] = \
@@ -403,17 +401,17 @@ class HostCoordinatesClass(IndexPointerClass):
                 if prop in self.form_host_coordiante_kinds:
                     # 3-D distance wrt host along default x,y,z axes [kpc physical]
                     coordinate_vectors[prop] = ut.coordinate.get_distances(
-                        'vector', part_at_snap[self.species_name]['position'][part_indices_at_snap],
-                        part_at_snap.center_position,
-                        part_at_snap.info['box.length']) * part_at_snap.snapshot['scalefactor']
+                        part_at_snap[self.species_name]['position'][part_indices_at_snap],
+                        part_at_snap.center_position, part_at_snap.info['box.length'],
+                        part_at_snap.snapshot['scalefactor'])
 
                 prop = 'form.host.velocity'
                 if prop in self.form_host_coordiante_kinds:
                     # 3-D velocity wrt host along default x,y,z axes [km / s]
                     # caveat: this does *not* include Hubble flow
                     coordinate_vectors[prop] = ut.coordinate.get_velocity_differences(
-                        'vector', part_at_snap[self.species_name]['velocity'][part_indices_at_snap],
-                        part_at_snap.center_velocity, include_hubble_flow=False)
+                        part_at_snap[self.species_name]['velocity'][part_indices_at_snap],
+                        part_at_snap.center_velocity)
 
                 # rotate coordinates to align with principal axes
                 for prop in self.form_host_coordiante_kinds:
@@ -449,8 +447,8 @@ class HostCoordinatesClass(IndexPointerClass):
                 dict_out[prop] = part[self.species_name][prop]
             dict_out['center.position'] = part[self.species_name].center_position_at_snapshots
             dict_out['center.velocity'] = part[self.species_name].center_velocity_at_snapshots
-            dict_out['principal.axes.vectors'] = \
-                part[self.species_name].principal_axes_vectors_at_snapshots
+            dict_out['principal.axes.vectors'] = (
+                part[self.species_name].principal_axes_vectors_at_snapshots)
 
             ut.io.file_hdf5(directory + file_name, dict_out)
 
@@ -487,7 +485,6 @@ class HostCoordinatesClass(IndexPointerClass):
 
 
 HostCoordinates = HostCoordinatesClass()
-
 
 #===================================================================================================
 # run from command line

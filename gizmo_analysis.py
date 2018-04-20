@@ -129,8 +129,8 @@ def plot_mass_contamination(
 
     for spec in profile_mass:
         distances = ut.coordinate.get_distances(
-            'total', part[spec]['position'], center_position, part.info['box.length']
-        ) * part.snapshot['scalefactor']  # [kpc physical]
+            part[spec]['position'], center_position, part.info['box.length'],
+            part.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
         if scale_to_halo_radius:
             distances /= halo_radius
         profile_mass[spec] = DistanceBin.get_sum_profile(
@@ -329,9 +329,8 @@ def plot_metal_v_distance(
     metal_values = []
     for part_i, part in enumerate(parts):
         distances = ut.coordinate.get_distances(
-            'total', part[species_name]['position'], center_positions[part_i],
-            part.info['box.length'])
-        distances *= part.snapshot['scalefactor']  # convert to [kpc physical]
+            part[species_name]['position'], center_positions[part_i], part.info['box.length'],
+            part.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
 
         metal_mass_kind = metal_name.replace('massfraction.', 'mass.')
         metal_masses = part[species_name].prop(metal_mass_kind)
@@ -352,7 +351,6 @@ def plot_metal_v_distance(
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-    #, left=0.17, right=0.96, top=0.96, bottom=0.14)
 
     ut.plot.set_axes_scaling_limits(
         subplot, distance_scaling, distance_limits, None,
@@ -945,15 +943,16 @@ def plot_property_distribution(
                 part[species_name], property_select, part_indices)
 
         if distance_limits:
+            # [kpc physical]
             distances = ut.coordinate.get_distances(
-                'total', part[species_name]['position'][part_indices], center_positions[part_i],
-                part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
+                part[species_name]['position'][part_indices], center_positions[part_i],
+                part.info['box.length'], part.snapshot['scalefactor'], total_distance=True)
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         if 'velocity' in property_name:
             orb = ut.particle.get_orbit_dictionary(
-                part, species_name, center_positions[part_i], center_velocities[part_i],
-                part_indices, include_hubble_flow=True, scalarize=True)
+                part, species_name, part_indices,
+                center_positions[part_i], center_velocities[part_i])
             prop_values = orb[property_name]
         else:
             prop_values = part[species_name].prop(property_name, part_indices)
@@ -1041,8 +1040,8 @@ def plot_property_v_property(
 
     if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
-            'total', center_position, part[species_name]['position'][part_indices],
-            part.info['box.length']) * part.snapshot['scalefactor']
+            center_position, part[species_name]['position'][part_indices],
+            part.info['box.length'], part.snapshot['scalefactor'], total_distance=True)  # [kpc phy]
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
 
     x_prop_values = part[species_name].prop(x_property_name, part_indices)
@@ -1340,6 +1339,191 @@ def plot_property_v_distance(
         return pros
 
 
+def print_densities(
+    parts, species_names=['star', 'dark', 'gas'],
+    distance_limitss=[[8.0, 8.4], [-1.1, 1.1], [0, 2 * np.pi]], cylindrical=True,
+    rotation=True, center_positions=None, center_velocities=None):
+    '''
+    parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
+    species_names : string or list thereof: name of particle species to compute densities of
+        options: 'dark', 'star', 'gas'
+    distance_limitss : list of lists : min and max distances/positions
+    cylindrical : boolean : get distances along major axes (R, positive definite),
+        minor axis (Z, signed), and angular (phi, 0 to 2 * pi)
+    rotation : boolean or array : whether to rotate particles - two options:
+      (a) if input array of eigen-vectors, will define rotation axes
+      (b) if True, will rotate to align with principal axes stored in species dictionary
+    center_positions : array or list of arrays : position of center for each particle catalog
+    center_velocities : array or list of arrays : velocity of center for each particle catalog
+    property_select : dict : (other) properties to select on: names as keys and limits as values
+    '''
+    Say = ut.io.SayClass(print_densities)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+
+    for part_i, part in enumerate(parts):
+        densities_2d = []
+        densities_3d = []
+
+        for spec_name in species_names:
+            distances = ut.particle.get_distances_wrt_center(
+                part, spec_name, None, center_positions[part_i], rotation, cylindrical)
+
+            pis = None
+            for dimen_i in range(len(distance_limitss)):
+                pis = ut.array.get_indices(distances[:, dimen_i], distance_limitss[dimen_i], pis)
+
+            mass = np.sum(part[spec_name]['mass'][pis])
+
+            # compute densities
+            # compute surface area [pc^2]
+            area = (np.pi * (max(distance_limitss[0]) ** 2 - min(distance_limitss[0]) ** 2) *
+                    ut.const.kilo ** 2)
+            area *= (max(distance_limitss[2]) - min(distance_limitss[2])) / (2 * np.pi)
+            # compute voluem [pc^3]
+            volume = area * (max(distance_limitss[1]) - min(distance_limitss[1])) * ut.const.kilo
+            density_2d = mass / area
+            density_3d = mass / volume
+
+            Say.say('{}:'.format(spec_name))
+            Say.say('  density_2d = {:.5f} Msun / pc^2'.format(density_2d))
+            Say.say('  density_3d = {:.5f} Msun / pc^3'.format(density_3d))
+
+            densities_2d.append(density_2d)
+            densities_3d.append(density_3d)
+
+        Say.say('total:'.format(spec_name))
+        Say.say('  density_2d = {:.5f} Msun / pc^2'.format(np.sum(densities_2d)))
+        Say.say('  density_3d = {:.5f} Msun / pc^3'.format(np.sum(densities_3d)))
+
+
+def plot_disk_orientation(
+    parts, species_names=['star', 'star.young', 'gas'],
+    property_vary='distance',
+    property_limits=[4, 20], property_bin_width=1, property_scaling='linear',
+    distance_ref=8.2, center_positions=None,
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
+    species_names : string or list : name[s] of particle species to compute
+        options: 'star', 'gas', 'dark'
+    vary_property : string : which property to vary (along x-axis): 'distance', 'age'
+    property_limits : list : min and max property for binning
+    property_bin_width : float : width of property bin
+    property_scaling : string : 'log', 'linear'
+    distance_ref : float : reference distance to compute principal axes
+    center_positions : array or list of arrays : position of center for each particle catalog
+    write_plot : boolean : whether to write figure to file
+    plot_directory : string : directory to write figure file
+    figure_index : int : index of figure for matplotlib
+    '''
+    orientation_axis = [0, 0, 1]  # which principal axis to measure orientation angle of
+    gas_temperature_limits = [0, 5e4]  # [K]
+    young_star_age_limits = [0, 1]  # [Gyr]
+
+    Say = ut.io.SayClass(plot_disk_orientation)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+
+    PropertyBin = ut.binning.BinClass(
+        property_limits, property_bin_width, scaling=property_scaling, include_max=True)
+
+    angles = np.zeros((len(parts), len(species_names), PropertyBin.number)) * np.nan
+
+    for part_i, part in enumerate(parts):
+        Say.say('{}'.format(part.info['simulation.name']))
+
+        # compute reference principal axes using all stars out to distance_ref
+        rotation_vectors, _eigen_values, _axes_ratios = ut.particle.get_principal_axes(
+            part, 'star', distance_ref, age_limits=[0, 1], center_position=center_positions[part_i],
+            print_results=False)
+        axis_rotation_ref = np.dot(orientation_axis, rotation_vectors)
+        #axis_rotation_ref = np.dot(orientation_axis, part['star'].principal_axes_vectors)
+
+        for spec_i, spec_name in enumerate(species_names):
+            Say.say('  {}'.format(spec_name))
+
+            if spec_name is 'gas':
+                part_indices = ut.array.get_indices(
+                    part[spec_name]['temperature'], gas_temperature_limits)
+            elif 'star' in spec_name and 'young' in spec_name:
+                part_indices = ut.array.get_indices(part['star'].prop('age'), young_star_age_limits)
+                spec_name = 'star'
+            else:
+                part_indices = None
+
+            for prop_i, property_max in enumerate(PropertyBin.mins):
+                if property_vary == 'distance':
+                    distance_max = property_max
+                elif property_vary == 'age':
+                    part_indices = ut.array.get_indices(part['star'].prop('age'), [0, property_max])
+                    distance_max = distance_ref
+
+                rotation_vectors, _eigen_values, _axes_ratios = ut.particle.get_principal_axes(
+                    part, spec_name, distance_max, center_position=center_positions[part_i],
+                    part_indicess=part_indices, print_results=False)
+
+                # get orientation of axis of interest
+                axis_rotation = np.dot(orientation_axis, rotation_vectors)
+                angle = np.arccos(np.dot(axis_rotation, axis_rotation_ref))
+                if angle is np.nan:
+                    angle = 0  # sanity check, for exact alignment
+                angle = min(angle, np.pi - angle)  # deal with possible flip
+                angle *= 180 / np.pi  # [degree]
+
+                angles[part_i, spec_i, prop_i] = angle
+
+                if property_vary == 'distance':
+                    Say.say('  {:4.1f} kpc: {:.1f} deg'.format(property_max, angle))
+                elif property_vary == 'age':
+                    Say.say('  {:4.1f} Gyr: {:.1f} deg'.format(property_max, angle))
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot, property_scaling, property_limits, None, 'linear', [0, None], angles)
+
+    if property_vary == 'distance':
+        subplot.set_xlabel('maximum radius $\\left[ {{\\rm kpc}} \\right]$')
+    else:
+        subplot.set_xlabel('star maximum age $\\left[ {{\\rm Gyr}} \\right]$')
+    subplot.set_ylabel('disk offset angle $\\left[ {{\\rm deg}} \\right]$')
+
+    if len(parts) > len(species_names):
+        colors = ut.plot.get_colors(len(parts))
+    else:
+        colors = ut.plot.get_colors(len(species_names))
+
+    for part_i, part in enumerate(parts):
+        for spec_i, spec_name in enumerate(species_names):
+            if len(parts) > len(species_names):
+                label = part.info['simulation.name']
+                color = colors[part_i]
+            else:
+                label = spec_name
+                color = colors[spec_i]
+
+            subplot.plot(
+                PropertyBin.mins, angles[part_i, spec_i], color=color, alpha=0.8, label=label)
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    property_y = 'disk.orientation'
+    if len(parts) == 1:
+        property_y = parts[0].info['simulation.name'] + '_' + property_y
+    plot_name = ut.plot.get_file_name(
+        property_y, property_vary, snapshot_dict=part.snapshot)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+
+
 def plot_velocity_distribution_of_halo(
     parts, species_name='star',
     property_name='velocity.tan', property_limits=[], property_bin_width=None,
@@ -1397,15 +1581,16 @@ def plot_velocity_distribution_of_halo(
                 part[species_name], property_select, part_indices)
 
         if distance_limits:
+            # [kpc physical]
             distances = ut.coordinate.get_distances(
-                'total', part[species_name]['position'][part_indices], center_positions[part_i],
-                part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
+                part[species_name]['position'][part_indices], center_positions[part_i],
+                part.info['box.length'], part.snapshot['scalefactor'], total_distance=True)
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         if 'velocity' in property_name:
             orb = ut.particle.get_orbit_dictionary(
-                part, species_name, center_positions[part_i], center_velocities[part_i],
-                part_indices, include_hubble_flow=True, scalarize=True)
+                part, species_name, part_indices,
+                center_positions[part_i], center_velocities[part_i])
             prop_values = orb[property_name]
         else:
             prop_values = part[species_name].prop(property_name, part_indices)
@@ -1474,7 +1659,7 @@ def assign_vel_circ_at_radius(
         if hii > 0 and hii % 10 == 0:
             ut.io.print_flush(hii)
         pis = ut.particle.get_indices_within_coordinates(
-            part, 'dark', [0, radius], hal['position'][hi], scalarize=True)
+            part, 'dark', [0, radius], hal['position'][hi])
         hal[mass_key][hi] = ut.halo_property.get_circular_velocity(pis.size * dark_mass, radius)
 
 
@@ -1851,9 +2036,10 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         if (center_position is not None and len(center_position) and
                 distance_limits is not None and len(distance_limits)):
+            # [kpc physical]
             distances = ut.coordinate.get_distances(
                 'total', part['star']['position'][part_indices], center_position,
-                part.info['box.length']) * part.snapshot['scalefactor']  # [kpc physical]
+                part.info['box.length'], part.snapshot['scalefactor'], total_distance=True)
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
         # get star particle formation times, sorted from earliest
@@ -2693,7 +2879,7 @@ def get_galaxy_mass_profiles_v_redshift(
             part, profile_species_name, 'mass.percent', mass_percent, star_distance_max)
 
         rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
-            part, profile_species_name, gal_90['radius'], scalarize=True)
+            part, profile_species_name, gal_90['radius'])
 
         gal['rotation.tensor'].append(rotation_vectors)
         gal['axis.ratio'].append(axis_ratios)

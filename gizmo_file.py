@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
-
 '''
 Delete snapshot files or transfer files across machines.
 
 @author: Andrew Wetzel
 '''
-
 
 # system ----
 from __future__ import absolute_import, division, print_function
@@ -18,16 +16,17 @@ from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 
-
-# default subset to keep for FIRE (61 snapshots)
+# default subset to keep for FIRE (65 snapshots)
 snapshot_indices_subset = [
-    0, 20, 26, 33, 41, 52, 55, 57, 60, 64, 67, 71, 75, 79, 83, 88, 91, 93, 96, 99,
-    102, 105, 109, 112, 116, 120, 124, 128, 133, 137,
-    142, 148, 153, 159, 165, 172, 179, 187, 195,
-    204, 214, 225, 236, 248, 262, 277, 294,
-    312, 332, 356, 382,
-    412, 446, 486,
-    534, 561, 567, 573, 579, 585,
+    0,
+    20, 26, 33, 41, 52,  # z = 10 - 6
+    55, 57, 60, 64, 67,  # z = 5.8 - 5.0
+    71, 75, 79, 83, 88,  # z = 4.8 - 4.0
+    91, 93, 96, 99, 102, 105, 109, 112, 116, 120,  # z = 3.9 - 3.0
+    124, 128, 133, 137, 142, 148, 153, 159, 165, 172,  # z = 2.9 - 2.0
+    179, 187, 195, 204, 214, 225, 236, 248, 262, 277,  # z = 1.9 - 1.0
+    294, 312, 332, 356, 382, 412, 446, 486, 534,  # z = 0.9 - 0.1
+    539, 544, 550, 555, 561, 567, 573, 579, 585,  # z = 0.09 - 0.01
     600
 ]
 

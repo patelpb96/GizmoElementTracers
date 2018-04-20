@@ -193,8 +193,8 @@ def write_initial_points(
     spec_select_number = []
     for spec in species:
         distances = ut.coordinate.get_distances(
-            'total', part_fin[spec]['position'], center_position,
-            part_fin.info['box.length']) * part_fin.snapshot['scalefactor']  # [kpc physical]
+            part_fin[spec]['position'], center_position, part_fin.info['box.length'],
+            part_fin.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
 
         indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
@@ -431,7 +431,7 @@ def print_contamination_in_box(
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
         distance_vector = np.abs(ut.coordinate.get_distances(
-            'vector', part['position'], center_position, part.info['box.length']))
+            part['position'], center_position, part.info['box.length']))
 
     for dist_i in range(DistanceBin.number):
         distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)
