@@ -6,7 +6,7 @@ to initial time.
 
 @author: Andrew Wetzel
 
-Masses in [M_sun], positions in [kpc comoving], distances and radii in [kpc physical].
+Mass in [M_sun], position in [kpc comoving], distance and radius in [kpc physical].
 '''
 
 # system ----
@@ -276,17 +276,17 @@ def write_initial_points(
         Write.write('# within convex hull at initial time')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_chull * ut.const.mega_per_kilo ** 3))
+                    volume_ini_chull * ut.constant.mega_per_kilo ** 3))
 
         Write.write('# within encompassing cuboid at initial time')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_cuboid * ut.const.mega_per_kilo ** 3))
+                    volume_ini_cuboid * ut.constant.mega_per_kilo ** 3))
 
         Write.write('# within encompassing cube at initial time (for MUSIC FFT)')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_cube * ut.const.mega_per_kilo ** 3))
+                    volume_ini_cube * ut.constant.mega_per_kilo ** 3))
 
         Write.write('# position range at initial time')
         for dimen_i in range(positions_ini.shape[1]):

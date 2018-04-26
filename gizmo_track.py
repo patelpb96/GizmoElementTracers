@@ -1,9 +1,9 @@
 '''
 Track particles across snapshots.
 
-Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
-
 @author: Andrew Wetzel
+
+Mass in [M_sun], position in [kpc comoving], distance and radius in [kpc physical].
 '''
 
 # system ----
@@ -11,7 +11,6 @@ from __future__ import absolute_import, division, print_function  # python 2 com
 import sys
 import collections
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 from . import gizmo_io

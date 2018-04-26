@@ -5,7 +5,7 @@ Analyze Gizmo simulations.
 
 @author: Andrew Wetzel
 
-Masses in [M_sun], positions in [kpc comoving], distances and radii in [kpc physical].
+Mass in [M_sun], position in [kpc comoving], distance and radius in [kpc physical].
 '''
 
 # system ----
@@ -843,7 +843,7 @@ class ImageClass(ut.io.SayClass):
 
             # convert to number density
             if use_column_units:
-                hist_valuess *= ut.const.hydrogen_per_sun * ut.const.kpc_per_cm ** 2
+                hist_valuess *= ut.constant.hydrogen_per_sun * ut.constant.kpc_per_cm ** 2
                 grid_number = hist_valuess.size
                 lls_number = np.sum((hist_valuess > 1e17) * (hist_valuess < 2e20))
                 dla_number = np.sum(hist_valuess > 2e20)
@@ -1382,10 +1382,10 @@ def print_densities(
             # compute densities
             # compute surface area [pc^2]
             area = (np.pi * (max(distance_limitss[0]) ** 2 - min(distance_limitss[0]) ** 2) *
-                    ut.const.kilo ** 2)
+                    ut.constant.kilo ** 2)
             area *= (max(distance_limitss[2]) - min(distance_limitss[2])) / (2 * np.pi)
             # compute voluem [pc^3]
-            volume = area * (max(distance_limitss[1]) - min(distance_limitss[1])) * ut.const.kilo
+            volume = area * (max(distance_limitss[1]) - min(distance_limitss[1])) * ut.constant.kilo
             density_2d = mass / area
             density_3d = mass / volume
 
@@ -2056,7 +2056,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         mass_cum_in_bins = np.interp(time_bins, form_times, masses_cum)
         mass_difs = np.diff(mass_cum_in_bins)
         time_difs = np.diff(time_bins)
-        dm_dt_in_bins = mass_difs / time_difs / ut.const.giga  # convert to [M_sun / yr]
+        dm_dt_in_bins = mass_difs / time_difs / ut.constant.giga  # convert to [M_sun / yr]
 
         # convert to midpoints of bins
         mass_cum_in_bins = mass_cum_in_bins[: mass_cum_in_bins.size - 1] + 0.5 * mass_difs

@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import  # python 2 compatability
 
 from . import gizmo_io as io
 from . import gizmo_analysis as analysis

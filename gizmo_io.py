@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Read Gizmo snapshots.
+Read Gizmo snapshots, intended for use with FIRE-2 simulations.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
@@ -9,12 +9,12 @@ Read Gizmo snapshots.
 Units
 
 Unless otherwise noted, all quantities are in (combinations of) these units:
-    Mass in [M_sun]
-    Position in [kpc comoving]
-    Distance and radius in [kpc physical]
-    Velocity in [km / s peculiar]
-    Time / age in [Gyr]
-    Elemental abundance in [(linear) mass fraction]
+    mass in [M_sun]
+    position in [kpc comoving]
+    distance, radius in [kpc physical]
+    delocity in [km / s peculiar]
+    time, age in [Gyr]
+    elemental abundance in [(linear) mass fraction]
 
 
 Reading a snapshot
@@ -37,9 +37,9 @@ computed using the stellar distribution (disk) of the primary host galaxy:
 Particle species
 
 The available particle species in a cosmological simulation are:
-    part['gas'] : gas
     part['dark'] : dark matter at the highest resolution
     part['dark.2'] : dark matter at lower resolution (outside of the zoom-in region)
+    part['gas'] : gas
     part['star'] : stars
     part['blackhole'] : black holes (if the simulation contains them)
 
@@ -57,15 +57,6 @@ All particle species have the following properties:
     'velocity' : 3-D velocity, along simulations's (arbitrary) x,y,z grid [km / s peculiar]
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
-
-Gas particles also have:
-    'temperature' : [K]
-    'density' : [M_sun / kpc^3]
-    'smooth.length' : smoothing/kernel length, stored as Plummer-equivalent
-        (for consistency with force softening) [kpc physical]
-    'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
-    'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
-    'sfr' : instantaneous star formation rate [M_sun / yr]
 
 Star and gas particles also have additional IDs (because they can split):
     'id.child' : child ID
@@ -87,6 +78,15 @@ Star and gas particles also have:
 Star particles also have:
   'form.scalefactor' : expansion scale-factor when the star particle formed [0 to 1]
 
+Gas particles also have:
+    'temperature' : [K]
+    'density' : [M_sun / kpc^3]
+    'smooth.length' : smoothing/kernel length, stored as Plummer-equivalent
+        (for consistency with force softening) [kpc physical]
+    'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
+    'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
+    'sfr' : instantaneous star formation rate [M_sun / yr]
+
 
 Derived properties
 
@@ -106,22 +106,23 @@ Some useful examples:
         3-D distance from primary galaxy center along simulation's (arbitrary) x,y,z [kpc physical]
     part[species_name].prop('host.distance.total') : total (scalar) distance [kpc physical]
     part[species_name].prop('host.distance.principal') :
-        3-D distance aligned with the principal (major, intermed, minor) axes of stars [kpc phys]
+        3-D distance aligned with the galaxy principal (major, intermed, minor) axes [kpc physial]
     part[species_name].prop('host.distance.principal.cylindrical') :
         same, but in cylindrical coordinates [kpc physical]:
-            first value is along the major axes (R, positive definite)
-            second value is vertical height wrt the disk (Z, signed)
-            third value is angle (phi, 0 to 2 * pi)
+            along the major axes (R, positive definite)
+            vertical height wrt the disk (Z, signed)
+            azimuthal angle (phi, 0 to 2 * pi)
 
     part[species_name].prop('host.velocity') :
         3-D velocity wrt primary galaxy center along simulation's (arbitrary) x,y,z axes [km / s]
     part[species_name].prop('host.velocity.total') : total (scalar) velocity [km / s]
     part[species_name].prop('host.velocity.principal') :
-        3-D velocity aligned with the principal (major, intermed, minor) axes of stars [km / s]
+        3-D velocity aligned with the galaxy principal (major, intermed, minor) axes [km / s]
     part[species_name].prop('host.distance.principal.cylindrical') :
-        2-D velocity along the major axes (major + intermediate) and minor axis [km / s]:
-          first value is along the major axes (positive definite)
-          second value is vertical velocity wrt the disk (signed)
+        same, but in cylindrical coordinates [km / s]:
+            along the major axes (v_R, signed)
+            along the vertical wrt the disk (v_Z, signed)
+            along the azimuth (phi, signed)
 
     part['star'].prop('form.time') : time of the Universe when star particle formed [Gyr]
     part['star'].prop('age') :
@@ -309,20 +310,20 @@ class ParticleDictionaryClass(dict):
 
             if 'metallicity.' in property_name:
                 values = ut.math.get_log(
-                    values / ut.const.sun_composition[element_name]['massfraction'])
+                    values / ut.constant.sun_composition[element_name]['massfraction'])
 
             return values
 
         if 'number.density' in property_name:
-            values = (self.prop('density', indices) * ut.const.proton_per_sun *
-                      ut.const.kpc_per_cm ** 3)
+            values = (self.prop('density', indices) * ut.constant.proton_per_sun *
+                      ut.constant.kpc_per_cm ** 3)
 
             if '.hydrogen' in property_name:
                 # number density of hydrogen, using actual hydrogen mass of each particle [cm ^ -3]
                 values = values * self.prop('massfraction.hydrogen', indices)
             else:
                 # number density of 'hydrogen', assuming solar metallicity for particles [cm ^ -3]
-                values = values * ut.const.sun_hydrogen_mass_fraction
+                values = values * ut.constant.sun_hydrogen_mass_fraction
 
             return values
 
@@ -353,7 +354,7 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        # distance/velocity wrt the center of host galaxy/halo
+        # distance or velocity wrt the center of host galaxy/halo
         if 'host.' in property_name:
             if 'distance' in property_name:
                 if 'form.' in property_name:
@@ -443,7 +444,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind='index', snapshot_values=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         properties='all', element_indices=None, particle_subsample_factor=None,
-        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=True,
+        separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
         assign_center=True, assign_principal_axes=False, assign_orbit=False,
         assign_formation_coordinates=False,
         check_properties=True):
@@ -457,9 +458,9 @@ class ReadClass(ut.io.SayClass):
         ----------
         species : string or list : name[s] of particle species:
             'all' = all species in file
-            'gas' = gas
             'dark' = dark matter at highest resolution
             'dark.2' = dark matter at lower resolution
+            'gas' = gas
             'star' = stars
             'blackhole' = black holes, if run contains them
         snapshot_value_kind : string :
@@ -558,7 +559,7 @@ class ReadClass(ut.io.SayClass):
                 'scalefactor': header['scalefactor'],
                 'time': time,
                 'time.lookback': part.Cosmology.get_time(0) - time,
-                'time.hubble': ut.const.Gyr_per_sec / part.Cosmology.get_hubble_parameter(0),
+                'time.hubble': ut.constant.Gyr_per_sec / part.Cosmology.get_hubble_parameter(0),
             }
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
@@ -607,7 +608,7 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots_simulations(
         self, simulation_directories=[], species='all',
         snapshot_value_kind='index', snapshot_value=600,
-        properties='all', element_indices=[0, 1, 6, 10], force_float32=True,
+        properties='all', element_indices=[0, 1, 6, 10], force_float32=False,
         assign_principal_axes=False):
         '''
         Read snapshots at the same redshift from different simulations.
@@ -1177,10 +1178,10 @@ class ReadClass(ut.io.SayClass):
                 helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
-                molecular_weights = mus * ut.const.proton_mass
+                molecular_weights = mus * ut.constant.proton_mass
                 part[spec_name]['temperature'] *= (
-                    ut.const.centi_per_kilo ** 2 * (self.gas_eos - 1) * molecular_weights /
-                    ut.const.boltzmann)
+                    ut.constant.centi_per_kilo ** 2 * (self.gas_eos - 1) * molecular_weights /
+                    ut.constant.boltzmann)
                 del(helium_mass_fracs, ys_helium, mus, molecular_weights)
 
             if 'potential' in part[spec_name]:
@@ -1383,16 +1384,15 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
-    def assign_center(self, part, method='center-of-mass', compare_centers=False):
+    def assign_center(self, part, method='center-of-mass'):
         '''
         Assign center position [kpc comoving] and velocity [km / s] to galaxy/halo,
-        using stars for baryonic simulation or dark matter for dark matter simulation.
+        using stars for baryonic simulation or dark matter for dark matter-only simulation.
 
         Parameters
         ----------
         part : dictionary class : catalog of particles at snapshot
         method : string : method of centering: 'center-of-mass', 'potential'
-        compare_centers : boolean : whether to compare centers via center-of-mass v potential
         '''
         if 'star' in part and 'position' in part['star'] and len(part['star']['position']):
             spec_for_center = 'star'
@@ -1408,8 +1408,7 @@ class ReadClass(ut.io.SayClass):
 
         if 'position' in part[spec_for_center]:
             # assign to overall dictionary
-            part.center_position = ut.particle.get_center_position(
-                part, spec_for_center, method, compare_centers=compare_centers)
+            part.center_position = ut.particle.get_center_position(part, spec_for_center, method)
             # assign to each species dictionary
             for spec_name in part:
                 part[spec_name].center_position = part.center_position
@@ -1445,27 +1444,27 @@ class ReadClass(ut.io.SayClass):
             [0, 100] of all particles within distance_max
         age_percent : float : keep youngest age_percent of particles within distance cut
         '''
-        species_name = 'star'
-        if species_name not in part or not len(part[species_name]['position']):
+        spec_name = 'star'
+        if spec_name not in part or not len(part[spec_name]['position']):
             self.say('! catalog not contain star particles, so cannot assign principal axes')
             return
 
         self.say('* assigning principal axes of galaxy/halo:')
-        self.say('using {} particles at distance < {} kpc'.format(species_name, distance_max))
+        self.say('using {} particles at distance < {} kpc'.format(spec_name, distance_max))
 
         if mass_percent:
             self.say('using distances that encloses {}% of mass'.format(mass_percent))
 
         if age_percent:
-            if ('form.scalefactor' not in part[species_name] or
-                    not len(part[species_name]['form.scalefactor'])):
-                self.say('! catalog not contain {} ages'.format(species_name))
-                self.say('so assigning principal axes using all {} particles'.format(species_name))
+            if ('form.scalefactor' not in part[spec_name] or
+                    not len(part[spec_name]['form.scalefactor'])):
+                self.say('! catalog not contain {} ages'.format(spec_name))
+                self.say('so assigning principal axes using all {} particles'.format(spec_name))
             else:
-                self.say('using youngest {}% of {} particles'.format(age_percent, species_name))
+                self.say('using youngest {}% of {} particles'.format(age_percent, spec_name))
 
         rotation_vectors, _eigen_values, axes_ratios = ut.particle.get_principal_axes(
-            part, species_name, distance_max, mass_percent, age_percent, print_results=False)
+            part, spec_name, distance_max, mass_percent, age_percent, print_results=False)
 
         part.principal_axes_vectors = rotation_vectors
         part.principal_axes_ratios = axes_ratios

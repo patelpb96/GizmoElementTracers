@@ -12,13 +12,12 @@ import os
 import sys
 import glob
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 
 # default subset to keep for FIRE (65 snapshots)
 snapshot_indices_subset = [
-    0,
+    0,  # z = 99
     20, 26, 33, 41, 52,  # z = 10 - 6
     55, 57, 60, 64, 67,  # z = 5.8 - 5.0
     71, 75, 79, 83, 88,  # z = 4.8 - 4.0
@@ -45,7 +44,7 @@ def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
     directory : string : directory of snapshots
     '''
     if snapshot_index_limits is None or not len(snapshot_index_limits):
-        snapshot_index_limits = [1, Inf]
+        snapshot_index_limits = [1, np.Inf]
 
     snapshot_name_bases = ['snapshot_*.hdf5', 'snapdir_*']
 

@@ -12,7 +12,6 @@ import collections
 import os
 import sys
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 from . import gizmo_io
@@ -206,7 +205,7 @@ def print_run_times_ratios(
         wall_timess.append(wall_times)
         cpu_timess.append(cpu_times)
 
-    snapshot_number_min = Inf
+    snapshot_number_min = np.Inf
     for d_i, wall_times in enumerate(wall_timess):
         if len(wall_times) < snapshot_number_min:
             snapshot_number_min = len(wall_times)

@@ -1,17 +1,15 @@
 '''
 Analyze nucleosynthetic yields in Gizmo.
 
-Masses in [M_sun].
-
 @author: Andrew Wetzel
-'''
 
+Mass in [M_sun].
+'''
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import utilities as ut
 
@@ -163,7 +161,7 @@ def plot_nucleosynthetic_yields(
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
     yield_names = np.array(yield_dict.keys())[yield_indices]
-    yield_labels = [str.capitalize(ut.const.element_symbol_from_name[k]) for k in yield_names]
+    yield_labels = [str.capitalize(ut.constant.element_symbol_from_name[k]) for k in yield_names]
     yield_indices = np.arange(yield_indices.size)
 
     # plot ----------
