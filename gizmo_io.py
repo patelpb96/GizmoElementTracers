@@ -6,14 +6,12 @@ Read Gizmo snapshots, intended for use with FIRE-2 simulations.
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
 
-Units
-
-Unless otherwise noted, all quantities are in (combinations of) these units:
+Units: unless otherwise noted, all quantities are in (combinations of):
     mass in [M_sun]
     position in [kpc comoving]
-    distance, radius in [kpc physical]
-    delocity in [km / s peculiar]
-    time, age in [Gyr]
+    distance and radius in [kpc physical]
+    velocity in [km / s]
+    time in [Gyr]
     elemental abundance in [(linear) mass fraction]
 
 

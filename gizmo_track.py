@@ -3,7 +3,12 @@ Track particles across snapshots.
 
 @author: Andrew Wetzel
 
-Mass in [M_sun], position in [kpc comoving], distance and radius in [kpc physical].
+Units: unless otherwise noted, all quantities are in (combinations of):
+    mass in [M_sun]
+    position in [kpc comoving]
+    distance and radius in [kpc physical]
+    velocity in [km / s]
+    time in [Gyr]
 '''
 
 # system ----

@@ -5,14 +5,19 @@ Analyze Gizmo simulations.
 
 @author: Andrew Wetzel
 
-Mass in [M_sun], position in [kpc comoving], distance and radius in [kpc physical].
+Units: unless otherwise noted, all quantities are in (combinations of):
+    mass in [M_sun]
+    position in [kpc comoving]
+    distance and radius in [kpc physical]
+    velocity in [km / s]
+    time in [Gyr]
 '''
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
+from numpy import Inf
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -789,7 +794,7 @@ class ImageClass(ut.io.SayClass):
 
             if 'histogram' in image_kind:
                 plot_name += '_i.{:.1f}-{:.1f}'.format(
-                    log10(image_limits_use[0]), log10(image_limits_use[1]))
+                    np.log10(image_limits_use[0]), np.log10(image_limits_use[1]))
 
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
@@ -1297,10 +1302,10 @@ def plot_property_v_distance(
 
         xs = pro[species_name]['distance']
         if 'log' in distance_scaling:
-            xs = log10(xs)
+            xs = np.log10(xs)
         ys = pro[species_name][property_statistic]
         if 'log' in property_scaling:
-            ys = log10(ys)
+            ys = np.log10(ys)
 
         masks = np.isfinite(xs)
         if fit_distance_limits is not None and len(fit_distance_limits):
@@ -1967,7 +1972,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             if time_kind == 'redshift':
                 time_limits += 1  # convert to z + 1 so log is well-defined
             times = 10 ** np.arange(
-                log10(time_limits.min()), log10(time_limits.max()) + time_width, time_width)
+                np.log10(time_limits.min()), np.log10(time_limits.max()) + time_width, time_width)
             if time_kind == 'redshift':
                 times -= 1
         else:
