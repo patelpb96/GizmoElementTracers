@@ -21,7 +21,7 @@ from . import gizmo_analysis
 #===================================================================================================
 # utility
 #===================================================================================================
-def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
+def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out*'):
     '''
     Get number of MPI tasks and OpenMP threads from run-time file.
     If cannot find any, default to 1.
@@ -110,6 +110,7 @@ def print_run_times(
         return scalefactor_string
 
     file_name = 'cpu.txt'
+
     if scalefactors is None or (not np.isscalar(scalefactors) and not len(scalefactors)):
         scalefactors = [
             0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]

@@ -936,6 +936,8 @@ class ReadClass(ut.io.SayClass):
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
+        self.say('* reading species: {}'.format(self.species_read))
+
         # open snapshot file
         with h5py.File(file_name, 'r') as file_in:
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
@@ -1014,7 +1016,7 @@ class ReadClass(ut.io.SayClass):
 
                 if ignore_flag:
                     props_print.sort()
-                    self.say('* reading {:6}: {}'.format(spec_name, props_print))
+                    self.say('* reading {} properties: {}'.format(spec_name, props_print))
 
                 # special case: particle mass is fixed and given in mass array in header
                 if 'Masses' in properties and 'Masses' not in part_in:
@@ -1443,6 +1445,7 @@ class ReadClass(ut.io.SayClass):
         age_percent : float : keep youngest age_percent of particles within distance cut
         '''
         spec_name = 'star'
+
         if spec_name not in part or not len(part[spec_name]['position']):
             self.say('! catalog not contain star particles, so cannot assign principal axes')
             return

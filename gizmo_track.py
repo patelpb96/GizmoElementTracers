@@ -260,6 +260,31 @@ class IndexPointerClass(ut.io.SayClass):
             else:
                 part.index_pointers = part_index_pointers
 
+    def get_reverse_index_pointer(self, part_index_pointers):
+        '''
+        Given input index pointers from z_reference to z, get index pointers from z to z_reference.
+
+        Parameters
+        ----------
+        part_index_pointers : array : particle index pointers, from z_reference to z
+
+        Returns
+        -------
+        part_reverse_index_pointers : array : particle index pointers, from z to z_reference
+        '''
+        # pointers from z_reference to z that have valid (non-null) values
+        masks_valid = (part_index_pointers >= 0)
+        part_index_pointers_valid = part_index_pointers[masks_valid]
+
+        part_number_at_z_ref = part_index_pointers.size
+        part_number_at_z = part_index_pointers_valid.size
+
+        part_reverse_index_pointers = ut.array.get_array_null(part_number_at_z)
+        part_reverse_index_pointers[part_index_pointers_valid] = (
+            ut.array.get_arange(part_number_at_z_ref)[masks_valid])
+
+        return part_reverse_index_pointers
+
 
 IndexPointer = IndexPointerClass()
 

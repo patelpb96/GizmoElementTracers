@@ -766,7 +766,7 @@ class ImageClass(ut.io.SayClass):
                     circle = plt.Circle((0, 0), 10, color='black', fill=False)
                     subplot.add_artist(circle)
 
-                subplot.axis('equal')
+                #subplot.axis('equal')
                 #fig.gca().set_aspect('equal')
 
             if part.info['simulation.name']:
@@ -1238,7 +1238,11 @@ def plot_property_v_distance(
         subplot, distance_scaling, distance_limits, None,
         property_scaling, property_limits, y_values)
 
-    axis_x_label = ut.plot.Label.get_label('radius', get_words=True)
+    if dimension_number in [2, 3]:
+        axis_x_label = 'radius'
+    elif dimension_number == 1:
+        axis_x_label = 'height'
+    axis_x_label = ut.plot.Label.get_label(axis_x_label, get_words=True)
     subplot.set_xlabel(axis_x_label)
 
     if property_statistic == 'vel.circ':
@@ -1298,37 +1302,82 @@ def plot_property_v_distance(
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
     if plot_fit:
-        from scipy import stats
-
         xs = pro[species_name]['distance']
-        if 'log' in distance_scaling:
-            xs = np.log10(xs)
         ys = pro[species_name][property_statistic]
-        if 'log' in property_scaling:
-            ys = np.log10(ys)
 
         masks = np.isfinite(xs)
         if fit_distance_limits is not None and len(fit_distance_limits):
             masks = (xs >= min(fit_distance_limits)) * (xs < max(fit_distance_limits))
-        slope, intercept, _r_value, _p_value, _std_err = stats.linregress(xs[masks], ys[masks])
-        print('# raw fit: slope = {:.3f}, intercept = {:.3f}'.format(slope, intercept))
-        if 'log' in property_scaling and 'log' not in distance_scaling:
-            print('# exponential fit:')
-            print('  scale length = {:.3f} kpc'.format(-1 * np.log10(np.e) / slope))
-            print('  normalization = 10^{:.2f} Msun / kpc^2'.format(intercept))
 
-        ys_fit = intercept + slope * xs
-        if 'log' in distance_scaling:
-            xs = 10 ** xs
-        if 'log' in property_scaling:
-            ys_fit = 10 ** ys_fit
+        fit_kind = 'exponential'
+        #fit_kind = 'sech2.single'
+        #fit_kind = 'sech2.double'
+
+        if fit_kind is 'exponential':
+            from scipy import stats
+
+            if 'log' in distance_scaling:
+                xs = np.log10(xs)
+            if 'log' in property_scaling:
+                ys = np.log10(ys)
+
+            slope, intercept, _r_value, _p_value, _std_err = stats.linregress(xs[masks], ys[masks])
+
+            print('# raw fit: slope = {:.3f}, intercept = {:.3f}'.format(slope, intercept))
+            if 'log' in property_scaling and 'log' not in distance_scaling:
+                print('# exponential fit:')
+                print('  scale length = {:.3f} kpc'.format(-1 * np.log10(np.e) / slope))
+                print('  normalization = 10^{:.2f} Msun / kpc^2'.format(intercept))
+
+            ys_fit = intercept + slope * xs
+
+            if 'log' in distance_scaling:
+                xs = 10 ** xs
+            if 'log' in property_scaling:
+                ys_fit = 10 ** ys_fit
+
+        elif fit_kind is 'sech2.single':
+
+            def disk_height_single(xs, a, b):
+                return a / np.cosh(xs / (2 * b)) ** 2
+
+            from scipy.optimize import curve_fit
+
+            params, _ = curve_fit(
+                disk_height_single, xs[masks], ys[masks], [1e7, 0.5],
+                bounds=[[0, 0], [1e14, 10]])
+            print('# single sech^2 fit:')
+            print('  scale height = {:.2f} kpc'.format(params[1]))
+            print('  normalization = {:.2e} Msun / kpc'.format(params[0] / 2))
+
+            ys_fit = disk_height_single(xs, *params)
+
+        elif fit_kind is 'sech2.double':
+
+            def disk_height_double(xs, a, b, c, d):
+                return a / np.cosh(xs / (2 * b)) ** 2 + c / np.cosh(xs / (2 * d)) ** 2
+
+            from scipy.optimize import curve_fit
+
+            params, _ = curve_fit(
+                disk_height_double, xs[masks], ys[masks], [1e8, 0.1, 1e8, 2],
+                bounds=[[10, 0.01, 10, 0.2], [1e14, 3, 1e14, 5]])
+
+            print('# double sech^2 fit:')
+            print('* thin scale height = {:.3f} kpc'.format(params[1]))
+            print('  normalization = {:.2e} Msun / kpc'.format(params[0] / 2))
+            print('* thick scale height = {:.3f} kpc'.format(params[3]))
+            print('  normalization = {:.2e} Msun / kpc'.format(params[2] / 2))
+
+            ys_fit = disk_height_double(xs, *params)
+
         subplot.plot(xs, ys_fit, color='black', alpha=0.5, linewidth=3.5)
 
     distance_name = 'dist'
     if dimension_number == 2:
         distance_name += '.2d'
     elif dimension_number == 1:
-        distance_name += '.1d'
+        distance_name = 'height'
 
     plot_name = ut.plot.get_file_name(
         property_name + '.' + property_statistic, distance_name, species_name,
