@@ -48,7 +48,7 @@ class IndexPointerClass(ut.io.SayClass):
         '''
         Assign to each particle a pointer to its index in the list of particles at each previous
         snapshot, to make it easier to track particles back in time.
-        Write index pointers to a pickle file, one for each previous snapshot.
+        Write index pointers to file, one for each snapshot prior to z = 0.
 
         Parameters
         ----------
@@ -117,10 +117,11 @@ class IndexPointerClass(ut.io.SayClass):
             if self.species_name == 'star':
                 # keep only particles that formed prior to this snapshot
                 part_indices = part_indices[
-                    part[self.species_name].prop('form.snapshot', part_indices) <= snapshot_index]
+                    part[self.species_name].prop('form.scalefactor', part_indices) <=
+                    part.Snapshot['scalefactor'][snapshot_index]]
+                self.say('# {} {} particles formed at snapshot index <= {}\n'.format(
+                         len(part_indices), self.species_name, snapshot_index))
                 if not len(part_indices):
-                    self.say('# no {} particles to track at snapshot index <= {}\n'.format(
-                             self.species_name, snapshot_index))
                     break
 
             part_ids = part[self.species_name]['id'][part_indices]
@@ -131,6 +132,12 @@ class IndexPointerClass(ut.io.SayClass):
                 self.species_name, 'index', snapshot_index,
                 properties=['id', match_property, test_property], element_indices=[0],
                 assign_center=False, check_properties=False)
+
+            if part_at_snap[self.species_name]['id'].size != part_indices.size:
+                self.say('! read {} {} particles at snapshot {}'.format(
+                    part_at_snap[self.species_name]['id'].size, self.species_name, snapshot_index))
+                self.say('but catalog at snapshot {} says {} particles formed before then'.format(
+                    part.snapshot['index'], part_indices.size))
 
             # assign pointer from particle id to its index in list
             ut.particle.assign_id_to_index(
