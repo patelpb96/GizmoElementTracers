@@ -100,7 +100,7 @@ class IndexPointerClass(ut.io.SayClass):
         # diagnostic
         pis_multiple = ut.particle.get_indices_id_kind(
             part, self.species_name, 'multiple', part_indices)
-        self.say('{} particles have redundant id'.format(pis_multiple.size))
+        self.say('* {} {} particles have redundant id'.format(pis_multiple.size, self.species_name))
 
         # initialize pointer array
         # set null values to negative and will return error if called as index
@@ -119,7 +119,7 @@ class IndexPointerClass(ut.io.SayClass):
                 part_indices = part_indices[
                     part[self.species_name].prop('form.scalefactor', part_indices) <=
                     part.Snapshot['scalefactor'][snapshot_index]]
-                self.say('# {} {} particles formed at snapshot index <= {}\n'.format(
+                self.say('* {} {} particles formed at snapshot index <= {}\n'.format(
                          len(part_indices), self.species_name, snapshot_index))
                 if not len(part_indices):
                     break
@@ -233,7 +233,8 @@ class IndexPointerClass(ut.io.SayClass):
             self.say('! {} total have offset {}'.format(
                      test_prop_offset_number_tot, test_property))
 
-    def io_index_pointer(self, part=None, snapshot_index=None, part_index_pointers=None):
+    def io_index_pointer(
+        self, part=None, snapshot_index=None, part_index_pointers=None, directory=None):
         '''
         Read or write, for each star particle, its index in the catalog at another snapshot.
 
@@ -252,14 +253,16 @@ class IndexPointerClass(ut.io.SayClass):
 
         file_name = '{}_indices_{:03d}'.format(self.species_name, snapshot_index)
 
+        if directory is None:
+            directory = self.directory
+
         if part_index_pointers is not None:
             # write to file
-            directory = ut.io.get_path(self.directory, create_path=True)
+            directory = ut.io.get_path(directory, create_path=True)
             ut.io.file_hdf5(directory + file_name, {hdf5_dict_name: part_index_pointers})
-
         else:
             # read from file
-            directory = ut.io.get_path(self.directory)
+            directory = ut.io.get_path(directory)
             dict_in = ut.io.file_hdf5(directory + file_name)
             part_index_pointers = dict_in[hdf5_dict_name]
             if part is None:
