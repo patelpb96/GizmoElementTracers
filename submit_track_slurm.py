@@ -5,7 +5,7 @@
 ##SBATCH --partition=normal    ## KNL node: 64 cores x 2 FP threads, 1.6 GB per core, 96 GB total
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
-#SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
+#SBATCH --cpus-per-task=10    ## OpenMP threads per MPI task
 #SBATCH --time=24:00:00
 #SBATCH --output=track/gizmo_track_job_%j.txt
 #SBATCH --mail-user=arwetzel@gmail.com
@@ -45,7 +45,7 @@ os.sys.stdout.flush()
 # execute
 if 'indices' in function_kind:
     IndexPointer = gizmo_track.IndexPointerClass(species_name)
-    IndexPointer.write_index_pointer()
+    IndexPointer.write_index_pointers_to_snapshots(thread_number=ScriptPrint.omp_number)
 
 if 'coordinates' in function_kind:
     HostCoordinates = gizmo_track.HostCoordinatesClass(species_name)
