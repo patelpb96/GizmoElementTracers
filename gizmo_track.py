@@ -43,33 +43,28 @@ class IndexPointerClass(ut.io.SayClass):
         self.directory = directory
         self.Read = gizmo_io.ReadClass()
 
-    def write_index_pointers_to_snapshot(
-        self, part, part_indices, match_property, match_propery_tolerance, test_property,
-        snapshot_index):
+    def write_index_pointers_to_snapshot(self, part_z0, snapshot_index):
         '''
         Assign to each particle a pointer to its index in the list of particles at each previous
         snapshot, to make it easier to track particles back in time.
-        Write index pointers to file, one for each snapshot prior to z = 0.
+        Write index pointers to file.
 
         Parameters
         ----------
-        part : dict : catalog of particles at snapshot
-        part_indices : array : indices of particles in catalog
-        match_property : string :
-            some particles have the same id. this is the property to use to match them.
-            options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
-        match_propery_tolerance : float : tolerance for matching via match_property, if a float
-        test_property : string : additional property to use to test matching
+        part_z0 : dict : catalog of particles at reference snapshot
         snapshot_index : int : snapshot index at which to assign particle index pointers
-        thread_number : int : number of threads for parallelization
         '''
         # read particles at this snapshot
         # need to do this first to get the exact scale-factor of snapshot
-        part_at_snap = self.Read.read_snapshots(
+        part_z = self.Read.read_snapshots(
             self.species_name, 'index', snapshot_index,
-            properties=['id', match_property, test_property], element_indices=[0],
+            properties=['id', self.match_property, self.test_property], element_indices=[0],
             assign_center=False, check_properties=False)
 
+        if self.species_name not in part_z or not len(part_z[self.species_name]['id']):
+            return 0, 0, 0, 0
+
+        """
         if self.species_name == 'star':
             # keep only particles that formed prior to this snapshot
             part_indices = part_indices[
@@ -92,15 +87,52 @@ class IndexPointerClass(ut.io.SayClass):
             print_diagnostic=False)
 
         part_ids = part[self.species_name]['id'][part_indices]
+        """
 
         # initialize pointer array
         # set null values to negative and will return error if called as index
-        part_index_pointers_at_snap = ut.array.get_array_null(part[self.species_name]['id'].size)
+        part_index_pointers = ut.array.get_array_null(part_z0[self.species_name]['id'].size)
 
         id_no_match_number = 0
-        prop_no_match_number = 0
-        prop_redundant_number = 0
+        match_prop_no_match_number = 0
+        match_prop_redundant_number = 0
 
+        for part_z_index, part_z_id in enumerate(part_z[self.species_name]['id']):
+            try:
+                part_z0_indices = part_z0[self.species_name].id_to_index[part_z_id]
+            except IndexError:
+                id_no_match_number += 1
+                continue
+
+            if np.isscalar(part_z0_indices):
+                # particle id is unique - easy case
+                part_index_pointers[part_z0_indices] = part_z_index
+            else:
+                # particle id is redundant - tricky case
+                # loop through particles with this id, use match_property to match
+                # sanity check
+                match_props = part_z0[self.species_name].prop(self.match_property, part_z0_indices)
+                if np.unique(match_props).size != part_z0_indices.size:
+                    match_prop_redundant_number += 1
+
+                match_prop_z = part_z[self.species_name].prop(self.match_property, part_z_index)
+
+                for part_z0_index in part_z0_indices:
+                    match_prop_z0 = part_z0[self.species_name].prop(
+                        self.match_property, part_z0_index)
+                    if self.match_property == 'id.child':
+                        if match_prop_z0 == match_prop_z:
+                            part_index_pointers[part_z0_index] = part_z_index
+                            break
+                    else:
+                        if (np.abs((match_prop_z0 - match_prop_z) / match_prop_z) <
+                                self.match_propery_tolerance):
+                            part_index_pointers[part_z0_index] = part_z_index
+                            break
+                else:
+                    match_prop_no_match_number += 1
+
+        """
         for pii, part_id in enumerate(part_ids):
             part_index = part_indices[pii]
 
@@ -137,38 +169,37 @@ class IndexPointerClass(ut.io.SayClass):
                             break
                 else:
                     prop_no_match_number += 1
+        """
 
         if id_no_match_number:
             self.say('! {} not have id match at snapshot {}!'.format(
                      id_no_match_number, snapshot_index))
-        if prop_no_match_number:
+        if match_prop_no_match_number:
             self.say('! {} not have {} match at snapshot {}!'.format(
-                     prop_no_match_number, match_property, snapshot_index))
-        if prop_redundant_number:
+                     match_prop_no_match_number, self.match_property, snapshot_index))
+        if match_prop_redundant_number:
             self.say('! {} have redundant {} at snapshot {}!'.format(
-                     prop_redundant_number, match_property, snapshot_index))
+                     match_prop_redundant_number, self.match_property, snapshot_index))
 
-        # sanity check
+        # sanity check using test property
         test_prop_offset_number = 0
-        if (test_property and test_property != match_property and
-                id_no_match_number == prop_no_match_number == 0):
-            part_index_pointers_at_snap_test = part_index_pointers_at_snap[
-                part_index_pointers_at_snap >= 0]
+        if (self.test_property and self.test_property != self.match_property and
+                id_no_match_number == match_prop_no_match_number == 0):
+            part_index_pointers_good = part_index_pointers[part_index_pointers >= 0]
             prop_difs = np.abs(
-                (part_at_snap[self.species_name].prop(
-                    test_property, part_index_pointers_at_snap_test) -
-                 part[self.species_name].prop(test_property, part_indices)) /
-                part[self.species_name].prop(test_property, part_indices))
-            test_prop_offset_number = np.sum(prop_difs > match_propery_tolerance)
+                (part_z[self.species_name].prop(self.test_property, part_index_pointers_good) -
+                 part_z0[self.species_name].prop(self.test_property)) /
+                part_z[self.species_name].prop(self.test_property))
+            test_prop_offset_number = np.sum(prop_difs > self.match_propery_tolerance)
 
             if test_prop_offset_number:
-                self.say('! {} have offset {} at snapshot {}!'.format(
-                         test_prop_offset_number, test_property, snapshot_index))
+                self.say('! {} matched have offset {} at snapshot {}!'.format(
+                         test_prop_offset_number, self.test_property, snapshot_index))
 
         # write file for this snapshot
-        self.io_index_pointers(None, snapshot_index, part_index_pointers_at_snap)
+        self.io_index_pointers(None, snapshot_index, part_index_pointers)
 
-        return (id_no_match_number, prop_no_match_number, prop_redundant_number,
+        return (id_no_match_number, match_prop_no_match_number, match_prop_redundant_number,
                 test_prop_offset_number)
 
     def write_index_pointers_to_snapshots(
@@ -185,7 +216,7 @@ class IndexPointerClass(ut.io.SayClass):
         match_property : string :
             some particles have the same id. this is the property to use to match them.
             options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
-        match_propery_tolerance : float : tolerance for matching via match_property, if a float
+        match_propery_tolerance : float : fractional tolerance for matching via match_property
         test_property : string : additional property to use to test matching
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
         thread_number : int : number of threads for parallelization
@@ -210,6 +241,11 @@ class IndexPointerClass(ut.io.SayClass):
                      match_property))
             match_property = 'massfraction.metals'
             self.say('switching to using: {}'.format(match_property))
+            if match_property not in properties_read:
+                properties_read.append(match_property)
+                part = self.Read.read_snapshots(
+                    self.species_name, 'redshift', 0, properties=properties_read,
+                    element_indices=[0], assign_center=False, check_properties=False)
 
         assert part[self.species_name].prop(match_property) is not None
 
@@ -223,21 +259,22 @@ class IndexPointerClass(ut.io.SayClass):
         snapshot_indices = np.setdiff1d(snapshot_indices, part.snapshot['index'])  # skip current
         snapshot_indices = snapshot_indices[::-1]  # work backwards in time
 
-        # particles to assign to
-        part_indices = ut.array.get_arange(part[self.species_name]['id'])
-
         # diagnostic
-        pis_multiple = ut.particle.get_indices_id_kind(
-            part, self.species_name, 'multiple', part_indices)
+        pis_multiple = ut.particle.get_indices_id_kind(part, self.species_name, 'multiple')
         self.say('* {} {} particles have redundant id'.format(pis_multiple.size, self.species_name))
 
-        # initialize pointer array
-        # set null values to negative and will return error if called as index
+        # assign pointer from particle id to its index in list
+        ut.particle.assign_id_to_index(
+            part, self.species_name, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
+
+        self.match_property = match_property
+        self.match_propery_tolerance = match_propery_tolerance
+        self.test_property = test_property
 
         # counters for sanity checks
         id_no_match_number = 0
-        prop_no_match_number = 0
-        prop_redundant_number = 0
+        match_prop_no_match_number = 0
+        match_prop_redundant_number = 0
         test_prop_offset_number = 0
 
         # initiate threads, if asking for > 1
@@ -248,18 +285,13 @@ class IndexPointerClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices:
             if thread_number > 1:
                 numbers = pool.apply_async(
-                    self.write_index_pointers_to_snapshot,
-                    (part, part_indices, match_property, match_propery_tolerance, test_property,
-                     snapshot_index)
-                )
+                    self.write_index_pointers_to_snapshot, (part, snapshot_index))
             else:
-                numbers = self.write_index_pointers_to_snapshot(
-                    part, part_indices, match_property, match_propery_tolerance, test_property,
-                    snapshot_index)
+                numbers = self.write_index_pointers_to_snapshot(part, snapshot_index)
 
             id_no_match_number += numbers[0]
-            prop_no_match_number += numbers[1]
-            prop_redundant_number += numbers[2]
+            match_prop_no_match_number += numbers[1]
+            match_prop_redundant_number += numbers[2]
             test_prop_offset_number += numbers[3]
 
         # close threads
@@ -270,10 +302,12 @@ class IndexPointerClass(ut.io.SayClass):
         # print cumulative diagnostics
         if id_no_match_number:
             self.say('! {} total not have id match!'.format(id_no_match_number))
-        if prop_no_match_number:
-            self.say('! {} total not have {} match!'.format(prop_no_match_number, match_property))
-        if prop_redundant_number:
-            self.say('! {} total have redundant {}!'.format(prop_redundant_number, match_property))
+        if match_prop_no_match_number:
+            self.say('! {} total not have {} match!'.format(
+                match_prop_no_match_number, match_property))
+        if match_prop_redundant_number:
+            self.say('! {} total have redundant {}!'.format(
+                match_prop_redundant_number, match_property))
         if test_prop_offset_number:
             self.say('! {} total have offset {}'.format(test_prop_offset_number, test_property))
 
