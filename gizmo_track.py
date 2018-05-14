@@ -166,7 +166,7 @@ class IndexPointerClass(ut.io.SayClass):
                          test_prop_offset_number, test_property, snapshot_index))
 
         # write file for this snapshot
-        self.io_index_pointer(None, snapshot_index, part_index_pointers_at_snap)
+        self.io_index_pointers(None, snapshot_index, part_index_pointers_at_snap)
 
         return (id_no_match_number, prop_no_match_number, prop_redundant_number,
                 test_prop_offset_number)
@@ -437,7 +437,7 @@ class HostCoordinatesClass(IndexPointerClass):
                 if snapshot_index == part.snapshot['index']:
                     part_index_pointers = part_indices
                 else:
-                    part_index_pointers = self.io_index_pointer(snapshot_index=snapshot_index)
+                    part_index_pointers = self.io_index_pointers(snapshot_index=snapshot_index)
 
                 part_indices_at_snap = part_index_pointers[part_indices_form]
 
