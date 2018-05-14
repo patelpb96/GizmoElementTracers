@@ -172,36 +172,38 @@ class IndexPointerClass(ut.io.SayClass):
         """
 
         if id_no_match_number:
-            self.say('! {} not have id match at snapshot {}!'.format(
+            self.say('! {} not have id match at snapshot {}'.format(
                      id_no_match_number, snapshot_index))
         if match_prop_no_match_number:
-            self.say('! {} not have {} match at snapshot {}!'.format(
+            self.say('! {} not have {} match at snapshot {}'.format(
                      match_prop_no_match_number, self.match_property, snapshot_index))
         if match_prop_redundant_number:
-            self.say('! {} have redundant {} at snapshot {}!'.format(
+            self.say('! {} have redundant {} at snapshot {}'.format(
                      match_prop_redundant_number, self.match_property, snapshot_index))
 
-        # another sanity check
-        part_index_pointers_good = part_index_pointers[part_index_pointers >= 0]
-        if part_index_pointers_good.size != part_z[self.species_name]['id'].size:
+        # more sanity checks
+        part_z0_indices = np.where(part_index_pointers >= 0)[0]
+        # ensure same number of particles assigned at z0 as in snapshot at z
+        if part_z0_indices.size != part_z[self.species_name]['id'].size:
             self.say('! {} {} particles at snapshot {}'.format(
-                     part_z[self.species_name]['id'], self.species_name, snapshot_index))
+                     part_z[self.species_name]['id'].size, self.species_name, snapshot_index))
             self.say('but matched to {} particles at snapshot {}'.format(
-                     part_index_pointers_good.size, part_z0.snapshot['index']))
+                     part_z0_indices.size, part_z0.snapshot['index']))
+        else:
+            # check using test property
+            test_prop_offset_number = 0
+            if (self.test_property and self.test_property != self.match_property and
+                    id_no_match_number == match_prop_no_match_number == 0):
+                part_index_pointers_good = part_index_pointers[part_z0_indices]
+                prop_difs = np.abs(
+                    (part_z[self.species_name].prop(self.test_property, part_index_pointers_good) -
+                     part_z0[self.species_name].prop(self.test_property, part_z0_indices)) /
+                    part_z[self.species_name].prop(self.test_property, part_index_pointers_good))
+                test_prop_offset_number = np.sum(prop_difs > self.match_propery_tolerance)
 
-        # check using test property
-        test_prop_offset_number = 0
-        if (self.test_property and self.test_property != self.match_property and
-                id_no_match_number == match_prop_no_match_number == 0):
-            prop_difs = np.abs(
-                (part_z[self.species_name].prop(self.test_property) -
-                 part_z0[self.species_name].prop(self.test_property, part_index_pointers_good)) /
-                part_z[self.species_name].prop(self.test_property))
-            test_prop_offset_number = np.sum(prop_difs > self.match_propery_tolerance)
-
-            if test_prop_offset_number:
-                self.say('! {} matched particles have different {} at snapshot {}'.format(
-                         test_prop_offset_number, self.test_property, snapshot_index))
+                if test_prop_offset_number:
+                    self.say('! {} matched particles have different {} at snapshot {}'.format(
+                             test_prop_offset_number, self.test_property, snapshot_index))
 
         # write file for this snapshot
         self.io_index_pointers(None, snapshot_index, part_index_pointers)
