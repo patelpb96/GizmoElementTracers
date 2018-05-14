@@ -181,14 +181,21 @@ class IndexPointerClass(ut.io.SayClass):
             self.say('! {} have redundant {} at snapshot {}!'.format(
                      match_prop_redundant_number, self.match_property, snapshot_index))
 
-        # sanity check using test property
+        # another sanity check
+        part_index_pointers_good = part_index_pointers[part_index_pointers >= 0]
+        if part_index_pointers_good.size != part_z[self.species_name]['id']:
+            self.say('! {} {} particles at snapshot {}'.format(
+                     part_z[self.species_name]['id'], self.species_name, snapshot_index))
+            self.say('but matched to {} particles at snapshot {}'.format(
+                     part_index_pointers_good.size, part_z0.snapshot['index']))
+
+        # check using test property
         test_prop_offset_number = 0
         if (self.test_property and self.test_property != self.match_property and
                 id_no_match_number == match_prop_no_match_number == 0):
-            part_index_pointers_good = part_index_pointers[part_index_pointers >= 0]
             prop_difs = np.abs(
-                (part_z[self.species_name].prop(self.test_property, part_index_pointers_good) -
-                 part_z0[self.species_name].prop(self.test_property)) /
+                (part_z[self.species_name].prop(self.test_property) -
+                 part_z0[self.species_name].prop(self.test_property, part_index_pointers_good)) /
                 part_z[self.species_name].prop(self.test_property))
             test_prop_offset_number = np.sum(prop_difs > self.match_propery_tolerance)
 
