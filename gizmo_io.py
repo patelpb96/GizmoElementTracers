@@ -587,12 +587,12 @@ class ReadClass(ut.io.SayClass):
             if assign_orbit and ('velocity' in properties or properties is 'all'):
                 self.assign_orbit(part, 'star')
 
-            # assign distance from host galaxy at formation to stars
+            # assign coordinates wrt host galaxy at formation
             if assign_formation_coordinates and 'star' in species:
                 from . import gizmo_track
-                HostCoordinate = gizmo_track.HostCoordinatesClass(
+                ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
                     'star', simulation_directory + 'track/')
-                HostCoordinate.io_formation_coordinates(part)
+                ParticleCoordinate.io_formation_coordinates(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:

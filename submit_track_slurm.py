@@ -44,12 +44,12 @@ os.sys.stdout.flush()
 
 # execute
 if 'indices' in function_kind:
-    IndexPointer = gizmo_track.IndexPointerClass(species_name)
-    IndexPointer.write_index_pointers_to_snapshots(thread_number=ScriptPrint.omp_number)
+    ParticleIndexPointer = gizmo_track.ParticleIndexPointerClass(species_name)
+    ParticleIndexPointer.write_index_pointers_to_snapshots(thread_number=ScriptPrint.omp_number)
 
 if 'coordinates' in function_kind:
-    HostCoordinates = gizmo_track.HostCoordinatesClass(species_name)
-    HostCoordinates.write_formation_coordinates()
+    ParticleCoordinate = gizmo_track.ParticleCoordinateClass(species_name)
+    ParticleCoordinate.write_formation_coordinates()
 
 # print run-time information
 ScriptPrint.print_final()

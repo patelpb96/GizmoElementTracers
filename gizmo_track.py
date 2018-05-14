@@ -27,7 +27,7 @@ TRACK_DIRECTORY = 'track/'
 #===================================================================================================
 # utility
 #===================================================================================================
-class IndexPointerClass(ut.io.SayClass):
+class ParticleIndexPointerClass(ut.io.SayClass):
     '''
     Compute particle index pointers for tracking particles across time.
     '''
@@ -43,7 +43,7 @@ class IndexPointerClass(ut.io.SayClass):
         self.directory = directory
         self.Read = gizmo_io.ReadClass()
 
-    def write_index_pointers_to_snapshot(self, part_z0, snapshot_index):
+    def _write_index_pointers_to_snapshot(self, part_z0, snapshot_index):
         '''
         Assign to each particle a pointer to its index in the list of particles at each previous
         snapshot, to make it easier to track particles back in time.
@@ -63,6 +63,11 @@ class IndexPointerClass(ut.io.SayClass):
 
         if self.species_name not in part_z or not len(part_z[self.species_name]['id']):
             return 0, 0, 0, 0
+
+        # diagnostic
+        pis_multiple = ut.particle.get_indices_id_kind(part_z, self.species_name, 'multiple')
+        self.say('* {} {} particles have redundant id at snapshot {}'.format(
+            pis_multiple.size, self.species_name, snapshot_index))
 
         """
         if self.species_name == 'star':
@@ -172,14 +177,16 @@ class IndexPointerClass(ut.io.SayClass):
         """
 
         if id_no_match_number:
-            self.say('! {} not have id match at snapshot {}'.format(
-                     id_no_match_number, snapshot_index))
+            self.say('! {} {} particles not have id match at snapshot {}'.format(
+                     id_no_match_number, self.species_name, snapshot_index))
         if match_prop_no_match_number:
-            self.say('! {} not have {} match at snapshot {}'.format(
-                     match_prop_no_match_number, self.match_property, snapshot_index))
+            self.say('! {} {} particles not have {} match at snapshot {}'.format(
+                     match_prop_no_match_number, self.species_name, self.match_property,
+                     snapshot_index))
         if match_prop_redundant_number:
-            self.say('! {} have redundant {} at snapshot {}'.format(
-                     match_prop_redundant_number, self.match_property, snapshot_index))
+            self.say('! {} {} particles have redundant {} at snapshot {}'.format(
+                     match_prop_redundant_number, self.species_name, self.match_property,
+                     snapshot_index))
 
         # more sanity checks
         part_z0_indices = np.where(part_index_pointers >= 0)[0]
@@ -202,8 +209,9 @@ class IndexPointerClass(ut.io.SayClass):
                 test_prop_offset_number = np.sum(prop_difs > self.match_propery_tolerance)
 
                 if test_prop_offset_number:
-                    self.say('! {} matched particles have different {} at snapshot {}'.format(
-                             test_prop_offset_number, self.test_property, snapshot_index))
+                    self.say('! {} matched particles have different {} at snapshot {} v {}'.format(
+                             test_prop_offset_number, self.test_property, snapshot_index,
+                             part_z0.snapshot['index']))
 
         # write file for this snapshot
         self.io_index_pointers(None, snapshot_index, part_index_pointers)
@@ -246,8 +254,8 @@ class IndexPointerClass(ut.io.SayClass):
 
         # older snapshot files do not have id.child - use abundance of total metals instead
         if match_property == 'id.child' and 'id.child' not in part[self.species_name]:
-            self.say('input match_property = {}, but it does not exist in the snapshot'.format(
-                     match_property))
+            self.say('input match_property = {} does not exist in snapshot {}'.format(
+                match_property, part.snapshot['index']))
             match_property = 'massfraction.metals'
             self.say('switching to using: {}'.format(match_property))
             if match_property not in properties_read:
@@ -294,9 +302,9 @@ class IndexPointerClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices:
             if thread_number > 1:
                 numbers = pool.apply_async(
-                    self.write_index_pointers_to_snapshot, (part, snapshot_index))
+                    self._write_index_pointers_to_snapshot, (part, snapshot_index))
             else:
-                numbers = self.write_index_pointers_to_snapshot(part, snapshot_index)
+                numbers = self._write_index_pointers_to_snapshot(part, snapshot_index)
 
             id_no_match_number += numbers[0]
             match_prop_no_match_number += numbers[1]
@@ -383,10 +391,10 @@ class IndexPointerClass(ut.io.SayClass):
         return part_reverse_index_pointers
 
 
-IndexPointer = IndexPointerClass()
+ParticleIndexPointer = ParticleIndexPointerClass()
 
 
-class HostCoordinatesClass(IndexPointerClass):
+class ParticleCoordinateClass(ParticleIndexPointerClass):
     '''
     Compute coordinates (3D distances and 3D velocities) wrt the host galaxy center for particles
     across time.
@@ -405,8 +413,7 @@ class HostCoordinatesClass(IndexPointerClass):
         # names of distances and velocities to write/read
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def write_formation_coordinates(
-        self, part=None, snapshot_indices=[], part_indices=None):
+    def write_formation_coordinates(self, part=None, snapshot_indices=[], part_indices=None):
         '''
         Assign to each particle its coordiates (3D distances and 3D velocities) wrt the host
         galaxy center at the snapshot after it formed.
@@ -610,7 +617,7 @@ class HostCoordinatesClass(IndexPointerClass):
             raise ValueError('! not recognize io_direction = {}'.format(io_direction))
 
 
-HostCoordinates = HostCoordinatesClass()
+ParticleCoordinate = ParticleCoordinateClass()
 
 #===================================================================================================
 # run from command line
@@ -624,7 +631,7 @@ if __name__ == '__main__':
     assert ('indices' in function_kind or 'coordinates' in function_kind)
 
     if 'indices' in function_kind:
-        IndexPointer.write_index_pointers_to_snapshots()
+        ParticleIndexPointer.write_index_pointers_to_snapshots()
 
     if 'coordinates' in function_kind:
-        HostCoordinates.write_formation_coordinates()
+        ParticleCoordinate.write_formation_coordinates()
