@@ -43,7 +43,7 @@ class IndexPointerClass(ut.io.SayClass):
         self.directory = directory
         self.Read = gizmo_io.ReadClass()
 
-    def assign_index_pointers(
+    def write_index_pointers_to_snapshot(
         self, part, part_indices, match_property, match_propery_tolerance, test_property,
         snapshot_index):
         '''
@@ -78,7 +78,7 @@ class IndexPointerClass(ut.io.SayClass):
             self.say('* {} {} particles formed at snapshot index <= {}\n'.format(
                      len(part_indices), self.species_name, snapshot_index))
             if not len(part_indices):
-                break
+                return 0, 0, 0, 0
 
         if part_at_snap[self.species_name]['id'].size != part_indices.size:
             self.say('! read {} {} particles at snapshot {}'.format(
@@ -194,14 +194,13 @@ class IndexPointerClass(ut.io.SayClass):
 
         if part is None:
             # read particles at z = 0
-            # complete list of all possible properties relevant to use in matching
-            properties_read = ['id', 'id.child', 'massfraction.metals', 'form.scalefactor']
+            # get list of properties relevant to use in matching
+            properties_read = ['id', 'id.child']
             if match_property not in properties_read:
                 properties_read.append(match_property)
             if test_property and test_property not in properties_read:
                 properties_read.append(test_property)
-            Read = gizmo_io.ReadClass()
-            part = Read.read_snapshots(
+            part = self.Read.read_snapshots(
                 self.species_name, 'redshift', 0, properties=properties_read, element_indices=[0],
                 assign_center=False, check_properties=False)
 
@@ -249,12 +248,12 @@ class IndexPointerClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices:
             if thread_number > 1:
                 numbers = pool.apply_async(
-                    self.assign_index_pointers,
+                    self.write_index_pointers_to_snapshot,
                     (part, part_indices, match_property, match_propery_tolerance, test_property,
                      snapshot_index)
                 )
             else:
-                numbers = self.assign_index_pointers(
+                numbers = self.write_index_pointers_to_snapshot(
                     part, part_indices, match_property, match_propery_tolerance, test_property,
                     snapshot_index)
 
