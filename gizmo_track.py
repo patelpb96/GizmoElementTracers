@@ -510,7 +510,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                     part_z, self.species_name, 'mass.percent', 90, distance_max=15,
                     print_results=True)
 
-                # compute rotation vectors for principal axes within R_90
+                # compute rotation vectors for principal axes from young stars within R_90
                 rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
                     part_z, self.species_name, gal['radius'], age_percent=30)
 

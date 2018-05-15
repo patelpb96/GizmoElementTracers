@@ -68,60 +68,55 @@ def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
 #===================================================================================================
 # transfer files
 #===================================================================================================
-def transfer_snapshots(
-    machine_name='stampede', directory_from='$STAMPEDE_FIRE/m12/m12i/m12i_res7000/output',
-    snapshot_indices=[600], directory_to='.'):
+def rsync_snapshots(
+    machine_name, simulation_directory_from='', simulation_directory_to='.',
+    snapshot_indices=snapshot_indices_subset):
     '''
-    Transfer snapshot file[s] or directory[s] from remote machine to local.
+    Use rsync to copy snapshot file[s].
 
     Parameters
     ----------
-    machine_name : string : name of remote machine
-        examples: 'stampede', 'pfe', 'ranch', 'lou'
-        these assume that you have aliased these names in your .ssh/config
-        else you need to supply, for example <username>@stampede.tacc.xsede.org
-    directory_from : string : directory of snapshot file[s] on remote machine
-    snapshot_indices : int or list : index[s] of snapshots to transfer
+    machine_name : string : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : string : directory to copy from
     directory_to : string : local directory to put snapshots
+    snapshot_indices : int or list : index[s] of snapshots to transfer
     '''
     snapshot_name_base = 'snap*_{:03d}*'
 
-    #if machine_name == 'stampede':
-    #    from_directory = '$STAMPEDE_SCRATCH/' + from_directory
-    #elif machine_name == 'zwicky':
-    #    from_directory = '$ZWICKY_SCRATCH/' + from_directory
-    #elif machine_name == 'ranch':
-    #    from_directory = '$RANCH_HOME/stampede/' + from_directory
-
-    directory_from = ut.io.get_path(directory_from)
+    directory_from = ut.io.get_path(simulation_directory_from) + 'output/'
+    directory_to = ut.io.get_path(simulation_directory_to) + 'output/.'
 
     if np.isscalar(snapshot_indices):
         snapshot_indices = [snapshot_indices]
 
     snapshot_path_names = ''
     for snapshot_index in snapshot_indices:
-        snapshot_path_names += directory_from + snapshot_name_base.format(snapshot_index) + ' '
+        snapshot_path_names += (
+            directory_from + snapshot_name_base.format(snapshot_index) + ' ')
 
-    os.system('rsync -ahvP --size-only --exclude=*~ {}:"{}" {}'.format(
-              machine_name, snapshot_path_names, directory_to))
+    executable = 'rsync -ahvP --size-only '
+    executable += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
+    print('executing: {}'.format(executable))
+    os.system(executable)
 
 
 #===================================================================================================
 # transfer whole simulation
 #===================================================================================================
-def rsync_simulation(
-    directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE',
-    directory_to='/scratch/projects/xsede/GalaxiesOnFIRE'):
+def rsync_simulation_files(
+    machine_name, directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE', directory_to='.'):
     '''
-    Use rsync to copy simulation.
+    Use rsync to copy simulation files.
 
     Parameters
     ----------
-    directory_from : string : directory of snapshot file[s] on remote machine
-    directory_to : string : local directory to put snapshots
+    machine_name : string : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : string : directory to copy from
+    directory_to : string : directory to put files
     '''
     excludes = [
         'output/',
+        'restartfiles/',
 
         'ewald_spc_table_64_dbl.dat',
         'spcool_tables/',
@@ -133,6 +128,14 @@ def rsync_simulation(
         'HIIheating.txt',
         'MomWinds.txt',
         'SNeIIheating.txt',
+
+        '*.ics',
+
+        'snapshot_scale-factors.txt',
+        'submit_gizmo*.py',
+
+        '*.bin',
+        '*.particles',
 
         '*.bak',
         '*.err',
@@ -148,16 +151,18 @@ def rsync_simulation(
         '#*#',
     ]
 
-    directory_from = ut.io.get_path(directory_from)
+    directory_from = machine_name + ':' + ut.io.get_path(directory_from)
     directory_to = ut.io.get_path(directory_to)
 
-    command = 'rsync -ahvP --size-only --exclude=*~'
+    executable = 'rsync -ahvP --size-only '
 
     arguments = ''
     for exclude in excludes:
         arguments += '--exclude="{}" '.format(exclude)
 
-    os.system(command + arguments + directory_from + directory_to + '.')
+    executable += arguments + directory_from + ' ' + directory_to + '.'
+    print('executing: {}'.format(executable))
+    os.system(executable)
 
 
 #===================================================================================================
@@ -165,10 +170,10 @@ def rsync_simulation(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: delete, transfer')
+        raise ValueError('specify function: delete, rsync')
 
     function_kind = str(sys.argv[1])
-    assert ('delete' in function_kind or 'transfer' in function_kind)
+    assert ('delete' in function_kind or 'rsync' in function_kind)
 
     directory = '.'
 
@@ -182,17 +187,14 @@ if __name__ == '__main__':
 
         delete_snapshots(snapshot_index_limits, directory)
 
-    elif 'transfer' in function_kind:
-        if len(sys.argv) < 6:
+    elif 'rsync' in function_kind:
+        if len(sys.argv) < 5:
             raise ValueError(
-                'imports: machine_name directory snapshot_kind snapshot_time_file_name')
+                'imports: machine_name simulation_directory_from simulation_directory_to')
 
         machine_name = str(sys.argv[2])
-        from_directory = str(sys.argv[3])
-        snapshot_kind = str(sys.argv[4])
-        snapshot_time_file_name = str(sys.argv[5])
+        simulation_directory_from = str(sys.argv[3])
+        simulation_directory_to = str(sys.argv[3])
 
-        Snapshot = ut.simulation.SnapshotClass()
-        Snapshot.read_snapshots(snapshot_time_file_name)
-
-        transfer_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])
+        rsync_simulation_files(machine_name, simulation_directory_from, simulation_directory_to)
+        rsync_snapshots(machine_name, simulation_directory_from, simulation_directory_to)
