@@ -194,7 +194,7 @@ if __name__ == '__main__':
 
         machine_name = str(sys.argv[2])
         simulation_directory_from = str(sys.argv[3])
-        simulation_directory_to = str(sys.argv[3])
+        simulation_directory_to = str(sys.argv[4])
 
         rsync_simulation_files(machine_name, simulation_directory_from, simulation_directory_to)
         rsync_snapshots(machine_name, simulation_directory_from, simulation_directory_to)
