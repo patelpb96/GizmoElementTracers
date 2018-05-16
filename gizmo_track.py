@@ -348,10 +348,128 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         self.directory = directory
         self.Read = gizmo_io.ReadClass()
 
+        # set numpy data type to store coordinates
+        self.coordinate_dtype = np.float32
+
+        if self.coordinate_dtype is np.float32:
+            self.force_float32 = True
+        else:
+            self.force_float32 = False
+
         # names of distances and velocities to write/read
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def write_formation_coordinates(self, part_z0=None, snapshot_indices=[]):
+    def _write_formation_coordinates(self, part_z0, snapshot_index, count_tot):
+        '''
+        Assign to each particle its coordinates (position and velocity) wrt its primary host.
+        Write to file.
+
+        Parameters
+        ----------
+        part_z0 : dict : catalog of particles at reference snapshot
+        snapshot_index : int : snapshot index at which to assign particle index pointers
+        count_tot : dict : diagnostic counters
+        '''
+        part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
+
+        if snapshot_index == part_z0.snapshot['index']:
+            part_index_pointers = part_z0_indices
+        else:
+            try:
+                part_index_pointers = self.io_index_pointers(snapshot_index=snapshot_index)
+            except Exception:
+                part_index_pointers = None
+
+        count = {
+            'id none': 0,
+            'id wrong': 0,
+        }
+
+        part_z0_indices_to_assign = part_z0_indices[part_index_pointers >= 0]
+        self.say('\n# {} to assign at snapshot {}'.format(
+            part_z0_indices_to_assign.size, snapshot_index))
+
+        if part_z0_indices_to_assign > 0:
+            part_z = self.Read.read_snapshots(
+                self.species_name, 'index', snapshot_index,
+                properties=['position', 'velocity', 'mass', 'id'], force_float32=self.force_float32,
+                assign_center=True, check_properties=True)
+
+            part_z_indices = part_index_pointers[part_z0_indices_to_assign]
+
+            # sanity checks
+            masks = (part_z_indices >= 0)
+            count['id none'] = part_z_indices.size - np.sum(masks)
+            if count['id none']:
+                self.say('! {} have no id match at snapshot {}!'.format(
+                         count['id none'], snapshot_index))
+                part_z_indices = part_z_indices[masks]
+                part_z0_indices = part_z0_indices[masks]
+
+            masks = (part_z0[self.species_name]['id'][part_z0_indices] ==
+                     part_z[self.species_name]['id'][part_z_indices])
+            count['id wrong'] = part_z_indices.size - np.sum(masks)
+            if count['id wrong']:
+                self.say('! {} have wrong id match at snapshot {}!'.format(
+                         count['id wrong'], snapshot_index))
+                part_z_indices = part_z_indices[masks]
+                part_z0_indices = part_z0_indices[masks]
+
+            # compute host galaxy properties, including R_90
+            gal = ut.particle.get_galaxy_properties(
+                part_z, self.species_name, 'mass.percent', 90, distance_max=15,
+                print_results=True)
+
+            # compute rotation vectors for principal axes from young stars within R_90
+            rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
+                part_z, self.species_name, gal['radius'], age_percent=30)
+
+            # store host galaxy center coordinates
+            part_z[self.species_name].center_position_at_snapshots[snapshot_index] = (
+                part_z.center_position)
+            part_z[self.species_name].center_velocity_at_snapshots[snapshot_index] = (
+                part_z.center_velocity)
+
+            # store rotation vectors
+            part_z[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = (
+                rotation_vectors)
+
+            # compute coordinates
+            coordinates = {}
+            prop = 'form.host.distance'
+            if prop in self.form_host_coordiante_kinds:
+                # 3-D distance wrt host in simulation's cartesian coordinates [kpc physical]
+                coordinates[prop] = ut.coordinate.get_distances(
+                    part_z[self.species_name]['position'][part_z_indices],
+                    part_z.center_position, part_z.info['box.length'],
+                    part_z.snapshot['scalefactor'])
+
+            prop = 'form.host.velocity'
+            if prop in self.form_host_coordiante_kinds:
+                # 3-D velocity wrt host in simulation's cartesian coordinates [km / s]
+                coordinates[prop] = ut.coordinate.get_velocity_differences(
+                    part_z[self.species_name]['velocity'][part_z_indices],
+                    part_z.center_velocity,
+                    part_z[self.species_name]['position'][part_z_indices],
+                    part_z.center_position, part_z.info['box.length'],
+                    part_z.snapshot['scalefactor'], part_z.snapshot['hubble.time'])
+
+            # rotate coordinates to align with principal axes
+            for prop in self.form_host_coordiante_kinds:
+                coordinates[prop] = ut.coordinate.get_coordinates_rotated(
+                    coordinates[prop], rotation_vectors)
+
+            # assign 3-D coordinates wrt host along principal axes [kpc physical]
+            for prop in self.form_host_coordiante_kinds:
+                part_z0[self.species_name][prop][part_z0_indices] = coordinates[prop]
+
+            for k in count:
+                count_tot[k] += count[k]
+
+            # continuously (re)write as go
+            self.io_formation_coordinates(part_z0, 'write')
+
+    def write_formation_coordinates(self, part_z0=None, snapshot_indices=[], thread_number=1):
         '''
         Assign to each particle its coordiates (3D distances and 3D velocities) wrt its primary host
         galaxy center at the snapshot after it formed.
@@ -360,22 +478,15 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         ----------
         part : dict : catalog of particles at reference snapshot
         snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+        thread_number : int : number of threads for parallelization
         '''
-        # set numpy data type to store coordinates
-        coordinate_dtype = np.float32
-
-        if coordinate_dtype is np.float32:
-            force_float32 = True
-        else:
-            force_float32 = False
-
         if part_z0 is None:
             # read particles at z = 0 - all properties possibly relevant for matching
             properties_read = [
                 'position', 'velocity', 'mass', 'id', 'id.child', 'form.scalefactor']
             part_z0 = self.Read.read_snapshots(
                 self.species_name, 'redshift', 0, properties=properties_read, element_indices=[0],
-                force_float32=force_float32, assign_center=False, check_properties=False)
+                force_float32=self.force_float32, assign_center=False, check_properties=False)
 
         part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
 
@@ -388,110 +499,45 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         # store particle properties and initialize to nan
         for prop in self.form_host_coordiante_kinds:
             part_z0[self.species_name][prop] = np.zeros(
-                [part_z0_indices.size, 3], coordinate_dtype) + np.nan
+                [part_z0_indices.size, 3], self.coordinate_dtype) + np.nan
 
         # store center position and velocity of the host galaxy at each snapshot
         part_z0[self.species_name].center_position_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3], coordinate_dtype) + np.nan)
+            np.zeros([snapshot_indices.size, 3], self.coordinate_dtype) + np.nan)
         part_z0[self.species_name].center_velocity_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3], coordinate_dtype) + np.nan)
+            np.zeros([snapshot_indices.size, 3], self.coordinate_dtype) + np.nan)
 
         # store principal axes rotation vectors of the host galaxy at each snapshot
         part_z0[self.species_name].principal_axes_vectors_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3, 3], coordinate_dtype) + np.nan)
+            np.zeros([snapshot_indices.size, 3, 3], self.coordinate_dtype) + np.nan)
 
-        id_wrong_number_tot = 0
-        id_none_number_tot = 0
+        count = {
+            'id none': 0,
+            'id wrong': 0,
+        }
+
+        # initiate threads, if asking for > 1
+        if thread_number > 1:
+            import multiprocessing as mp
+            pool = mp.Pool(thread_number)
 
         for snapshot_index in snapshot_indices:
-            if snapshot_index == part_z0.snapshot['index']:
-                part_index_pointers = part_z0_indices
+            if thread_number > 1:
+                pool.apply(
+                    self._write_formation_coordinates, (part_z0, snapshot_index, count))
             else:
-                try:
-                    part_index_pointers = self.io_index_pointers(snapshot_index=snapshot_index)
-                except Exception:
-                    part_index_pointers = None
+                self._write_formation_coordinates(part_z0, snapshot_index, count)
 
-            part_z0_indices_to_assign = part_z0_indices[part_index_pointers >= 0]
-            self.say('\n# {} to assign at snapshot {}'.format(
-                part_z0_indices_to_assign.size, snapshot_index))
+        # close threads
+        if thread_number > 1:
+            pool.close()
+            pool.join()
 
-            if part_z0_indices_to_assign > 0:
-                part_z = self.Read.read_snapshots(
-                    self.species_name, 'index', snapshot_index,
-                    properties=['position', 'velocity', 'mass', 'id'], force_float32=force_float32,
-                    assign_center=True, check_properties=True)
-
-                part_z_indices = part_index_pointers[part_z0_indices_to_assign]
-
-                # sanity checks
-                masks = (part_z_indices >= 0)
-                id_none_number = part_z_indices.size - np.sum(masks)
-                if id_none_number:
-                    self.say('! {} have no id match at snapshot {}!'.format(
-                             id_none_number, snapshot_index))
-                    id_none_number_tot += id_none_number
-                    part_z_indices = part_z_indices[masks]
-                    part_z0_indices = part_z0_indices[masks]
-
-                id_wrong_number = np.sum(
-                    part_z0[self.species_name]['id'][part_z0_indices] !=
-                    part_z[self.species_name]['id'][part_z_indices])
-                if id_wrong_number:
-                    self.say('! {} have wrong id match at snapshot {}!'.format(
-                             id_wrong_number, snapshot_index))
-                    id_wrong_number_tot += id_wrong_number
-
-                # compute host galaxy properties, including R_90
-                gal = ut.particle.get_galaxy_properties(
-                    part_z, self.species_name, 'mass.percent', 90, distance_max=15,
-                    print_results=True)
-
-                # compute rotation vectors for principal axes from young stars within R_90
-                rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
-                    part_z, self.species_name, gal['radius'], age_percent=30)
-
-                # store host galaxy center coordinates
-                part_z[self.species_name].center_position_at_snapshots[snapshot_index] = (
-                    part_z.center_position)
-                part_z[self.species_name].center_velocity_at_snapshots[snapshot_index] = (
-                    part_z.center_velocity)
-
-                # store rotation vectors
-                part_z[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = (
-                    rotation_vectors)
-
-                # compute coordinates
-                coordinates = {}
-                prop = 'form.host.distance'
-                if prop in self.form_host_coordiante_kinds:
-                    # 3-D distance wrt host in simulation's cartesian coordinates [kpc physical]
-                    coordinates[prop] = ut.coordinate.get_distances(
-                        part_z[self.species_name]['position'][part_z_indices],
-                        part_z.center_position, part_z.info['box.length'],
-                        part_z.snapshot['scalefactor'])
-
-                prop = 'form.host.velocity'
-                if prop in self.form_host_coordiante_kinds:
-                    # 3-D velocity wrt host in simulation's cartesian coordinates [km / s]
-                    coordinates[prop] = ut.coordinate.get_velocity_differences(
-                        part_z[self.species_name]['velocity'][part_z_indices],
-                        part_z.center_velocity,
-                        part_z[self.species_name]['position'][part_z_indices],
-                        part_z.center_position, part_z.info['box.length'],
-                        part_z.snapshot['scalefactor'], part_z.snapshot['hubble.time'])
-
-                # rotate coordinates to align with principal axes
-                for prop in self.form_host_coordiante_kinds:
-                    coordinates[prop] = ut.coordinate.get_coordinates_rotated(
-                        coordinates[prop], rotation_vectors)
-
-                # assign 3-D coordinates wrt host along principal axes [kpc physical]
-                for prop in self.form_host_coordiante_kinds:
-                    part_z0[self.species_name][prop][part_z0_indices] = coordinates[prop]
-
-                # continuously (re)write as go
-                self.io_formation_coordinates(part_z0, 'write')
+        # print cumulative diagnostics
+        if count['id none']:
+            self.say('! {} total do not have valid id!'.format(count['id none']))
+        if count['id wrong']:
+            self.say('! {} total not have id match!'.format(count['id wrong']))
 
     def io_formation_coordinates(self, part, io_direction='read'):
         '''

@@ -383,13 +383,32 @@ class ParticleDictionaryClass(dict):
             if 'cylindrical' in property_name:
                 # convert to cylindrical coordinates
                 if 'distance' in property_name:
-                    # along major axes (R, positive definite), minor axis (Z, signed),
-                    # angle (phi, 0 to 2 * pi)
-                    values = ut.coordinate.get_positions_cylindrical(values)
+                    # along major axes R (positive definite), minor axis Z (signed),
+                    # angle phi (0 to 2 * pi)
+                    values = ut.coordinate.get_positions_in_coordinate_system(
+                        values, 'cartesian', 'cylindrical')
                 if 'velocity' in property_name:
                     # along major axes (v_R), minor axis (v_Z), angular (v_phi)
-                    distance_vectors = self.prop('host.distance.principal', indices)
-                    values = ut.coordinate.get_velocities_cylindrical(values, distance_vectors)
+                    if 'principal' in property_name:
+                        distance_vectors = self.prop('host.distance.principal', indices)
+                    else:
+                        distance_vectors = self.prop('host.distance', indices)
+                    values = ut.coordinate.get_velocities_in_coordinate_system(
+                        values, distance_vectors, 'cartesian', 'cylindrical')
+            elif 'spherical' in property_name:
+                # convert to spherical coordinates
+                if 'distance' in property_name:
+                    # along R (positive definite), theta [0, pi), phi [0, 2 * pi)
+                    values = ut.coordinate.get_positions_in_coordinate_system(
+                        values, 'cartesian', 'spherical')
+                if 'velocity' in property_name:
+                    # along v_R, v_theta, v_phi
+                    if 'principal' in property_name:
+                        distance_vectors = self.prop('host.distance.principal', indices)
+                    else:
+                        distance_vectors = self.prop('host.distance', indices)
+                    values = ut.coordinate.get_velocities_in_coordinate_system(
+                        values, distance_vectors, 'cartesian', 'spherical')
 
             if 'total' in property_name:
                 # compute total (scalar) distance / velocity
