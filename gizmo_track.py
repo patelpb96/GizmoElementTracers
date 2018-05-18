@@ -392,7 +392,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         if part_z0_indices_to_assign.size > 0:
             part_z = self.Read.read_snapshots(
                 self.species_name, 'index', snapshot_index,
-                properties=['position', 'velocity', 'mass', 'id'], force_float32=self.force_float32,
+                properties=['position', 'velocity', 'mass', 'id', 'form.scalefactor'],
+                force_float32=self.force_float32,
                 assign_center=True, check_properties=True)
 
             part_z_indices = part_index_pointers[part_z0_indices_to_assign]
@@ -481,12 +482,12 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         thread_number : int : number of threads for parallelization
         '''
         if part_z0 is None:
-            # read particles at z = 0 - all properties possibly relevant for matching
-            properties_read = [
-                'position', 'velocity', 'mass', 'id', 'id.child', 'form.scalefactor']
+            # read particles at z = 0
             part_z0 = self.Read.read_snapshots(
-                self.species_name, 'redshift', 0, properties=properties_read, element_indices=[0],
-                force_float32=self.force_float32, assign_center=False, check_properties=False)
+                self.species_name, 'redshift', 0,
+                properties=['position', 'velocity', 'mass', 'id', 'id.child', 'form.scalefactor'],
+                element_indices=[0], force_float32=self.force_float32, assign_center=False,
+                check_properties=False)
 
         part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
 
