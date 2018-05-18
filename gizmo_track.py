@@ -350,16 +350,20 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         # set numpy data type to store coordinates
         self.coordinate_dtype = np.float32
-
         if self.coordinate_dtype is np.float32:
             self.force_float32 = True
         else:
             self.force_float32 = False
 
+        # distance limits to select particles associated with primary host at z0
+        # use only these particle to define progenitor center at higher redshifts
+        self.host_z0_distance_limits = [0, 100]  # [kpc physical]
+
         # names of distances and velocities to write/read
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def _write_formation_coordinates(self, part_z0, snapshot_index, count_tot):
+    def _write_formation_coordinates(
+        self, part_z0, snapshot_index, count_tot):
         '''
         Assign to each particle its coordinates (position and velocity) wrt its primary host.
         Write to file.
@@ -371,6 +375,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         count_tot : dict : diagnostic counters
         '''
         part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
+        part_z0_indices_host = ut.array.get_indices(
+            part_z0[self.species_name].prop('host.distance.total'), self.host_z0_distance_limits)
 
         if snapshot_index == part_z0.snapshot['index']:
             part_index_pointers = part_z0_indices
@@ -388,14 +394,15 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             'id wrong': 0,
         }
 
-        # TODO: use only particles that end up within 300 kpc at z = 0
-
         if part_z0_indices.size > 0:
             part_z = self.Read.read_snapshots(
                 self.species_name, 'index', snapshot_index,
                 properties=['position', 'velocity', 'mass', 'id', 'form.scalefactor'],
                 force_float32=self.force_float32,
-                assign_center=True, check_properties=True)
+                assign_center=False, check_properties=True)
+
+            # limit progenitor center to those particle that end up near host at z0
+            self.Read.assign_center(part_z, self.species_name, part_z0_indices_host)
 
             part_z_indices = part_index_pointers[part_z0_indices]
 

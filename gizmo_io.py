@@ -1404,31 +1404,42 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
-    def assign_center(self, part, method='center-of-mass'):
+    def assign_center(self, part, species_name='', part_indices=None, method='center-of-mass'):
         '''
         Assign center position [kpc comoving] and velocity [km / s] to galaxy/halo,
-        using stars for baryonic simulation or dark matter for dark matter-only simulation.
+        using species_name, else default to stars for baryonic simulation or dark matter for
+        dark matter-only simulation.
 
         Parameters
         ----------
         part : dictionary class : catalog of particles at snapshot
+        species_name : string : which particle species to use to define center
+        part_indices : array : list of indices of particle to use to define center
+            use this to exclude particles that you know are not relevant
         method : string : method of centering: 'center-of-mass', 'potential'
         '''
-        if 'star' in part and 'position' in part['star'] and len(part['star']['position']):
-            spec_for_center = 'star'
-            velocity_radius_max = 15
+        if (species_name in part and 'position' in part[species_name] and
+                len(part[species_name]['position'])):
+            pass
+        elif 'star' in part and 'position' in part['star'] and len(part['star']['position']):
+            species_name = 'star'
         elif 'dark' in part and 'position' in part['dark'] and len(part['dark']['position']):
-            spec_for_center = 'dark'
-            velocity_radius_max = 30
+            species_name = 'dark'
         else:
             self.say('! catalog not contain star or dark particles, so cannot assign center')
             return
 
+        if species_name is 'star':
+            velocity_radius_max = 15
+        elif species_name is 'dark':
+            velocity_radius_max = 30
+
         self.say('* assigning center of galaxy/halo:')
 
-        if 'position' in part[spec_for_center]:
+        if 'position' in part[species_name]:
             # assign to overall dictionary
-            part.center_position = ut.particle.get_center_position(part, spec_for_center, method)
+            part.center_position = ut.particle.get_center_position(
+                part, species_name, part_indices, method)
             # assign to each species dictionary
             for spec_name in part:
                 part[spec_name].center_position = part.center_position
@@ -1437,10 +1448,10 @@ class ReadClass(ut.io.SayClass):
             ut.io.print_array(part.center_position, '{:.3f}', end='')
             print(') [kpc comoving]')
 
-        if 'velocity' in part[spec_for_center]:
+        if 'velocity' in part[species_name]:
             # assign to overall dictionary
             part.center_velocity = ut.particle.get_center_velocity(
-                part, spec_for_center, velocity_radius_max, part.center_position)
+                part, species_name, part_indices, velocity_radius_max, part.center_position)
             # assign to each species dictionary
             for spec_name in part:
                 part[spec_name].center_velocity = part.center_velocity
