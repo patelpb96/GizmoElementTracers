@@ -432,7 +432,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 part_z.center_velocity)
 
             # store rotation vectors
-            part_z[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = (
+            part_z0[self.species_name].principal_axes_vectors_at_snapshots[snapshot_index] = (
                 rotation_vectors)
 
             # compute coordinates
