@@ -380,23 +380,22 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             except Exception:
                 part_index_pointers = None
 
+        part_z0_indices = part_z0_indices[part_index_pointers >= 0]
+        self.say('\n# {} to assign at snapshot {}'.format(part_z0_indices.size, snapshot_index))
+
         count = {
             'id none': 0,
             'id wrong': 0,
         }
 
-        part_z0_indices_to_assign = part_z0_indices[part_index_pointers >= 0]
-        self.say('\n# {} to assign at snapshot {}'.format(
-            part_z0_indices_to_assign.size, snapshot_index))
-
-        if part_z0_indices_to_assign.size > 0:
+        if part_z0_indices.size > 0:
             part_z = self.Read.read_snapshots(
                 self.species_name, 'index', snapshot_index,
                 properties=['position', 'velocity', 'mass', 'id', 'form.scalefactor'],
                 force_float32=self.force_float32,
                 assign_center=True, check_properties=True)
 
-            part_z_indices = part_index_pointers[part_z0_indices_to_assign]
+            part_z_indices = part_index_pointers[part_z0_indices]
 
             # sanity checks
             masks = (part_z_indices >= 0)
