@@ -5,8 +5,8 @@
 ##SBATCH --partition=normal    ## KNL node: 64 cores x 2 FP threads, 1.6 GB per core, 96 GB total
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
-#SBATCH --cpus-per-task=5    ## OpenMP threads per MPI task
-#SBATCH --time=8:00:00
+#SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
+#SBATCH --time=12:00:00
 #SBATCH --output=track/gizmo_track_job_%j.txt
 #SBATCH --mail-user=arwetzel@gmail.com
 #SBATCH --mail-type=fail

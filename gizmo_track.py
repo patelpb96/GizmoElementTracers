@@ -389,7 +389,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         self.say('\n# {} to assign at snapshot {}'.format(
             part_z0_indices_to_assign.size, snapshot_index))
 
-        if part_z0_indices_to_assign > 0:
+        if part_z0_indices_to_assign.size > 0:
             part_z = self.Read.read_snapshots(
                 self.species_name, 'index', snapshot_index,
                 properties=['position', 'velocity', 'mass', 'id'], force_float32=self.force_float32,

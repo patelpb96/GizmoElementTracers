@@ -395,6 +395,7 @@ class ParticleDictionaryClass(dict):
                         distance_vectors = self.prop('host.distance', indices)
                     values = ut.coordinate.get_velocities_in_coordinate_system(
                         values, distance_vectors, 'cartesian', 'cylindrical')
+
             elif 'spherical' in property_name:
                 # convert to spherical coordinates
                 if 'distance' in property_name:
