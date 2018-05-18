@@ -378,7 +378,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             try:
                 part_index_pointers = self.io_index_pointers(snapshot_index=snapshot_index)
             except Exception:
-                part_index_pointers = None
+                return
 
         part_z0_indices = part_z0_indices[part_index_pointers >= 0]
         self.say('\n# {} to assign at snapshot {}'.format(part_z0_indices.size, snapshot_index))
@@ -387,6 +387,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             'id none': 0,
             'id wrong': 0,
         }
+
+        # TODO: use only particles that end up within 300 kpc at z = 0
 
         if part_z0_indices.size > 0:
             part_z = self.Read.read_snapshots(
@@ -419,6 +421,10 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             gal = ut.particle.get_galaxy_properties(
                 part_z, self.species_name, 'mass.percent', 90, distance_max=15,
                 print_results=True)
+
+            if not gal['radius'] or np.isnan(gal['radius']):
+                self.say('! no ')
+                return
 
             # compute rotation vectors for principal axes from young stars within R_90
             rotation_vectors, _ev, _ar = ut.particle.get_principal_axes(
@@ -551,6 +557,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         part : dict : catalog of particles at snapshot
         io_direction : string : 'read' or 'write'
         '''
+        assert io_direction in ('read', 'write')
+
         file_name = '{}_form_coordinates_{:03d}'.format(self.species_name, part.snapshot['index'])
 
         if io_direction == 'write':
@@ -593,9 +601,6 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 if prop + '.3d' in part[self.species_name]:
                     part[self.species_name][prop] = part[self.species_name][prop + '.3d']
                     del(part[self.species_name][prop + '.3d'])
-
-        else:
-            raise ValueError('! not recognize io_direction = {}'.format(io_direction))
 
 
 ParticleCoordinate = ParticleCoordinateClass()
