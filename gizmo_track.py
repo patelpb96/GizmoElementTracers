@@ -453,7 +453,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                     part_z.center_velocity,
                     part_z[self.species_name]['position'][part_z_indices],
                     part_z.center_position, part_z.info['box.length'],
-                    part_z.snapshot['scalefactor'], part_z.snapshot['hubble.time'])
+                    part_z.snapshot['scalefactor'], part_z.snapshot['time.hubble'])
 
             # rotate coordinates to align with principal axes
             for prop in self.form_host_coordiante_kinds:
