@@ -426,9 +426,9 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 part_z, self.species_name, gal['radius'], age_percent=30)
 
             # store host galaxy center coordinates
-            part_z[self.species_name].center_position_at_snapshots[snapshot_index] = (
+            part_z0[self.species_name].center_position_at_snapshots[snapshot_index] = (
                 part_z.center_position)
-            part_z[self.species_name].center_velocity_at_snapshots[snapshot_index] = (
+            part_z0[self.species_name].center_velocity_at_snapshots[snapshot_index] = (
                 part_z.center_velocity)
 
             # store rotation vectors
