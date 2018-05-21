@@ -363,7 +363,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
     def _write_formation_coordinates(
-        self, part_z0, snapshot_index, count_tot):
+        self, part_z0, part_z0_indices_host, snapshot_index, count_tot):
         '''
         Assign to each particle its coordinates (position and velocity) wrt its primary host.
         Write to file.
@@ -371,12 +371,11 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         Parameters
         ----------
         part_z0 : dict : catalog of particles at reference snapshot
+        part_z0_indices_host : array : indices of particles near host at z0
         snapshot_index : int : snapshot index at which to assign particle index pointers
         count_tot : dict : diagnostic counters
         '''
         part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
-        part_z0_indices_host = ut.array.get_indices(
-            part_z0[self.species_name].prop('host.distance.total'), self.host_z0_distance_limits)
 
         if snapshot_index == part_z0.snapshot['index']:
             part_index_pointers = part_z0_indices
@@ -386,7 +385,9 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             except Exception:
                 return
 
-        part_z0_indices = part_z0_indices[part_index_pointers >= 0]
+        part_index_masks = (part_index_pointers >= 0)
+
+        part_z0_indices = part_z0_indices[part_index_masks]
         self.say('\n# {} to assign at snapshot {}'.format(part_z0_indices.size, snapshot_index))
 
         count = {
@@ -401,9 +402,10 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 force_float32=self.force_float32,
                 assign_center=False, check_properties=True)
 
-            # limit progenitor center to those particle that end up near host at z0
+            # limit progenitor center to particles that end up near host at z0
             self.Read.assign_center(
-                part_z, self.species_name, part_index_pointers[part_z0_indices_host])
+                part_z, self.species_name,
+                part_index_pointers[part_z0_indices_host[part_index_masks]])
 
             part_z_indices = part_index_pointers[part_z0_indices]
 
@@ -502,6 +504,10 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 element_indices=[0], force_float32=self.force_float32, assign_center=True,
                 check_properties=False)
 
+        # store indices of particles near host at z0
+        part_z0_indices_host = ut.array.get_indices(
+            part_z0[self.species_name].prop('host.distance.total'), self.host_z0_distance_limits)
+
         # get list of snapshots to assign
         if snapshot_indices is None or not len(snapshot_indices):
             snapshot_indices = np.arange(
@@ -536,9 +542,11 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         for snapshot_index in snapshot_indices:
             if thread_number > 1:
                 pool.apply(
-                    self._write_formation_coordinates, (part_z0, snapshot_index, count))
+                    self._write_formation_coordinates,
+                    (part_z0, part_z0_indices_host, snapshot_index, count))
             else:
-                self._write_formation_coordinates(part_z0, snapshot_index, count)
+                self._write_formation_coordinates(
+                    part_z0, part_z0_indices_host, snapshot_index, count)
 
         # close threads
         if thread_number > 1:
