@@ -402,7 +402,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 assign_center=False, check_properties=True)
 
             # limit progenitor center to those particle that end up near host at z0
-            self.Read.assign_center(part_z, self.species_name, part_z0_indices_host)
+            self.Read.assign_center(
+                part_z, self.species_name, part_index_pointers[part_z0_indices_host])
 
             part_z_indices = part_index_pointers[part_z0_indices]
 
