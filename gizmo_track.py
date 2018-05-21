@@ -385,9 +385,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             except Exception:
                 return
 
-        part_index_masks = (part_index_pointers >= 0)
-
-        part_z0_indices = part_z0_indices[part_index_masks]
+        part_z0_indices = part_z0_indices[part_index_pointers >= 0]
         self.say('\n# {} to assign at snapshot {}'.format(part_z0_indices.size, snapshot_index))
 
         count = {
@@ -403,9 +401,9 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 assign_center=False, check_properties=True)
 
             # limit progenitor center to particles that end up near host at z0
+            part_indices_host = part_index_pointers[part_z0_indices_host]
             self.Read.assign_center(
-                part_z, self.species_name,
-                part_index_pointers[part_z0_indices_host[part_index_masks]])
+                part_z, self.species_name, part_indices_host[part_indices_host > 0])
 
             part_z_indices = part_index_pointers[part_z0_indices]
 
@@ -433,7 +431,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 print_results=True)
 
             if not gal['radius'] or np.isnan(gal['radius']):
-                self.say('! no ')
+                self.say('! too few particles to define galaxy size')
                 return
 
             # compute rotation vectors for principal axes from young stars within R_90
