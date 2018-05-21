@@ -84,7 +84,7 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         for part_z_index, part_z_id in enumerate(part_z[self.species_name]['id']):
             try:
                 part_z0_indices = part_z0[self.species_name].id_to_index[part_z_id]
-            except IndexError:
+            except (IndexError, KeyError):
                 count['id no match'] += 1
                 continue
 
@@ -403,7 +403,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             # limit progenitor center to particles that end up near host at z0
             part_indices_host = part_index_pointers[part_z0_indices_host]
             self.Read.assign_center(
-                part_z, self.species_name, part_indices_host[part_indices_host > 0])
+                part_z, self.species_name, part_indices_host[part_indices_host >= 0])
 
             part_z_indices = part_index_pointers[part_z0_indices]
 
