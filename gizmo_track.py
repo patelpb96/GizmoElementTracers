@@ -498,10 +498,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             part_z0 = self.Read.read_snapshots(
                 self.species_name, 'redshift', 0,
                 properties=['position', 'velocity', 'mass', 'id', 'id.child', 'form.scalefactor'],
-                element_indices=[0], force_float32=self.force_float32, assign_center=False,
+                element_indices=[0], force_float32=self.force_float32, assign_center=True,
                 check_properties=False)
-
-        part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
 
         # get list of snapshots to assign
         if snapshot_indices is None or not len(snapshot_indices):
@@ -512,7 +510,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         # store particle properties and initialize to nan
         for prop in self.form_host_coordiante_kinds:
             part_z0[self.species_name][prop] = np.zeros(
-                [part_z0_indices.size, 3], self.coordinate_dtype) + np.nan
+                part_z0[self.species_name]['position'].shape, self.coordinate_dtype) + np.nan
 
         # store center position and velocity of the host galaxy at each snapshot
         part_z0[self.species_name].center_position_at_snapshots = (

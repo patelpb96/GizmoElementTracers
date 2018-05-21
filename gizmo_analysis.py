@@ -3,7 +3,7 @@
 '''
 Analyze Gizmo simulations.
 
-@author: Andrew Wetzel
+@author: Andrew Wetzel <arwetzel@gmail.com>
 
 Units: unless otherwise noted, all quantities are in (combinations of):
     mass in [M_sun]
