@@ -1313,9 +1313,10 @@ def plot_property_v_distance(
         #fit_kind = 'sech2.single'
         #fit_kind = 'sech2.double'
 
-        if fit_kind is 'exponential':
-            from scipy import stats
+        from scipy.optimize import curve_fit
+        from scipy import stats
 
+        if fit_kind is 'exponential':
             if 'log' in distance_scaling:
                 xs = np.log10(xs)
             if 'log' in property_scaling:
@@ -1341,8 +1342,6 @@ def plot_property_v_distance(
             def disk_height_single(xs, a, b):
                 return a / np.cosh(xs / (2 * b)) ** 2
 
-            from scipy.optimize import curve_fit
-
             params, _ = curve_fit(
                 disk_height_single, xs[masks], ys[masks], [1e7, 0.5],
                 bounds=[[0, 0], [1e14, 10]])
@@ -1356,8 +1355,6 @@ def plot_property_v_distance(
 
             def disk_height_double(xs, a, b, c, d):
                 return a / np.cosh(xs / (2 * b)) ** 2 + c / np.cosh(xs / (2 * d)) ** 2
-
-            from scipy.optimize import curve_fit
 
             params, _ = curve_fit(
                 disk_height_double, xs[masks], ys[masks], [1e8, 0.1, 1e8, 2],
