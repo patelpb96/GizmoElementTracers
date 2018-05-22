@@ -1392,15 +1392,15 @@ def plot_property_v_distance(
 
 def print_densities(
     parts, species_names=['star', 'dark', 'gas'],
-    distance_limitss=[[8.0, 8.4], [-1.1, 1.1], [0, 2 * np.pi]], cylindrical=True,
+    distance_limitss=[[8.0, 8.4], [-1.1, 1.1], [0, 2 * np.pi]], coordinate_system='cylindrical',
     rotation=True, center_positions=None, center_velocities=None):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
     species_names : string or list thereof: name of particle species to compute densities of
         options: 'dark', 'star', 'gas'
     distance_limitss : list of lists : min and max distances/positions
-    cylindrical : boolean : get distances along major axes (R, positive definite),
-        minor axis (Z, signed), and angular (phi, 0 to 2 * pi)
+    coordinate_system : string : which coordinates to get positions in:
+        'cartesian' (default), 'cylindrical', 'spherical'
     rotation : boolean or array : whether to rotate particles - two options:
       (a) if input array of eigen-vectors, will define rotation axes
       (b) if True, will rotate to align with principal axes stored in species dictionary
@@ -1409,6 +1409,8 @@ def print_densities(
     property_select : dict : (other) properties to select on: names as keys and limits as values
     '''
     Say = ut.io.SayClass(print_densities)
+
+    assert coordinate_system in ('cartesian', 'cylindrical', 'spherical')
 
     if isinstance(parts, dict):
         parts = [parts]
@@ -1422,7 +1424,7 @@ def print_densities(
 
         for spec_name in species_names:
             distances = ut.particle.get_distances_wrt_center(
-                part, spec_name, None, center_positions[part_i], rotation, cylindrical)
+                part, spec_name, None, center_positions[part_i], rotation, 'cylindrical')
 
             pis = None
             for dimen_i in range(len(distance_limitss)):
