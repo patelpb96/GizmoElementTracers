@@ -11,6 +11,7 @@ from __future__ import absolute_import, division, print_function
 import collections
 import os
 import sys
+import glob
 import numpy as np
 # local ----
 import utilities as ut
@@ -39,8 +40,9 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out*'):
     loop_number_max = 1000
 
     Say = ut.io.SayClass(get_cpu_numbers)
-    file_path_name = ut.io.get_path(simulation_directory) + runtime_file_name
-    file_in = open(file_path_name, 'r')
+    file_name_base = ut.io.get_path(simulation_directory) + runtime_file_name
+    file_names = glob.glob(file_name_base)
+    file_in = open(file_names[0], 'r')
 
     loop_i = 0
     mpi_number = None
@@ -79,7 +81,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out*'):
 #===================================================================================================
 def print_run_times(
     simulation_directory='.', output_directory='output/', core_number=None,
-    runtime_file_name='gizmo.out', wall_time_restart=0, scalefactors=[]):
+    runtime_file_name='gizmo.out*', wall_time_restart=0, scalefactors=[]):
     '''
     Print wall [and CPU] times (based on average per MPI task from cpu.txt) at scale-factors,
     for Gizmo simulation.
@@ -172,7 +174,7 @@ def print_run_times(
 
 
 def print_run_times_ratios(
-    simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out',
+    simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out*',
     wall_times_restart=[],
     scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]):
     '''
