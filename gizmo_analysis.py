@@ -1045,7 +1045,7 @@ def plot_property_v_property(
 
     if len(center_position) and host_distance_limits is not None and len(host_distance_limits):
         distances = ut.coordinate.get_distances(
-            center_position, part[species_name]['position'][part_indices],
+            part[species_name]['position'][part_indices], center_position,
             part.info['box.length'], part.snapshot['scalefactor'], total_distance=True)  # [kpc phy]
         part_indices = part_indices[ut.array.get_indices(distances, host_distance_limits)]
 
@@ -2091,7 +2091,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 distance_limits is not None and len(distance_limits)):
             # [kpc physical]
             distances = ut.coordinate.get_distances(
-                'total', part['star']['position'][part_indices], center_position,
+                part['star']['position'][part_indices], center_position,
                 part.info['box.length'], part.snapshot['scalefactor'], total_distance=True)
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
