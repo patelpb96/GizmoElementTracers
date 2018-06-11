@@ -33,7 +33,7 @@ snapshot_indices_keep = [
 #===================================================================================================
 # compress files
 #===================================================================================================
-def compress_snapshot(directory='output', directory_out='', snapshot_index):
+def compress_snapshot(directory='output', directory_out='', snapshot_index=600):
     '''
     Compress single snapshot (which may be multiple files) in input directory.
 
