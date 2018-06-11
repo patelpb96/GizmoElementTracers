@@ -16,7 +16,7 @@ import numpy as np
 import utilities as ut
 
 # default subset to keep for FIRE (65 snapshots)
-snapshot_indices_subset = [
+snapshot_indices_keep = [
     0,  # z = 99
     20, 26, 33, 41, 52,  # z = 10 - 6
     55, 57, 60, 64, 67,  # z = 5.8 - 5.0
@@ -77,36 +77,42 @@ def compress_snapshots(directory='output', directory_out='', snapshot_index_limi
 #===================================================================================================
 # delete files
 #===================================================================================================
-def delete_snapshots(directory='output', snapshot_index_limits=[1, 599]):
+def delete_snapshots(
+    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False):
     '''
-    Delete all snapshots within snapshot_index_limits in given directory,
-    except for those in snapshot_indices_keep list below.
+    Delete all snapshots in given directory within snapshot_index_limits,
+    except for those in snapshot_indices_keep list.
 
     Parameters
     ----------
-    directory : string : directory of snapshots
-    snapshot_index_limits : list : min and max snapshot indices to consider deleting
+    snapshot_directory : string : directory of snapshots
+    snapshot_index_limits : list : min and max snapshot indices to delete
+    delete_halos : boolean : whether to delete halo catalog files at same snapshot times
     '''
+    snapshot_name_base = 'snap*_{:03d}*'
+    if not snapshot_directory:
+        snapshot_directory = 'output/'
+
+    halo_name_base = 'halos_{:03d}*'
+    halo_directory = 'halo/rockstar_dm/catalog/'
+
+    if snapshot_directory[-1] != '/':
+        snapshot_directory += '/'
+
     if snapshot_index_limits is None or not len(snapshot_index_limits):
-        snapshot_index_limits = [1, np.Inf]
+        snapshot_index_limits = [1, 599]
+    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-    snapshot_name_bases = ['snapshot_*.hdf5', 'snapdir_*']
+    for snapshot_index in snapshot_indices:
+        if snapshot_index not in snapshot_indices_keep:
+            snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
+            print('* deleting {}'.format(snapshot_name))
+            os.system('rm -rf {}'.format(snapshot_name))
 
-    os.chdir(directory)
-
-    for snapshot_name_base in snapshot_name_bases:
-        snapshot_names = glob.glob(snapshot_name_base)
-        snapshot_names.sort()
-
-        for snapshot_name in snapshot_names:
-            snapshot_index = ut.io.get_numbers_in_string(snapshot_name)[0]
-
-            if (snapshot_index not in snapshot_indices_subset and
-                    snapshot_index >= min(snapshot_index_limits) and
-                    snapshot_index <= max(snapshot_index_limits)):
-
-                print('* deleting {}'.format(snapshot_name))
-                os.system('rm -rf ' + snapshot_name)
+            if delete_halos:
+                halo_name = halo_directory + halo_name_base.format(snapshot_index)
+                print('* deleting {}'.format(halo_name))
+                os.system('rm -rf {}'.format(halo_name))
 
 
 #===================================================================================================
@@ -114,7 +120,7 @@ def delete_snapshots(directory='output', snapshot_index_limits=[1, 599]):
 #===================================================================================================
 def rsync_snapshots(
     machine_name, simulation_directory_from='', simulation_directory_to='.',
-    snapshot_indices=snapshot_indices_subset):
+    snapshot_indices=snapshot_indices_keep):
     '''
     Use rsync to copy snapshot file[s].
 
@@ -225,11 +231,12 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        directory_out = ''
+        snapshot_index_max = 600
         if len(sys.argv) > 3:
-            directory_out = str(sys.argv[3])
+            snapshot_index_max = int(sys.argv[3])
+            snapshot_index_limits = [0, snapshot_index_max]
 
-        compress_snapshots(directory, directory_out)
+        compress_snapshots(directory, snapshot_index_limits=snapshot_index_limits)
 
     elif 'delete' in function_kind:
         directory = 'output'

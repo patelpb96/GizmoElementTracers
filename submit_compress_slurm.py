@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
 #SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
 #SBATCH --time=24:00:00
-#SBATCH --output=track/gizmo_compress_job_%j.txt
+#SBATCH --output=gizmo_compress_job_%j.txt
 #SBATCH --mail-user=arwetzel@gmail.com
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
@@ -22,6 +22,7 @@ Submit this script from within the primary directory of the simulation.
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
+import os
 # local ----
 from utilities.basic import io as ut_io
 from gizmo_analysis import gizmo_file
@@ -30,8 +31,14 @@ from gizmo_analysis import gizmo_file
 ScriptPrint = ut_io.ScriptPrintClass('slurm')
 ScriptPrint.print_initial()
 
+# check if any input arguments
+snapshot_index_max = 600
+if len(os.sys.argv) > 1:
+    snapshot_index_max = str(os.sys.argv[1])
+snapshot_index_limits = [0, 600]
+
 # execute
-gizmo_file.compress_snapshots()
+gizmo_file.compress_snapshots(snapshot_index_limits=snapshot_index_limits)
 
 # print run-time information
 ScriptPrint.print_final()
