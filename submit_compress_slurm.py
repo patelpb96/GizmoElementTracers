@@ -5,8 +5,8 @@
 ##SBATCH --partition=normal    ## KNL node: 64 cores x 2 FP threads, 1.6 GB per core, 96 GB total
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1    ## MPI tasks per node
-#SBATCH --cpus-per-task=1    ## OpenMP threads per MPI task
-#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=12    ## OpenMP threads per MPI task
+#SBATCH --time=12:00:00
 #SBATCH --output=gizmo_compress_job_%j.txt
 #SBATCH --mail-user=arwetzel@gmail.com
 #SBATCH --mail-type=fail
@@ -38,7 +38,8 @@ if len(os.sys.argv) > 1:
 snapshot_index_limits = [0, 600]
 
 # execute
-gizmo_file.compress_snapshots(snapshot_index_limits=snapshot_index_limits)
+gizmo_file.compress_snapshots(
+    snapshot_index_limits=snapshot_index_limits, thread_number=ScriptPrint.omp_number)
 
 # print run-time information
 ScriptPrint.print_final()

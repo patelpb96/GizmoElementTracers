@@ -33,15 +33,15 @@ snapshot_indices_keep = [
 #===================================================================================================
 # compress files
 #===================================================================================================
-def compress_snapshots(directory='output', directory_out='', snapshot_index_limits=[0, 600]):
+def compress_snapshot(directory='output', directory_out='', snapshot_index):
     '''
-    Compress all snapshots in given directory.
+    Compress single snapshot (which may be multiple files) in input directory.
 
     Parameters
     ----------
-    directory : string : directory of snapshots
-    directory_out : string : directory to write compressed snapshots
-    snapshot_index_limits : list : min and max snapshot indices to compress
+    directory : string : directory of snapshot
+    directory_out : string : directory to write compressed snapshot
+    snapshot_index : int : index of snapshot
     '''
     executable = 'python3 ~/analysis/manipulate_hdf5/compactify_hdf5.py -L 0'
     snapshot_name_base = 'snap*_{:03d}*'
@@ -51,27 +51,43 @@ def compress_snapshots(directory='output', directory_out='', snapshot_index_limi
     if directory_out and directory_out[-1] != '/':
         directory_out += '/'
 
+    file_path_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
+
+    if len(file_path_names):
+        if 'snapdir' in file_path_names[0]:
+            file_names = glob.glob(file_path_names[0] + '/*')
+        else:
+            file_names = file_path_names
+
+        file_names.sort()
+
+        for file_name in file_names:
+            if directory_out:
+                file_name_out = file_name.replace(directory, directory_out)
+            else:
+                file_name_out = file_name
+
+            executable_i = '{} -o {} {}'.format(executable, file_name_out, file_name)
+            print('executing:  {}'.format(executable_i))
+            os.system(executable_i)
+
+
+def compress_snapshots(
+    directory='output', directory_out='', snapshot_index_limits=[0, 600], thread_number=1):
+    '''
+    Compress all snapshots in input directory.
+
+    Parameters
+    ----------
+    directory : string : directory of snapshots
+    directory_out : string : directory to write compressed snapshots
+    snapshot_index_limits : list : min and max snapshot indices to compress
+    '''
     snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-    for snapshot_index in snapshot_indices:
-        file_path_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
-        if len(file_path_names):
-            if 'snapdir' in file_path_names[0]:
-                file_names = glob.glob(file_path_names[0] + '/*')
-            else:
-                file_names = file_path_names
+    args_list = [(directory, directory_out, snapshot_index) for snapshot_index in snapshot_indices]
 
-            file_names.sort()
-
-            for file_name in file_names:
-                if directory_out:
-                    file_name_out = file_name.replace(directory, directory_out)
-                else:
-                    file_name_out = file_name
-
-                executable_i = '{} -o {} {}'.format(executable, file_name_out, file_name)
-                print('executing:  {}'.format(executable_i))
-                os.system(executable_i)
+    ut.io.run_in_parallel(compress_snapshot, args_list, thread_number)
 
 
 #===================================================================================================
