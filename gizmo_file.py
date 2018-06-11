@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
-Delete snapshot files or transfer files across machines.
+Edit gizmo snapshot files: compress, delete, transfer across machines.
 
 @author: Andrew Wetzel
 '''
@@ -31,17 +31,61 @@ snapshot_indices_subset = [
 
 
 #===================================================================================================
+# compress files
+#===================================================================================================
+def compress_snapshots(directory='output', directory_out='', snapshot_index_limits=[0, 600]):
+    '''
+    Compress all snapshots in given directory.
+
+    Parameters
+    ----------
+    directory : string : directory of snapshots
+    directory_out : string : directory to write compressed snapshots
+    snapshot_index_limits : list : min and max snapshot indices to compress
+    '''
+    executable = 'python3 ~/analysis/manipulate_hdf5/compactify_hdf5.py -L 0'
+    snapshot_name_base = 'snap*_{:03d}*'
+
+    if directory[-1] != '/':
+        directory += '/'
+    if directory_out and directory_out[-1] != '/':
+        directory_out += '/'
+
+    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+
+    for snapshot_index in snapshot_indices:
+        file_path_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
+        if len(file_path_names):
+            if 'snapdir' in file_path_names[0]:
+                file_names = glob.glob(file_path_names[0] + '/*')
+            else:
+                file_names = file_path_names
+
+            file_names.sort()
+
+            for file_name in file_names:
+                if directory_out:
+                    file_name_out = file_name.replace(directory, directory_out)
+                else:
+                    file_name_out = file_name
+
+                executable_i = '{} -o {} {}'.format(executable, file_name_out, file_name)
+                print('executing:  {}'.format(executable_i))
+                os.system(executable_i)
+
+
+#===================================================================================================
 # delete files
 #===================================================================================================
-def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
+def delete_snapshots(directory='output', snapshot_index_limits=[1, 599]):
     '''
     Delete all snapshots within snapshot_index_limits in given directory,
     except for those in snapshot_indices_keep list below.
 
     Parameters
     ----------
-    snapshot_index_limits : list : min and max snapshot indices to consider deleting
     directory : string : directory of snapshots
+    snapshot_index_limits : list : min and max snapshot indices to consider deleting
     '''
     if snapshot_index_limits is None or not len(snapshot_index_limits):
         snapshot_index_limits = [1, np.Inf]
@@ -170,22 +214,33 @@ def rsync_simulation_files(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: delete, rsync')
+        raise ValueError('specify function: compress, delete, rsync')
 
     function_kind = str(sys.argv[1])
-    assert ('delete' in function_kind or 'rsync' in function_kind)
 
-    directory = '.'
+    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind)
 
-    if 'delete' in function_kind:
-        snapshot_index_limits = None
+    if 'compress' in function_kind:
+        directory = 'output'
+        if len(sys.argv) > 2:
+            directory = str(sys.argv[2])
+
+        directory_out = ''
         if len(sys.argv) > 3:
-            snapshot_index_limits = [int(sys.argv[2]), int(sys.argv[3])]
+            directory_out = str(sys.argv[3])
 
-            if len(sys.argv) > 4:
-                directory = str(sys.argv[4])
+        compress_snapshots(directory, directory_out)
 
-        delete_snapshots(snapshot_index_limits, directory)
+    elif 'delete' in function_kind:
+        directory = 'output'
+        if len(sys.argv) > 3:
+            directory = str(sys.argv[3])
+
+        snapshot_index_limits = None
+        if len(sys.argv) > 4:
+            snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
+
+        delete_snapshots(directory, snapshot_index_limits)
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
