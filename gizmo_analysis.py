@@ -804,8 +804,8 @@ class ImageClass(ut.io.SayClass):
         self.plot_name = plot_name
 
     def get_histogram(
-        self, image_kind, dimensions_plot, position_bin_number, position_limits, positions,
-        weights, use_column_units):
+        self, image_kind, dimension_list, position_bin_number, position_limits, positions,
+        weights, use_column_units=False):
         '''
         Get 2-D histogram, either by summing all partiles along 3rd dimension or computing the
         highest density along 3rd dimension.
@@ -813,13 +813,13 @@ class ImageClass(ut.io.SayClass):
         Parameters
         ----------
         image_kind : string : 'histogram', 'histogram.3d'
-        dimensions_plot : list : indices of dimensions to plot
+        dimension_list : list : indices of dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
         position_bin_number : number of pixels/bins across image
         position_limits : list or list of lists : min and max values of position to compute
         positions : array : 3-D positions
         weights : array : weight for each position
-        use_column_units : boolean : whether to convert to particle number / cm^2
+        use_column_units : boolean : whether to convert to [number / cm^2]
         '''
         if '3d' in image_kind:
             # calculate maximum local density along projected dimension
@@ -830,7 +830,7 @@ class ImageClass(ut.io.SayClass):
             hist_valuess /= (
                 np.diff(hist_xs)[0] * np.diff(hist_ys)[0] * np.diff(hist_zs)[0])
 
-            dimension_project = np.setdiff1d([0, 1, 2], dimensions_plot)
+            dimension_project = np.setdiff1d([0, 1, 2], dimension_list)
 
             # compute maximum density
             hist_valuess = np.max(hist_valuess, dimension_project)
@@ -838,8 +838,8 @@ class ImageClass(ut.io.SayClass):
         else:
             # project along single dimension
             hist_valuess, hist_xs, hist_ys = np.histogram2d(
-                positions[:, dimensions_plot[0]], positions[:, dimensions_plot[1]],
-                position_bin_number, position_limits[dimensions_plot],
+                positions[:, dimension_list[0]], positions[:, dimension_list[1]],
+                position_bin_number, position_limits[dimension_list],
                 weights=weights, normed=False,
             )
 
@@ -3178,36 +3178,36 @@ class CompareSimulationsClass(ut.io.SayClass):
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-            prop = 'dark'
-            if prop in parts[0]:
+            spec = 'dark'
+            if spec in parts[0]:
                 plot_property_v_distance(
-                    parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
+                    parts, spec, 'mass', 'sum.cum', 'log', False, [None, None],
                     self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop, 'mass', 'density', 'log', False, [None, None],
+                    parts, spec, 'mass', 'density', 'log', False, [None, None],
                     self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-            prop = 'gas'
-            if prop in parts[0]:
+            spec = 'gas'
+            if spec in parts[0]:
                 plot_property_v_distance(
-                    parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
+                    parts, spec, 'mass', 'sum.cum', 'log', False, [None, None],
                     self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop, 'metallicity.total', 'median', 'linear', True, [None, None],
+                    parts, spec, 'metallicity.total', 'median', 'linear', True, [None, None],
                     self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
-                    parts, prop, 'metallicity.total', [-4, 1.3], 0.1, None, 'linear',
+                    parts, spec, 'metallicity.total', [-5, 1.3], 0.1, None, 'linear',
                     'probability', self.halo_profile_radius_limits, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
@@ -3215,71 +3215,71 @@ class CompareSimulationsClass(ut.io.SayClass):
                 """
                 if 'velocity' in parts[0][prop]:
                     plot_property_v_distance(
-                        parts, prop, 'host.velocity.rad', 'average', 'linear', True,
+                        parts, spec, 'host.velocity.rad', 'average', 'linear', True,
                         [None, None], self.halo_profile_radius_limits, 0.25,
                         write_plot=True, plot_directory=self.plot_directory,
                     )
                 """
 
-            prop = 'star'
-            if prop in parts[0]:
+            spec = 'star'
+            if spec in parts[0]:
                 plot_property_v_distance(
-                    parts, prop, 'mass', 'sum.cum', 'log', False, [None, None],
+                    parts, spec, 'mass', 'sum.cum', 'log', False, [None, None],
                     self.halo_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop, 'mass', 'density', 'log', False, [None, None],
+                    parts, spec, 'mass', 'density', 'log', False, [None, None],
                     self.galaxy_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop, 'metallicity.fe', 'median', 'linear', True,
+                    parts, spec, 'metallicity.fe', 'median', 'linear', True,
                     [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_v_distance(
-                    parts, prop, 'metallicity.mg - metallicity.fe', 'median', 'linear', True,
+                    parts, spec, 'metallicity.mg - metallicity.fe', 'median', 'linear', True,
                     [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
-                    parts, prop, 'metallicity.fe', [-4, 1.3], 0.1, None, 'linear',
+                    parts, spec, 'metallicity.fe', [-5, 1.3], 0.1, None, 'linear',
                     'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
                 plot_property_distribution(
-                    parts, prop, 'metallicity.mg - metallicity.fe', [-1.7, 0.6], 0.1, None,
+                    parts, spec, 'metallicity.mg - metallicity.fe', [-1.7, 0.6], 0.1, None,
                     'linear', 'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-                if 'form.scalefactor' in parts[0][prop] and redshift <= 5:
+                if 'form.scalefactor' in parts[0][spec] and redshift <= 5:
                     plot_property_v_distance(
-                        parts, prop, 'age', 'average', 'linear', True,
+                        parts, spec, 'age', 'average', 'linear', True,
                         [None, None], self.galaxy_radius_limits, distance_bin_width, 'linear',
                         write_plot=True, plot_directory=self.plot_directory,
                     )
 
                     StarFormHistory.plot_star_form_history(
-                        parts, 'mass', 'redshift', [0, 6], 0.2, 'linear',
+                        parts, 'mass', 'redshift', [None, 7], 0.2, 'linear',
                         self.galaxy_radius_limits, sfh_limits=[None, None],
                         write_plot=True, plot_directory=self.plot_directory,
                     )
 
                     StarFormHistory.plot_star_form_history(
-                        parts, 'form.rate', 'time.lookback', [0, 13], 0.5, 'linear',
+                        parts, 'form.rate', 'time.lookback', [None, 13], 0.5, 'linear',
                         self.galaxy_radius_limits, sfh_limits=[None, None],
                         write_plot=True, plot_directory=self.plot_directory,
                     )
 
                     StarFormHistory.plot_star_form_history(
-                        parts, 'form.rate.specific', 'time.lookback', [0, 13], 0.5, 'linear',
+                        parts, 'form.rate.specific', 'time.lookback', [None, 13], 0.5, 'linear',
                         self.galaxy_radius_limits, sfh_limits=[None, None],
                         write_plot=True, plot_directory=self.plot_directory,
                     )

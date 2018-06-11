@@ -752,6 +752,8 @@ class ReadClass(ut.io.SayClass):
             'Flag_Feedback': 'has.feedback',
             'Flag_DoublePrecision': 'has.double.precision',
             'Flag_IC_Info': 'has.ic.info',
+            # level of compression of snapshot file
+            'CompactLevel': 'compact.level',
         }
 
         header = {}  # dictionary to store header information

@@ -7,7 +7,7 @@ Delete snapshot files or transfer files across machines.
 '''
 
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import os
 import sys
 import glob
