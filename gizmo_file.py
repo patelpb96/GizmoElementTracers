@@ -33,7 +33,9 @@ snapshot_indices_keep = [
 #===================================================================================================
 # compress files
 #===================================================================================================
-def compress_snapshot(directory='output', directory_out='', snapshot_index=600):
+def compress_snapshot(
+    directory='output', directory_out='', snapshot_index=600,
+    analysis_directory='~/analysis', python_executable='python3'):
     '''
     Compress single snapshot (which may be multiple files) in input directory.
 
@@ -42,8 +44,10 @@ def compress_snapshot(directory='output', directory_out='', snapshot_index=600):
     directory : string : directory of snapshot
     directory_out : string : directory to write compressed snapshot
     snapshot_index : int : index of snapshot
+    analysis_directory : string : directory of analysis code
     '''
-    executable = 'python3 ~/analysis/manipulate_hdf5/compactify_hdf5.py -L 0'
+    executable = '{} {}/manipulate_hdf5/compactify_hdf5.py -L 0'.format(
+        python_executable, analysis_directory)
     snapshot_name_base = 'snap*_{:03d}*'
 
     if directory[-1] != '/':
@@ -82,6 +86,8 @@ def compress_snapshots(
     directory : string : directory of snapshots
     directory_out : string : directory to write compressed snapshots
     snapshot_index_limits : list : min and max snapshot indices to compress
+    syncronize : boolean : whether to synchronize parallel tasks,
+        wait for each thread bundle to complete before starting new bundle
     '''
     snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
@@ -122,12 +128,12 @@ def delete_snapshots(
     for snapshot_index in snapshot_indices:
         if snapshot_index not in snapshot_indices_keep:
             snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
-            print('* deleting {}'.format(snapshot_name))
+            print('* deleting:  {}'.format(snapshot_name))
             os.system('rm -rf {}'.format(snapshot_name))
 
             if delete_halos:
                 halo_name = halo_directory + halo_name_base.format(snapshot_index)
-                print('* deleting {}'.format(halo_name))
+                print('* deleting:  {}'.format(halo_name))
                 os.system('rm -rf {}'.format(halo_name))
 
 
@@ -162,7 +168,7 @@ def rsync_snapshots(
 
     executable = 'rsync -ahvP --size-only '
     executable += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
-    print('executing: {}'.format(executable))
+    print('executing:  {}'.format(executable))
     os.system(executable)
 
 
@@ -227,7 +233,7 @@ def rsync_simulation_files(
         arguments += '--exclude="{}" '.format(exclude)
 
     executable += arguments + directory_from + ' ' + directory_to + '.'
-    print('executing: {}'.format(executable))
+    print('executing:  {}'.format(executable))
     os.system(executable)
 
 
