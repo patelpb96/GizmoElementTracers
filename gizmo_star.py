@@ -2,17 +2,20 @@
 Analyze stellar evolution, including supernova rates, stellar mass loss, nucleosynthetic yields,
 as implemented in Gizmo.
 
-Masses in [M_sun].
-
 @author: Andrew Wetzel
-'''
 
+Units: unless otherwise noted, all quantities are in (combinations of):
+    mass in [M_sun]
+    position in [kpc comoving]
+    distance and radius in [kpc physical]
+    velocity in [km / s]
+    time in [Gyr]
+'''
 
 # system ----
 from __future__ import absolute_import, division, print_function
 import collections
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 from scipy import integrate
 # local ----
 import wutilities as ut
@@ -25,6 +28,7 @@ class SupernovaIIClass:
     '''
     Compute rates and related quantities for core-collapse supernovae, as implemented in Gizmo.
     '''
+
     def __init__(self):
         self.ejecta_mass = 10.5  # ejecta mass per event, IMF-averaged [M_sun]
 
@@ -131,6 +135,7 @@ class SupernovaIaClass:
     '''
     Compute rates and related quantities for supernovae Ia, as implemented in Gizmo.
     '''
+
     def __init__(self):
         self.ejecta_mass = 1.4  # ejecta mass per event, IMF-averaged [M_sun]
 
@@ -158,6 +163,7 @@ class SupernovaIaClass:
         -------
         rate : float : rate per M_sun [Myr ^ -1]
         '''
+
         def get_rate(ages, kind):
             if kind == 'mannucci':
                 # Mannucci, Della Valle, & Panagia 2006
@@ -242,6 +248,7 @@ class StellarWindClass:
     '''
     Compute mass loss rates rates and related quantities for stellar winds, as implemented in Gizmo.
     '''
+
     def __init__(self):
         self.ejecta_mass = 1.0  # these already are mass fractions
         self.solar_metal_mass_fraction = 0.02  # Gizmo assumes this
@@ -355,6 +362,7 @@ class MassLossClass:
     Compute mass loss from all channels (supernova II, Ia, and stellar winds),
     as implemented in Gizmo.
     '''
+
     def __init__(self):
         self.SupernovaII = SupernovaIIClass()
         self.SupernovaIa = SupernovaIaClass()
@@ -715,7 +723,7 @@ def plot_nucleosynthetic_yields(
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
     yield_names = np.array(yield_dict.keys())[yield_indices]
-    yield_labels = [str.capitalize(ut.const.element_symbol_from_name[k]) for k in yield_names]
+    yield_labels = [str.capitalize(ut.constant.element_symbol_from_name[k]) for k in yield_names]
     yield_indices = np.arange(yield_indices.size)
 
     # plot ----------

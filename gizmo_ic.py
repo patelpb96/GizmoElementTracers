@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 
-
 '''
 Generate initial condition points by selecting particles at final time and tracing them back
 to initial time.
 
-Masses in [M_sun], positions in [kpc comoving], distances in [kpc physical].
-
 @author: Andrew Wetzel
-'''
 
+Units: unless otherwise noted, all quantities are in (combinations of):
+    mass in [M_sun]
+    position in [kpc comoving]
+    distance and radius in [kpc physical]
+    velocity in [km / s]
+    time in [Gyr]
+'''
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
@@ -28,6 +31,7 @@ class ReadClass(ut.io.SayClass):
     '''
     Read particles and halo catalog.
     '''
+
     def __init__(self, snapshot_redshifts=[0, 99], simulation_directory='.'):
         '''
         Read particles from final and initial snapshot and halos from final snapshot.
@@ -50,7 +54,7 @@ class ReadClass(ut.io.SayClass):
         parts : list : catalogs of particles at initial and final snapshots
         hal : list : catalog of halos at final snapshot
         '''
-        from rockstar import rockstar_io
+        from rockstar_analysis import rockstar_io
 
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
@@ -101,7 +105,7 @@ class ReadClass(ut.io.SayClass):
         -------
         hal : list : catalog of halos at final snapshot
         '''
-        from rockstar import rockstar_io
+        from rockstar_analysis import rockstar_io
 
         Read = rockstar_io.ReadClass()
         hal = Read.read_catalogs(
@@ -194,8 +198,8 @@ def write_initial_points(
     spec_select_number = []
     for spec in species:
         distances = ut.coordinate.get_distances(
-            'scalar', part_fin[spec]['position'], center_position,
-            part_fin.info['box.length']) * part_fin.snapshot['scalefactor']  # [kpc physical]
+            part_fin[spec]['position'], center_position, part_fin.info['box.length'],
+            part_fin.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
 
         indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
@@ -277,17 +281,17 @@ def write_initial_points(
         Write.write('# within convex hull at initial time')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_chull * ut.const.mega_per_kilo ** 3))
+                    volume_ini_chull * ut.constant.mega_per_kilo ** 3))
 
         Write.write('# within encompassing cuboid at initial time')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_cuboid * ut.const.mega_per_kilo ** 3))
+                    volume_ini_cuboid * ut.constant.mega_per_kilo ** 3))
 
         Write.write('# within encompassing cube at initial time (for MUSIC FFT)')
         Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
         Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_cube * ut.const.mega_per_kilo ** 3))
+                    volume_ini_cube * ut.constant.mega_per_kilo ** 3))
 
         Write.write('# position range at initial time')
         for dimen_i in range(positions_ini.shape[1]):
@@ -379,7 +383,7 @@ def read_write_initial_points_from_zoom(
     parts = Read.read_particles()
 
     center_position = ut.particle.get_center_position(
-        parts[0], 'dark', 'center-of-mass', compare_centers=True)
+        parts[0], 'dark', method='center-of-mass', compare_centers=True)
 
     write_initial_points(
         parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
@@ -432,7 +436,7 @@ def print_contamination_in_box(
         neig_pis = neig_pis[0]
     elif geometry == 'cube':
         distance_vector = np.abs(ut.coordinate.get_distances(
-            'vector', part['position'], center_position, part.info['box.length']))
+            part['position'], center_position, part.info['box.length']))
 
     for dist_i in range(DistanceBin.number):
         distance_bin_limits = DistanceBin.get_bin_limits(distance_scaling, dist_i)

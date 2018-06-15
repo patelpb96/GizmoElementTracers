@@ -1,129 +1,194 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python3
 
 '''
-Delete snapshot files or transfer files across machines.
+Edit gizmo snapshot files: compress, delete, transfer across machines.
 
 @author: Andrew Wetzel
 '''
 
-
 # system ----
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function  # python 2 compatability
 import os
 import sys
 import glob
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import wutilities as ut
 
-
-# default subset to keep for FIRE (61 snapshots)
-snapshot_indices_subset = [
-    0, 20, 26, 33, 41, 52, 55, 57, 60, 64, 67, 71, 75, 79, 83, 88, 91, 93, 96, 99,
-    102, 105, 109, 112, 116, 120, 124, 128, 133, 137,
-    142, 148, 153, 159, 165, 172, 179, 187, 195,
-    204, 214, 225, 236, 248, 262, 277, 294,
-    312, 332, 356, 382,
-    412, 446, 486,
-    534, 561, 567, 573, 579, 585,
+# default subset to keep for FIRE (65 snapshots)
+snapshot_indices_keep = [
+    0,  # z = 99
+    20, 26, 33, 41, 52,  # z = 10 - 6
+    55, 57, 60, 64, 67,  # z = 5.8 - 5.0
+    71, 75, 79, 83, 88,  # z = 4.8 - 4.0
+    91, 93, 96, 99, 102, 105, 109, 112, 116, 120,  # z = 3.9 - 3.0
+    124, 128, 133, 137, 142, 148, 153, 159, 165, 172,  # z = 2.9 - 2.0
+    179, 187, 195, 204, 214, 225, 236, 248, 262, 277,  # z = 1.9 - 1.0
+    294, 312, 332, 356, 382, 412, 446, 486, 534,  # z = 0.9 - 0.1
+    539, 544, 550, 555, 561, 567, 573, 579, 585,  # z = 0.09 - 0.01
     600
 ]
 
 
 #===================================================================================================
-# delete files
+# compress files
 #===================================================================================================
-def delete_snapshots(snapshot_index_limits=[1, 599], directory='.'):
+def compress_snapshot(
+    directory='output', directory_out='', snapshot_index=600,
+    analysis_directory='~/analysis', python_executable='python3'):
     '''
-    Delete all snapshots within snapshot_index_limits in given directory,
-    except for those in snapshot_indices_keep list below.
+    Compress single snapshot (which may be multiple files) in input directory.
 
     Parameters
     ----------
-    snapshot_index_limits : list : min and max snapshot indices to consider deleting
-    directory : string : directory of snapshots
+    directory : string : directory of snapshot
+    directory_out : string : directory to write compressed snapshot
+    snapshot_index : int : index of snapshot
+    analysis_directory : string : directory of analysis code
     '''
+    executable = '{} {}/manipulate_hdf5/compactify_hdf5.py -L 0'.format(
+        python_executable, analysis_directory)
+    snapshot_name_base = 'snap*_{:03d}*'
+
+    if directory[-1] != '/':
+        directory += '/'
+    if directory_out and directory_out[-1] != '/':
+        directory_out += '/'
+
+    file_path_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
+
+    if len(file_path_names):
+        if 'snapdir' in file_path_names[0]:
+            file_names = glob.glob(file_path_names[0] + '/*')
+        else:
+            file_names = file_path_names
+
+        file_names.sort()
+
+        for file_name in file_names:
+            if directory_out:
+                file_name_out = file_name.replace(directory, directory_out)
+            else:
+                file_name_out = file_name
+
+            executable_i = '{} -o {} {}'.format(executable, file_name_out, file_name)
+            print('executing:  {}'.format(executable_i))
+            os.system(executable_i)
+
+
+def compress_snapshots(
+    directory='output', directory_out='', snapshot_index_limits=[0, 600], thread_number=1):
+    '''
+    Compress all snapshots in input directory.
+
+    Parameters
+    ----------
+    directory : string : directory of snapshots
+    directory_out : string : directory to write compressed snapshots
+    snapshot_index_limits : list : min and max snapshot indices to compress
+    syncronize : boolean : whether to synchronize parallel tasks,
+        wait for each thread bundle to complete before starting new bundle
+    '''
+    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+
+    args_list = [(directory, directory_out, snapshot_index) for snapshot_index in snapshot_indices]
+
+    ut.io.run_in_parallel(compress_snapshot, args_list, thread_number)
+
+
+#===================================================================================================
+# delete files
+#===================================================================================================
+def delete_snapshots(
+    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False):
+    '''
+    Delete all snapshots in given directory within snapshot_index_limits,
+    except for those in snapshot_indices_keep list.
+
+    Parameters
+    ----------
+    snapshot_directory : string : directory of snapshots
+    snapshot_index_limits : list : min and max snapshot indices to delete
+    delete_halos : boolean : whether to delete halo catalog files at same snapshot times
+    '''
+    snapshot_name_base = 'snap*_{:03d}*'
+    if not snapshot_directory:
+        snapshot_directory = 'output/'
+
+    halo_name_base = 'halos_{:03d}*'
+    halo_directory = 'halo/rockstar_dm/catalog/'
+
+    if snapshot_directory[-1] != '/':
+        snapshot_directory += '/'
+
     if snapshot_index_limits is None or not len(snapshot_index_limits):
-        snapshot_index_limits = [1, Inf]
+        snapshot_index_limits = [1, 599]
+    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-    snapshot_name_bases = ['snapshot_*.hdf5', 'snapdir_*']
+    for snapshot_index in snapshot_indices:
+        if snapshot_index not in snapshot_indices_keep:
+            snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
+            print('* deleting:  {}'.format(snapshot_name))
+            os.system('rm -rf {}'.format(snapshot_name))
 
-    os.chdir(directory)
-
-    for snapshot_name_base in snapshot_name_bases:
-        snapshot_names = glob.glob(snapshot_name_base)
-        snapshot_names.sort()
-
-        for snapshot_name in snapshot_names:
-            snapshot_index = ut.io.get_numbers_in_string(snapshot_name)[0]
-
-            if (snapshot_index not in snapshot_indices_subset and
-                    snapshot_index >= min(snapshot_index_limits) and
-                    snapshot_index <= max(snapshot_index_limits)):
-
-                print('* deleting {}'.format(snapshot_name))
-                os.system('rm -rf ' + snapshot_name)
+            if delete_halos:
+                halo_name = halo_directory + halo_name_base.format(snapshot_index)
+                print('* deleting:  {}'.format(halo_name))
+                os.system('rm -rf {}'.format(halo_name))
 
 
 #===================================================================================================
 # transfer files
 #===================================================================================================
-def transfer_snapshots(
-    machine_name='stampede', directory_from='$STAMPEDE_FIRE/m12/m12i/m12i_res7000/output',
-    snapshot_indices=[600], directory_to='.'):
+def rsync_snapshots(
+    machine_name, simulation_directory_from='', simulation_directory_to='.',
+    snapshot_indices=snapshot_indices_keep):
     '''
-    Transfer snapshot file[s] or directory[s] from remote machine to local.
+    Use rsync to copy snapshot file[s].
 
     Parameters
     ----------
-    machine_name : string : name of remote machine
-        examples: 'stampede', 'pfe', 'ranch', 'lou'
-        these assume that you have aliased these names in your .ssh/config
-        else you need to supply, for example <username>@stampede.tacc.xsede.org
-    directory_from : string : directory of snapshot file[s] on remote machine
-    snapshot_indices : int or list : index[s] of snapshots to transfer
+    machine_name : string : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : string : directory to copy from
     directory_to : string : local directory to put snapshots
+    snapshot_indices : int or list : index[s] of snapshots to transfer
     '''
     snapshot_name_base = 'snap*_{:03d}*'
 
-    #if machine_name == 'stampede':
-    #    from_directory = '$STAMPEDE_SCRATCH/' + from_directory
-    #elif machine_name == 'zwicky':
-    #    from_directory = '$ZWICKY_SCRATCH/' + from_directory
-    #elif machine_name == 'ranch':
-    #    from_directory = '$RANCH_HOME/stampede/' + from_directory
-
-    directory_from = ut.io.get_path(directory_from)
+    directory_from = ut.io.get_path(simulation_directory_from) + 'output/'
+    directory_to = ut.io.get_path(simulation_directory_to) + 'output/.'
 
     if np.isscalar(snapshot_indices):
         snapshot_indices = [snapshot_indices]
 
     snapshot_path_names = ''
     for snapshot_index in snapshot_indices:
-        snapshot_path_names += directory_from + snapshot_name_base.format(snapshot_index) + ' '
+        snapshot_path_names += (
+            directory_from + snapshot_name_base.format(snapshot_index) + ' ')
 
-    os.system('rsync -ahvP --size-only --exclude=*~ {}:"{}" {}'.format(
-              machine_name, snapshot_path_names, directory_to))
+    executable = 'rsync -ahvP --size-only '
+    executable += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
+    print('executing:  {}'.format(executable))
+    os.system(executable)
 
 
 #===================================================================================================
 # transfer whole simulation
 #===================================================================================================
-def rsync_simulation(
-    directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE',
-    directory_to='/scratch/projects/xsede/GalaxiesOnFIRE'):
+def rsync_simulation_files(
+    machine_name, directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE', directory_to='.'):
     '''
-    Use rsync to copy simulation.
+    Use rsync to copy simulation files.
 
     Parameters
     ----------
-    directory_from : string : directory of snapshot file[s] on remote machine
-    directory_to : string : local directory to put snapshots
+    machine_name : string : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : string : directory to copy from
+    directory_to : string : directory to put files
     '''
     excludes = [
         'output/',
+        'restartfiles/',
 
         'ewald_spc_table_64_dbl.dat',
         'spcool_tables/',
@@ -135,6 +200,14 @@ def rsync_simulation(
         'HIIheating.txt',
         'MomWinds.txt',
         'SNeIIheating.txt',
+
+        '*.ics',
+
+        'snapshot_scale-factors.txt',
+        'submit_gizmo*.py',
+
+        '*.bin',
+        '*.particles',
 
         '*.bak',
         '*.err',
@@ -150,16 +223,18 @@ def rsync_simulation(
         '#*#',
     ]
 
-    directory_from = ut.io.get_path(directory_from)
+    directory_from = machine_name + ':' + ut.io.get_path(directory_from)
     directory_to = ut.io.get_path(directory_to)
 
-    command = 'rsync -ahvP --size-only --exclude=*~'
+    executable = 'rsync -ahvP --size-only '
 
     arguments = ''
     for exclude in excludes:
         arguments += '--exclude="{}" '.format(exclude)
 
-    os.system(command + arguments + directory_from + directory_to + '.')
+    executable += arguments + directory_from + ' ' + directory_to + '.'
+    print('executing:  {}'.format(executable))
+    os.system(executable)
 
 
 #===================================================================================================
@@ -167,34 +242,43 @@ def rsync_simulation(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: delete, transfer')
+        raise ValueError('specify function: compress, delete, rsync')
 
     function_kind = str(sys.argv[1])
-    assert ('delete' in function_kind or 'transfer' in function_kind)
 
-    directory = '.'
+    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind)
 
-    if 'delete' in function_kind:
-        snapshot_index_limits = None
+    if 'compress' in function_kind:
+        directory = 'output'
+        if len(sys.argv) > 2:
+            directory = str(sys.argv[2])
+
+        snapshot_index_max = 600
         if len(sys.argv) > 3:
-            snapshot_index_limits = [int(sys.argv[2]), int(sys.argv[3])]
+            snapshot_index_max = int(sys.argv[3])
+            snapshot_index_limits = [0, snapshot_index_max]
 
-            if len(sys.argv) > 4:
-                directory = str(sys.argv[4])
+        compress_snapshots(directory, snapshot_index_limits=snapshot_index_limits)
 
-        delete_snapshots(snapshot_index_limits, directory)
+    elif 'delete' in function_kind:
+        directory = 'output'
+        if len(sys.argv) > 3:
+            directory = str(sys.argv[3])
 
-    elif 'transfer' in function_kind:
-        if len(sys.argv) < 6:
+        snapshot_index_limits = None
+        if len(sys.argv) > 4:
+            snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
+
+        delete_snapshots(directory, snapshot_index_limits)
+
+    elif 'rsync' in function_kind:
+        if len(sys.argv) < 5:
             raise ValueError(
-                'imports: machine_name directory snapshot_kind snapshot_time_file_name')
+                'imports: machine_name simulation_directory_from simulation_directory_to')
 
         machine_name = str(sys.argv[2])
-        from_directory = str(sys.argv[3])
-        snapshot_kind = str(sys.argv[4])
-        snapshot_time_file_name = str(sys.argv[5])
+        simulation_directory_from = str(sys.argv[3])
+        simulation_directory_to = str(sys.argv[4])
 
-        Snapshot = ut.simulation.SnapshotClass()
-        Snapshot.read_snapshots(snapshot_time_file_name)
-
-        transfer_snapshots(machine_name, from_directory, snapshot_kind, Snapshot['index'])
+        rsync_simulation_files(machine_name, simulation_directory_from, simulation_directory_to)
+        rsync_snapshots(machine_name, simulation_directory_from, simulation_directory_to)

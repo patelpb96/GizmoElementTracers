@@ -1,20 +1,18 @@
 #!/usr/bin/env python
 
-
 '''
 Diagnose Gizmo simulations.
 
 @author: Andrew Wetzel
 '''
 
-
 # system ----
 from __future__ import absolute_import, division, print_function
 import collections
 import os
 import sys
+import glob
 import numpy as np
-from numpy import log10, Inf  # @UnusedImport
 # local ----
 import wutilities as ut
 from . import gizmo_io
@@ -24,7 +22,7 @@ from . import gizmo_analysis
 #===================================================================================================
 # utility
 #===================================================================================================
-def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
+def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out*'):
     '''
     Get number of MPI tasks and OpenMP threads from run-time file.
     If cannot find any, default to 1.
@@ -42,8 +40,9 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
     loop_number_max = 1000
 
     Say = ut.io.SayClass(get_cpu_numbers)
-    file_path_name = ut.io.get_path(simulation_directory) + runtime_file_name
-    file_in = open(file_path_name, 'r')
+    file_name_base = ut.io.get_path(simulation_directory) + runtime_file_name
+    file_names = glob.glob(file_name_base)
+    file_in = open(file_names[0], 'r')
 
     loop_i = 0
     mpi_number = None
@@ -82,7 +81,7 @@ def get_cpu_numbers(simulation_directory='.', runtime_file_name='gizmo.out'):
 #===================================================================================================
 def print_run_times(
     simulation_directory='.', output_directory='output/', core_number=None,
-    runtime_file_name='gizmo.out', wall_time_restart=0, scalefactors=[]):
+    runtime_file_name='gizmo.out*', wall_time_restart=0, scalefactors=[]):
     '''
     Print wall [and CPU] times (based on average per MPI task from cpu.txt) at scale-factors,
     for Gizmo simulation.
@@ -100,21 +99,27 @@ def print_run_times(
     -------
     scalefactors, redshifts, wall_times, cpu_times : arrays
     '''
+
     def get_scalefactor_string(scalefactor):
         if scalefactor == 1:
             scalefactor_string = '1'
+        elif np.abs(scalefactor % 0.1) < 0.01:
+            scalefactor_string = '{:.1f}'.format(scalefactor)
+        elif np.abs(scalefactor % 0.01) < 0.001:
+            scalefactor_string = '{:.2f}'.format(scalefactor)
         else:
-            scalefactor_string = '{}'.format(scalefactor)
+            scalefactor_string = '{:.3f}'.format(scalefactor)
         return scalefactor_string
 
     file_name = 'cpu.txt'
+
     if scalefactors is None or (not np.isscalar(scalefactors) and not len(scalefactors)):
         scalefactors = [
             0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]
     scalefactors = ut.array.arrayize(scalefactors)
 
-    file_path_name = (ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) +
-                      file_name)
+    file_path_name = (
+        ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name)
     file_in = open(file_path_name, 'r')
 
     wall_times = []
@@ -132,7 +137,6 @@ def print_run_times(
                 break
             else:
                 scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
-
         elif scalefactor in line:
             print_next_line = True
 
@@ -170,7 +174,7 @@ def print_run_times(
 
 
 def print_run_times_ratios(
-    simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out',
+    simulation_directories=['.'], output_directory='output/', runtime_file_name='gizmo.out*',
     wall_times_restart=[],
     scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9, 1.0]):
     '''
@@ -204,7 +208,7 @@ def print_run_times_ratios(
         wall_timess.append(wall_times)
         cpu_timess.append(cpu_times)
 
-    snapshot_number_min = Inf
+    snapshot_number_min = np.Inf
     for d_i, wall_times in enumerate(wall_timess):
         if len(wall_times) < snapshot_number_min:
             snapshot_number_min = len(wall_times)
