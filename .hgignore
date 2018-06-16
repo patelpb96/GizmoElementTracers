@@ -6,5 +6,6 @@ syntax: glob
 .*~
 *~
 .ipynb_checkpoints/*
+.ipy-logs/*
 ipy-logs/*
 *.orig
