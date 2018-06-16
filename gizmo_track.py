@@ -415,7 +415,9 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                     part_z, self.species_name, part_indices_host[part_indices_host >= 0])
             else:
                 center_guess = center_position_function(part_z.info['scalefactor'])
-                self.Read.assign_center(part_z, self.species_name, part_indices_host[part_indices_host >= 0], guess=center_guess, window=50)
+                self.Read.assign_center(
+                    part_z, self.species_name, part_indices_host[part_indices_host >= 0], 
+                    center_position=center_guess, distance_max=50)
 
             part_z_indices = part_index_pointers[part_z0_indices]
 
