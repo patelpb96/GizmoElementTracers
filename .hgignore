@@ -1,4 +1,10 @@
 syntax: glob
 
 *.pyc
+*.origsyntax: glob
+*.pyc
+.*~
+*~
+.ipynb_checkpoints/*
+ipy-logs/*
 *.orig

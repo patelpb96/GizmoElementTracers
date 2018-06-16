@@ -870,7 +870,7 @@ class ReadClass(ut.io.SayClass):
             for prop_in in header_in:
                 prop = header_dict[prop_in]
                 header[prop] = header_in[prop_in]  # transfer to custom header dict
-
+                
         # determine whether simulation is cosmological
         if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] <= 1 and
                 0 < header['omega_lambda'] <= 1):
@@ -1082,12 +1082,12 @@ class ReadClass(ut.io.SayClass):
                     for file_i in range(1, header['file.number.per.snapshot']):
                         file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
                         # try each snapshot file
-                        file_in_i = h5py.File(file_name_i, 'r')
-                        part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
-                        if part_numbers_in_file_i[spec_id] > 0:
-                            # found one
-                            part_in = file_in_i['PartType' + str(spec_id)]
-                            break
+                        with h5py.File(file_name_i, 'r') as file_in_i:
+                            part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
+                            if part_numbers_in_file_i[spec_id] > 0:
+                                # found one!
+                                part_in = file_in_i['PartType' + str(spec_id)]
+                                break
                     else:
                         # tried all files and still did not find particles of species
                         raise ValueError('no {} particles in any snapshot file'.format(spec_name))
