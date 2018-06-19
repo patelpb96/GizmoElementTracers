@@ -361,7 +361,7 @@ class ParticleDictionaryClass(dict):
             mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
             molecular_weights = mus * ut.constant.proton_mass
             
-            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (self.gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
+            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
 
             return values
 
