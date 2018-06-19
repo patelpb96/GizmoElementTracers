@@ -1081,6 +1081,7 @@ class ReadClass(ut.io.SayClass):
                     if np.isscalar(element_indices):
                         element_indices = [element_indices]
 
+                    print(properties)
                     # need hydrogen if calculating temperature
                     if 'InternalEnergy' in properties and 1 not in element_indices:
                         element_indices = np.r_[element_indices, 1]
