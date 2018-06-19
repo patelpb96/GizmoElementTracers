@@ -446,7 +446,7 @@ class ReadClass(ut.io.SayClass):
     '''
     Read Gizmo snapshot[s].
     '''
-    def __init__(self, cosmological=True, snapshot_name_base='snap*[!txt]'):
+    def __init__(self, cosmological=True, snapshot_name_base='snap*[!txt]', quiet=False):
         '''
         Set properties for snapshot files.
         '''
@@ -472,6 +472,8 @@ class ReadClass(ut.io.SayClass):
 
         self.species_all = tuple(self.species_dict.keys())
         self.species_read = list(self.species_all)
+
+        self.quiet = quiet
 
     def read_snapshots(
         self, species='all',
@@ -873,7 +875,8 @@ class ReadClass(ut.io.SayClass):
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
-        self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n')
+        if not quiet:
+            self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n')
 
         # open snapshot file
         with h5py.File(file_name, 'r') as file_in:
@@ -902,12 +905,14 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
 
-        self.say('snapshot contains the following number of particles:')
+        if not quiet:
+            self.say('snapshot contains the following number of particles:')
         # keep only species that have any particles
         read_particle_number = 0
         for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
             spec_id = self.species_dict[spec_name]
-            self.say('  {:9s} (id = {}): {} particles'.format(
+            if not quiet:
+                self.say('  {:9s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
 
             if header['particle.numbers.total'][spec_id] > 0:
