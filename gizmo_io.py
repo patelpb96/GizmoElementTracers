@@ -1076,8 +1076,7 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name] = ParticleDictionaryClass()
 
                 # set element pointers if reading only subset of elements
-                if (element_indices is not None and len(str(element_indices)) and
-                        element_indices != 'all'):
+                if (element_indices is not None and len(str(element_indices)) and str(element_indices) != 'all'):
                     if np.isscalar(element_indices):
                         element_indices = [element_indices]
 
