@@ -353,6 +353,18 @@ class ParticleDictionaryClass(dict):
 
             return values
 
+        # internal energy of the gas, from the temperature etc.
+        if 'internal.energy' in property_name:
+            helium_mass_fracs = self.prop('massfraction.helium')
+            gas_eos = 5. / 3
+            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
+            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
+            molecular_weights = mus * ut.constant.proton_mass
+            
+            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (self.gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
+
+            return values
+
         # distance or velocity wrt the center of host galaxy/halo
         if 'host.' in property_name:
             if 'distance' in property_name:
@@ -1032,6 +1044,7 @@ class ReadClass(ut.io.SayClass):
             for prop in np.setdiff1d(['ElectronAbundance', 'Metallicity'], properties):
                 properties.append(prop)
 
+
         # parse other input values
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
@@ -1063,10 +1076,14 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name] = ParticleDictionaryClass()
 
                 # set element pointers if reading only subset of elements
-                if (element_indices is not None and len(element_indices) and
+                if (element_indices is not None and len(str(element_indices)) and
                         element_indices != 'all'):
                     if np.isscalar(element_indices):
                         element_indices = [element_indices]
+
+                    # need hydrogen if calculating temperature
+                    if 'temperature' in properties and 1 not in element_indices:
+                        element_indices = np.r_[element_indices, 1]
                     for element_i, element_index in enumerate(element_indices):
                         part[spec_name].element_pointer[element_index] = element_i
 
@@ -1290,7 +1307,8 @@ class ReadClass(ut.io.SayClass):
             if 'temperature' in part[spec_name]:
                 # convert from [(km / s) ^ 2] to [Kelvin]
                 # ignore small corrections from elements beyond He
-                helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
+                # helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
+                helium_mass_fracs = part[spec_name].prop('massfraction.helium')
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
                 molecular_weights = mus * ut.constant.proton_mass
