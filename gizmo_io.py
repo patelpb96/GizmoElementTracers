@@ -1076,7 +1076,8 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name] = ParticleDictionaryClass()
 
                 # set element pointers if reading only subset of elements
-                if (element_indices is not None and len(str(element_indices)) and str(element_indices) != 'all'):
+                if (element_indices is not None and len(str(element_indices)) and
+                        str(element_indices) != 'all'):
                     if np.isscalar(element_indices):
                         element_indices = [element_indices]
 
@@ -1121,7 +1122,7 @@ class ReadClass(ut.io.SayClass):
                         elif len(part_in[prop_in].shape) == 2:
                             prop_shape = [part_number_tot, part_in[prop_in].shape[1]]
                             if (prop_in == 'Metallicity' and element_indices is not None and
-                                    element_indices != 'all'):
+                                    str(element_indices) != 'all'):
                                 prop_shape = [part_number_tot, len(element_indices)]
 
                         # determine data type to store
@@ -1199,7 +1200,7 @@ class ReadClass(ut.io.SayClass):
                                         part_in[prop_in])
                                 elif len(part_in[prop_in].shape) == 2:
                                     if (prop_in == 'Metallicity' and element_indices is not None and
-                                            element_indices != 'all'):
+                                            str(element_indices) != 'all'):
                                         prop_in = part_in[prop_in][:, element_indices]
                                     else:
                                         prop_in = part_in[prop_in]
