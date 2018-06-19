@@ -875,7 +875,7 @@ class ReadClass(ut.io.SayClass):
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
-        if not quiet:
+        if not self.quiet:
             self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n')
 
         # open snapshot file
@@ -905,13 +905,13 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
 
-        if not quiet:
+        if not self.quiet:
             self.say('snapshot contains the following number of particles:')
         # keep only species that have any particles
         read_particle_number = 0
         for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
             spec_id = self.species_dict[spec_name]
-            if not quiet:
+            if not self.quiet:
                 self.say('  {:9s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
 
