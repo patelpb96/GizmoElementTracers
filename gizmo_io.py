@@ -1081,9 +1081,8 @@ class ReadClass(ut.io.SayClass):
                     if np.isscalar(element_indices):
                         element_indices = [element_indices]
 
-                    # TODO fix this -- this isn't working for some reason
                     # need hydrogen if calculating temperature
-                    if 'temperature' in properties and 1 not in element_indices:
+                    if 'InternalEnergy' in properties and 1 not in element_indices:
                         element_indices = np.r_[element_indices, 1]
 
                     for element_i, element_index in enumerate(element_indices):
