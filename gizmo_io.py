@@ -329,7 +329,68 @@ class ParticleDictionaryClass(dict):
             # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
             return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
 
-        if ('form.' in property_name or property_name == 'age') and 'distance' not in property_name:
+        # distance or velocity wrt the center of host galaxy/halo
+        if 'host.' in property_name:
+            if 'form.' in property_name:
+                # special case: coordinates wrt primary host *at formation*
+                if 'distance' in property_name:
+                    # 3-D distance vector wrt primary host at formation
+                    values = self.prop('form.host.distance', indices)
+                elif 'velocity' in property_name:
+                    # 3-D velocity vectory wrt host at formation
+                    values = self.prop('form.host.velocity', indices)
+            else:
+                # general case: coordinates wrt primary host at current snapshot
+                if 'distance' in property_name:
+                    # 3-D distance vector wrt primary host at current snapshot
+                    values = ut.coordinate.get_distances(
+                        self.prop('position', indices), self.center_position,
+                        self.info['box.length'], self.snapshot['scalefactor'])  # [kpc physical]
+                elif 'velocity' in property_name:
+                    # 3-D velocity, includes the Hubble flow
+                    values = ut.coordinate.get_velocity_differences(
+                        self.prop('velocity', indices), self.center_velocity,
+                        self.prop('position', indices), self.center_position,
+                        self.info['box.length'], self.snapshot['scalefactor'],
+                        self.snapshot['time.hubble'])
+
+                if 'principal' in property_name:
+                    # align with host principal axes
+                    values = ut.coordinate.get_coordinates_rotated(
+                        values, self.principal_axes_vectors)
+
+            if 'cylindrical' in property_name or 'spherical' in property_name:
+                # convert to cylindrical or spherical coordinates
+                if 'cylindrical' in property_name:
+                    coordinate_system = 'cylindrical'
+                elif 'spherical' in property_name:
+                    coordinate_system = 'spherical'
+
+                if 'distance' in property_name:
+                    values = ut.coordinate.get_positions_in_coordinate_system(
+                        values, 'cartesian', coordinate_system)
+                elif 'velocity' in property_name:
+                    if 'form.' in property_name:
+                        # special case: coordinates wrt primary host *at formation*
+                        distance_vectors = self.prop('form.host.distance', indices)
+                    elif 'principal' in property_name:
+                        distance_vectors = self.prop('host.distance.principal', indices)
+                    else:
+                        distance_vectors = self.prop('host.distance', indices)
+                    values = ut.coordinate.get_velocities_in_coordinate_system(
+                        values, distance_vectors, 'cartesian', coordinate_system)
+
+            if 'total' in property_name:
+                # compute total (scalar) distance / velocity
+                if len(values.shape) == 1:
+                    shape_pos = 0
+                else:
+                    shape_pos = 1
+                values = np.sqrt(np.sum(values ** 2, shape_pos))
+
+            return values
+
+        if 'form.' in property_name or property_name == 'age':
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 # look-back time (stellar age) to formation
                 values = self.snapshot['time'] - self.prop('form.time', indices)
@@ -349,75 +410,6 @@ class ParticleDictionaryClass(dict):
                     'scalefactor',
                     np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
                     round_kind='up')
-
-            return values
-
-        # distance or velocity wrt the center of host galaxy/halo
-        if 'host.' in property_name:
-            if 'distance' in property_name:
-                if 'form.' in property_name:
-                    # 3-D distance vector wrt primary host at formation
-                    values = self.prop('form.host.distance', indices)
-                else:
-                    # 3-D distance vector wrt host now
-                    values = ut.coordinate.get_distances(
-                        self.prop('position', indices), self.center_position,
-                        self.info['box.length'], self.snapshot['scalefactor'])  # [kpc physical]
-
-            elif 'velocity' in property_name:
-                if 'form.' in property_name:
-                    # 3-D velocity vectory wrt host at formation
-                    values = self.prop('form.host.velocity', indices)
-                else:
-                    # 3-D velocity, includes the Hubble flow
-                    values = ut.coordinate.get_velocity_differences(
-                        self.prop('velocity', indices), self.center_velocity,
-                        self.prop('position', indices), self.center_position,
-                        self.info['box.length'], self.snapshot['scalefactor'],
-                        self.snapshot['time.hubble'])
-
-            if 'principal' in property_name:
-                # align with host principal axes
-                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes_vectors)
-
-            if 'cylindrical' in property_name:
-                # convert to cylindrical coordinates
-                if 'distance' in property_name:
-                    # along major axes R (positive definite), minor axis Z (signed),
-                    # angle phi (0 to 2 * pi)
-                    values = ut.coordinate.get_positions_in_coordinate_system(
-                        values, 'cartesian', 'cylindrical')
-                if 'velocity' in property_name:
-                    # along major axes (v_R), minor axis (v_Z), angular (v_phi)
-                    if 'principal' in property_name:
-                        distance_vectors = self.prop('host.distance.principal', indices)
-                    else:
-                        distance_vectors = self.prop('host.distance', indices)
-                    values = ut.coordinate.get_velocities_in_coordinate_system(
-                        values, distance_vectors, 'cartesian', 'cylindrical')
-
-            elif 'spherical' in property_name:
-                # convert to spherical coordinates
-                if 'distance' in property_name:
-                    # along R (positive definite), theta [0, pi), phi [0, 2 * pi)
-                    values = ut.coordinate.get_positions_in_coordinate_system(
-                        values, 'cartesian', 'spherical')
-                if 'velocity' in property_name:
-                    # along v_R, v_theta, v_phi
-                    if 'principal' in property_name:
-                        distance_vectors = self.prop('host.distance.principal', indices)
-                    else:
-                        distance_vectors = self.prop('host.distance', indices)
-                    values = ut.coordinate.get_velocities_in_coordinate_system(
-                        values, distance_vectors, 'cartesian', 'spherical')
-
-            if 'total' in property_name:
-                # compute total (scalar) distance / velocity
-                if len(values.shape) == 1:
-                    shape_pos = 0
-                else:
-                    shape_pos = 1
-                values = np.sqrt(np.sum(values ** 2, shape_pos))
 
             return values
 
