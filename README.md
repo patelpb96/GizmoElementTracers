@@ -27,6 +27,15 @@ To update the repo, cd into $DIR/gizmo_analysis and run hg pull && hg update.
 Python package for running and analyzing Gizmo simulations.
 
 
+---
+# Requirements
+
+This package relies on my [utilities/](https://bitbucket.org/sheagk/utilities) Python package for low-level utility functions.
+
+I developd this package using Python 3.6 and recommend that you use that version. However, I have tried to maintain backward compatibility with Python 2.7.
+
+
+---
 # Contents
 
 ## gizmo_io.py
@@ -53,22 +62,27 @@ Python package for running and analyzing Gizmo simulations.
 ## gizmo_yield.py
 * print/plot information about nucleosynthetic yields in Gizmo
 
-## tutorial.ipynb
+## gizmo_tutorial.ipynb
 * ipython notebook tutorial for using this package and reading particles from snapshots
 
 
-# Requirements
+---
+# Units
 
-This package relies on my [utilities/](https://bitbucket.org/sheagk/utilities) Python package for low-level utility functions.
+Unless otherwise noted, all quantities are in (or converted to during read-in) these units (and combinations thereof):
 
-I develop this package using the latest version of the Anaconda Python environment.
-I use Python 3.6 and recommend that you do the same.
-However, I try to maintain backward compatibility with Python 2.7.
+* mass in [M_sun]
+* position, distance, radius in [kpc physical]
+* velocity in [km / s]
+* time, age in [Gyr]
+* elemental abundance in [(linear) mass fraction]
+* metallicity in log10(mass_fraction / mass_fraction_solar), assuming Asplund et al 2009 for Solar
 
 
-# Licensing
+---
+# License
 
-Copyright 2014-2017 by Andrew Wetzel.
+Copyright 2014-2018 by Andrew Wetzel <arwetzel@gmail.com>.
 
 In summary, you are free to use, edit, share, and do whatever you want. But please keep me informed. Have fun!
 

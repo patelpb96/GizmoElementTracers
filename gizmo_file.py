@@ -72,7 +72,7 @@ def compress_snapshot(
                 file_name_out = file_name
 
             executable_i = '{} -o {} {}'.format(executable, file_name_out, file_name)
-            print('executing:  {}'.format(executable_i))
+            ut.io.print_flush('executing:  {}'.format(executable_i))
             os.system(executable_i)
 
 
