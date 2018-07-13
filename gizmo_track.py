@@ -352,10 +352,6 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         # set numpy data type to store coordinates
         self.coordinate_dtype = np.float32
-        if self.coordinate_dtype is np.float32:
-            self.force_float32 = True
-        else:
-            self.force_float32 = False
 
         # distance limits to select particles associated with primary host at z0
         # use only these particle to define progenitor center at higher redshifts
@@ -399,7 +395,6 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             part_z = self.Read.read_snapshots(
                 self.species_name, 'index', snapshot_index,
                 properties=['position', 'velocity', 'mass', 'id', 'form.scalefactor'],
-                force_float32=self.force_float32,
                 assign_center=False, check_properties=True)
 
             # limit progenitor center to particles that end up near host at z0
@@ -501,8 +496,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             part_z0 = self.Read.read_snapshots(
                 self.species_name, 'redshift', 0,
                 properties=['position', 'velocity', 'mass', 'id', 'id.child', 'form.scalefactor'],
-                element_indices=[0], force_float32=self.force_float32, assign_center=True,
-                check_properties=False)
+                element_indices=[0], assign_center=True, check_properties=False)
 
         # store indices of particles near host at z0
         part_z0_indices_host = ut.array.get_indices(

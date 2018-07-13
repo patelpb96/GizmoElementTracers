@@ -72,7 +72,7 @@ class ReadClass(ut.io.SayClass):
         ----------
         properties : string or list : name[s] of particle properties to read
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
-        force_float32 : boolean : whether to force all floats to 32-bit, to save memory
+        force_float32 : boolean : whether to force all floats to be 32-bit, to save memory
 
         Returns
         -------

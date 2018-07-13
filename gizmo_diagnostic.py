@@ -256,7 +256,7 @@ def print_properties_statistics(
     part = Read.read_snapshots(
         species, snapshot_value_kind, snapshot_value, simulation_directory,
         snapshot_directory, '', None, None, assign_center=False,
-        separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False)
+        separate_dark_lowres=False, sort_dark_by_id=False)
 
     gizmo_analysis.print_properties_statistics(part, species)
 
@@ -316,8 +316,7 @@ def print_properties_snapshots(
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 species_read, 'index', snapshot_i, simulation_directory, snapshot_directory, '',
-                properties_read, element_indices, assign_center=False, sort_dark_by_id=False,
-                force_float32=False)
+                properties_read, element_indices, assign_center=False, sort_dark_by_id=False)
 
             for spec in species_property_dict:
                 for prop in species_property_dict[spec]:
@@ -594,7 +593,7 @@ def plot_lowres_contamination_v_distance_both(redshift=0, directory='.'):
     Read = gizmo_io.ReadClass()
     part = Read.read_snapshots(
         ['dark', 'dark.2'], 'redshift', redshift, directory,
-        properties=['position', 'mass', 'potential'], force_float32=True, assign_center=True)
+        properties=['position', 'mass', 'potential'], assign_center=True)
 
     halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
 

@@ -2517,8 +2517,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 
     for _zi, redshift in enumerate(redshifts):
         part = Read.read_snapshots(
-            species, 'redshift', redshift, simulation_directory, properties=properties_read,
-            force_float32=True)
+            species, 'redshift', redshift, simulation_directory, properties=properties_read)
 
         for k in ['index', 'redshift', 'scalefactor', 'time', 'time.lookback']:
             gal[k].append(part.snapshot[k])
@@ -2707,8 +2706,7 @@ def get_galaxy_mass_profiles_v_redshift(
             part = parts[z_i]
         else:
             part = Read.read_snapshots(
-                species_read, 'redshift', redshift, directory, properties=properties_read,
-                force_float32=True)
+                species_read, 'redshift', redshift, directory, properties=properties_read)
 
         for k in ['index', 'redshift', 'scalefactor', 'time', 'time.lookback']:
             gal[k].append(part.snapshot[k])
@@ -3253,7 +3251,7 @@ def compare_resolution(
                 part = Read.read_snapshots(
                     'dark', 'redshift', redshift, simulation_directory,
                     simulation_name=simulation_name, properties=['position', 'mass'],
-                    assign_center=assign_center, force_float32=True)
+                    assign_center=assign_center)
                 if 'res880' in simulation_directory:
                     part.center_position = np.array(
                         [41820.015, 44151.745, 46272.818], dtype=np.float32)
