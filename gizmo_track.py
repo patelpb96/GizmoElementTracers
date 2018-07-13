@@ -322,10 +322,13 @@ class ParticleIndexPointerClass(ut.io.SayClass):
 
         part_number_at_z_ref = part_index_pointers.size
         part_number_at_z = part_index_pointers_valid.size
+
         # sanity check
         if part_index_pointers_valid.max() >= part_number_at_z:
-            self.say('! input part_index_pointers not point to all particles at snapshot z')
-            self.say('  increasing size of reverse index pointer array to accomodate them')
+            self.say('! input part_index_pointers has {} valid pointers'.format(part_number_at_z))
+            self.say('but its pointer index max = {}'.format(part_index_pointers_valid.max()))
+            self.say('thus it does not point to all particles at snapshot at z')
+            self.say('increasing size of reverse pointer array to accomodate missing particles')
             part_number_at_z = part_index_pointers_valid.max() + 1
 
         part_reverse_index_pointers = ut.array.get_array_null(part_number_at_z)
