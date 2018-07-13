@@ -9,3 +9,4 @@ syntax: glob
 .ipy-logs/*
 ipy-logs/*
 *.orig
+.idea/
