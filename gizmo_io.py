@@ -7,12 +7,12 @@ Read Gizmo snapshots, intended for use with FIRE-2 simulations.
 
 
 Units: unless otherwise noted, all quantities are in (combinations of):
-    mass in [M_sun]
-    position in [kpc comoving]
-    distance and radius in [kpc physical]
-    velocity in [km / s]
-    time in [Gyr]
-    elemental abundance in [(linear) mass fraction]
+    mass [M_sun]
+    position [kpc comoving]
+    distance, radius [kpc physical]
+    velocity [km / s]
+    time [Gyr]
+    elemental abundance [(linear) mass fraction]
 
 
 Reading a snapshot
