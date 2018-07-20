@@ -443,7 +443,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             part_pointers = part_z0_indices
         else:
             try:
-                part_pointers = self.io_index_pointers(snapshot_index=snapshot_index)
+                part_pointers = self.io_pointers(snapshot_index=snapshot_index)
             except Exception:
                 return
 
