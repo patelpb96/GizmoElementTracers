@@ -34,7 +34,8 @@ class ParticleIndexPointerClass(ut.io.SayClass):
     Compute particle index pointers for tracking particles across time.
     '''
 
-    def __init__(self, species_name='star', directory=TRACK_DIRECTORY, reference_snapshot_index=0):
+    def __init__(
+        self, species_name='star', directory=TRACK_DIRECTORY, reference_snapshot_index=600):
         '''
         Parameters
         ----------
@@ -398,7 +399,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
     def __init__(
         self, species_name='star', directory=TRACK_DIRECTORY, reference_snapshot_index=600,
-        host_z0_distance_limits=[0, 100]):
+        host_distance_limits=[0, 100]):
         '''
         Parameters
         ----------
@@ -406,14 +407,14 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         directory : string : directory to write files
         reference_snapshot_index : float :
             reference snapshot to compute particle index pointers relative to
-        host_z0_distance_limits : list :
+        host_distance_limits : list :
             min and max distance [kpc physical] to select particles near the primary host at the
             reference snapshot; use only these particle to define host center at higher redshifts
         '''
         self.species_name = species_name
         self.directory = directory
         self.reference_snapshot_index = reference_snapshot_index
-        self.host_z0_distance_limits = host_z0_distance_limits
+        self.host_distance_limits = host_distance_limits
 
         self.Read = gizmo_io.ReadClass()
 
@@ -563,7 +564,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         # store indices of particles near host at z0
         part_z0_indices_host = ut.array.get_indices(
-            part_z0[self.species_name].prop('host.distance.total'), self.host_z0_distance_limits)
+            part_z0[self.species_name].prop('host.distance.total'), self.host_distance_limits)
 
         # get list of snapshots to assign
         if snapshot_indices is None or not len(snapshot_indices):
