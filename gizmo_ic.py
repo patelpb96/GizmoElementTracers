@@ -107,8 +107,8 @@ class ReadClass(ut.io.SayClass):
         '''
         from rockstar_analysis import rockstar_io
 
-        IO = rockstar_io.IOClass()
-        hal = IO.read_catalogs('redshift', self.snapshot_redshifts[0], self.simulation_directory)
+        hal = rockstar_io.IO.read_catalogs(
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory)
 
         rockstar_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 1000, 6000, 'halo')
 
