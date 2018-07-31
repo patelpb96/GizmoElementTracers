@@ -542,7 +542,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 count_tot[k] += count[k]
 
             # continuously (re)write as go
-            self.io_formation_coordinates(part_z0, 'write')
+            self.io_formation_coordinates(part_z0, write=True)
 
     def write_formation_coordinates(self, part_z0=None, snapshot_indices=[], thread_number=1):
         '''
@@ -617,7 +617,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         if count['id wrong']:
             self.say('! {} total not have id match!'.format(count['id wrong']))
 
-    def io_formation_coordinates(self, part, io_direction='read'):
+    def io_formation_coordinates(self, part, write=False):
         '''
         Read or write, for each particle, at the first snapshot after it formed,
         its coordinates (3-D distances and 3-D velocities) wrt the host galaxy center,
@@ -627,13 +627,11 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         Parameters
         ----------
         part : dict : catalog of particles at a snapshot
-        io_direction : string : 'read' or 'write'
+        write : boolean : whether to write to file (instead of read)
         '''
-        assert io_direction in ('read', 'write')
-
         file_name = '{}_form_coordinates_{:03d}'.format(self.species_name, part.snapshot['index'])
 
-        if io_direction == 'write':
+        if write:
             directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
             dict_out['id'] = part[self.species_name]['id']
@@ -646,7 +644,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
             ut.io.file_hdf5(directory + file_name, dict_out)
 
-        elif io_direction == 'read':
+        else:
             directory = ut.io.get_path(self.directory)
             dict_in = ut.io.file_hdf5(directory + file_name)
 

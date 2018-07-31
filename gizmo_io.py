@@ -178,7 +178,7 @@ class ParticleDictionaryClass(dict):
         self.element_dict['iron'] = self.element_dict['fe'] = 10
 
         # to use if read only subset of elements
-        self.element_pointer = np.arange(len(self.element_dict) / 2)
+        self.element_pointer = np.arange(len(self.element_dict) // 2)
 
     def prop(self, property_name='', indices=None):
         '''
