@@ -381,7 +381,7 @@ class ParticleDictionaryClass(dict):
                         values, distance_vectors, 'cartesian', coordinate_system)
 
             if 'total' in property_name:
-                # compute total (scalar) distance / velocity
+                # compute total (scalar) distance or velocity
                 if len(values.shape) == 1:
                     shape_pos = 0
                 else:
@@ -569,7 +569,8 @@ class ReadClass(ut.io.SayClass):
                 'scalefactor': header['scalefactor'],
                 'time': time,
                 'time.lookback': part.Cosmology.get_time(0) - time,
-                'time.hubble': ut.constant.Gyr_per_sec / part.Cosmology.get_hubble_parameter(0),
+                'time.hubble': (ut.constant.Gyr_per_sec /
+                                part.Cosmology.get_hubble_parameter(header['redshift'])),
             }
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot

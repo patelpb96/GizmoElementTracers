@@ -230,7 +230,7 @@ class ParticleIndexPointerClass(ut.io.SayClass):
 
         # assign pointer from particle id to its index in list
         ut.particle.assign_id_to_index(
-            part, self.species_name, 'id', id_min=0, store_as_dict=True, print_diagnostic=False)
+            part, self.species_name, 'id', 0, store_as_dict=True, print_diagnostic=False)
 
         self.match_property = match_property
         self.match_propery_tolerance = match_propery_tolerance
