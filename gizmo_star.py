@@ -449,7 +449,7 @@ class MassLossClass:
         import pickle
         if 'Spline' not in self.__dict__:
             print("No Spline found; creating it")
-            make_mass_fraction_spline()
+            self.make_mass_fraction_spline()
         with open(filename, 'wb') as f:
             pickle.dump(self.Spline, f)
 
@@ -458,7 +458,8 @@ class MassLossClass:
         if 'Spline' in self.__dict__ and not force:
             print('Spline already exists and not told to force the reload; not loading!')
         elif not os.path.isfile(filename):
-            print(f'{filename} does not exist; creating the spline from scratch')
+            print('{} does not exist; creating the spline from scratch'.format(filename))
+            self.make_mass_fraction_spline()
         else:
             with open(filename, 'rb') as f:
                 self.Spline = pickle.load(f)
