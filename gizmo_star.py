@@ -453,6 +453,7 @@ class MassLossClass:
             print("done!")
         with open(filename, 'wb') as f:
             pickle.dump(self.Spline, f)
+        print("Saved spline as {}".format(filename))
 
     def load_mass_fraction_spline(self, filename=default_filename, force=False):
         import pickle,os
@@ -464,6 +465,7 @@ class MassLossClass:
         else:
             with open(filename, 'rb') as f:
                 self.Spline = pickle.load(f)
+                print("Loaded spline from {}".format(filename))
 
 
 MassLoss = MassLossClass()
