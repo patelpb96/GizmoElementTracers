@@ -362,13 +362,13 @@ class MassLossClass:
     Compute mass loss from all channels (supernova II, Ia, and stellar winds),
     as implemented in Gizmo.
     '''
+    from os.path import expanduser
+    default_filename = expanduser('~')+'/.gizmo_mass_fraction_spline.pkl'
 
     def __init__(self):
-        from os.path import expanduser
         self.SupernovaII = SupernovaIIClass()
         self.SupernovaIa = SupernovaIaClass()
         self.StellarWind = StellarWindClass()
-        self.default_filename = expanduser('~')+'/.gizmo_mass_fraction_spline.pkl'
 
     def get_rate(
         self, ages, ia_kind='mannucci', ia_age_min=37.53, metallicity=1, metal_mass_fraction=None):
@@ -445,7 +445,7 @@ class MassLossClass:
         self.Spline = interpolate.RectBivariateSpline(
             AgeBin.mins, MetalBin.mins, self.mass_fractions)
 
-    def save_mass_fraction_spline(self, filename=self.default_filename):
+    def save_mass_fraction_spline(self, filename=default_filename):
         import pickle
         if 'Spline' not in self.__dict__:
             print("No Spline found; creating it")
@@ -453,7 +453,7 @@ class MassLossClass:
         with open(filename, 'wb') as f:
             pickle.dump(self.Spline, f)
 
-    def load_mass_fraction_spline(self, filename=self.default_filename, force=False):
+    def load_mass_fraction_spline(self, filename=default_filename, force=False):
         import pickle,os
         if 'Spline' in self.__dict__ and not force:
             print('Spline already exists and not told to force the reload; not loading!')
