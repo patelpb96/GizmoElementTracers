@@ -448,8 +448,9 @@ class MassLossClass:
     def save_mass_fraction_spline(self, filename=default_filename):
         import pickle
         if 'Spline' not in self.__dict__:
-            print("No Spline found; creating it")
+            print("No Spline found.  Creating it, which may take awhile....", end='')
             self.make_mass_fraction_spline()
+            print("done!")
         with open(filename, 'wb') as f:
             pickle.dump(self.Spline, f)
 
