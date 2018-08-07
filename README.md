@@ -10,7 +10,8 @@ In commands, that is:
 ```
 #!bash
 
-mkdir $DIR
+DIR=$HOME/code/wetzel_repos/
+mkdir -p $DIR
 cd $DIR
 hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis
 cp gizmo_analysis/setup.py .
