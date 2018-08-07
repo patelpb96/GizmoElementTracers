@@ -256,6 +256,23 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ----------
+        if property_name == 'birth.mass':
+            from .gizmo_star import MassLoss, StellarWind
+            # mass of the star particle when it formed
+            
+            # first load/create the spline required to unwind mass loss
+            MassLoss.load_mass_fraction_spline()
+
+            # how long have stars been losing mass for, in Myr?
+            age_in_Myr = self.prop('age', indices=indices)*1e3
+
+            # metallicity wrt "solar" in GIZMO in linear space
+            linear_metallicity = self.prop('massfraction.total', indices=indices) / StellarWind.solar_metal_mass_fraction 
+
+            # now ask the spline what fraction of my mass I've lost at this age and with my metallicity for each particle
+            return self.prop('mass', indices=indices) * (1 + MassLoss.Spline.ev(age_in_Myr, linear_metallicity) )
+
+
         if 'mass.' in property_name:
             # mass of individual element
             values = (self.prop('mass', indices) *
