@@ -3,7 +3,7 @@
 '''
 Edit gizmo snapshot files: compress, delete, transfer across machines.
 
-@author: Andrew Wetzel
+@author: Andrew Wetzel <arwetzel@gmail.com>
 '''
 
 # system ----

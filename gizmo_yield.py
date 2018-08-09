@@ -4,11 +4,11 @@ Analyze nucleosynthetic yields in Gizmo.
 @author: Andrew Wetzel
 
 Units: unless otherwise noted, all quantities are in (combinations of):
-    mass in [M_sun]
-    position in [kpc comoving]
-    distance and radius in [kpc physical]
-    velocity in [km / s]
-    time in [Gyr]
+    mass [M_sun]
+    position [kpc comoving]
+    distance, radius [kpc physical]
+    velocity [km / s]
+    time [Gyr]
 '''
 
 # system ----
@@ -33,7 +33,7 @@ def get_nucleosynthetic_yields(
     ----------
     event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float :
-        total metallicity of star prior to event, relative to solar = sun_metal_mass_fraction
+        total metallicity of star prior to event, relative to solar (sun_metal_mass_fraction)
     normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
 
     Returns

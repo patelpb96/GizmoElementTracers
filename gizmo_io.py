@@ -12,7 +12,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     distance, radius [kpc physical]
     velocity [km / s]
     time [Gyr]
-    elemental abundance [(linear) mass fraction]
+    elemental abundance [mass fraction]
 
 
 Reading a snapshot
@@ -809,8 +809,8 @@ class ReadClass(ut.io.SayClass):
                 self.species_read.remove(spec_name)
 
         if read_particle_number <= 0:
-            raise ValueError('snapshot file[s] contain no particles of species = {}'.format(
-                             self.species_read))
+            raise IOError(
+                'snapshot file[s] contain no particles of species = {}'.format(self.species_read))
 
         # check if simulation contains baryons
         header['has.baryons'] = False
@@ -915,7 +915,7 @@ class ReadClass(ut.io.SayClass):
         part = ut.array.DictClass()  # dictionary class to store properties for particle species
 
         # parse input list of properties to read
-        if properties == 'all' or properties == ['all'] or not properties:
+        if 'all' in properties or not properties:
             properties = list(property_dict.keys())
         else:
             if np.isscalar(properties):
@@ -981,7 +981,7 @@ class ReadClass(ut.io.SayClass):
                 else:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
-                        raise ValueError('no {} particles in snapshot file'.format(spec_name))
+                        raise IOError('no {} particles in snapshot file'.format(spec_name))
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
@@ -995,7 +995,7 @@ class ReadClass(ut.io.SayClass):
                             break
                     else:
                         # tried all files and still did not find particles of species
-                        raise ValueError('no {} particles in any snapshot file'.format(spec_name))
+                        raise IOError('no {} particles in any snapshot file'.format(spec_name))
 
                 props_print = []
                 ignore_flag = False  # whether ignored any properties in the file
@@ -1255,8 +1255,8 @@ class ReadClass(ut.io.SayClass):
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
-            raise ValueError('cannot find snapshot index = {} in: {}'.format(
-                             snapshot_index, path_names))
+            raise IOError(
+                'cannot find snapshot index = {} in:  {}'.format(snapshot_index, path_names))
 
         path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
 
@@ -1269,7 +1269,7 @@ class ReadClass(ut.io.SayClass):
             if len(path_file_names) and '.0.' in path_file_names[0]:
                 path_file_name = path_file_names[0]
             else:
-                raise ValueError('cannot find 0th snapshot file in ' + path_file_names)
+                raise IOError('cannot find 0th snapshot file in:  {}'.format(path_file_names))
 
         return path_file_name
 
@@ -1325,7 +1325,7 @@ class ReadClass(ut.io.SayClass):
                         elif 'nspec' in line:
                             n_s = get_check_value(line, n_s)
 
-            except ValueError:
+            except IOError:
                 self.say('cannot find MUSIC config file: {}'.format(file_name_find.strip('./')))
 
         # AGORA box (use as default, if cannot find MUSIC config file)
