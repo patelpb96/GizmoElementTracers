@@ -7,12 +7,12 @@ Read Gizmo snapshots, intended for use with FIRE-2 simulations.
 
 
 Units: unless otherwise noted, all quantities are in (combinations of):
-    mass in [M_sun]
-    position in [kpc comoving]
-    distance and radius in [kpc physical]
-    velocity in [km / s]
-    time in [Gyr]
-    elemental abundance in [(linear) mass fraction]
+    mass [M_sun]
+    position [kpc comoving]
+    distance, radius [kpc physical]
+    velocity [km / s]
+    time [Gyr]
+    elemental abundance [mass fraction]
 
 
 Reading a snapshot
@@ -179,7 +179,7 @@ class ParticleDictionaryClass(dict):
         self.element_dict['iron'] = self.element_dict['fe'] = 10
 
         # to use if read only subset of elements
-        self.element_pointer = np.arange(len(self.element_dict) / 2, dtype=np.int32)
+        self.element_pointer = np.arange(len(self.element_dict) // 2)
 
     def prop(self, property_name='', indices=None):
         '''
@@ -399,7 +399,7 @@ class ParticleDictionaryClass(dict):
                         values, distance_vectors, 'cartesian', coordinate_system)
 
             if 'total' in property_name:
-                # compute total (scalar) distance / velocity
+                # compute total (scalar) distance or velocity
                 if len(values.shape) == 1:
                     shape_pos = 0
                 else:
@@ -635,7 +635,7 @@ class ReadClass(ut.io.SayClass):
 
         # read all input snapshots
         for snapshot_value in snapshot_values:
-            snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
 
             # read header from snapshot file
             header = self.read_header(
@@ -677,7 +677,8 @@ class ReadClass(ut.io.SayClass):
                 'scale-factor':header['scalefactor'],  #added by SGK for compatibility w/ KEB libs
                 'time': time,
                 'time.lookback': part.Cosmology.get_time(0) - time,
-                'time.hubble': ut.constant.Gyr_per_sec / part.Cosmology.get_hubble_parameter(0),
+                'time.hubble': (ut.constant.Gyr_per_sec /
+                                part.Cosmology.get_hubble_parameter(header['redshift'])),
             }
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
@@ -946,7 +947,7 @@ class ReadClass(ut.io.SayClass):
 
         if snapshot_value_kind != 'index':
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-            snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
 
@@ -999,8 +1000,8 @@ class ReadClass(ut.io.SayClass):
                 self.species_read.remove(spec_name)
 
         if read_particle_number <= 0:
-            raise ValueError('snapshot file[s] contain no particles of species = {}'.format(
-                             self.species_read))
+            raise IOError(
+                'snapshot file[s] contain no particles of species = {}'.format(self.species_read))
 
         # check if simulation contains baryons
         header['has.baryons'] = False
@@ -1105,7 +1106,7 @@ class ReadClass(ut.io.SayClass):
         part = ut.array.DictClass()  # dictionary class to store properties for particle species
 
         # parse input list of properties to read
-        if properties == 'all' or properties == ['all'] or not properties:
+        if 'all' in properties or not properties:
             properties = list(property_dict.keys())
         else:
             if np.isscalar(properties):
@@ -1134,7 +1135,7 @@ class ReadClass(ut.io.SayClass):
 
         if snapshot_value_kind != 'index':
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-            snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
 
@@ -1177,7 +1178,7 @@ class ReadClass(ut.io.SayClass):
                 else:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
-                        raise ValueError('no {} particles in snapshot file'.format(spec_name))
+                        raise IOError('no {} particles in snapshot file'.format(spec_name))
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
@@ -1191,7 +1192,7 @@ class ReadClass(ut.io.SayClass):
                                 break
                     else:
                         # tried all files and still did not find particles of species
-                        raise ValueError('no {} particles in any snapshot file'.format(spec_name))
+                        raise IOError('no {} particles in any snapshot file'.format(spec_name))
 
                 props_print = []
                 ignore_flag = False  # whether ignored any properties in the file
@@ -1455,8 +1456,8 @@ class ReadClass(ut.io.SayClass):
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
-            raise ValueError('cannot find snapshot index = {} in: {}'.format(
-                             snapshot_index, path_names))
+            raise IOError(
+                'cannot find snapshot index = {} in:  {}'.format(snapshot_index, path_names))
 
         path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
 
@@ -1469,7 +1470,7 @@ class ReadClass(ut.io.SayClass):
             if len(path_file_names) and '.0.' in path_file_names[0]:
                 path_file_name = path_file_names[0]
             else:
-                raise ValueError('cannot find 0th snapshot file in ' + path_file_names)
+                raise IOError('cannot find 0th snapshot file in:  {}'.format(path_file_names))
 
         return path_file_name
 
@@ -1566,7 +1567,7 @@ class ReadClass(ut.io.SayClass):
                         elif 'nspec' in line:
                             n_s = get_check_value(line, n_s)
 
-            except ValueError:
+            except IOError:
                 self.say('cannot find MUSIC config file: {}'.format(file_name_find.strip('./')))
 
         # AGORA box (use as default, if cannot find MUSIC config file)
@@ -1805,7 +1806,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-        snapshot_index = Snapshot.parse_snapshot_value(snapshot_value_kind, snapshot_value)
+        snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n\n')

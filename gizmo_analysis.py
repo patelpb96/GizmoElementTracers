@@ -6,11 +6,11 @@ Analyze Gizmo simulations.
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
 Units: unless otherwise noted, all quantities are in (combinations of):
-    mass in [M_sun]
-    position in [kpc comoving]
-    distance and radius in [kpc physical]
-    velocity in [km / s]
-    time in [Gyr]
+    mass [M_sun]
+    position [kpc comoving]
+    distance, radius [kpc physical]
+    velocity [km / s]
+    time [Gyr]
 '''
 
 # system ----
@@ -352,7 +352,7 @@ class ImageClass(ut.io.SayClass):
         if hal is not None:
             # compile halos
             if hal_indices is None or not len(hal_indices):
-                hal_indices = ut.array.get_arange(hal['total.mass'])
+                hal_indices = ut.array.get_arange(hal['mass'])
 
             if 0 not in hal_indices:
                 hal_indices = np.concatenate([[0], hal_indices])
@@ -423,7 +423,6 @@ class ImageClass(ut.io.SayClass):
                     if image_limits[1] is not None:
                         image_limits_use[1] = image_limits[1]
 
-                #"""
                 _Image = subplot.imshow(
                     hist_valuess.transpose(),
                     norm=colors.LogNorm(),
@@ -433,7 +432,6 @@ class ImageClass(ut.io.SayClass):
                     extent=np.concatenate(position_limits[dimensions_plot]),
                     vmin=image_limits[0], vmax=image_limits[1],
                 )
-                #"""
 
                 # standard method
                 """
@@ -1445,7 +1443,7 @@ def assign_vel_circ_at_radius(
     '''
     Say = ut.io.SayClass(assign_vel_circ_at_radius)
 
-    his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf])
+    his = ut.array.get_indices(hal.prop('mass.bound/mass'), [0.1, Inf])
     his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
     his = ut.array.get_indices(hal[sort_property_name], [sort_property_value_min, Inf], his)
     Say.say('{} halos within limits'.format(his.size))
@@ -1454,7 +1452,7 @@ def assign_vel_circ_at_radius(
     his = his[::-1][: halo_number_max]
 
     mass_key = 'vel.circ.rad.{:.1f}'.format(radius)
-    hal[mass_key] = np.zeros(hal['total.mass'].size)
+    hal[mass_key] = np.zeros(hal['mass'].size)
     dark_mass = np.median(part['dark']['mass'])
 
     for hii, hi in enumerate(his):
@@ -1494,8 +1492,8 @@ def plot_vel_circ_v_radius_halos(
             his = None
             if hal_indicess is not None:
                 his = hal_indicess[cat_i]
-            his = ut.array.get_indices(hal.prop('mass.bound/mass.200m'), [0.1, Inf], his)
-            his = ut.array.get_indices(hal['total.mass'], total_mass_limits, his)
+            his = ut.array.get_indices(hal.prop('mass.bound/mass'), [0.1, Inf], his)
+            his = ut.array.get_indices(hal['mass'], total_mass_limits, his)
             his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
 
             if 'star.indices' in hal:

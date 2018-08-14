@@ -59,7 +59,7 @@ class ReadClass(ut.io.SayClass):
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
 
-        rockstar_io.Read.assign_lowres_mass(hal, parts[0], mass_limits)
+        rockstar_io.IO.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
 
@@ -107,12 +107,10 @@ class ReadClass(ut.io.SayClass):
         '''
         from rockstar_analysis import rockstar_io
 
-        Read = rockstar_io.ReadClass()
-        hal = Read.read_catalogs(
-            'redshift', self.snapshot_redshifts[0], self.simulation_directory, sort_by_mass=False,
-            sort_host_first=False)
+        hal = rockstar_io.IO.read_catalogs(
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory)
 
-        rockstar_io.Read.assign_nearest_neighbor(hal, 'total.mass', mass_limits, 1000, 6000, 'halo')
+        rockstar_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 1000, 6000, 'halo')
 
         return hal
 

@@ -3,7 +3,7 @@
 '''
 Diagnose Gizmo simulations.
 
-@author: Andrew Wetzel
+@author: Andrew Wetzel <arwetzel@gmail.com>
 '''
 
 # system ----
