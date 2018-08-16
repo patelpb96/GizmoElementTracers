@@ -585,7 +585,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         # store principal axes rotation vectors of the host galaxy at each snapshot
         part_z0[self.species_name].principal_axes_vectors_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3, 3], self.coordinate_dtype) + np.nan)
+            np.zeros([part_z0.Snapshot['index'].size, 3, 3], self.coordinate_dtype) + np.nan)
 
         count = {
             'id none': 0,
