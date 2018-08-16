@@ -104,7 +104,7 @@ class SupernovaIIClass:
 
         return numbers
 
-    def get_mass_fraction(self, age_min=0, age_maxs=99, element_name='', metallicity=1.0):
+    def get_mass_loss_fraction(self, age_min=0, age_maxs=99, element_name='', metallicity=1.0):
         '''
         Get fractional mass loss via supernova ejecta (ejecta mass per M_sun) in age interval[s].
 
@@ -117,15 +117,15 @@ class SupernovaIIClass:
 
         Returns
         -------
-        masses : float : total eject mass[es] per M_sun
+        mass_loss_fractions : float : fractional mass loss (ejecta mass[es] per M_sun)
         '''
-        mass_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs)
+        mass_loss_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs)
 
         if element_name:
             element_yields = get_nucleosynthetic_yields('supernova.ii', metallicity, normalize=True)
-            mass_fractions *= element_yields[element_name]
+            mass_loss_fractions *= element_yields[element_name]
 
-        return mass_fractions
+        return mass_loss_fractions
 
 
 SupernovaII = SupernovaIIClass()
@@ -139,7 +139,7 @@ class SupernovaIaClass:
     def __init__(self):
         self.ejecta_mass = 1.4  # ejecta mass per event, IMF-averaged [M_sun]
 
-    def get_rate(self, ages, kind='mannucci', ia_age_min=37.53):
+    def get_rate(self, ages, ia_kind='mannucci', ia_age_min=37.53):
         '''
         Get specific rate [Myr ^ -1 M_sun ^ -1] of supernova Ia.
 
@@ -154,8 +154,8 @@ class SupernovaIaClass:
         Parameters
         ----------
         ages : float : age of stellar population [Myr]
-        kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for Ia to occur [Myr]
+        ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
             decreasing to 10 Myr increases total number by ~50%,
             increasing to 100 Myr decreases total number by ~50%
 
@@ -174,23 +174,23 @@ class SupernovaIaClass:
                 #return 3e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] hybrid
                 #return 6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] galaxy clusters
 
-        assert kind in ['mannucci', 'maoz']
+        assert ia_kind in ['mannucci', 'maoz']
 
         if np.isscalar(ages):
             if ages < ia_age_min:
                 rates = 0
             else:
-                rates = get_rate(ages, kind)
+                rates = get_rate(ages, ia_kind)
         else:
             ages = np.asarray(ages)
             rates = np.zeros(ages.size)
 
             masks = np.where(ages >= ia_age_min)[0]
-            rates[masks] = get_rate(ages[masks], kind)
+            rates[masks] = get_rate(ages[masks], ia_kind)
 
         return rates
 
-    def get_number(self, age_min=0, age_maxs=99, kind='mannucci', ia_age_min=37.53):
+    def get_number(self, age_min=0, age_maxs=99, ia_kind='mannucci', ia_age_min=37.53):
         '''
         Get specific number (per M_sun) of supernovae Ia in given age interval.
 
@@ -198,25 +198,25 @@ class SupernovaIaClass:
         ----------
         age_min : float : min age of stellar population [Myr]
         age_maxs : float or array : max age[s] of stellar population [Myr]
-        kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for Ia to occur [Myr]
+        ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
 
         Returns
         -------
         numbers : float or array : specific number[s] of supernovae [M_sun ^ -1]
         '''
         if np.isscalar(age_maxs):
-            numbers = integrate.quad(self.get_rate, age_min, age_maxs, (kind, ia_age_min))[0]
+            numbers = integrate.quad(self.get_rate, age_min, age_maxs, (ia_kind, ia_age_min))[0]
         else:
             numbers = np.zeros(len(age_maxs))
             for age_i, age in enumerate(age_maxs):
                 numbers[age_i] = integrate.quad(
-                    self.get_rate, age_min, age, (kind, ia_age_min))[0]
+                    self.get_rate, age_min, age, (ia_kind, ia_age_min))[0]
 
         return numbers
 
-    def get_mass_fraction(
-        self, age_min=0, age_maxs=99, kind='mannucci', ia_age_min=37.53, element_name=''):
+    def get_mass_loss_fraction(
+        self, age_min=0, age_maxs=99, ia_kind='mannucci', ia_age_min=37.53, element_name=''):
         '''
         Get fractional mass loss via supernova ejecta (ejecta mass per M_sun) in age interval[s].
 
@@ -224,21 +224,22 @@ class SupernovaIaClass:
         ----------
         age_min : float : min age of stellar population [Myr]
         age_maxs : float or array : max age[s] of stellar population [Myr]
-        kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for Ia to occur [Myr]
+        ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
         element_name : string : name of element to get yield of
 
         Returns
         -------
-        masses : float or array : total ejecta mass[es] per M_sun
+        mass_loss_fractions : float or array : mass loss fraction[s] (ejecta mass[es] per M_sun)
         '''
-        mass_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs, kind, ia_age_min)
+        mass_loss_fractions = (
+            self.ejecta_mass * self.get_number(age_min, age_maxs, ia_kind, ia_age_min))
 
         if element_name:
             element_yields = get_nucleosynthetic_yields('supernova.ia', normalize=True)
-            mass_fractions *= element_yields[element_name]
+            mass_loss_fractions *= element_yields[element_name]
 
-        return mass_fractions
+        return mass_loss_fractions
 
 
 SupernovaIa = SupernovaIaClass()
@@ -274,7 +275,7 @@ class StellarWindClass:
         metallicity_min = 0.01  # min and max imposed in Gizmo for stellar wind rates for stability
         metallicity_max = 3
 
-        if metal_mass_fraction:
+        if metal_mass_fraction is not None:
             metallicity = metal_mass_fraction / self.solar_metal_mass_fraction
 
         metallicity = np.clip(metallicity, metallicity_min, metallicity_max)
@@ -316,7 +317,7 @@ class StellarWindClass:
 
         return rates
 
-    def get_mass_fraction(
+    def get_mass_loss_fraction(
         self, age_min=0, age_maxs=99, metallicity=1, metal_mass_fraction=None, element_name=''):
         '''
         Get fractional mass loss via stellar winds in age interval[s].
@@ -331,33 +332,33 @@ class StellarWindClass:
 
         Returns
         -------
-        masses : float or array : total eject mass[es] per M_sun
+        mass_loss_fractions : float or array : mass loss fraction[s] (eject mass per M_sun)
         '''
-        #age_bin_width = 0.01  # [Myr]
+        age_bin_width = 0.01  # [Myr]
 
         if np.isscalar(age_maxs):
-            mass_fractions = integrate.quad(
+            mass_loss_fractions = integrate.quad(
                 self.get_rate, age_min, age_maxs, (metallicity, metal_mass_fraction))[0]
         else:
-            mass_fractions = np.zeros(len(age_maxs))
+            mass_loss_fractions = np.zeros(len(age_maxs))
             for age_i, age in enumerate(age_maxs):
-                mass_fractions[age_i] = integrate.quad(
-                    self.get_rate, age_min, age, (metallicity, metal_mass_fraction))[0]
+                #mass_loss_fractions[age_i] = integrate.quad(
+                #    self.get_rate, age_min, age, (metallicity, metal_mass_fraction))[0]
                 # this method is more stable for piece-wise (discontinuous) function
-                #ages = np.arange(age_min, age + age_bin_width, age_bin_width)
-                #mass_fractions[age_i] = self.get_rate(ages).sum() * age_bin_width
+                ages = np.arange(age_min, age + age_bin_width, age_bin_width)
+                mass_loss_fractions[age_i] = self.get_rate(ages).sum() * age_bin_width
 
         if element_name:
             element_yields = get_nucleosynthetic_yields('wind', metallicity, normalize=True)
-            mass_fractions *= element_yields[element_name]
+            mass_loss_fractions *= element_yields[element_name]
 
-        return mass_fractions
+        return mass_loss_fractions
 
 
 StellarWind = StellarWindClass()
 
 
-class MassLossClass:
+class MassLossClass(ut.io.SayClass):
     '''
     Compute mass loss from all channels (supernova II, Ia, stellar winds) as implemented in Gizmo.
     '''
@@ -366,19 +367,20 @@ class MassLossClass:
         self.SupernovaII = SupernovaIIClass()
         self.SupernovaIa = SupernovaIaClass()
         self.StellarWind = StellarWindClass()
+        self.Spline = None
 
     def get_rate(
-        self, ages, ia_kind='mannucci', ia_age_min=37.53, metallicity=1, metal_mass_fraction=None):
+        self, ages, metallicity=1, metal_mass_fraction=None, ia_kind='mannucci', ia_age_min=37.53):
         '''
         Get fractional mass loss rate [Myr ^ -1] from all stellar evolution channels.
 
         Parameters
         ----------
         age : float or array : age[s] of stellar population [Myr]
-        ia_kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for Ia to occur [Myr]
         metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
         metal_mass_fraction : float : mass fration of all metals (everything not H, He)
+        ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
 
         Returns
         -------
@@ -389,33 +391,71 @@ class MassLossClass:
                 self.SupernovaIa.ejecta_mass +
                 self.StellarWind.get_rate(ages, metallicity, metal_mass_fraction))
 
-    def get_mass_fraction(
-        self, age_min=0, age_maxs=99, ia_kind='mannucci', ia_age_min=37.53,
-        metallicity=1, metal_mass_fraction=None):
+    def get_mass_loss_fraction(
+        self, age_min=0, age_maxs=99, metallicity=1, metal_mass_fraction=None,
+        ia_kind='mannucci', ia_age_min=37.53):
         '''
-        Get fractional mass loss via all stellar evolution channels in age interval[s].
+        Get fractional mass loss via all stellar evolution channels in age interval[s]
+        via direct integration.
 
         Parameters
         ----------
-        age_min : float : min age of stellar population [Myr]
-        age_maxs : float or array : max age[s] of stellar population [Myr]
-        ia_kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for Ia to occur [Myr]
+        age_min : float : min (starting) age of stellar population [Myr]
+        age_maxs : float or array : max (ending) age[s] of stellar population [Myr]
         metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
         metal_mass_fraction : float : mass fration of all metals (everything not H, He)
+        ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
 
         Returns
         -------
-        masses : float or array : total eject mass[es] per M_sun
+        mass_loss_fractions : float or array : mass loss fraction[s] (mass per M_sun)
         '''
-        return (self.SupernovaII.get_mass_fraction(age_min, age_maxs) +
-                self.SupernovaIa.get_mass_fraction(age_min, age_maxs, ia_kind, ia_age_min) +
-                self.StellarWind.get_mass_fraction(age_min, age_maxs, metallicity,
-                                                   metal_mass_fraction))
+        #print(self.SupernovaII.get_mass_loss_fraction(age_min, age_maxs),
+        #      self.SupernovaIa.get_mass_loss_fraction(age_min, age_maxs, ia_kind, ia_age_min),
+        #      self.StellarWind.get_mass_loss_fraction(
+        #          age_min, age_maxs, metallicity, metal_mass_fraction))
 
-    def make_mass_fraction_spline(
-        self, age_limits=[0.1, 13900], age_bin_width=0.025,
-        metallicity_limits=[0.01, 3], metallicity_bin_width=0.02,
+        return (self.SupernovaII.get_mass_loss_fraction(age_min, age_maxs) +
+                self.SupernovaIa.get_mass_loss_fraction(age_min, age_maxs, ia_kind, ia_age_min) +
+                self.StellarWind.get_mass_loss_fraction(
+                    age_min, age_maxs, metallicity, metal_mass_fraction))
+
+    def get_mass_loss_fraction_from_spline(
+        self, ages=[], metallicities=[], metal_mass_fractions=None):
+        '''
+        Get fractional mass loss via all stellar evolution channels at ages and metallicities
+        (or mass fractions) via bivariate spline.
+
+        Parameters
+        ----------
+        ages : float or array : age[s] of stellar population [Myr]
+        metallicities : float or array : total abundace[s] of metals wrt solar_metal_mass_fraction
+        metal_mass_fractions : float or array : mass fration[s] of all metals (everything not H, He)
+
+        Returns
+        -------
+        mass_loss_fractions : float or array : mass loss fraction[s] (mass per M_sun)
+        '''
+        if metal_mass_fractions is not None:
+            # convert mass fraction to metallicity using Solar value assumed in Gizmo
+            metallicities = metal_mass_fractions / self.StellarWind.solar_metal_mass_fraction
+
+        assert np.isscalar(ages) or np.isscalar(metallicities) or len(ages) == len(metallicities)
+
+        if self.Spline is None:
+            self.make_mass_loss_fraction_spline()
+
+        mass_loss_fractions = self.Spline.ev(ages, metallicities)
+
+        if np.isscalar(ages) and np.isscalar(metallicities):
+            mass_loss_fractions = np.asscalar(mass_loss_fractions)
+
+        return mass_loss_fractions
+
+    def make_mass_loss_fraction_spline(
+        self, age_limits=[1, 13900], age_bin_width=0.1,
+        metallicity_limits=[0.01, 3], metallicity_bin_width=0.1,
         ia_kind='mannucci', ia_age_min=37.53):
         '''
         Create 2-D spline (in age and metallicity) for fractional mass loss via all stellar
@@ -423,26 +463,34 @@ class MassLossClass:
 
         Parameters
         ----------
-        age_limits : list : min and max age of stellar population [Myr]
-        age_bin_width : float : width of age bin [Myr]
-        metallicity_limits : list : min and max abundance of metals wrt solar_metal_mass_fraction
-        metallicity_bin_width : float : width of metallicity or log(metal_mass_fraction) bin
-        ia_kind : string : rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for Ia to occur [Myr]
+        age_limits : list : min and max limits of age of stellar population [Myr]
+        age_bin_width : float : log width of age bin [Myr]
+        metallicity_limits : list :
+            min and max limits of metal abundance wrt solar_metal_mass_fraction
+        metallicity_bin_width : float : width of metallicity bin
+        ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
         '''
         from scipy import interpolate
 
-        AgeBin = ut.binning.BinClass(age_limits, age_bin_width, include_max=True, scaling='log')
-        MetalBin = ut.binning.BinClass(
-            metallicity_limits, metallicity_bin_width, include_max=True)
+        age_min = 0
 
-        self.mass_fractions = np.zeros((AgeBin.number, MetalBin.number))
-        for metallicity_i, metallicity in enumerate(MetalBin.mins):
-            self.mass_fractions[:, metallicity_i] = self.get_mass_fraction(
-                0, AgeBin.mins, ia_kind, ia_age_min, metallicity)
+        self.AgeBin = ut.binning.BinClass(
+            age_limits, age_bin_width, include_max=True, scaling='log')
+        self.MetalBin = ut.binning.BinClass(
+            metallicity_limits, metallicity_bin_width, include_max=True, scaling='log')
+
+        self.say('* generating 2-D spline to compute mass loss from age and metallicity')
+        self.say('number of age bins = {}'.format(self.AgeBin.number))
+        self.say('number of metallicity bins = {}'.format(self.MetalBin.number))
+
+        self.mass_loss_fractions = np.zeros((self.AgeBin.number, self.MetalBin.number))
+        for metallicity_i, metallicity in enumerate(self.MetalBin.mins):
+            self.mass_loss_fractions[:, metallicity_i] = self.get_mass_loss_fraction(
+                age_min, self.AgeBin.mins, metallicity, None, ia_kind, ia_age_min)
 
         self.Spline = interpolate.RectBivariateSpline(
-            AgeBin.mins, MetalBin.mins, self.mass_fractions)
+            self.AgeBin.mins, self.MetalBin.mins, self.mass_loss_fractions)
 
 
 MassLoss = MassLossClass()
@@ -545,10 +593,10 @@ def plot_mass_loss_v_age(
         supernova_Ia = SupernovaIa.get_rate(AgeBin.mins, Ia_kind) * SupernovaIa.ejecta_mass
         wind = StellarWind.get_rate(AgeBin.mins, metallicity, metal_mass_fraction)
     else:
-        supernova_II = SupernovaII.get_mass_fraction(0, AgeBin.mins, element_name, metallicity)
-        supernova_Ia = SupernovaIa.get_mass_fraction(
+        supernova_II = SupernovaII.get_mass_loss_fraction(0, AgeBin.mins, element_name, metallicity)
+        supernova_Ia = SupernovaIa.get_mass_loss_fraction(
             0, AgeBin.mins, Ia_kind, element_name=element_name)
-        wind = StellarWind.get_mass_fraction(
+        wind = StellarWind.get_mass_loss_fraction(
             0, AgeBin.mins, metallicity, metal_mass_fraction, element_name)
 
     total = supernova_II + supernova_Ia + wind

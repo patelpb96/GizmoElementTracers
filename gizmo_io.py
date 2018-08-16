@@ -56,7 +56,7 @@ All particle species have the following properties:
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
-Star and gas particles also have additional IDs (because they can split):
+Star and gas particles also have additional IDs (because gas can split):
     'id.child' : child ID
     'id.generation' : generation ID
 These are initialized to 0 for all gas particles.
@@ -149,6 +149,7 @@ import h5py
 import numpy as np
 # local ----
 import utilities as ut
+from . import gizmo_star
 
 
 #===================================================================================================
@@ -179,6 +180,8 @@ class ParticleDictionaryClass(dict):
 
         # to use if read only subset of elements
         self.element_pointer = np.arange(len(self.element_dict) // 2)
+
+        self.MassLoss = None
 
     def prop(self, property_name='', indices=None):
         '''
@@ -255,6 +258,24 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ----------
+        # stellar mass loss
+        if ('mass' in property_name and 'form' in property_name) or property_name == 'mass.loss':
+            if self.MassLoss is None:
+                self.MassLoss = gizmo_star.MassLossClass()
+
+            # fractional mass loss since formation
+            values = self.MassLoss.get_mass_loss_fraction_from_spline(
+                self.prop('age', indices) * 1000,
+                metal_mass_fractions=self.prop('massfraction.metals', indices))
+
+            if ('mass' in property_name and 'form' in property_name):
+                values = self.prop('mass', indices) / (1 - values)  # formation mass
+            elif property_name == 'mass.loss':
+                values *= self.prop('mass', indices)  # mass loss
+
+            return values
+
+        # mass of element
         if 'mass.' in property_name:
             # mass of individual element
             values = (self.prop('mass', indices) *
@@ -329,6 +350,30 @@ class ParticleDictionaryClass(dict):
             # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
             return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
 
+        # formation time or coordinates
+        if 'form.' in property_name or property_name == 'age':
+            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
+                # look-back time (stellar age) to formation
+                values = self.snapshot['time'] - self.prop('form.time', indices)
+            elif 'time' in property_name:
+                # time (age of universe) of formation
+                values = self.Cosmology.get_time(
+                    self.prop('form.scalefactor', indices), 'scalefactor')
+            elif 'redshift' in property_name:
+                # redshift of formation
+                values = 1 / self.prop('form.scalefactor', indices) - 1
+            elif 'snapshot' in property_name:
+                # snapshot index immediately after formation
+                # increase formation scale-factor slightly for safety, because scale-factors of
+                # written snapshots do not exactly coincide with input scale-factors
+                padding_factor = (1 + 1e-7)
+                values = self.Snapshot.get_snapshot_indices(
+                    'scalefactor',
+                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
+                    round_kind='up')
+
+            return values
+
         # distance or velocity wrt the center of host galaxy/halo
         if 'host.' in property_name:
             if 'form.' in property_name:
@@ -387,29 +432,6 @@ class ParticleDictionaryClass(dict):
                 else:
                     shape_pos = 1
                 values = np.sqrt(np.sum(values ** 2, shape_pos))
-
-            return values
-
-        if 'form.' in property_name or property_name == 'age':
-            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
-                # look-back time (stellar age) to formation
-                values = self.snapshot['time'] - self.prop('form.time', indices)
-            elif 'time' in property_name:
-                # time (age of universe) of formation
-                values = self.Cosmology.get_time(
-                    self.prop('form.scalefactor', indices), 'scalefactor')
-            elif 'redshift' in property_name:
-                # redshift of formation
-                values = 1 / self.prop('form.scalefactor', indices) - 1
-            elif 'snapshot' in property_name:
-                # snapshot index immediately after formation
-                # increase formation scale-factor slightly for safety, because scale-factors of
-                # written snapshots do not exactly coincide with input scale-factors
-                padding_factor = (1 + 1e-7)
-                values = self.Snapshot.get_snapshot_indices(
-                    'scalefactor',
-                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
-                    round_kind='up')
 
             return values
 

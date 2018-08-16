@@ -165,7 +165,7 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         # write file for this snapshot
         self.io_pointers(None, snapshot_index, part_pointers)
 
-    def write_pointers_all_snapshots(
+    def write_pointers_to_snapshots(
         self, part=None, match_property='id.child', match_propery_tolerance=1e-6,
         test_property='form.scalefactor', snapshot_indices=[], thread_number=1):
         '''
@@ -182,7 +182,7 @@ class ParticleIndexPointerClass(ut.io.SayClass):
             options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
         match_propery_tolerance : float : fractional tolerance for matching via match_property
         test_property : string : additional property to use to test matching
-        snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+        snapshot_indices : array-like : snapshot indices at which to assign index pointers
         thread_number : int : number of threads for parallelization
         '''
         assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
@@ -552,7 +552,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         Parameters
         ----------
         part : dict : catalog of particles at the reference snapshot
-        snapshot_indices : array-like : list of snapshot indices at which to assign index pointers
+        snapshot_indices : array-like : snapshot indices at which to assign formation coordinates
         thread_number : int : number of threads for parallelization
         '''
         if part_z0 is None:
@@ -579,9 +579,9 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         # store center position and velocity of the host galaxy at each snapshot
         part_z0[self.species_name].center_position_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3], self.coordinate_dtype) + np.nan)
+            np.zeros([part_z0.Snapshot['index'].size, 3], self.coordinate_dtype) + np.nan)
         part_z0[self.species_name].center_velocity_at_snapshots = (
-            np.zeros([snapshot_indices.size, 3], self.coordinate_dtype) + np.nan)
+            np.zeros([part_z0.Snapshot['index'].size, 3], self.coordinate_dtype) + np.nan)
 
         # store principal axes rotation vectors of the host galaxy at each snapshot
         part_z0[self.species_name].principal_axes_vectors_at_snapshots = (
@@ -687,7 +687,7 @@ if __name__ == '__main__':
     assert ('indices' in function_kind or 'coordinates' in function_kind)
 
     if 'indices' in function_kind:
-        ParticleIndexPointer.write_pointers_all_snapshots()
+        ParticleIndexPointer.write_pointers_to_snapshots()
 
     if 'coordinates' in function_kind:
         ParticleCoordinate.write_formation_coordinates()
