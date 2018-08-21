@@ -56,7 +56,7 @@ All particle species have the following properties:
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
-Star and gas particles also have additional IDs (because they can split):
+Star and gas particles also have additional IDs (because gas can split):
     'id.child' : child ID
     'id.generation' : generation ID
 These are initialized to 0 for all gas particles.
@@ -150,6 +150,7 @@ import os
 import numpy as np
 # local ----
 import wutilities as ut
+from . import gizmo_star
 
 
 #===================================================================================================
@@ -180,6 +181,8 @@ class ParticleDictionaryClass(dict):
 
         # to use if read only subset of elements
         self.element_pointer = np.arange(len(self.element_dict) // 2)
+
+        self.MassLoss = None
 
     def prop(self, property_name='', indices=None):
         '''
@@ -256,23 +259,27 @@ class ParticleDictionaryClass(dict):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         ## parsing specific to this catalog ----------
-        if property_name == 'birth.mass':
-            from .gizmo_star import MassLoss, StellarWind
-            # mass of the star particle when it formed
-            
-            # first load/create the spline required to unwind mass loss
-            MassLoss.load_mass_fraction_spline()
+        # stellar mass loss
+        if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
+            if self.MassLoss is None:
+                self.MassLoss = gizmo_star.MassLossClass()
 
-            # how long have stars been losing mass for, in Myr?
-            age_in_Myr = self.prop('age', indices=indices)*1e3
+            # fractional mass loss since formation
+            values = self.MassLoss.get_mass_loss_fraction_from_spline(
+                self.prop('age', indices) * 1000,
+                metal_mass_fractions=self.prop('massfraction.metals', indices))
 
-            # metallicity wrt "solar" in GIZMO in linear space
-            linear_metallicity = self.prop('massfraction.total', indices=indices) / StellarWind.solar_metal_mass_fraction 
+            if 'mass.loss' in property_name:
+                if 'fraction' in property_name:
+                    pass
+                else:
+                    values *= self.prop('mass', indices) / (1 - values)  # mass loss
+            elif 'mass' in property_name and 'form' in property_name:
+                values = self.prop('mass', indices) / (1 - values)  # formation mass
 
-            # now ask the spline what fraction of my mass I've lost at this age and with my metallicity for each particle
-            return self.prop('mass', indices=indices) * (1 + MassLoss.Spline.ev(age_in_Myr, linear_metallicity) )
+            return values
 
-
+        # mass of element
         if 'mass.' in property_name:
             # mass of individual element
             values = (self.prop('mass', indices) *
@@ -347,6 +354,42 @@ class ParticleDictionaryClass(dict):
             # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
             return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
 
+        # internal energy of the gas, from the temperature etc -- i.e., unwinding internal energy -> temperature conversion (needed by Phil's code)
+        if 'internal.energy' in property_name:
+            helium_mass_fracs = self.prop('massfraction.helium')
+            gas_eos = 5. / 3
+            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
+            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
+            molecular_weights = mus * ut.constant.proton_mass
+            
+            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
+
+            return values
+
+        # formation time or coordinates -- avoid case where we have, e.g., 'host.form.distance' from triggering
+        if ('form.' in property_name and 'host.' not in property_name) or property_name == 'age':
+            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
+                # look-back time (stellar age) to formation
+                values = self.snapshot['time'] - self.prop('form.time', indices)
+            elif 'time' in property_name:
+                # time (age of universe) of formation
+                values = self.Cosmology.get_time(
+                    self.prop('form.scalefactor', indices), 'scalefactor')
+            elif 'redshift' in property_name:
+                # redshift of formation
+                values = 1 / self.prop('form.scalefactor', indices) - 1
+            elif 'snapshot' in property_name:
+                # snapshot index immediately after formation
+                # increase formation scale-factor slightly for safety, because scale-factors of
+                # written snapshots do not exactly coincide with input scale-factors
+                padding_factor = (1 + 1e-7)
+                values = self.Snapshot.get_snapshot_indices(
+                    'scalefactor',
+                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
+                    round_kind='up')
+
+            return values
+
         # distance or velocity wrt the center of host galaxy/halo
         if 'host.' in property_name:
             if 'form.' in property_name:
@@ -408,110 +451,6 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        if 'form.' in property_name or property_name == 'age':
-            if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
-                # look-back time (stellar age) to formation
-                values = self.snapshot['time'] - self.prop('form.time', indices)
-            elif 'time' in property_name:
-                # time (age of universe) of formation
-                values = self.Cosmology.get_time(
-                    self.prop('form.scalefactor', indices), 'scalefactor')
-            elif 'redshift' in property_name:
-                # redshift of formation
-                values = 1 / self.prop('form.scalefactor', indices) - 1
-            elif 'snapshot' in property_name:
-                # snapshot index immediately after formation
-                # increase formation scale-factor slightly for safety, because scale-factors of
-                # written snapshots do not exactly coincide with input scale-factors
-                padding_factor = (1 + 1e-7)
-                values = self.Snapshot.get_snapshot_indices(
-                    'scalefactor',
-                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
-                    round_kind='up')
-
-            return values
-
-        # internal energy of the gas, from the temperature etc.
-        if 'internal.energy' in property_name:
-            helium_mass_fracs = self.prop('massfraction.helium')
-            gas_eos = 5. / 3
-            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
-            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
-            molecular_weights = mus * ut.constant.proton_mass
-            
-            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
-
-            return values
-
-        # distance or velocity wrt the center of host galaxy/halo
-        if 'host.' in property_name:
-            if 'distance' in property_name:
-                if 'form.' in property_name:
-                    # 3-D distance vector wrt primary host at formation
-                    values = self.prop('form.host.distance', indices)
-                else:
-                    # 3-D distance vector wrt host now
-                    values = ut.coordinate.get_distances(
-                        self.prop('position', indices), self.center_position,
-                        self.info['box.length'], self.snapshot['scalefactor'])  # [kpc physical]
-
-            elif 'velocity' in property_name:
-                if 'form.' in property_name:
-                    # 3-D velocity vectory wrt host at formation
-                    values = self.prop('form.host.velocity', indices)
-                else:
-                    # 3-D velocity, includes the Hubble flow
-                    values = ut.coordinate.get_velocity_differences(
-                        self.prop('velocity', indices), self.center_velocity,
-                        self.prop('position', indices), self.center_position,
-                        self.info['box.length'], self.snapshot['scalefactor'],
-                        self.snapshot['time.hubble'])
-
-            if 'principal' in property_name:
-                # align with host principal axes
-                values = ut.coordinate.get_coordinates_rotated(values, self.principal_axes_vectors)
-
-            if 'cylindrical' in property_name:
-                # convert to cylindrical coordinates
-                if 'distance' in property_name:
-                    # along major axes R (positive definite), minor axis Z (signed),
-                    # angle phi (0 to 2 * pi)
-                    values = ut.coordinate.get_positions_in_coordinate_system(
-                        values, 'cartesian', 'cylindrical')
-                if 'velocity' in property_name:
-                    # along major axes (v_R), minor axis (v_Z), angular (v_phi)
-                    if 'principal' in property_name:
-                        distance_vectors = self.prop('host.distance.principal', indices)
-                    else:
-                        distance_vectors = self.prop('host.distance', indices)
-                    values = ut.coordinate.get_velocities_in_coordinate_system(
-                        values, distance_vectors, 'cartesian', 'cylindrical')
-
-            elif 'spherical' in property_name:
-                # convert to spherical coordinates
-                if 'distance' in property_name:
-                    # along R (positive definite), theta [0, pi), phi [0, 2 * pi)
-                    values = ut.coordinate.get_positions_in_coordinate_system(
-                        values, 'cartesian', 'spherical')
-                if 'velocity' in property_name:
-                    # along v_R, v_theta, v_phi
-                    if 'principal' in property_name:
-                        distance_vectors = self.prop('host.distance.principal', indices)
-                    else:
-                        distance_vectors = self.prop('host.distance', indices)
-                    values = ut.coordinate.get_velocities_in_coordinate_system(
-                        values, distance_vectors, 'cartesian', 'spherical')
-
-            if 'total' in property_name:
-                # compute total (scalar) distance / velocity
-                if len(values.shape) == 1:
-                    shape_pos = 0
-                else:
-                    shape_pos = 1
-                values = np.sqrt(np.sum(values ** 2, shape_pos))
-
-            return values
-
         # should not get this far without a return
         raise ValueError(
             'property = {} is not valid input to {}'.format(property_name, self.__class__))
@@ -560,7 +499,7 @@ class ReadClass(ut.io.SayClass):
         properties='all', element_indices=None, particle_subsample_factor=None,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
         assign_center=True, assign_principal_axes=False, assign_orbit=False,
-        assign_formation_coordinates=False,
+        assign_formation_coordinates=False, assign_index_pointers=False,
         check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -599,6 +538,8 @@ class ReadClass(ut.io.SayClass):
         assign_orbit : booelan : whether to assign derived orbital properties wrt host galaxy/halo
         assign_formation_coordinates : boolean :
             whether to assign coordindates wrt the host galaxy at formation to stars
+        assign_index_pointers : boolean :
+            whether to assign index pointers from particles at z = 0 to particles in this snapshot
         check_properties : boolean : whether to check sanity of particle properties after read in
 
         Returns
@@ -708,12 +649,19 @@ class ReadClass(ut.io.SayClass):
             if assign_orbit and ('velocity' in properties or properties is 'all'):
                 self.assign_orbit(part, 'star')
 
-            # assign coordinates wrt host galaxy at formation
-            if assign_formation_coordinates and 'star' in species:
+            if 'star' in species and (assign_formation_coordinates or assign_index_pointers):
                 from . import gizmo_track
-                ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
-                    'star', simulation_directory + 'track/')
-                ParticleCoordinate.io_formation_coordinates(part)
+                if assign_formation_coordinates:
+                    # assign coordinates wrt host galaxy at formation
+                    ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
+                        'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                    ParticleCoordinate.io_formation_coordinates(part)
+
+                elif assign_index_pointers:
+                    # assign particle index pointers from z = 0 to this snapshot
+                    ParticleIndex = gizmo_track.ParticleIndexPointerClass(
+                        'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                    ParticleIndex.io_pointers(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
