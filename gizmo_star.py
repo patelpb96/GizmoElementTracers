@@ -363,14 +363,15 @@ class MassLossClass(ut.io.SayClass):
     '''
     Compute mass loss from all channels (supernova II, Ia, stellar winds) as implemented in Gizmo.
     '''
-    from os.path import expanduser
-    default_filename = expanduser('~')+'/.gizmo_mass_fraction_spline.pkl'
-
+    
     def __init__(self):
         self.SupernovaII = SupernovaIIClass()
         self.SupernovaIa = SupernovaIaClass()
         self.StellarWind = StellarWindClass()
         self.Spline = None
+
+        from os.path import expanduser
+        self.filename = expanduser('~')+'/.gizmo_mass_loss_spline.pkl'
 
     def get_rate(
         self, ages, metallicity=1, metal_mass_fraction=None, ia_kind='mannucci', ia_age_min=37.53):
@@ -459,7 +460,8 @@ class MassLossClass(ut.io.SayClass):
     def _make_mass_loss_fraction_spline(
         self, age_limits=[1, 14000], age_bin_width=0.2,
         metallicity_limits=[0.01, 3], metallicity_bin_width=0.1,
-        ia_kind='mannucci', ia_age_min=37.53):
+        ia_kind='mannucci', ia_age_min=37.53, 
+        force_remake=False, save_spline=True):
         '''
         Create 2-D spline (in age and metallicity) for fractional mass loss via all stellar
         evolution channels.
@@ -473,7 +475,15 @@ class MassLossClass(ut.io.SayClass):
         metallicity_bin_width : float : width of metallicity bin
         ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
         ia_age_min : float : minimum age for supernova Ia to occur [Myr]
+        force_remake : bool : force a recalculation of the spline, even if the file
+            that contains it exists
+        save_spline : bool : save the spline to a pickle file for rapid loading in the future
         '''
+        from os.path import isfile
+        if not force_remake and isfile(self.filename):
+            self._load_mass_fraction_spline()
+            return
+
         from scipy import interpolate
 
         age_min = 0
@@ -495,28 +505,20 @@ class MassLossClass(ut.io.SayClass):
         self.Spline = interpolate.RectBivariateSpline(
             self.AgeBin.mins, self.MetalBin.mins, self.mass_loss_fractions)
 
-    def save_mass_fraction_spline(self, filename=default_filename):
-        import pickle
-        if 'Spline' not in self.__dict__:
-            print("No Spline found.  Creating it, which may take awhile....", end='', flush=True)
-            self.make_mass_fraction_spline()
-            print("done!")
-        with open(filename, 'wb') as f:
-            pickle.dump(self.Spline, f)
-        print("Saved spline as {}".format(filename))
+        if save_spline:
+            self._save_mass_fraction_spline()
 
-    def load_mass_fraction_spline(self, filename=default_filename, force=False):
+    def _save_mass_fraction_spline(self):
+        import pickle
+        with open(self.filename, 'wb') as f:
+            pickle.dump(self.Spline, f)
+        print("Saved spline as {}".format(self.filename))
+
+    def _load_mass_fraction_spline(self):
         import pickle,os
-        if 'Spline' in self.__dict__ and not force:
-            # print('Spline already exists and not told to force the reload; not loading!')
-            pass
-        elif not os.path.isfile(filename):
-            print('{} does not exist; creating the spline from scratch'.format(filename))
-            self.make_mass_fraction_spline()
-        else:
-            with open(filename, 'rb') as f:
-                self.Spline = pickle.load(f)
-                print("Loaded spline from {}".format(filename))
+        with open(self.filename, 'rb') as f:
+            self.Spline = pickle.load(f)
+            print("Loaded spline from {}".format(self.filename))
 
 
 MassLoss = MassLossClass()
