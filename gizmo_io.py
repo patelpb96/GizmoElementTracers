@@ -259,7 +259,7 @@ class ParticleDictionaryClass(dict):
 
         ## parsing specific to this catalog ----------
         # stellar mass loss
-        if ('mass' in property_name and 'form' in property_name) or property_name == 'mass.loss':
+        if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
             if self.MassLoss is None:
                 self.MassLoss = gizmo_star.MassLossClass()
 
@@ -268,10 +268,13 @@ class ParticleDictionaryClass(dict):
                 self.prop('age', indices) * 1000,
                 metal_mass_fractions=self.prop('massfraction.metals', indices))
 
-            if ('mass' in property_name and 'form' in property_name):
+            if 'mass.loss' in property_name:
+                if 'fraction' in property_name:
+                    pass
+                else:
+                    values *= self.prop('mass', indices) / (1 - values)  # mass loss
+            elif 'mass' in property_name and 'form' in property_name:
                 values = self.prop('mass', indices) / (1 - values)  # formation mass
-            elif property_name == 'mass.loss':
-                values *= self.prop('mass', indices)  # mass loss
 
             return values
 
@@ -478,7 +481,7 @@ class ReadClass(ut.io.SayClass):
         properties='all', element_indices=None, particle_subsample_factor=None,
         separate_dark_lowres=True, sort_dark_by_id=False, force_float32=False,
         assign_center=True, assign_principal_axes=False, assign_orbit=False,
-        assign_formation_coordinates=False,
+        assign_formation_coordinates=False, assign_index_pointers=False,
         check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -517,6 +520,8 @@ class ReadClass(ut.io.SayClass):
         assign_orbit : booelan : whether to assign derived orbital properties wrt host galaxy/halo
         assign_formation_coordinates : boolean :
             whether to assign coordindates wrt the host galaxy at formation to stars
+        assign_index_pointers : boolean :
+            whether to assign index pointers from particles at z = 0 to particles in this snapshot
         check_properties : boolean : whether to check sanity of particle properties after read in
 
         Returns
@@ -622,12 +627,19 @@ class ReadClass(ut.io.SayClass):
             if assign_orbit and ('velocity' in properties or properties is 'all'):
                 self.assign_orbit(part, 'star')
 
-            # assign coordinates wrt host galaxy at formation
-            if assign_formation_coordinates and 'star' in species:
+            if 'star' in species and (assign_formation_coordinates or assign_index_pointers):
                 from . import gizmo_track
-                ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
-                    'star', simulation_directory + 'track/')
-                ParticleCoordinate.io_formation_coordinates(part)
+                if assign_formation_coordinates:
+                    # assign coordinates wrt host galaxy at formation
+                    ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
+                        'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                    ParticleCoordinate.io_formation_coordinates(part)
+
+                elif assign_index_pointers:
+                    # assign particle index pointers from z = 0 to this snapshot
+                    ParticleIndex = gizmo_track.ParticleIndexPointerClass(
+                        'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                    ParticleIndex.io_pointers(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:

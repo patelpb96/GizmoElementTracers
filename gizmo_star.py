@@ -256,7 +256,7 @@ class StellarWindClass:
 
     def get_rate(self, ages, metallicity=1, metal_mass_fraction=None):
         '''
-        Get fractional mass loss rate [Myr ^ -1] from stellar winds.
+        Get rate of fractional mass loss [Myr ^ -1] from stellar winds.
         Includes all non-supernova mass-loss channels, but dominated by O, B, and AGB-star winds.
 
         Note: Gizmo assumes solar abundance (total metal mass fraction) of 0.02,
@@ -265,12 +265,12 @@ class StellarWindClass:
         Parameters
         ----------
         age : float or array : age[s] of stellar population [Myr]
-        metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
+        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
         metal_mass_fraction : float : mass fration of all metals (everything not H, He)
 
         Returns
         -------
-        rates : float or array : fractional mass loss rate[s] [Myr ^ -1]
+        rates : float or array : rate[s] of fractional mass loss [Myr ^ -1]
         '''
         metallicity_min = 0.01  # min and max imposed in Gizmo for stellar wind rates for stability
         metallicity_max = 3
@@ -292,7 +292,7 @@ class StellarWindClass:
             else:
                 rates = 1.03 * (ages / 1e3) ** -1.1 / (12.9 - np.log(ages / 1e3))
         else:
-            assert (np.min(ages) >= 0 and np.max(ages) < 14000)
+            assert (np.min(ages) >= 0 and np.max(ages) < 16000)
 
             ages = np.asarray(ages)
             rates = np.zeros(ages.size)
@@ -326,27 +326,28 @@ class StellarWindClass:
         ----------
         age_min : float : min age of stellar population [Myr]
         age_maxs : float or array : max age[s] of stellar population [Myr]
-        metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
+        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
         metal_mass_fraction : float : mass fraction of all metals (everything not H, He)
         element_name : string : name of element to get yield of
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s] (eject mass per M_sun)
+        mass_loss_fractions : float or array : mass loss fraction[s]
         '''
-        age_bin_width = 0.01  # [Myr]
-
         if np.isscalar(age_maxs):
             mass_loss_fractions = integrate.quad(
                 self.get_rate, age_min, age_maxs, (metallicity, metal_mass_fraction))[0]
         else:
             mass_loss_fractions = np.zeros(len(age_maxs))
             for age_i, age in enumerate(age_maxs):
-                #mass_loss_fractions[age_i] = integrate.quad(
-                #    self.get_rate, age_min, age, (metallicity, metal_mass_fraction))[0]
-                # this method is more stable for piece-wise (discontinuous) function
-                ages = np.arange(age_min, age + age_bin_width, age_bin_width)
-                mass_loss_fractions[age_i] = self.get_rate(ages).sum() * age_bin_width
+                mass_loss_fractions[age_i] = integrate.quad(
+                    self.get_rate, age_min, age, (metallicity, metal_mass_fraction))[0]
+
+                # this method may be more stable for piece-wise (discontinuous) function
+                #age_bin_width = 0.001  # [Myr]
+                #ages = np.arange(age_min, age + age_bin_width, age_bin_width)
+                #mass_loss_fractions[age_i] = self.get_rate(
+                #    ages, metallicity, metal_mass_fraction).sum() * age_bin_width
 
         if element_name:
             element_yields = get_nucleosynthetic_yields('wind', metallicity, normalize=True)
@@ -372,12 +373,12 @@ class MassLossClass(ut.io.SayClass):
     def get_rate(
         self, ages, metallicity=1, metal_mass_fraction=None, ia_kind='mannucci', ia_age_min=37.53):
         '''
-        Get fractional mass loss rate [Myr ^ -1] from all stellar evolution channels.
+        Get rate of fractional mass loss [Myr ^ -1] from all stellar evolution channels.
 
         Parameters
         ----------
         age : float or array : age[s] of stellar population [Myr]
-        metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
+        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
         metal_mass_fraction : float : mass fration of all metals (everything not H, He)
         ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
         ia_age_min : float : minimum age for supernova Ia to occur [Myr]
@@ -402,7 +403,7 @@ class MassLossClass(ut.io.SayClass):
         ----------
         age_min : float : min (starting) age of stellar population [Myr]
         age_maxs : float or array : max (ending) age[s] of stellar population [Myr]
-        metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
+        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
         metal_mass_fraction : float : mass fration of all metals (everything not H, He)
         ia_kind : string : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
         ia_age_min : float : minimum age for supernova Ia to occur [Myr]
@@ -430,7 +431,7 @@ class MassLossClass(ut.io.SayClass):
         Parameters
         ----------
         ages : float or array : age[s] of stellar population [Myr]
-        metallicities : float or array : total abundace[s] of metals wrt solar_metal_mass_fraction
+        metallicities : float or array : total abundance[s] of metals wrt solar_metal_mass_fraction
         metal_mass_fractions : float or array : mass fration[s] of all metals (everything not H, He)
 
         Returns
@@ -444,7 +445,7 @@ class MassLossClass(ut.io.SayClass):
         assert np.isscalar(ages) or np.isscalar(metallicities) or len(ages) == len(metallicities)
 
         if self.Spline is None:
-            self.make_mass_loss_fraction_spline()
+            self._make_mass_loss_fraction_spline()
 
         mass_loss_fractions = self.Spline.ev(ages, metallicities)
 
@@ -453,8 +454,8 @@ class MassLossClass(ut.io.SayClass):
 
         return mass_loss_fractions
 
-    def make_mass_loss_fraction_spline(
-        self, age_limits=[1, 13900], age_bin_width=0.1,
+    def _make_mass_loss_fraction_spline(
+        self, age_limits=[1, 14000], age_bin_width=0.2,
         metallicity_limits=[0.01, 3], metallicity_bin_width=0.1,
         ia_kind='mannucci', ia_age_min=37.53):
         '''
@@ -480,7 +481,7 @@ class MassLossClass(ut.io.SayClass):
         self.MetalBin = ut.binning.BinClass(
             metallicity_limits, metallicity_bin_width, include_max=True, scaling='log')
 
-        self.say('* generating 2-D spline to compute mass loss from age and metallicity')
+        self.say('* generating 2-D spline to compute stellar mass loss from age + metallicity')
         self.say('number of age bins = {}'.format(self.AgeBin.number))
         self.say('number of metallicity bins = {}'.format(self.MetalBin.number))
 
@@ -576,7 +577,7 @@ def plot_mass_loss_v_age(
     mass_loss_limits : list : min and max limits to impose on y-axis
     mass_loss_scaling : string : 'log' or 'linear'
     element_name : string : name of element to get yield of (if None, compute total mass loss)
-    metallicity : float : total abundace of metals wrt solar_metal_mass_fraction
+    metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
     metal_mass_fraction : float : mass fration of all metals (everything not H, He)
     write_plot : boolean : whether to write plot to file
     plot_directory : string : where to write plot file
