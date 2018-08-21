@@ -26,7 +26,8 @@ import utilities as ut
 #===================================================================================================
 class SupernovaIIClass:
     '''
-    Compute rates and related quantities for core-collapse supernovae, as implemented in Gizmo.
+    Compute rates, cumulative numbers, and cumulative ejecta masses for core-collapse supernovae,
+    as implemented in Gizmo.
     '''
 
     def __init__(self):
@@ -34,11 +35,10 @@ class SupernovaIIClass:
 
     def get_rate(self, ages):
         '''
-        Get specific rate [Myr ^ -1 M_sun ^ -1] of core-collapse supernova.
+        Get specific rate [Myr ^ -1 M_sun ^ -1] of core-collapse supernovae.
 
-        These rates are from Starburst99 energetics:
-            assume each core-collapse is 10^51 erg, derive rate.
-        Core-collapse occur 3.4 to 37.53 Myr after formation:
+        Rates are from Starburst99 energetics: assume each core-collapse is 10^51 erg, derive rate.
+        Core-collapse occur from 3.4 to 37.53 Myr after formation:
             3.4 to 10.37 Myr: rate / M_sun = 5.408e-10 yr ^ -1
             10.37 to 37.53 Myr: rate / M_sun = 2.516e-10 yr ^ -1
 
@@ -77,7 +77,7 @@ class SupernovaIIClass:
 
     def get_number(self, age_min=0, age_maxs=99):
         '''
-        Get specific number (per M_sun) of supernovae in given age interval.
+        Get specific number [per M_sun] of supernovae in input age interval.
 
         Parameters
         ----------
@@ -86,7 +86,7 @@ class SupernovaIIClass:
 
         Returns
         -------
-        numbers : float or list : specific number[s] of supernovae events (per M_sun)
+        numbers : float or array : specific number[s] of supernovae events [per M_sun]
         '''
         age_bin_width = 0.01
 
@@ -133,7 +133,8 @@ SupernovaII = SupernovaIIClass()
 
 class SupernovaIaClass:
     '''
-    Compute rates and related quantities for supernovae Ia, as implemented in Gizmo.
+    Compute rates, cumulative numbers, and cumulative ejecta masses for supernovae Ia,
+    as implemented in Gizmo.
     '''
 
     def __init__(self):
@@ -141,14 +142,15 @@ class SupernovaIaClass:
 
     def get_rate(self, ages, ia_kind='mannucci', ia_age_min=37.53):
         '''
-        Get specific rate [Myr ^ -1 M_sun ^ -1] of supernova Ia.
+        Get specific rate [Myr ^ -1 M_sun ^ -1] of supernovae Ia.
 
         Default rates are from Mannucci, Della Valle, & Panagia 2006,
         for a delayed population (constant rate) + prompt population (gaussian).
         Starting 37.53 Myr after formation:
             rate / M_sun = 5.3e-14 + 1.6e-11 * exp(-0.5 * ((star_age - 5e-5) / 1e-5) ** 2) yr ^ -1
 
-        Alternately, Maoz & Graur 2017 (start Ia at 40 Myr):
+        Updated power-law model (to update Gizmo to eventually) from Maoz & Graur 2017,
+        normalized assuming Ia start 40 Myr after formation:
             rate / M_sun = 2e-13 * (star_age / 1e6) ** (-1.1) yr ^ -1
 
         Parameters
@@ -161,7 +163,7 @@ class SupernovaIaClass:
 
         Returns
         -------
-        rate : float : specific rate [Myr ^ -1 M_sun ^ -1]
+        rate : float : specific rate of supernovae [Myr ^ -1 M_sun ^ -1]
         '''
 
         def get_rate(ages, kind):
@@ -192,7 +194,7 @@ class SupernovaIaClass:
 
     def get_number(self, age_min=0, age_maxs=99, ia_kind='mannucci', ia_age_min=37.53):
         '''
-        Get specific number (per M_sun) of supernovae Ia in given age interval.
+        Get specific number [per M_sun] of supernovae Ia in given age interval.
 
         Parameters
         ----------
@@ -230,7 +232,7 @@ class SupernovaIaClass:
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s] (ejecta mass[es] per M_sun)
+        mass_loss_fractions : float or array : mass loss fraction[s] (ejecta mass per M_sun)
         '''
         mass_loss_fractions = (
             self.ejecta_mass * self.get_number(age_min, age_maxs, ia_kind, ia_age_min))
@@ -247,7 +249,8 @@ SupernovaIa = SupernovaIaClass()
 
 class StellarWindClass:
     '''
-    Compute mass loss rates rates and related quantities for stellar winds, as implemented in Gizmo.
+    Compute mass loss rates rates and cumulative mass loss fractions for stellar winds,
+    as implemented in Gizmo.
     '''
 
     def __init__(self):
@@ -257,6 +260,7 @@ class StellarWindClass:
     def get_rate(self, ages, metallicity=1, metal_mass_fraction=None):
         '''
         Get rate of fractional mass loss [Myr ^ -1] from stellar winds.
+
         Includes all non-supernova mass-loss channels, but dominated by O, B, and AGB-star winds.
 
         Note: Gizmo assumes solar abundance (total metal mass fraction) of 0.02,
@@ -320,7 +324,7 @@ class StellarWindClass:
     def get_mass_loss_fraction(
         self, age_min=0, age_maxs=99, metallicity=1, metal_mass_fraction=None, element_name=''):
         '''
-        Get fractional mass loss via stellar winds in age interval[s].
+        Get cumulative fractional mass loss via stellar winds within age interval[s].
 
         Parameters
         ----------
@@ -396,7 +400,7 @@ class MassLossClass(ut.io.SayClass):
         self, age_min=0, age_maxs=99, metallicity=1, metal_mass_fraction=None,
         ia_kind='mannucci', ia_age_min=37.53):
         '''
-        Get fractional mass loss via all stellar evolution channels in age interval[s]
+        Get fractional mass loss via all stellar evolution channels within age interval[s]
         via direct integration.
 
         Parameters
@@ -410,13 +414,8 @@ class MassLossClass(ut.io.SayClass):
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s] (mass per M_sun)
+        mass_loss_fractions : float or array : mass loss fraction[s]
         '''
-        #print(self.SupernovaII.get_mass_loss_fraction(age_min, age_maxs),
-        #      self.SupernovaIa.get_mass_loss_fraction(age_min, age_maxs, ia_kind, ia_age_min),
-        #      self.StellarWind.get_mass_loss_fraction(
-        #          age_min, age_maxs, metallicity, metal_mass_fraction))
-
         return (self.SupernovaII.get_mass_loss_fraction(age_min, age_maxs) +
                 self.SupernovaIa.get_mass_loss_fraction(age_min, age_maxs, ia_kind, ia_age_min) +
                 self.StellarWind.get_mass_loss_fraction(
@@ -426,7 +425,7 @@ class MassLossClass(ut.io.SayClass):
         self, ages=[], metallicities=[], metal_mass_fractions=None):
         '''
         Get fractional mass loss via all stellar evolution channels at ages and metallicities
-        (or mass fractions) via bivariate spline.
+        (or metal mass fractions) via 2-D (bivariate) spline.
 
         Parameters
         ----------
@@ -436,7 +435,7 @@ class MassLossClass(ut.io.SayClass):
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s] (mass per M_sun)
+        mass_loss_fractions : float or array : mass loss fraction[s]
         '''
         if metal_mass_fractions is not None:
             # convert mass fraction to metallicity using Solar value assumed in Gizmo
@@ -459,8 +458,8 @@ class MassLossClass(ut.io.SayClass):
         metallicity_limits=[0.01, 3], metallicity_bin_width=0.1,
         ia_kind='mannucci', ia_age_min=37.53):
         '''
-        Create 2-D spline (in age and metallicity) for fractional mass loss via all stellar
-        evolution channels.
+        Create 2-D bivariate spline (in age and metallicity) for fractional mass loss via
+        all stellar evolution channels.
 
         Parameters
         ----------
@@ -502,7 +501,8 @@ def plot_supernova_v_age(
     y_axis_kind='rate', y_axis_limits=[None, None], y_axis_scaling='log',
     write_plot=False, plot_directory='.', figure_index=1):
     '''
-    Plot rates or cumulative numbers of supernova (core-collapse and Ia) per M_sun.
+    Plot specific rates or cumulative numbers of supernovae (core-collapse + Ia) [per M_sun]
+    versus stellar age.
 
     Parameters
     ----------
@@ -566,7 +566,7 @@ def plot_mass_loss_v_age(
     metallicity=1, metal_mass_fraction=None,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
-    Plot nucleosynthetic element yields, according to input event_kind.
+    Compute mass loss from all channels (supernova II, Ia, stellar winds) versus stellar age.
 
     Parameters
     ----------
@@ -583,7 +583,7 @@ def plot_mass_loss_v_age(
     plot_directory : string : where to write plot file
     figure_index : int : index for matplotlib window
     '''
-    Ia_kind = 'mannucci'
+    ia_kind = 'mannucci'
 
     assert mass_loss_kind in ['rate', 'cumulative']
 
@@ -591,12 +591,12 @@ def plot_mass_loss_v_age(
 
     if mass_loss_kind == 'rate':
         supernova_II = SupernovaII.get_rate(AgeBin.mins) * SupernovaII.ejecta_mass
-        supernova_Ia = SupernovaIa.get_rate(AgeBin.mins, Ia_kind) * SupernovaIa.ejecta_mass
+        supernova_Ia = SupernovaIa.get_rate(AgeBin.mins, ia_kind) * SupernovaIa.ejecta_mass
         wind = StellarWind.get_rate(AgeBin.mins, metallicity, metal_mass_fraction)
     else:
         supernova_II = SupernovaII.get_mass_loss_fraction(0, AgeBin.mins, element_name, metallicity)
         supernova_Ia = SupernovaIa.get_mass_loss_fraction(
-            0, AgeBin.mins, Ia_kind, element_name=element_name)
+            0, AgeBin.mins, ia_kind, element_name=element_name)
         wind = StellarWind.get_mass_loss_fraction(
             0, AgeBin.mins, metallicity, metal_mass_fraction, element_name)
 
@@ -638,8 +638,8 @@ def get_nucleosynthetic_yields(
     event_kind='supernova.ii', star_metallicity=1.0, normalize=True):
     '''
     Get nucleosynthetic element yields, according to input event_kind.
-    This is the *additional* nucleosynthetic yields that are added to a stellar population's e
-    xisting metallicity (so these are not the total metal masses that get deposited to gas).
+    This is the *additional* nucleosynthetic yields that are added to a stellar population's
+    existing abundances (so these are not the total elemental masses that get deposited to gas).
 
     Parameters
     ----------
