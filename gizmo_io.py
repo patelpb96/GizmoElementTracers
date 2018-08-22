@@ -491,6 +491,7 @@ class ReadClass(ut.io.SayClass):
         self.species_read = list(self.species_all)
 
         self.quiet = quiet
+        self.verbose = not quiet
 
     def read_snapshots(
         self, species='all',
@@ -569,7 +570,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
@@ -894,7 +895,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
             snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
@@ -902,7 +903,7 @@ class ReadClass(ut.io.SayClass):
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
-        if not self.quiet:
+        if self.verbose:
             self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n')
 
         # open snapshot file
@@ -932,13 +933,13 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
 
-        if not self.quiet:
+        if self.verbose:
             self.say('snapshot contains the following number of particles:')
         # keep only species that have any particles
         read_particle_number = 0
         for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
             spec_id = self.species_dict[spec_name]
-            if not self.quiet:
+            if self.verbose:
                 self.say('  {:9s} (id = {}): {} particles'.format(
                      spec_name, spec_id, header['particle.numbers.total'][spec_id]))
 
@@ -1082,7 +1083,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
             snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
         else:
             snapshot_index = snapshot_value
@@ -1192,10 +1193,16 @@ class ReadClass(ut.io.SayClass):
         # initial particle indices to assign to each species from each file
         part_indices_lo = np.zeros(len(self.species_read), dtype=np.int64)
 
-        if header['file.number.per.snapshot'] == 1:
-            self.say('* reading particles from:\n    {}'.format(file_name.strip('./')))
+        if self.quiet:
+            if header['file.number.per.snapshot'] == 1:
+                self.say('* reading particles from {}'.format(file_name))
+            else:
+                self.say('* reading particles from {} and {} more files'.format(file_name, header['file.number.per.snapshot']))
         else:
-            self.say('* reading particles from:')
+            if header['file.number.per.snapshot'] == 1:
+                self.say('* reading particles from:\n    {}'.format(file_name.strip('./')))
+            else:
+                self.say('* reading particles from:')
 
         # loop over all files at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
@@ -1204,7 +1211,7 @@ class ReadClass(ut.io.SayClass):
 
             # open snapshot file
             with h5py.File(file_name_i, 'r') as file_in:
-                if header['file.number.per.snapshot'] > 1:
+                if not self.quiet and header['file.number.per.snapshot'] > 1:
                     self.say('  ' + file_name_i.split('/')[-1])
 
                 part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
@@ -1437,7 +1444,7 @@ class ReadClass(ut.io.SayClass):
         '''
         directory = ut.io.get_path(directory)
 
-        Snapshot = ut.simulation.SnapshotClass()
+        Snapshot = ut.simulation.SnapshotClass(quiet=self.quiet)
 
 
         if os.path.isfile(ut.io.get_path(directory) + 'snapshot_times.txt'):
@@ -1753,7 +1760,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
         snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
