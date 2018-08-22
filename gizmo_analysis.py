@@ -65,7 +65,7 @@ def print_properties_statistics(part, species='all'):
         for prop in species_property_dict[spec]:
             try:
                 prop_values = part[spec].prop(prop)
-            except ValueError:
+            except KeyError:
                 Say.say('{} not in catalog'.format(prop))
                 continue
 
@@ -2264,7 +2264,7 @@ def explore_galaxy(
             try:
                 element_name = 'metallicity.iron'
                 hal.prop('star.' + element_name)
-            except ValueError:
+            except KeyError:
                 element_name = 'metallicity.total'
 
             plot_property_distribution(

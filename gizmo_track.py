@@ -680,7 +680,7 @@ ParticleCoordinate = ParticleCoordinateClass()
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: indices, coordinates, indices+coordinates')
+        raise OSError('specify function: indices, coordinates, indices+coordinates')
 
     function_kind = str(sys.argv[1])
 

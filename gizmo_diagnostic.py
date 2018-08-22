@@ -893,7 +893,7 @@ def plot_scaling(
 if __name__ == '__main__':
 
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: runtime, properties, extrema, contamination, delete')
+        raise OSError('specify function: runtime, properties, extrema, contamination, delete')
 
     function_kind = str(sys.argv[1])
     assert ('runtime' in function_kind or 'properties' in function_kind or
