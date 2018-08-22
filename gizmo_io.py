@@ -577,7 +577,7 @@ class ReadClass(ut.io.SayClass):
 
         # read all input snapshots
         for snapshot_value in snapshot_values:
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
 
             # read header from snapshot file
             header = self.read_header(
@@ -896,7 +896,7 @@ class ReadClass(ut.io.SayClass):
 
         if snapshot_value_kind != 'index':
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
         else:
             snapshot_index = snapshot_value
 
@@ -1084,7 +1084,7 @@ class ReadClass(ut.io.SayClass):
 
         if snapshot_value_kind != 'index':
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
         else:
             snapshot_index = snapshot_value
 
@@ -1761,7 +1761,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
-        snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+        snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
 
         file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n\n')
