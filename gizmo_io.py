@@ -126,6 +126,9 @@ Some useful examples:
     part['star'].prop('age') :
         age of star particle at current snapshot (current_time - formation_time) [Gyr]
 
+    part['star'].prop('form.mass') : mass of star particle when it formed [M_sun]
+    part['star'].prop('mass.loss') : mass loss since formation of star particle [M_sun]
+
     part['gas'].prop('number.density') :
         gas number density, assuming solar metallicity [hydrogen atoms / cm^3]
 
@@ -1337,9 +1340,10 @@ class ReadClass(ut.io.SayClass):
 
         if directory:
             # find MUSIC file, assuming named *.conf
-            try:
-                file_name_find = ut.io.get_path(directory) + '*/*.conf'
-                file_name = ut.io.get_file_names(file_name_find)[0]
+            file_name_find = ut.io.get_path(directory) + '*/*.conf'
+            file_name = ut.io.get_file_names(file_name_find, verbose=False)
+            if len(file_name):
+                file_name = file_name[0]
                 self.say('* reading cosmological parameters from:  {}'.format(
                     file_name.strip('./')), end='\n\n')
                 # read cosmological parameters
@@ -1358,13 +1362,12 @@ class ReadClass(ut.io.SayClass):
                             sigma_8 = get_check_value(line, sigma_8)
                         elif 'nspec' in line:
                             n_s = get_check_value(line, n_s)
-
-            except OSError:
-                self.say('cannot find MUSIC config file: {}'.format(file_name_find.strip('./')))
+            else:
+                self.say('! cannot find MUSIC config file:  {}'.format(file_name_find.strip('./')))
 
         # AGORA box (use as default, if cannot find MUSIC config file)
         if omega_baryon is None or sigma_8 is None or n_s is None:
-            self.say('! missing cosmological parameters, assuming values from AGORA box:')
+            self.say('! missing cosmological parameters, assuming the following (from AGORA box):')
             if omega_baryon is None:
                 omega_baryon = 0.0455
                 self.say('assuming omega_baryon = {}'.format(omega_baryon))
