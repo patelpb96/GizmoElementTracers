@@ -693,7 +693,7 @@ ParticleCoordinate = ParticleCoordinateClass()
 if __name__ == '__main__':
     usage = "usage:  python {} <function: indices, distances, or indices+distances> [4 column text file with a, x, y, z in comoving kpc] [track directory=track]".format(sys.argv[0])
     if len(sys.argv) <= 1:
-        raise ValueError(usage)
+        raise OSError(usage)
 
     function_kind = str(sys.argv[1])
 

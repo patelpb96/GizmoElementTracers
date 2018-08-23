@@ -59,7 +59,7 @@ class ReadClass(ut.io.SayClass):
         parts = self.read_particles()
         hal = self.read_halos(mass_limits)
 
-        rockstar_io.IO.assign_lowres_mass(hal, parts[0], mass_limits)
+        rockstar_io.Particle.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
 
@@ -461,7 +461,7 @@ def print_contamination_in_box(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('must specify selection radius, in terms of R_200m')
+        raise OSError('must specify selection radius, in terms of R_200m')
 
     distance_max = float(sys.argv[1])
 
