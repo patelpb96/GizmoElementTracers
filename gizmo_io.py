@@ -851,12 +851,11 @@ class ReadClass(ut.io.SayClass):
 
         # check if simulation contains baryons
         header['has.baryons'] = False
-        temp = ut.array.get_list_combined(self.species_all, ['gas', 'star', 'disk', 'bulge'])
-        for spec_name in temp:
-            spec_id = self.species_dict[spec_name]
-            if header['particle.numbers.total'][spec_id] > 0:
-                header['has.baryons'] = True
-                break
+        for spec_name in self.species_all:
+            if 'dark' not in spec_name:
+                if header['particle.numbers.total'][self.species_dict[spec_name]] > 0:
+                    header['has.baryons'] = True
+                    break
 
         # assign simulation name
         if not simulation_name and simulation_directory != './':
