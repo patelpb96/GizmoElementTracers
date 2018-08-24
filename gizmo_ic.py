@@ -50,15 +50,20 @@ class ReadClass(ut.io.SayClass):
         '''
         Read particles at final and initial snapshots and halos at final snapshot.
 
+        Parameters
+        ----------
+        mass_limits : list : min and max halo mass to assign low-res DM mass
+
         Returns
         -------
         parts : list of dictionaries : catalogs of particles at initial and final snapshots
         hal : dictionary class : catalog of halos at final snapshot
         '''
-        parts = self.read_particles()
         hal = self.read_halos(mass_limits)
+        parts = self.read_particles()
 
-        rockstar_io.Particle.assign_lowres_mass(hal, parts[0], mass_limits)
+        if 'dark.2' in parts[0] and len(parts[0]['dark.2']['mass']):
+            rockstar_io.Particle.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
 
@@ -94,16 +99,20 @@ class ReadClass(ut.io.SayClass):
 
         return parts
 
-    def read_halos(self, mass_limits=[1e11, np.Inf]):
+    def read_halos(self, mass_limits=[1e11, np.Inf], file_kind='out'):
         '''
         Read halos at final snapshot.
+
+        Parameters
+        ----------
+        mass_limits : list : min and max halo mass to assign low-res DM mass
 
         Returns
         -------
         hal : dictionary class : catalog of halos at final snapshot
         '''
         hal = rockstar_io.IO.read_catalogs(
-            'redshift', self.snapshot_redshifts[0], self.simulation_directory)
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory, file_kind=file_kind)
 
         rockstar_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rself', 8000)
 
