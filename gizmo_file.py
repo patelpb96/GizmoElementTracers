@@ -242,7 +242,7 @@ def rsync_simulation_files(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise ValueError('specify function: compress, delete, rsync')
+        raise OSError('specify function: compress, delete, rsync')
 
     function_kind = str(sys.argv[1])
 
@@ -273,7 +273,7 @@ if __name__ == '__main__':
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
-            raise ValueError(
+            raise OSError(
                 'imports: machine_name simulation_directory_from simulation_directory_to')
 
         machine_name = str(sys.argv[2])
