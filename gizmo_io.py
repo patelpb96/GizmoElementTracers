@@ -357,7 +357,8 @@ class ParticleDictionaryClass(dict):
             return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
 
         # formation time or coordinates
-        if 'form.' in property_name or property_name == 'age':
+        if (('form.' in property_name or property_name == 'age') and
+                'distance' not in property_name and 'velocity' not in property_name):
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 # look-back time (stellar age) to formation
                 values = self.snapshot['time'] - self.prop('form.time', indices)
@@ -381,7 +382,8 @@ class ParticleDictionaryClass(dict):
             return values
 
         # distance or velocity wrt the center of host galaxy/halo
-        if 'host.' in property_name:
+        if ('host.' in property_name and
+                ('distance' in property_name or 'velocity' in property_name)):
             if 'form.' in property_name:
                 # special case: coordinates wrt primary host *at formation*
                 if 'distance' in property_name:

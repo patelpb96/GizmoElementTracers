@@ -62,10 +62,34 @@ class ReadClass(ut.io.SayClass):
         hal = self.read_halos(mass_limits)
         parts = self.read_particles()
 
-        if 'dark.2' in parts[0] and len(parts[0]['dark.2']['mass']):
+        if ('dark.2' in parts[0] and 'mass' in parts[0]['dark.2'] and
+                len(parts[0]['dark.2']['mass'])):
             rockstar_io.Particle.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
+
+    def read_halos(
+        self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=False):
+        '''
+        Read halos at final snapshot.
+
+        Parameters
+        ----------
+        mass_limits : list : min and max halo mass to assign low-res DM mass
+        file_kind : string : kind of halo file: 'hdf5', 'out', 'ascii', 'hlist'
+        assign_nearest_neighbor : boolean : whether to assign nearest neighboring halo
+
+        Returns
+        -------
+        hal : dictionary class : catalog of halos at final snapshot
+        '''
+        hal = rockstar_io.IO.read_catalogs(
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory, file_kind=file_kind)
+
+        if assign_nearest_neighbor:
+            rockstar_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rneig', 8000)
+
+        return hal
 
     def read_particles(
         self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
@@ -99,25 +123,6 @@ class ReadClass(ut.io.SayClass):
 
         return parts
 
-    def read_halos(self, mass_limits=[1e11, np.Inf], file_kind='out'):
-        '''
-        Read halos at final snapshot.
-
-        Parameters
-        ----------
-        mass_limits : list : min and max halo mass to assign low-res DM mass
-
-        Returns
-        -------
-        hal : dictionary class : catalog of halos at final snapshot
-        '''
-        hal = rockstar_io.IO.read_catalogs(
-            'redshift', self.snapshot_redshifts[0], self.simulation_directory, file_kind=file_kind)
-
-        rockstar_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rself', 8000)
-
-        return hal
-
 
 Read = ReadClass()
 
@@ -126,8 +131,12 @@ Read = ReadClass()
 # generate region for initial conditions
 #===================================================================================================
 class InitialConditionClass(ut.io.SayClass):
+    '''
+    Generate text file of positions of particles at the initial snapshot that are within the
+    selection region at the final snapshot.
+    '''
 
-    def write_initial_points(
+    def write_initial_positions(
         self, parts, center_position=None, distance_max=7, scale_to_halo_radius=True,
         halo_radius=None, virial_kind='200m', region_kind='convex-hull', dark_mass=None):
         '''
@@ -153,7 +162,7 @@ class InitialConditionClass(ut.io.SayClass):
             'particles', 'convex-hull', 'cube'
         dark_mass : float : DM particle mass (if simulation has only DM at single resolution)
         '''
-        file_name = 'ic_agora_mX_rad{:.1f}_points.txt'.format(distance_max)
+        file_name = 'ic_L_mX_rad{:.1f}_points.txt'.format(distance_max)
 
         assert region_kind in ['particles', 'convex-hull', 'cube']
 
@@ -355,7 +364,7 @@ class InitialConditionClass(ut.io.SayClass):
         center_position = hal['position'][hal_index]
         halo_radius = hal['radius'][hal_index]
 
-        self.write_initial_points(
+        self.write_initial_positions(
             parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
             region_kind, dark_mass)
 
@@ -390,7 +399,7 @@ class InitialConditionClass(ut.io.SayClass):
         center_position = ut.particle.get_center_position(
             parts[0], 'dark', method='center-of-mass', compare_centers=True)
 
-        self.write_initial_points(
+        self.write_initial_positions(
             parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
             region_kind)
 
