@@ -28,7 +28,7 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : string : directory of simulation
+        simulation_directory : string : top-level directory of simulation
         runtime_file_name : string : name of run-time file name (set in submission script)
 
         Returns
@@ -178,7 +178,7 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directories : string or list : directory[s] of simulation[s]
+        simulation_directories : string or list : top-level directory[s] of simulation[s]
         output_directory : string : directory of output files within simulation directory
         runtime_file_name : string : name of run-time file  to read CPU info
         wall_times_restart : float or list :
@@ -235,9 +235,9 @@ class ContaminationClass(ut.io.SayClass):
 
     def plot_contamination_v_distance(
         self, part,
-        distance_limits=[1, 2000], distance_bin_width=0.02, distance_scaling='log',
+        distance_limits=[10, 2000], distance_bin_width=0.01, distance_scaling='log',
         halo_radius=None, scale_to_halo_radius=False, center_position=None,
-        axis_y_limits=[0.0001, 3], axis_y_scaling='log',
+        axis_y_limits=[0.0001, 1], axis_y_scaling='log',
         write_plot=False, plot_directory='.', figure_index=1):
         '''
         Plot contamination from low-resolution particles v distance from center.
@@ -257,11 +257,8 @@ class ContaminationClass(ut.io.SayClass):
         plot_directory : string : directory to write figure file
         figure_index : int : index of figure for matplotlib
         '''
-        species_test = ['dark.2', 'dark.3', 'dark.4', 'dark.5', 'dark.6', 'gas', 'star']
-
         virial_kind = '200m'
 
-        species_test = ut.particle.parse_species(part, species_test)
         center_position = ut.particle.parse_property(part, 'position', center_position)
 
         if scale_to_halo_radius:
@@ -272,13 +269,13 @@ class ContaminationClass(ut.io.SayClass):
 
         profile_mass = collections.OrderedDict()
         profile_mass['total'] = {}
-        for spec in species_test:
+        for spec in part:
             profile_mass[spec] = {}
 
         profile_mass_ratio = {}
         profile_number = {}
 
-        for spec in species_test:
+        for spec in part:
             distances = ut.coordinate.get_distances(
                 part[spec]['position'], center_position, part.info['box.length'],
                 part.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
@@ -294,45 +291,46 @@ class ContaminationClass(ut.io.SayClass):
                 profile_mass['total'][prop] = profile_mass[spec][prop]
 
         # compute mass fractions relative to total mass
-        for spec in species_test:
+        for spec in part:
             for prop in profile_mass[spec]:
                 if 'distance' not in prop:
                     profile_mass['total'][prop] += profile_mass[spec][prop]
 
-        for spec in species_test:
-            mass_ratio_bin = profile_mass[spec]['sum'] / profile_mass['total']['sum']
-            mass_ratio_cum = profile_mass[spec]['sum.cum'] / profile_mass['total']['sum.cum']
-            profile_mass_ratio[spec] = {'sum': mass_ratio_bin, 'sum.cum': mass_ratio_cum}
+        for spec in part:
+            profile_mass_ratio[spec] = {
+                'sum': profile_mass[spec]['sum'] / profile_mass['total']['sum'],
+                'sum.cum': profile_mass[spec]['sum.cum'] / profile_mass['total']['sum.cum'],
+            }
             profile_number[spec] = {
                 'sum': np.int64(np.round(profile_mass[spec]['sum'] / part[spec]['mass'][0])),
-                'sum.cum': np.int64(np.round(profile_mass[spec]['sum.cum'] /
-                                             part[spec]['mass'][0])),
+                'sum.cum': np.int64(np.round(
+                    profile_mass[spec]['sum.cum'] / part[spec]['mass'][0])),
             }
 
         # print diagnostics
         if scale_to_halo_radius:
-            distances_halo = profile_mass[species_test[0]]['distance.cum']
+            distances_halo = profile_mass['dark.2']['distance.cum']
             distances_phys = distances_halo * halo_radius
         else:
-            distances_phys = profile_mass[species_test[0]]['distance.cum']
+            distances_phys = profile_mass['dark.2']['distance.cum']
             if halo_radius and halo_radius > 0:
                 distances_halo = distances_phys / halo_radius
             else:
                 distances_halo = distances_phys
 
-        species_dark = [spec for spec in species_test if 'dark' in spec]
+        species_lowres_dark = [spec for spec in part if 'dark.' in spec]
 
-        for spec in species_dark:
-            self.say(spec)
+        for spec in species_lowres_dark:
+            self.say('* {}'.format(spec))
             if profile_mass[spec]['sum.cum'][-1] == 0:
                 self.say('  none. yay!')
                 continue
 
             if scale_to_halo_radius:
-                print_string = '  d/R_halo < {:.2f}, d < {:.2f} kpc: '
+                print_string = 'd/R_halo < {:5.2f}, d < {:6.2f} kpc: '
             else:
-                print_string = '  d < {:.2f} kpc, d/R_halo < {:.2f}: '
-            print_string += 'mass_frac = {:.3f}, mass = {:.2e}, number = {:.0f}'
+                print_string = 'd < {:6.1f} kpc, d/R_halo < {:5.2f}: '
+            print_string += 'mass_frac = {:.4f}, mass = {:.2e}, number = {:.0f}'
 
             for dist_i in range(profile_mass[spec]['sum.cum'].size):
                 if profile_mass[spec]['sum.cum'][dist_i] > 0:
@@ -380,7 +378,7 @@ class ContaminationClass(ut.io.SayClass):
         print('* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
               species, distances_phys[dist_i], distances_halo[dist_i]))
 
-        for spec in species_dark:
+        for spec in species_lowres_dark:
             if species != 'dark.2' and profile_number[spec]['sum.cum'][dist_i_halo] > 0:
                 print('! {} {} particles within R_halo'.format(
                       profile_number[species]['sum.cum'][dist_i_halo], species))
@@ -406,7 +404,7 @@ class ContaminationClass(ut.io.SayClass):
             axis_x_label = 'distance $[\\rm kpc]$'
         subplot.set_xlabel(axis_x_label)
 
-        colors = ut.plot.get_colors(len(species_test), use_black=False)
+        colors = ut.plot.get_colors(len(species_lowres_dark), use_black=False)
 
         if halo_radius:
             if scale_to_halo_radius:
@@ -415,10 +413,10 @@ class ContaminationClass(ut.io.SayClass):
                 x_ref = halo_radius
             subplot.plot([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-        for spec_i, spec in enumerate(species_test):
+        for spec_i, spec in enumerate(species_lowres_dark):
             subplot.plot(
                 DistanceBin.mids, profile_mass_ratio[spec]['sum'], color=colors[spec_i], alpha=0.7,
-                label=species)
+                label=spec)
 
         ut.plot.make_legends(subplot, 'best')
 
@@ -457,7 +455,7 @@ class ContaminationClass(ut.io.SayClass):
             part, distance_limits, distance_bin_width, None, distance_scaling, halo_radius,
             scale_to_halo_radius, hal['position'][hal_index], axis_y_scaling, write_plot=None)
 
-    def plot_contamination_v_distance_both(self, redshift=0, directory='.'):
+    def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
         '''
         Plot contamination from lower-resolution particles around halo center as a function of
         distance.
@@ -465,18 +463,18 @@ class ContaminationClass(ut.io.SayClass):
         Parameters
         ----------
         redshift : float : redshift of snapshot
-        directory : string : directory of simulation (one level above directory of snapshot file)
+        simulation_directory : string : top-level directory of simulation
         '''
         distance_bin_width = 0.01
-        distance_limits_phys = [1, 4000]  # [kpc physical]
-        distance_limits_halo = [0.01, 10]  # [units of R_halo]
+        distance_limits_phys = [10, 2000]  # [kpc physical]
+        distance_limits_halo = [0.01, 7]  # [units of R_halo]
         virial_kind = '200m'
 
-        os.chdir(directory)
+        os.chdir(simulation_directory)
 
         Read = gizmo_io.ReadClass()
         part = Read.read_snapshots(
-            ['dark', 'dark.2'], 'redshift', redshift, directory,
+            ['dark', 'dark.2'], 'redshift', redshift, simulation_directory,
             properties=['position', 'mass', 'potential'], assign_center=True)
 
         halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
