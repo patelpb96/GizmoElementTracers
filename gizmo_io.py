@@ -126,6 +126,9 @@ Some useful examples:
     part['star'].prop('age') :
         age of star particle at current snapshot (current_time - formation_time) [Gyr]
 
+    part['star'].prop('form.mass') : mass of star particle when it formed [M_sun]
+    part['star'].prop('mass.loss') : mass loss since formation of star particle [M_sun]
+
     part['gas'].prop('number.density') :
         gas number density, assuming solar metallicity [hydrogen atoms / cm^3]
 
@@ -361,13 +364,14 @@ class ParticleDictionaryClass(dict):
             ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
             mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
             molecular_weights = mus * ut.constant.proton_mass
-            
+
             values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
 
             return values
 
-        # formation time or coordinates -- avoid case where we have, e.g., 'host.form.distance' from triggering
-        if ('form.' in property_name and 'host.' not in property_name) or property_name == 'age':
+        # formation time or coordinates
+        if (('form.' in property_name or property_name == 'age') and
+                'distance' not in property_name and 'velocity' not in property_name):
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 # look-back time (stellar age) to formation
                 values = self.snapshot['time'] - self.prop('form.time', indices)
@@ -391,7 +395,8 @@ class ParticleDictionaryClass(dict):
             return values
 
         # distance or velocity wrt the center of host galaxy/halo
-        if 'host.' in property_name:
+        if ('host.' in property_name and
+                ('distance' in property_name or 'velocity' in property_name)):
             if 'form.' in property_name:
                 # special case: coordinates wrt primary host *at formation*
                 if 'distance' in property_name:
@@ -954,12 +959,11 @@ class ReadClass(ut.io.SayClass):
 
         # check if simulation contains baryons
         header['has.baryons'] = False
-        temp = ut.array.get_list_combined(self.species_all, ['gas', 'star', 'disk', 'bulge'])
-        for spec_name in temp:
-            spec_id = self.species_dict[spec_name]
-            if header['particle.numbers.total'][spec_id] > 0:
-                header['has.baryons'] = True
-                break
+        for spec_name in self.species_all:
+            if 'dark' not in spec_name:
+                if header['particle.numbers.total'][self.species_dict[spec_name]] > 0:
+                    header['has.baryons'] = True
+                    break
 
         # assign simulation name
         if not simulation_name and simulation_directory != './':
@@ -1500,9 +1504,10 @@ class ReadClass(ut.io.SayClass):
 
         if directory:
             # find MUSIC file, assuming named *.conf
-            try:
-                file_name_find = ut.io.get_path(directory) + '*/*.conf'
-                file_name = ut.io.get_file_names(file_name_find)[0]
+            file_name_find = ut.io.get_path(directory) + '*/*.conf'
+            file_name = ut.io.get_file_names(file_name_find, verbose=False)
+            if len(file_name):
+                file_name = file_name[0]
                 self.say('* reading cosmological parameters from:  {}'.format(
                     file_name.strip('./')), end='\n\n')
                 # read cosmological parameters
@@ -1526,7 +1531,7 @@ class ReadClass(ut.io.SayClass):
 
         # AGORA box (use as default, if cannot find MUSIC config file)
         if omega_baryon is None or sigma_8 is None or n_s is None:
-            self.say('! missing cosmological parameters, assuming values from AGORA box:')
+            self.say('! missing cosmological parameters, assuming the following (from AGORA box):')
             if omega_baryon is None:
                 omega_baryon = 0.0455
                 self.say('assuming omega_baryon = {}'.format(omega_baryon))
