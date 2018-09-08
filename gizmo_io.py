@@ -1526,7 +1526,7 @@ class ReadClass(ut.io.SayClass):
                             sigma_8 = get_check_value(line, sigma_8)
                         elif 'nspec' in line:
                             n_s = get_check_value(line, n_s)
-            except (OSError, IOError, IndexError):
+            else:
                 self.say('cannot find MUSIC config file: {}'.format(file_name_find.strip('./')))
 
         # AGORA box (use as default, if cannot find MUSIC config file)
