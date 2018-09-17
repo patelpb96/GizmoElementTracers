@@ -42,12 +42,12 @@ def print_properties_statistics(part, species='all'):
 
     species = ut.array.arrayize(species)
     if 'all' in species:
-        species = ['dark.2', 'dark', 'star', 'gas']
+        species = ['dark2', 'dark', 'star', 'gas']
 
     species_print = [s for s in species if s in list(part)]
 
     species_property_dict = collections.OrderedDict()
-    species_property_dict['dark.2'] = ['id', 'position', 'velocity', 'mass']
+    species_property_dict['dark2'] = ['id', 'position', 'velocity', 'mass']
     species_property_dict['dark'] = ['id', 'position', 'velocity', 'mass']
     species_property_dict['star'] = [
         'id', 'id.child', 'id.generation', 'position', 'velocity', 'mass', 'form.scalefactor',
@@ -299,10 +299,10 @@ class ImageClass(ut.io.SayClass):
                 # rotate image
                 if rotation is True:
                     # rotate according to principal axes
-                    if (part[species_name].principal_axes_vectors is not None and
-                            len(part[species_name].principal_axes_vectors)):
+                    if (part[species_name].host_rotation_tensors is not None and
+                            len(part[species_name].host_rotation_tensors[0])):
                         # rotate to align with stored principal axes
-                        rotation_vectors = part[species_name].principal_axes_vectors
+                        rotation_tensor = part[species_name].host_rotation_tensors[0]
                     else:
                         # compute principal axes using all particles originally within image limits
                         masks = (positions[:, dimensions_select[0]] <= distances_max[0])
@@ -311,19 +311,19 @@ class ImageClass(ut.io.SayClass):
                                 (positions[:, dimen_i] >= -distances_max[dimen_i]) *
                                 (positions[:, dimen_i] <= distances_max[dimen_i])
                             )
-                        rotation_vectors = ut.coordinate.get_principal_axes(
+                        rotation_tensor = ut.coordinate.get_principal_axes(
                             positions[masks], weights[masks])[0]
                 elif len(rotation):
                     # use input rotation vectors
-                    rotation_vectors = np.asarray(rotation)
-                    if (np.ndim(rotation_vectors) != 2 or
-                            rotation_vectors.shape[0] != positions.shape[1] or
-                            rotation_vectors.shape[1] != positions.shape[1]):
+                    rotation_tensor = np.asarray(rotation)
+                    if (np.ndim(rotation_tensor) != 2 or
+                            rotation_tensor.shape[0] != positions.shape[1] or
+                            rotation_tensor.shape[1] != positions.shape[1]):
                         raise ValueError('wrong shape for rotation = {}'.format(rotation))
                 else:
                     raise ValueError('cannot parse rotation = {}'.format(rotation))
 
-                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_vectors)
+                positions = ut.coordinate.get_coordinates_rotated(positions, rotation_tensor)
 
             # keep only particles within distance limits
             masks = (positions[:, dimensions_select[0]] <= distances_max[0])
@@ -1286,11 +1286,11 @@ def plot_disk_orientation(
         Say.say('{}'.format(part.info['simulation.name']))
 
         # compute reference principal axes using all stars out to distance_ref
-        rotation_vectors, _eigen_values, _axes_ratios = ut.particle.get_principal_axes(
+        principal_axes = ut.particle.get_principal_axes(
             part, 'star', distance_ref, age_limits=[0, 1], center_position=center_positions[part_i],
             print_results=False)
-        axis_rotation_ref = np.dot(orientation_axis, rotation_vectors)
-        #axis_rotation_ref = np.dot(orientation_axis, part['star'].principal_axes_vectors)
+        axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation.tensor'])
+        #axis_rotation_ref = np.dot(orientation_axis, part['star'].host_rotation_tensors[0])
 
         for spec_i, spec_name in enumerate(species_names):
             Say.say('  {}'.format(spec_name))
@@ -1311,12 +1311,12 @@ def plot_disk_orientation(
                     part_indices = ut.array.get_indices(part['star'].prop('age'), [0, property_max])
                     distance_max = distance_ref
 
-                rotation_vectors, _eigen_values, _axes_ratios = ut.particle.get_principal_axes(
+                principal_axes = ut.particle.get_principal_axes(
                     part, spec_name, distance_max, center_position=center_positions[part_i],
                     part_indicess=part_indices, print_results=False)
 
                 # get orientation of axis of interest
-                axis_rotation = np.dot(orientation_axis, rotation_vectors)
+                axis_rotation = np.dot(orientation_axis, principal_axes['rotation.tensor'])
                 angle = np.arccos(np.dot(axis_rotation, axis_rotation_ref))
                 if angle is np.nan:
                     angle = 0  # sanity check, for exact alignment
@@ -2521,7 +2521,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
             gal[k].append(part.snapshot[k])
 
         # get position and velocity
-        gal['star.position'].append(part.center_position)
+        gal['star.position'].append(part.host_positions[0])
 
         for spec in species:
             for mass_percent in mass_percents:
@@ -2710,23 +2710,23 @@ def get_galaxy_mass_profiles_v_redshift(
             gal[k].append(part.snapshot[k])
 
         # get position and velocity
-        gal['star.position'].append(part.center_position)
-        gal['star.velocity'].append(part.center_velocity)
+        gal['star.position'].append(part.host_positions[0])
+        gal['star.velocity'].append(part.host_velocities[0])
 
         gal['dark.position'].append(
-            ut.particle.get_center_position(part, 'dark', method='potential'))
+            ut.particle.get_center_positions(part, 'dark', method='potential'))
         gal['dark.velocity'].append(
-            ut.particle.get_center_velocity(part, 'dark', distance_max=dark_distance_max))
+            ut.particle.get_center_velocities(part, 'dark', distance_max=dark_distance_max))
 
         # get radius_90 as fiducial
         gal_90 = ut.particle.get_galaxy_properties(
             part, profile_species_name, 'mass.percent', mass_percent, star_distance_max)
 
-        rotation_vectors, _eigen_values, axis_ratios = ut.particle.get_principal_axes(
+        principal_axes = ut.particle.get_principal_axes(
             part, profile_species_name, gal_90['radius'])
 
-        gal['rotation.tensor'].append(rotation_vectors)
-        gal['axis.ratio'].append(axis_ratios)
+        gal['rotation.tensor'].append(principal_axes['rotation.tensor'])
+        gal['axis.ratios'].append(principal_axes['axis.ratios'])
 
         for mass_percent in profile_mass_percents:
             mass_percent_name = '{:.0f}'.format(mass_percent)
@@ -2738,14 +2738,14 @@ def get_galaxy_mass_profiles_v_redshift(
 
             gal_minor = ut.particle.get_galaxy_properties(
                 part, profile_species_name, 'mass.percent', mass_percent, star_distance_max,
-                axis_kind='minor', rotation_vectors=rotation_vectors,
+                axis_kind='minor', rotation_tensor=principal_axes['rotation.tensor'],
                 other_axis_distance_limits=[0, gal_90['radius']])
             gal['radius.minor.' + mass_percent_name].append(gal_minor['radius'])
             gal['mass.minor.' + mass_percent_name].append(gal_minor['mass'])
 
             gal_major = ut.particle.get_galaxy_properties(
                 part, profile_species_name, 'mass.percent', mass_percent, star_distance_max,
-                axis_kind='major', rotation_vectors=rotation_vectors,
+                axis_kind='major', rotation_tensor=principal_axes['rotation.tensor'],
                 other_axis_distance_limits=[0, gal_minor['radius']])
             gal['radius.major.' + mass_percent_name].append(gal_major['radius'])
             gal['mass.major.' + mass_percent_name].append(gal_major['radius'])
@@ -2759,14 +2759,15 @@ def get_galaxy_mass_profiles_v_redshift(
         pro = plot_property_v_distance(
             part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, 'log', 2,
-            rotation_vectors=rotation_vectors, other_axis_distance_limits=[0, 1], get_values=True)
+            rotation_tensor=principal_axes['rotation.tensor'], other_axis_distance_limits=[0, 1],
+            get_values=True)
         for k in ['distance', 'density']:
             gal['profile.major.' + k].append(pro[profile_species_name][k])
 
         pro = plot_property_v_distance(
             part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, 'log', 1,
-            rotation_vectors=rotation_vectors, other_axis_distance_limits=[0, 0.05],
+            rotation_tensor=principal_axes['rotation.tensor'], other_axis_distance_limits=[0, 0.05],
             get_values=True)
         for k in ['distance', 'density']:
             gal['profile.minor.bulge.' + k].append(pro[profile_species_name][k])
@@ -2774,7 +2775,8 @@ def get_galaxy_mass_profiles_v_redshift(
         pro = plot_property_v_distance(
             part, profile_species_name, 'mass', 'density', 'log', False, None,
             [0.05, 20], 0.1, 'log', 1,
-            rotation_vectors=rotation_vectors, other_axis_distance_limits=[1, 10], get_values=True)
+            rotation_tensor=principal_axes['rotation.tensor'], other_axis_distance_limits=[1, 10],
+            get_values=True)
         for k in ['distance', 'density']:
             gal['profile.minor.disk.' + k].append(pro[profile_species_name][k])
 
@@ -2889,7 +2891,6 @@ class CompareSimulationsClass(ut.io.SayClass):
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         distance_max : float : maximum distance from center to plot
-        align_principal_axes : boolean : whether to align plot axes with principal axes
         '''
         properties = ['mass', 'position']
         mass_fraction = 90
@@ -2910,7 +2911,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 for part in parts:
                     gal = ut.particle.get_galaxy_properties(
                         part, spec, 'mass.percent', mass_fraction, distance_max,
-                        axis_kind='both', principal_axes_distance_max=distance_max)
+                        axis_kind='both', rotation_distance_max=distance_max)
                     gals.append(gal)
 
                 self.say('\n# species = {}'.format(spec))
@@ -3242,17 +3243,17 @@ def compare_resolution(
         parts = []
         for simulation_directory, simulation_name in simulation_names:
             for redshift in redshifts:
-                assign_center = True
+                assign_host_coordinates = True
                 if 'res880' in simulation_directory:
-                    assign_center = False
+                    assign_host_coordinates = False
                 Read = gizmo_io.ReadClass()
                 part = Read.read_snapshots(
                     'dark', 'redshift', redshift, simulation_directory,
                     simulation_name=simulation_name, properties=['position', 'mass'],
-                    assign_center=assign_center)
+                    assign_host_coordinates=assign_host_coordinates)
                 if 'res880' in simulation_directory:
-                    part.center_position = np.array(
-                        [41820.015, 44151.745, 46272.818], dtype=np.float32)
+                    part.host_positions = np.array(
+                        [[41820.015, 44151.745, 46272.818]], dtype=np.float32)
                 if len(redshifts) > 1:
                     part.info['simulation.name'] += ' z=%.1f'.format(redshift)
 
