@@ -448,8 +448,9 @@ class ParticleDictionaryClass(dict):
                     values = ut.coordinate.get_velocities_in_coordinate_system(
                         values, distance_vectors, 'cartesian', coordinate_system)
 
-            if 'total' in property_name:
-                # compute total (scalar) distance or velocity
+            # compute total (scalar) quantity
+            if '.total' in property_name:
+
                 if len(values.shape) == 1:
                     shape_pos = 0
                 else:
@@ -457,6 +458,16 @@ class ParticleDictionaryClass(dict):
                 values = np.sqrt(np.sum(values ** 2, shape_pos))
 
             return values
+
+        if '.total' in property_name:
+            # compute total (scalar) quantity (for velocity, acceleration)
+            prop_name = property_name.replace('.total', '')
+            try:
+                values = self.prop(prop_name, indices)
+                values = np.sqrt(np.sum(values ** 2, 1))
+                return values
+            except ValueError:
+                pass
 
         # should not get this far without a return
         raise KeyError(
@@ -744,7 +755,7 @@ class ReadClass(ut.io.SayClass):
                     assign_host_principal_axes=assign_host_principal_axes)
 
                 if 'velocity' in properties:
-                    self.assign_orbit(part, 'gas')
+                    self.assign_host_orbits(part, 'gas')
 
                 parts.append(part)
                 directories_read.append(directory)
