@@ -1608,7 +1608,7 @@ class ReadClass(ut.io.SayClass):
         if host_velocities is None:
             host_velocities = part.host_velocities
 
-        for center_i, center_position in host_positions:
+        for center_i, center_position in enumerate(host_positions):
             center_velocity = host_velocities[center_i]
 
             orb = ut.particle.get_orbit_dictionary(
