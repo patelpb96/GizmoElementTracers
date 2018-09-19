@@ -383,7 +383,8 @@ class ParticleDictionaryClass(dict):
 
         # distance or velocity wrt the host galaxy/halo
         if ('host' in property_name and
-                ('distance' in property_name or 'velocity' in property_name)):
+                ('distance' in property_name or 'velocity' in property_name or
+                 'acceleration' in property_name)):
             if 'host.near.' in property_name:
                 host_name = 'host.near.'
                 host_index = 0
@@ -421,6 +422,9 @@ class ParticleDictionaryClass(dict):
                         self.prop('position', indices), self.host_positions[host_index],
                         self.info['box.length'], self.snapshot['scalefactor'],
                         self.snapshot['time.hubble'])
+                elif 'acceleration' in property_name:
+                    # 3-D acceleration
+                    values = self.prop('acceleration', indices)
 
                 if 'principal' in property_name:
                     # align with host principal axes
@@ -437,7 +441,7 @@ class ParticleDictionaryClass(dict):
                 if 'distance' in property_name:
                     values = ut.coordinate.get_positions_in_coordinate_system(
                         values, 'cartesian', coordinate_system)
-                elif 'velocity' in property_name:
+                elif 'velocity' in property_name or 'acceleration' in property_name:
                     if 'form.' in property_name:
                         # special case: coordinates wrt primary host *at formation*
                         distance_vectors = self.prop('form.' + host_name + 'distance', indices)
