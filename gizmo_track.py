@@ -489,7 +489,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
             # compute host galaxy properties, including R_90
             gal = ut.particle.get_galaxy_properties(
-                part_z, self.species_name, 'mass.percent', 90, distance_max=15, print_results=True)
+                part_z, self.species_name, 'mass.percent', 90, distance_max=20, print_results=True)
 
             if not gal['radius'] or np.isnan(gal['radius']):
                 self.say('! too few particles to define galaxy size')

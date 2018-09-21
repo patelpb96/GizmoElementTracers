@@ -1965,8 +1965,22 @@ class StarFormHistoryClass(ut.io.SayClass):
         part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
         time_limits = np.array(time_limits)
-        if time_limits[1] is None:
-            time_limits[1] = parts[0].snapshot[time_kind]
+        if None in time_limits:
+            if time_kind == 'redshift':
+                if time_limits[0] is None:
+                    time_limits[0] = parts[0].snapshot[time_kind]
+                if time_limits[1] is None:
+                    time_limits[1] = 7
+            elif time_kind == 'time':
+                if time_limits[0] is None:
+                    time_limits[0] = 0
+                elif time_limits[1] is None:
+                    time_limits[1] = parts[0].snapshot[time_kind]
+            elif time_kind == 'time.lookback':
+                if time_limits[0] is None:
+                    time_limits[0] = 0
+                elif time_limits[1] is None:
+                    time_limits[1] = 13.6  # [Gyr]
 
         sfh = {}
 
@@ -2886,7 +2900,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                    0.29, 0.28, 0.27, 0.26, 0.25, 0.24, 0.23, 0.22, 0.21, 0.2,
                    0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1,
                    0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0],
-        distance_max=15):
+        distance_max=20):
         '''
         Print 2-D sizes of galaxies.
 
