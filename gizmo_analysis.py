@@ -116,7 +116,7 @@ def plot_metal_v_distance(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
 
     distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
@@ -288,7 +288,7 @@ class ImageClass(ut.io.SayClass):
         if weight_name:
             weights = part[species_name].prop(weight_name, part_indices)
 
-        center_position = ut.particle.parse_property(part, 'position', center_position)
+        center_position = ut.particle.parse_property(part, 'center_position', center_position)
 
         if center_position is not None and len(center_position):
             # re-orient to input center
@@ -722,10 +722,10 @@ def plot_property_distribution(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
     if 'velocity' in property_name:
-        center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+        center_velocities = ut.particle.parse_property(parts, 'center_velocity', center_velocities)
 
     Stat = ut.statistic.StatisticClass()
 
@@ -826,7 +826,7 @@ def plot_property_v_property(
     '''
     Say = ut.io.SayClass(plot_property_v_property)
 
-    center_position = ut.particle.parse_property(part, 'position', center_position)
+    center_position = ut.particle.parse_property(part, 'center_position', center_position)
 
     if part_indices is None or not len(part_indices):
         part_indices = ut.array.get_arange(part[species_name].prop(x_property_name))
@@ -995,9 +995,9 @@ def plot_property_v_distance(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
     if 'velocity' in property_name:
-        center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+        center_velocities = ut.particle.parse_property(parts, 'center_velocity', center_velocities)
     else:
         center_velocities = [center_velocities for _ in center_positions]
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
@@ -1207,8 +1207,8 @@ def print_densities(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
-    center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+    center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
+    center_velocities = ut.particle.parse_property(parts, 'center_velocity', center_velocities)
 
     for part_i, part in enumerate(parts):
         densities_2d = []
@@ -1275,7 +1275,7 @@ def plot_disk_orientation(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
 
     PropertyBin = ut.binning.BinClass(
         property_limits, property_bin_width, scaling=property_scaling, include_max=True)
@@ -1408,10 +1408,10 @@ def plot_velocity_distribution_of_halo(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+    center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
     if 'velocity' in property_name:
-        center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities)
+        center_velocities = ut.particle.parse_property(parts, 'center_velocity', center_velocities)
 
     Stat = ut.statistic.StatisticClass()
 
@@ -1877,7 +1877,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             part_indices = ut.catalog.get_indices_catalog(
                 part['star'], property_select, part_indices)
 
-        center_position = ut.particle.parse_property(part, 'position', center_position)
+        center_position = ut.particle.parse_property(part, 'center_position', center_position)
 
         if (center_position is not None and len(center_position) and
                 distance_limits is not None and len(distance_limits)):
@@ -1961,7 +1961,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         if isinstance(parts, dict):
             parts = [parts]
 
-        center_positions = ut.particle.parse_property(parts, 'position', center_positions)
+        center_positions = ut.particle.parse_property(parts, 'center_position', center_positions)
         part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
         time_limits = np.array(time_limits)
@@ -2211,7 +2211,7 @@ StarFormHistory = StarFormHistoryClass()
 #===================================================================================================
 def explore_galaxy(
     hal, hal_index=None, part=None, species_plot=['star'],
-    distance_max=None, distance_bin_width=0.25, distance_bin_number=None, plot_only_members=False,
+    distance_max=None, distance_bin_width=0.25, distance_bin_number=None, plot_only_members=True,
     write_plot=False, plot_directory='.'):
     '''
     Print and plot several properties of galaxies in list.
@@ -2244,12 +2244,14 @@ def explore_galaxy(
             if plot_only_members:
                 part_indices = hal.prop('star.indices', hi)
 
+            # image of member particles
             Image.plot_image(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), part_indices=part_indices,
                 write_plot=write_plot, plot_name=plot_directory, figure_index=10)
 
+            # image of all nearby particles
             Image.plot_image(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
@@ -2308,34 +2310,38 @@ def explore_galaxy(
                 part, 'mass.normalized', 'time.lookback', [13.6, 0], 0.2, 'linear', [], None, {},
                 part_indices, [0, 1], 'linear', write_plot, plot_directory, figure_index=18)
 
-        if 'dark' in species_plot and 'dark' in part:  # and 'dark.indices' in hal:
+        if 'dark' in species_plot and 'dark' in part:
             part_indices = None
-            #if plot_only_members:
-            #    part_indices = hal.prop('dark.indices', hi)
 
             center_position = hal.prop('position', hi)
-            #center_velocity = hal.prop('velocity', hi)
-            if 'star.position' in hal:
-                center_position = hal.prop('star.position', hi)
-            #    center_velocity = hal.prop('star.velocity', hi)
+            #if 'star.position' in hal:
+            #    center_position = hal.prop('star.position', hi)
 
             if 'star.radius.50' in hal:
                 distance_reference = hal.prop('star.radius.50', hi)
             else:
                 distance_reference = None
 
+            # DM image centered on stars
             Image.plot_image(
                 part, 'dark', 'mass', 'histogram',
                 [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), background_color='black',
                 write_plot=write_plot, plot_name=plot_directory, figure_index=20)
 
+            # DM image centered on DM halo
+            Image.plot_image(
+                part, 'dark', 'mass', 'histogram',
+                [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
+                hal.prop('position', hi), background_color='black',
+                write_plot=write_plot, plot_name=plot_directory, figure_index=21)
+
             plot_property_v_distance(
                 part, 'dark', 'mass', 'density', 'log', False, None,
                 [0.1, distance_max], 0.1, 'log', 3,
                 center_positions=center_position, part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=22)
 
             """
             plot_property_v_distance(
@@ -2344,7 +2350,7 @@ def explore_galaxy(
                 center_positions=center_position, center_velocities=center_velocity,
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=22)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=23)
             """
 
             plot_property_v_distance(
@@ -2352,7 +2358,7 @@ def explore_galaxy(
                 [0.1, distance_max], 0.1, 'log', 3,
                 center_positions=center_position, part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=23)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=24)
 
         if 'gas' in species_plot and 'gas' in part and 'gas.indices' in hal:
             part_indices = None

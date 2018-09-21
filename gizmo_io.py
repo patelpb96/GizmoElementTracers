@@ -943,7 +943,7 @@ class ReadClass(ut.io.SayClass):
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
-            'Acceleration': 'acceleration',
+            'Acceleration': 'acceleration',  # from grav for DM and stars, from grav + hydro for gas
             ## particles with adaptive smoothing
             #'AGS-Softening': 'smooth.length',  # for gas, this is same as SmoothingLength
 
@@ -1280,7 +1280,7 @@ class ReadClass(ut.io.SayClass):
             if 'potential' in part[spec_name]:
                 # convert to [km^2 / s^2 physical]
                 # TO DO: check if Gizmo writes potential as m / r, in raw units?
-                # 1 / a conversion remains accurate, but might need to add:
+                # might need to add:
                 # M *= 1e10 / header['hubble'] to get Msun
                 # r /= header['hubble'] to get kpc physical
                 # G conversion?
