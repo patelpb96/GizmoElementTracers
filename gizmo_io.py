@@ -703,7 +703,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directories : list or list of lists :
+        simulation_directories : list or list of lists :
             list of simulation directories, or list of pairs of directory + simulation name
         species : string or list : name[s] of particle species to read
         snapshot_value_kind : string :

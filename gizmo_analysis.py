@@ -299,7 +299,7 @@ class ImageClass(ut.io.SayClass):
                 # rotate image
                 if rotation is True:
                     # rotate according to principal axes
-                    if (part[species_name].host_rotation_tensors is not None and
+                    if (len(part[species_name].host_rotation_tensors) and
                             len(part[species_name].host_rotation_tensors[0])):
                         # rotate to align with stored principal axes
                         rotation_tensor = part[species_name].host_rotation_tensors[0]
@@ -2867,6 +2867,29 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         self.simulation_names = []
 
+    def parse_inputs(self, parts=None, species=None, redshifts=None):
+        '''
+        parts : list : dictionaries of particles at snapshot
+        species : string or list : name[s] of particle species to read and analyze
+        redshifts : float or list
+        '''
+        if parts is not None and isinstance(parts, dict):
+            parts = [parts]
+
+        if species is not None and np.isscalar(species):
+            species = [species]
+
+        if redshifts is not None and np.isscalar(redshifts):
+            redshifts = [redshifts]
+
+        if parts is not None and redshifts is not None and len(redshifts) > 1:
+            self.say('! input particles at single snapshot but also input more than one redshift')
+            self.say('  analyzing just snapshot redshift = {:.3f}'.format(
+                parts[0].snapshot['redshift']))
+            redshifts = [parts[0].snapshot['redshift']]
+
+        return parts, species, redshifts
+
     def plot_all(
         self, parts=None, species=['star', 'gas', 'dark'], simulation_directories=None,
         redshifts=[0]):
@@ -2884,8 +2907,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if len(redshifts) > 1:
-                parts = self.Read.read_simulations(
-                    simulation_directories, species, redshift, self.properties)
+                parts = self.Read.read_snapshots_simulations(
+                    simulation_directories, species, 'redshift', redshift, self.properties)
 
             if 'star' in species:
                 self.print_masses_sizes(parts, 'star', simulation_directories, redshifts)
@@ -2923,8 +2946,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if len(redshifts) > 1:
-                parts = self.Read.read_simulations(
-                    simulation_directories, species, redshift, properties)
+                parts = self.Read.read_snapshots_simulations(
+                    simulation_directories, species, 'redshift', redshift, properties)
 
             gals = []
             for spec in ut.array.get_list_combined(species, parts[0], 'intersect'):
@@ -2967,8 +2990,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if len(redshifts) > 1:
-                parts = self.Read.read_simulations(
-                    simulation_directories, species, redshift, self.properties)
+                parts = self.Read.read_snapshots_simulations(
+                    simulation_directories, species, 'redshift', redshift, self.properties)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
@@ -3115,8 +3138,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if len(redshifts) > 1:
-                parts = self.Read.read_simulations(
-                    simulation_directories, species, redshift, self.properties)
+                parts = self.Read.read_snapshot_imulations(
+                    simulation_directories, species, 'redshift', redshift, self.properties)
 
             for part in parts:
                 species_name = 'star'
@@ -3184,8 +3207,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if len(redshifts) > 1:
-                parts = self.Read.read_simulations(
-                    simulation_directories, species, redshift, properties)
+                parts = self.Read.read_snapshots_simulations(
+                    simulation_directories, species, 'redshift', redshift, properties)
 
             for part in parts:
                 species_name = 'star'
@@ -3217,29 +3240,6 @@ class CompareSimulationsClass(ut.io.SayClass):
                         background_color='black',
                         write_plot=True, plot_name=plot_directory,
                     )
-
-    def parse_inputs(self, parts=None, species=None, redshifts=None):
-        '''
-        parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
-        redshifts : float or list
-        '''
-        if parts is not None and isinstance(parts, dict):
-            parts = [parts]
-
-        if species is not None and np.isscalar(species):
-            species = [species]
-
-        if redshifts is not None and np.isscalar(redshifts):
-            redshifts = [redshifts]
-
-        if parts is not None and redshifts is not None and len(redshifts) > 1:
-            self.say('! input particles at single snapshot but also input more than one redshift')
-            self.say('  analyzing just snapshot redshift = {:.3f}'.format(
-                parts[0].snapshot['redshift']))
-            redshifts = [parts[0].snapshot['redshift']]
-
-        return parts, species, redshifts
 
 
 CompareSimulations = CompareSimulationsClass()
