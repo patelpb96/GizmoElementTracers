@@ -1890,41 +1890,44 @@ class StarFormHistoryClass(ut.io.SayClass):
         # get star particle formation times, sorted from earliest
         part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
         form_times = part[species].prop('form.time', part_indices_sort)
-        masses = part[species]['mass'][part_indices_sort]
-        masses_cum = np.cumsum(masses)
+        form_masses = part[species].prop('form.mass', part_indices_sort)
+        current_masses = part[species]['mass'][part_indices_sort]
 
         # get time bins, ensure are ordered from earliest
         time_dict = self.get_time_bin_dictionary(
             time_kind, time_limits, time_width, time_scaling, part.Cosmology)
         time_bins = np.sort(time_dict['time'])
-
-        mass_cum_in_bins = np.interp(time_bins, form_times, masses_cum)
-        mass_difs = np.diff(mass_cum_in_bins)
         time_difs = np.diff(time_bins)
-        dm_dt_in_bins = mass_difs / time_difs / ut.constant.giga  # convert to [M_sun / yr]
+
+        form_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(form_masses))
+        form_mass_difs = np.diff(form_mass_cum_bins)
+        form_rate_bins = form_mass_difs / time_difs / ut.constant.giga  # convert to [M_sun / yr]
+
+        current_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(current_masses))
+        current_mass_difs = np.diff(current_mass_cum_bins)
 
         # convert to midpoints of bins
-        mass_cum_in_bins = mass_cum_in_bins[: mass_cum_in_bins.size - 1] + 0.5 * mass_difs
-
-        # account for stellar mass loss, crudely assuming instantaneous recycling
-        dm_dt_in_bins /= 0.7
-        #mass_cum_in_bins += mass_difs * (1 / 0.7 - 1)
+        current_mass_cum_bins = (
+            current_mass_cum_bins[: current_mass_cum_bins.size - 1] +
+            0.5 * current_mass_difs)
+        form_mass_cum_bins = (
+            form_mass_cum_bins[: form_mass_cum_bins.size - 1] + 0.5 * form_mass_difs)
 
         for k in time_dict:
             time_dict[k] = time_dict[k][: time_dict[k].size - 1] + 0.5 * np.diff(time_dict[k])
 
         # ensure ordering jives with ordering of input limits
         if time_dict['time'][0] > time_dict['time'][1]:
-            dm_dt_in_bins = dm_dt_in_bins[::-1]
-            mass_cum_in_bins = mass_cum_in_bins[::-1]
+            form_rate_bins = form_rate_bins[::-1]
+            current_mass_cum_bins = current_mass_cum_bins[::-1]
 
         sfh = {}
         for k in time_dict:
             sfh[k] = time_dict[k]
-        sfh['form.rate'] = dm_dt_in_bins
-        sfh['form.rate.specific'] = dm_dt_in_bins / mass_cum_in_bins
-        sfh['mass'] = mass_cum_in_bins
-        sfh['mass.normalized'] = mass_cum_in_bins / mass_cum_in_bins.max()
+        sfh['form.rate'] = form_rate_bins
+        sfh['form.rate.specific'] = form_rate_bins / form_mass_cum_bins
+        sfh['mass'] = current_mass_cum_bins
+        sfh['mass.normalized'] = current_mass_cum_bins / current_mass_cum_bins.max()
         sfh['particle.number'] = form_times.size
 
         return sfh
@@ -1996,7 +1999,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             for k in sfh_p:
                 sfh[k].append(sfh_p[k])
 
-            self.say('star.mass max = {:.3e}'.format(sfh_p['mass'].max()))
+            self.say('star.mass max = {}'.format(
+                ut.io.get_string_from_numbers(sfh_p['mass'].max(), 2, exponential=True)))
 
         if time_kind == 'redshift' and 'log' in time_scaling:
             time_limits += 1  # convert to z + 1 so log is well-defined
@@ -2188,7 +2192,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 linewidth = 2.5 + 0.1 * hal_ii
                 #linewidth = 3.0
                 mass = ut.io.get_string_from_numbers(
-                    sfh['mass'][hal_ii][-1], 1, force_exponential=True)
+                    sfh['mass'][hal_ii][-1], 1, exponential=True)
                 label = '${}\,{{\\rm M}}_\odot$'.format(mass)
                 subplot.plot(sfh[time_kind][hal_ii], sfh[sfh_kind][hal_ii],
                              linewidth=linewidth, color=colors[hal_ii], alpha=0.55, label=label)
@@ -2225,7 +2229,7 @@ StarFormHistory = StarFormHistoryClass()
 #===================================================================================================
 def explore_galaxy(
     hal, hal_index=None, part=None, species_plot=['star'],
-    distance_max=None, distance_bin_width=0.25, distance_bin_number=None, plot_only_members=True,
+    distance_max=None, distance_bin_width=0.2, distance_bin_number=None, plot_only_members=True,
     write_plot=False, plot_directory='.'):
     '''
     Print and plot several properties of galaxies in list.
@@ -2251,7 +2255,7 @@ def explore_galaxy(
 
     if part is not None:
         if not distance_max and 'star.radius.90' in hal:
-            distance_max = 3 * hal.prop('star.radius.90', hi)
+            distance_max = 2 * hal.prop('star.radius.90', hi)
 
         if 'star' in species_plot and 'star' in part and 'star.indices' in hal:
             part_indices = None
@@ -2268,7 +2272,7 @@ def explore_galaxy(
             # image of all nearby particles
             Image.plot_image(
                 part, 'star', 'mass', 'histogram',
-                [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
+                [0, 1, 2], [0, 1, 2], distance_max * 4, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi),
                 write_plot=write_plot, plot_name=plot_directory, figure_index=11)
 
@@ -2339,14 +2343,14 @@ def explore_galaxy(
             # DM image centered on stars
             Image.plot_image(
                 part, 'dark', 'mass', 'histogram',
-                [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
+                [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), background_color='black',
                 write_plot=write_plot, plot_name=plot_directory, figure_index=20)
 
             # DM image centered on DM halo
             Image.plot_image(
                 part, 'dark', 'mass', 'histogram',
-                [0, 1], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
+                [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('position', hi), background_color='black',
                 write_plot=write_plot, plot_name=plot_directory, figure_index=21)
 

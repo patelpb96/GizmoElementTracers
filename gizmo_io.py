@@ -186,7 +186,7 @@ class ParticleDictionaryClass(dict):
 
         self.MassLoss = None
 
-    def prop(self, property_name='', indices=None):
+    def prop(self, property_name='', indices=None, dict_only=False):
         '''
         Get property, either from self dictionary or derive.
         Can compute basic mathematical manipulations, for example:
@@ -196,6 +196,7 @@ class ParticleDictionaryClass(dict):
         ----------
         property_name : string : name of property
         indices : array : indices of particles to select
+        dict_only : bool : require property_name to be in self's dict - avoids endless recursion
 
         Returns
         -------
@@ -210,6 +211,8 @@ class ParticleDictionaryClass(dict):
                 return self[property_name][indices]
             else:
                 return self[property_name]
+        elif dict_only:
+            raise KeyError('property = {} is not in self\'s dictionary'.format(property_name))
 
         # math relation, combining more than one property
         if ('/' in property_name or '*' in property_name or '+' in property_name or
@@ -222,8 +225,7 @@ class ParticleDictionaryClass(dict):
                     break
 
             if len(prop_names) == 1:
-                raise KeyError(
-                    'property = {} is not valid input to {}'.format(property_name, self.__class__))
+                raise KeyError('not sure how to parse property = {}'.format(property_name))
 
             # make copy so not change values in input catalog
             prop_values = np.array(self.prop(prop_names[0], indices))
@@ -275,21 +277,21 @@ class ParticleDictionaryClass(dict):
                 if 'fraction' in property_name:
                     pass
                 else:
-                    values *= self.prop('mass', indices) / (1 - values)  # mass loss
+                    values *= self.prop('mass', indices, dict_only=True) / (1 - values)  # mass loss
             elif 'mass' in property_name and 'form' in property_name:
-                values = self.prop('mass', indices) / (1 - values)  # formation mass
+                values = self.prop('mass', indices, dict_only=True) / (1 - values)  # formation mass
 
             return values
 
         # mass of element
         if 'mass.' in property_name:
             # mass of individual element
-            values = (self.prop('mass', indices) *
+            values = (self.prop('mass', indices, dict_only=True) *
                       self.prop(property_name.replace('mass.', 'massfraction.'), indices))
 
             if property_name == 'mass.hydrogen.neutral':
                 # mass of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
-                values = values * self.prop('hydrogen.neutral.fraction', indices)
+                values = values * self.prop('hydrogen.neutral.fraction', indices, dict_only=True)
 
             return values
 
@@ -325,8 +327,7 @@ class ParticleDictionaryClass(dict):
                     break
 
             if element_index is None:
-                raise KeyError(
-                    'property = {} is not valid input to {}'.format(property_name, self.__class__))
+                raise KeyError('not sure how to parse property = {}'.format(property_name))
 
             if indices is None:
                 values = self['massfraction'][:, element_index]
@@ -340,7 +341,7 @@ class ParticleDictionaryClass(dict):
             return values
 
         if 'number.density' in property_name:
-            values = (self.prop('density', indices) * ut.constant.proton_per_sun *
+            values = (self.prop('density', indices, dict_only=True) * ut.constant.proton_per_sun *
                       ut.constant.kpc_per_cm ** 3)
 
             if '.hydrogen' in property_name:
@@ -354,21 +355,23 @@ class ParticleDictionaryClass(dict):
 
         if 'kernel.length' in property_name:
             # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
-            return 1000 * (self.prop('mass', indices) / self.prop('density', indices)) ** (1 / 3)
+            return 1000 * (self.prop('mass', indices, dict_only=True) /
+                           self.prop('density', indices, dict_only=True)) ** (1 / 3)
 
         # formation time or coordinates
         if (('form.' in property_name or property_name == 'age') and
-                'distance' not in property_name and 'velocity' not in property_name):
+                'host' not in property_name and 'distance' not in property_name and
+                'velocity' not in property_name):
             if property_name == 'age' or ('time' in property_name and 'lookback' in property_name):
                 # look-back time (stellar age) to formation
                 values = self.snapshot['time'] - self.prop('form.time', indices)
             elif 'time' in property_name:
                 # time (age of universe) of formation
                 values = self.Cosmology.get_time(
-                    self.prop('form.scalefactor', indices), 'scalefactor')
+                    self.prop('form.scalefactor', indices, dict_only=True), 'scalefactor')
             elif 'redshift' in property_name:
                 # redshift of formation
-                values = 1 / self.prop('form.scalefactor', indices) - 1
+                values = 1 / self.prop('form.scalefactor', indices, dict_only=True) - 1
             elif 'snapshot' in property_name:
                 # snapshot index immediately after formation
                 # increase formation scale-factor slightly for safety, because scale-factors of
@@ -376,8 +379,8 @@ class ParticleDictionaryClass(dict):
                 padding_factor = (1 + 1e-7)
                 values = self.Snapshot.get_snapshot_indices(
                     'scalefactor',
-                    np.clip(self.prop('form.scalefactor', indices) * padding_factor, 0, 1),
-                    round_kind='up')
+                    np.clip(self.prop('form.scalefactor', indices, dict_only=True) *
+                            padding_factor, 0, 1), round_kind='up')
 
             return values
 
@@ -404,27 +407,30 @@ class ParticleDictionaryClass(dict):
                 # special case: coordinates wrt primary host *at formation*
                 if 'distance' in property_name:
                     # 3-D distance vector wrt primary host at formation
-                    values = self.prop('form.' + host_name + 'distance', indices)
+                    values = self.prop('form.' + host_name + 'distance', indices, dict_only=True)
                 elif 'velocity' in property_name:
                     # 3-D velocity vectory wrt host at formation
-                    values = self.prop('form.' + host_name + '.velocity', indices)
+                    values = self.prop('form.' + host_name + 'velocity', indices, dict_only=True)
             else:
                 # general case: coordinates wrt primary host at current snapshot
                 if 'distance' in property_name:
                     # 3-D distance vector wrt primary host at current snapshot
                     values = ut.coordinate.get_distances(
-                        self.prop('position', indices), self.host_positions[host_index],
+                        self.prop('position', indices, dict_only=True),
+                        self.host_positions[host_index],
                         self.info['box.length'], self.snapshot['scalefactor'])  # [kpc physical]
                 elif 'velocity' in property_name:
                     # 3-D velocity, includes the Hubble flow
                     values = ut.coordinate.get_velocity_differences(
-                        self.prop('velocity', indices), self.host_velocities[host_index],
-                        self.prop('position', indices), self.host_positions[host_index],
+                        self.prop('velocity', indices, dict_only=True),
+                        self.host_velocities[host_index],
+                        self.prop('position', indices, dict_only=True),
+                        self.host_positions[host_index],
                         self.info['box.length'], self.snapshot['scalefactor'],
                         self.snapshot['time.hubble'])
                 elif 'acceleration' in property_name:
                     # 3-D acceleration
-                    values = self.prop('acceleration', indices)
+                    values = self.prop('acceleration', indices, dict_only=True)
 
                 if 'principal' in property_name:
                     # align with host principal axes
@@ -444,11 +450,13 @@ class ParticleDictionaryClass(dict):
                 elif 'velocity' in property_name or 'acceleration' in property_name:
                     if 'form.' in property_name:
                         # special case: coordinates wrt primary host *at formation*
-                        distance_vectors = self.prop('form.' + host_name + 'distance', indices)
+                        distance_vectors = self.prop(
+                            'form.' + host_name + 'distance', indices, dict_only=True)
                     elif 'principal' in property_name:
                         distance_vectors = self.prop(host_name + 'distance.principal', indices)
                     else:
-                        distance_vectors = self.prop(host_name + 'distance', indices)
+                        distance_vectors = self.prop(
+                            host_name + 'distance', indices, dict_only=True)
                     values = ut.coordinate.get_velocities_in_coordinate_system(
                         values, distance_vectors, 'cartesian', coordinate_system)
 
@@ -474,8 +482,7 @@ class ParticleDictionaryClass(dict):
                 pass
 
         # should not get this far without a return
-        raise KeyError(
-            'property = {} is not valid input to {}'.format(property_name, self.__class__))
+        raise KeyError('not sure how to parse property = {}'.format(property_name))
 
 
 #===================================================================================================
@@ -514,7 +521,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind='index', snapshot_values=600,
         simulation_directory='.', snapshot_directory='output/', simulation_name='',
         properties='all', element_indices=None, particle_subsample_factor=None,
-        separate_dark_lowres=False, sort_dark_by_id=False, force_float32=False,
+        separate_dark_lowres=False, sort_dark_by_id=False, convert_float32=False,
         host_number=1, assign_host_coordinates=True,
         assign_host_principal_axes=False, assign_host_orbits=False,
         assign_formation_coordinates=False, assign_index_pointers=False,
@@ -550,7 +557,7 @@ class ReadClass(ut.io.SayClass):
         separate_dark_lowres : boolean :
             whether to separate low-resolution dark matter into separate dicts according to mass
         sort_dark_by_id : boolean : whether to sort dark-matter particles by id
-        force_float32 : boolean : whether to force all floats to be 32 bit, to save memory
+        convert_float32 : boolean : whether to convert all floats to 32 bit to save memory
         host_number : int : number of hosts to assign and compute coordinates relative to
         assign_host_coordinates : boolean :
             whether to assign position[s] and velocity[s] of host galaxy/halo[s]
@@ -604,7 +611,7 @@ class ReadClass(ut.io.SayClass):
             # read particles from snapshot file[s]
             part = self.read_particles(
                 'index', snapshot_index, simulation_directory, snapshot_directory, properties,
-                element_indices, force_float32, header)
+                element_indices, convert_float32, header)
 
             # read/get (additional) cosmological parameters
             if header['is.cosmological']:
@@ -695,7 +702,7 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots_simulations(
         self, simulation_directories=[], species='all',
         snapshot_value_kind='index', snapshot_value=600,
-        properties='all', element_indices=[0, 1, 6, 10], force_float32=False,
+        properties='all', element_indices=[0, 1, 6, 10], convert_float32=False,
         assign_host_principal_axes=False):
         '''
         Read snapshots at the same redshift from different simulations.
@@ -711,7 +718,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value : int or float : index or redshift or scale-factor of snapshot
         properties : string or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
-        force_float32 : boolean : whether to force positions to be 32-bit
+        convert_float32 : boolean : whether to convert all floats to 32 bit to save memory
         assign_host_principal_axes : boolean :
             whether to assign principal axes rotation tensor[s] of host galaxy[s]/halo[s]
 
@@ -755,7 +762,7 @@ class ReadClass(ut.io.SayClass):
                 part = self.read_snapshots(
                     species, snapshot_value_kind, snapshot_value, directory,
                     simulation_name=simulation_name, properties=properties,
-                    element_indices=element_indices, force_float32=force_float32,
+                    element_indices=element_indices, convert_float32=convert_float32,
                     assign_host_principal_axes=assign_host_principal_axes)
 
                 if 'velocity' in properties:
@@ -913,7 +920,7 @@ class ReadClass(ut.io.SayClass):
     def read_particles(
         self, snapshot_value_kind='index', snapshot_value=600, simulation_directory='.',
         snapshot_directory='output/', properties='all', element_indices=None,
-        force_float32=False, header=None):
+        convert_float32=False, header=None):
         '''
         Read particles from snapshot file[s].
 
@@ -928,7 +935,7 @@ class ReadClass(ut.io.SayClass):
             otherwise, choose subset from among property_dict
         element_indices : int or list : indices of elements to keep
             note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
-        force_float32 : boolean : whether to force all floats to 32-bit, to save memory
+        convert_float32 : boolean : whether to convert all floats to 32 bit to save memory
 
         Returns
         -------
@@ -1090,7 +1097,7 @@ class ReadClass(ut.io.SayClass):
 
                         # determine data type to store
                         prop_in_dtype = part_in[prop_in].dtype
-                        if force_float32 and prop_in_dtype == 'float64':
+                        if convert_float32 and prop_in_dtype == 'float64':
                             prop_in_dtype = np.float32
 
                         # initialize to -1's
