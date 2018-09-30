@@ -259,7 +259,7 @@ class ContaminationClass(ut.io.SayClass):
         '''
         virial_kind = '200m'
 
-        center_position = ut.particle.parse_property(part, 'position', center_position)
+        center_position = ut.particle.parse_property(part, 'center_position', center_position)
 
         if scale_to_halo_radius:
             assert halo_radius and halo_radius > 0
@@ -451,7 +451,7 @@ class ContaminationClass(ut.io.SayClass):
         distance_limits = [0, distance_max]
         axis_y_scaling = 'log'
 
-        self.say('halo radius = {:.3f} kpc'.format(hal['radius'][hal_index]))
+        self.say('halo radius = {:.1f} kpc'.format(hal['radius'][hal_index]))
 
         halo_radius = hal['radius'][hal_index]
 
