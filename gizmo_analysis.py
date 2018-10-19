@@ -2225,6 +2225,104 @@ StarFormHistory = StarFormHistoryClass()
 
 
 #===================================================================================================
+# analysis across time
+#===================================================================================================
+def plot_gas_neutral_fraction_v_redshift(
+    parts=None, redshift_limits=[6, 8.4], simulation_directory='.',
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    .
+    '''
+    if parts is None:
+        from . import gizmo_io
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+        snapshot_indices = ut.array.get_indices(
+            Snapshot['redshift'], [min(redshift_limits) * 0.99, max(redshift_limits) * 1.01])
+        redshifts = Snapshot['redshift'][snapshot_indices]
+
+        Read = gizmo_io.ReadClass()
+
+        parts = Read.read_snapshots(
+            'gas', 'index', snapshot_indices, simulation_directory,
+            properties=['mass', 'density', 'hydrogen.neutral.fraction'],
+            assign_host_coordinates=False)
+    else:
+        snapshot_indices = np.array([part.snapshot['index'] for part in parts], np.int32)
+        redshifts = parts[0].Snapshot['redshift'][snapshot_indices]
+
+    #Statistic = ut.statistic.StatisticClass()
+
+    neutral_fraction_by_mass = {}
+    neutral_fraction_by_volume = {}
+    for part in parts:
+        values = part['gas']['hydrogen.neutral.fraction']
+
+        #weights = None
+        weights = part['gas']['mass']
+        #Stat = Statistic.get_statistic_dict(values, weights=weights)
+        stat = {}
+        #stat['median'] = ut.math.percentile_weighted(values, 50, weights)
+        #stat['percent.16'] = ut.math.percentile_weighted(values, 16, weights)
+        #stat['percent.84'] = ut.math.percentile_weighted(values, 84, weights)
+        stat['average'] = np.sum(values * weights) / np.sum(weights)
+        stat['std'] = np.sqrt(np.sum(weights / np.sum(weights) *
+                                     (values - stat['average']) ** 2))
+        stat['std.lo'] = stat['average'] - stat['std']
+        stat['std.hi'] = stat['average'] + stat['std']
+        ut.array.append_dictionary(neutral_fraction_by_mass, stat)
+
+        weights = part['gas']['mass'] / part['gas']['density']
+        #Stat = Statistic.get_statistic_dict(values, weights=weights)
+        stat = {}
+        #stat['median'] = ut.math.percentile_weighted(values, 50, weights)
+        #stat['percent.16'] = ut.math.percentile_weighted(values, 16, weights)
+        #stat['percent.84'] = ut.math.percentile_weighted(values, 84, weights)
+        stat['average'] = np.sum(values * weights) / np.sum(weights)
+        stat['std'] = np.sqrt(np.sum(weights / np.sum(weights) *
+                                     (values - stat['average']) ** 2))
+        stat['std.lo'] = stat['average'] - stat['std']
+        stat['std.hi'] = stat['average'] + stat['std']
+
+        ut.array.append_dictionary(neutral_fraction_by_volume, stat)
+
+    ut.array.arrayize_dictionary(neutral_fraction_by_mass)
+    ut.array.arrayize_dictionary(neutral_fraction_by_volume)
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    ut.plot.set_axes_scaling_limits(
+        subplot, 'linear', None, redshifts, 'linear', [0, 1])
+
+    subplot.set_xlabel('redshift')
+    subplot.set_ylabel('neutral fraction')
+
+    colors = ut.plot.get_colors(2)
+
+    #name_hi = 'percent.84'
+    #name_mid = 'median'
+    #name_lo = 'percent.16'
+
+    name_hi = 'std.hi'
+    name_mid = 'average'
+    name_lo = 'std.lo'
+
+    subplot.fill_between(
+        redshifts, neutral_fraction_by_mass[name_lo], neutral_fraction_by_mass[name_hi],
+        alpha=0.4, color=colors[0])
+    subplot.plot(redshifts, neutral_fraction_by_mass[name_mid], label='mass-weighted')
+
+    subplot.fill_between(
+        redshifts, neutral_fraction_by_volume[name_lo],
+        neutral_fraction_by_volume[name_hi], alpha=0.4, color=colors[1])
+    subplot.plot(redshifts, neutral_fraction_by_volume[name_mid], label='volume-weighted')
+
+    ut.plot.make_legends(subplot)
+
+    ut.plot.parse_output(write_plot, 'gas.neutral.frac_v_redshift', plot_directory)
+
+
+#===================================================================================================
 # analysis with halo catalog
 #===================================================================================================
 def explore_galaxy(

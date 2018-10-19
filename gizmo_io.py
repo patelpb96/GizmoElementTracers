@@ -28,7 +28,7 @@ returns a numpy array of masses, one for each star particle, while
 returns a numpy array of positions, of dimension particle_number x 3.
 
 If you want the code to compute and store the principal axes (via the moment of inertia tensor),
-computed using the stellar distribution (disk) of the primary host galaxy:
+computed using the stellar distribution (disk) of the host galaxy[s]:
     part = gizmo.io.Read.read_snapshots('all', 'redshift', 0, assign_host_principal_axes=True)
 
 
@@ -88,7 +88,7 @@ Gas particles also have:
 
 Derived properties
 
-part is in fact a ParticleDictionaryClass that can compute derived properties on the fly.
+part is a ParticleDictionaryClass that can compute derived properties on the fly.
 Call derived (or stored) properties via:
     part[species_name].prop(property_name)
 For example:
