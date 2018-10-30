@@ -638,7 +638,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         part : dict : catalog of particles at a snapshot
         write : boolean : whether to write to file (instead of read)
         '''
-        file_name = '{}_form_host_coordinates_{:03d}'.format(
+        file_name = '{}_form_coordinates_{:03d}'.format(
             self.species_name, part.snapshot['index'])
 
         if write:
