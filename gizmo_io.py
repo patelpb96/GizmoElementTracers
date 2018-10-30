@@ -1571,7 +1571,7 @@ class ReadClass(ut.io.SayClass):
         self.say('using {} particles at distance < {} kpc'.format(spec_name, distance_max))
 
         if mass_percent:
-            self.say('using distances that encloses {}% of mass'.format(mass_percent))
+            self.say('using distance that encloses {}% of mass'.format(mass_percent))
 
         if age_percent:
             if ('form.scalefactor' not in part[spec_name] or

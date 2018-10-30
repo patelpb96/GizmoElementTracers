@@ -536,7 +536,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                         coordinates, part_z.host_rotation_tensors[host_i])
 
                     # assign 3-D coordinates wrt primary host along principal axes [kpc physical]
-                    part_z0[self.species_name][prop][part_z0_indices] = coordinates[prop]
+                    part_z0[self.species_name][prop][part_z0_indices] = coordinates
 
                 for k in count:
                     count_tot[k] += count[k]
