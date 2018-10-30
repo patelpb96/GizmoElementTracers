@@ -1625,10 +1625,7 @@ class ReadClass(ut.io.SayClass):
             orb = ut.particle.get_orbit_dictionary(
                 part, species, None, center_position, center_velocity, return_single=False)
 
-            if center_i == 0:
-                host_name = 'host.'
-            else:
-                host_name = 'host{}.'.format(center_i + 1)
+            host_name = ut.catalog.get_host_name(center_i)
 
             for spec_name in species:
                 for prop in orb[spec_name]:
