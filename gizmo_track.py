@@ -579,7 +579,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             [part_z0.Snapshot['index'].size, host_number, 3, 3], self.coordinate_dtype) + np.nan
 
         # store indices of particles near all primary hosts at z0
-        hosts_part_z0_indices = np.zeros(0, dtype=ut.array.parse_data_type(part_z0['id'].size))
+        hosts_part_z0_indices = np.zeros(
+            0, dtype=ut.array.parse_data_type(part_z0[self.species_name]['id'].size))
 
         for host_index in range(host_number):
             host_name = ut.catalog.get_host_name(host_index)
