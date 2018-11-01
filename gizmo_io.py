@@ -1522,7 +1522,7 @@ class ReadClass(ut.io.SayClass):
         elif species_name is 'dark':
             velocity_radius_max = 30
 
-        self.say('* assigning coordinates of host galaxy[s]/halo[s]:')
+        self.say('* assigning coordinates for {} host galaxy/halo[s]:'.format(host_number))
 
         if 'position' in part[species_name]:
             # assign to overall dictionary
