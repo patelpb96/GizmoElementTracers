@@ -2321,6 +2321,8 @@ def plot_gas_neutral_fraction_v_redshift(
 
     ut.plot.parse_output(write_plot, 'gas.neutral.frac_v_redshift', plot_directory)
 
+    return parts
+
 
 #===================================================================================================
 # analysis with halo catalog

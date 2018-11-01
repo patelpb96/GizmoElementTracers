@@ -147,6 +147,7 @@ Some useful examples:
 
 # system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatibility
+import os
 import collections
 import h5py
 import numpy as np
@@ -594,6 +595,10 @@ class ReadClass(ut.io.SayClass):
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
+
+        # if 'elvis' is in simulation directory name, force 2 hosts
+        host_number = ut.catalog.get_host_number_from_directory(
+            host_number, simulation_directory, os)
 
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_values = ut.array.arrayize(snapshot_values)
