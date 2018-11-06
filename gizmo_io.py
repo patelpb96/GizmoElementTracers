@@ -822,7 +822,7 @@ class ReadClass(ut.io.SayClass):
             'Time': 'time',  # [Gyr/h]
             'BoxSize': 'box.length',  # [kpc/h comoving]
             'Redshift': 'redshift',
-            # number of output files per snapshot
+            # number of file blocks per snapshot
             'NumFilesPerSnapshot': 'file.number.per.snapshot',
             'Omega0': 'omega_matter',
             'OmegaLambda': 'omega_lambda',
@@ -852,13 +852,13 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
-        self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n')
+        self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n')
 
         # open snapshot file
-        with h5py.File(file_name, 'r') as file_in:
+        with h5py.File(path_file_name, 'r') as file_in:
             header_in = file_in['Header'].attrs  # load header dictionary
 
             for prop_in in header_in:
@@ -1039,12 +1039,12 @@ class ReadClass(ut.io.SayClass):
             header = self.read_header(
                 'index', snapshot_index, simulation_directory, snapshot_directory)
 
-        file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
 
         self.say('* reading species: {}'.format(self.species_read))
 
         # open snapshot file
-        with h5py.File(file_name, 'r') as file_in:
+        with h5py.File(path_file_name, 'r') as file_in:
             part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
             # initialize arrays to store each prop for each species
@@ -1073,7 +1073,7 @@ class ReadClass(ut.io.SayClass):
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
-                        file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+                        file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
                         # try each snapshot file
                         file_in_i = h5py.File(file_name_i, 'r')
                         part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
@@ -1133,14 +1133,14 @@ class ReadClass(ut.io.SayClass):
         part_indices_lo = np.zeros(len(self.species_read), dtype=np.int64)
 
         if header['file.number.per.snapshot'] == 1:
-            self.say('* reading particles from:\n    {}'.format(file_name.strip('./')))
+            self.say('* reading particles from:\n    {}'.format(path_file_name.strip('./')))
         else:
             self.say('* reading particles from:')
 
         # loop over all files at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
-            file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+            file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
 
             # open snapshot file
             with h5py.File(file_name_i, 'r') as file_in:
@@ -1333,27 +1333,24 @@ class ReadClass(ut.io.SayClass):
 
         Returns
         -------
-        path_file_name : string : file name (with relative path)
+        path_file_name : string : (relative) path + name of file
         '''
         directory = ut.io.get_path(directory)
 
-        path_names, file_indices = ut.io.get_file_names(
+        path_file_names, file_indices = ut.io.get_file_names(
             directory + self.snapshot_name_base, (int, float))
 
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
             raise OSError(
-                'cannot find snapshot index = {} in:  {}'.format(snapshot_index, path_names))
+                'cannot find snapshot index = {} in:  {}'.format(snapshot_index, path_file_names))
 
-        path_name = path_names[np.where(file_indices == snapshot_index)[0][0]]
+        path_file_name = path_file_names[np.where(file_indices == snapshot_index)[0][0]]
 
-        if self.file_extension in path_name:
-            # got actual file, so good to go
-            path_file_name = path_name
-        else:
+        if self.file_extension not in path_file_name:
             # got snapshot directory with multiple files, return only 0th one
-            path_file_names = ut.io.get_file_names(path_name + '/' + self.snapshot_name_base)
+            path_file_names = ut.io.get_file_names(path_file_name + '/' + self.snapshot_name_base)
             if len(path_file_names) and '.0.' in path_file_names[0]:
                 path_file_name = path_file_names[0]
             else:
@@ -1392,13 +1389,13 @@ class ReadClass(ut.io.SayClass):
         if directory:
             # find MUSIC file, assuming named *.conf
             file_name_find = ut.io.get_path(directory) + '*/*.conf'
-            file_name = ut.io.get_file_names(file_name_find, verbose=False)
-            if len(file_name):
-                file_name = file_name[0]
+            path_file_names = ut.io.get_file_names(file_name_find, verbose=False)
+            if len(path_file_names):
+                path_file_name = path_file_names[0]
                 self.say('* reading cosmological parameters from:  {}'.format(
-                    file_name.strip('./')), end='\n\n')
+                         path_file_name.strip('./')), end='\n\n')
                 # read cosmological parameters
-                with open(file_name, 'r') as file_in:
+                with open(path_file_name, 'r') as file_in:
                     for line in file_in:
                         line = line.lower().strip().strip('\n')  # ensure lowercase for safety
                         if 'omega_l' in line:
@@ -1670,18 +1667,18 @@ class ReadClass(ut.io.SayClass):
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
 
-        file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
-        self.say('* reading header from:  {}'.format(file_name.replace('./', '')), end='\n\n')
+        path_file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n\n')
 
         ## read header ----------
         # open snapshot file and parse header
-        with h5py.File(file_name, 'r+') as file_in:
+        with h5py.File(path_file_name, 'r+') as file_in:
             header = file_in['Header'].attrs  # load header dictionary
 
             ## read and delete input species ----------
             for file_i in range(header['NumFilesPerSnapshot']):
                 # open i'th of multiple files for snapshot
-                file_name_i = file_name.replace('.0.', '.{}.'.format(file_i))
+                file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
                 file_in = h5py.File(file_name_i, 'r+')
 
                 self.say('reading particles from: ' + file_name_i.split('/')[-1])
