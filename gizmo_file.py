@@ -13,7 +13,7 @@ import sys
 import glob
 import numpy as np
 # local ----
-import wutilities as ut
+import utilities as ut
 
 # default subset to keep for FIRE (65 snapshots)
 snapshot_indices_keep = [

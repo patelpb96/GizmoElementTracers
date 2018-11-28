@@ -24,7 +24,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 # local ----
-import wutilities as ut
+import utilities as ut
 
 
 #===================================================================================================

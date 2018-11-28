@@ -20,7 +20,7 @@ import collections
 import numpy as np
 from numpy import log10, Inf  # @UnusedImport
 # local ----
-import wutilities as ut
+import utilities as ut
 #from gizmo_analysis import gizmo_io
 from . import gizmo_io
 

@@ -14,7 +14,7 @@ import sys
 import glob
 import numpy as np
 # local ----
-import wutilities as ut
+import utilities as ut
 from . import gizmo_io
 from . import gizmo_analysis
 

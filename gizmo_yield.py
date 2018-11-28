@@ -19,7 +19,7 @@ from numpy import log10, Inf  # @UnusedImport
 from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties
 # local ----
-import wutilities as ut
+import utilities as ut
 
 
 #===================================================================================================

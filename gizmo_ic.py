@@ -20,12 +20,9 @@ import sys
 import numpy as np
 from scipy import spatial
 # local ----
-import wutilities as ut
+import utilities as ut
 from . import gizmo_io
-try:
-    from rockstar_analysis import rockstar_io
-except ImportError:
-    from rockstar import rockstar_io
+from rockstar_analysis import rockstar_io
 
 
 #===================================================================================================

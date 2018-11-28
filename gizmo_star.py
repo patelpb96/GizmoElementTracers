@@ -18,7 +18,7 @@ import collections
 import numpy as np
 from scipy import integrate
 # local ----
-import wutilities as ut
+import utilities as ut
 
 
 #===================================================================================================

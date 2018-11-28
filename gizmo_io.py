@@ -152,7 +152,7 @@ import h5py
 import os
 import numpy as np
 # local ----
-import wutilities as ut
+import utilities as ut
 from . import gizmo_star
 
 
