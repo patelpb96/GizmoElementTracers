@@ -93,7 +93,7 @@ def compress_snapshots(
 
     args_list = [(directory, directory_out, snapshot_index) for snapshot_index in snapshot_indices]
 
-    ut.io.run_in_parallel(compress_snapshot, args_list, thread_number)
+    ut.io.run_in_parallel(compress_snapshot, args_list, thread_number=thread_number)
 
 
 #===================================================================================================

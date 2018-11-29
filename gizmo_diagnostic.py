@@ -259,7 +259,7 @@ class ContaminationClass(ut.io.SayClass):
         '''
         virial_kind = '200m'
 
-        center_position = ut.particle.parse_property(part, 'position', center_position)
+        center_position = ut.particle.parse_property(part, 'center_position', center_position)
 
         if scale_to_halo_radius:
             assert halo_radius and halo_radius > 0
@@ -309,16 +309,20 @@ class ContaminationClass(ut.io.SayClass):
 
         # print diagnostics
         if scale_to_halo_radius:
-            distances_halo = profile_mass['dark.2']['distance.cum']
+            distances_halo = profile_mass['dark2']['distance.cum']
             distances_phys = distances_halo * halo_radius
         else:
-            distances_phys = profile_mass['dark.2']['distance.cum']
+            distances_phys = profile_mass['dark2']['distance.cum']
             if halo_radius and halo_radius > 0:
                 distances_halo = distances_phys / halo_radius
             else:
                 distances_halo = distances_phys
 
-        species_lowres_dark = [spec for spec in part if 'dark.' in spec]
+        species_lowres_dark = []
+        for i in range(2, 10):
+            dark_name = 'dark{}'.format(i)
+            if dark_name in part:
+                species_lowres_dark.append(dark_name)
 
         for spec in species_lowres_dark:
             self.say('* {}'.format(spec))
@@ -351,13 +355,13 @@ class ContaminationClass(ut.io.SayClass):
                         profile_number[spec]['sum.cum'][dist_i])
                     )
 
-                    if spec != 'dark.2':
+                    if spec != 'dark2':
                         # print only 1 distance bin for lower-resolution particles
                         break
 
         print()
         print('contamination summary')
-        species = 'dark.2'
+        species = 'dark2'
         if halo_radius and halo_radius > 0:
             dist_i_halo = np.searchsorted(distances_phys, halo_radius)
         else:
@@ -379,7 +383,7 @@ class ContaminationClass(ut.io.SayClass):
               species, distances_phys[dist_i], distances_halo[dist_i]))
 
         for spec in species_lowres_dark:
-            if species != 'dark.2' and profile_number[spec]['sum.cum'][dist_i_halo] > 0:
+            if species != 'dark2' and profile_number[spec]['sum.cum'][dist_i_halo] > 0:
                 print('! {} {} particles within R_halo'.format(
                       profile_number[species]['sum.cum'][dist_i_halo], species))
                 dist_i = np.where(profile_number[spec]['sum.cum'] > 0)[0][0]
@@ -447,7 +451,7 @@ class ContaminationClass(ut.io.SayClass):
         distance_limits = [0, distance_max]
         axis_y_scaling = 'log'
 
-        self.say('halo radius = {:.3f} kpc'.format(hal['radius'][hal_index]))
+        self.say('halo radius = {:.1f} kpc'.format(hal['radius'][hal_index]))
 
         halo_radius = hal['radius'][hal_index]
 
@@ -474,8 +478,8 @@ class ContaminationClass(ut.io.SayClass):
 
         Read = gizmo_io.ReadClass()
         part = Read.read_snapshots(
-            ['dark', 'dark.2'], 'redshift', redshift, simulation_directory,
-            properties=['position', 'mass', 'potential'], assign_center=True)
+            ['dark', 'dark2'], 'redshift', redshift, simulation_directory,
+            properties=['position', 'mass', 'potential'], assign_host_coordinates=True)
 
         halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
 
@@ -511,12 +515,12 @@ def print_properties_statistics(
     '''
     species = ut.array.arrayize(species)
     if 'all' in species:
-        species = ['dark.2', 'dark', 'star', 'gas']
+        species = ['dark2', 'dark', 'star', 'gas']
 
     Read = gizmo_io.ReadClass()
     part = Read.read_snapshots(
         species, snapshot_value_kind, snapshot_value, simulation_directory,
-        snapshot_directory, '', None, None, assign_center=False,
+        snapshot_directory, '', None, None, assign_host_coordinates=False,
         separate_dark_lowres=False, sort_dark_by_id=False)
 
     gizmo_analysis.print_properties_statistics(part, species)
@@ -577,7 +581,8 @@ def print_properties_snapshots(
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 species_read, 'index', snapshot_i, simulation_directory, snapshot_directory, '',
-                properties_read, element_indices, assign_center=False, sort_dark_by_id=False)
+                properties_read, element_indices, assign_host_coordinates=False,
+                sort_dark_by_id=False)
 
             for spec in species_property_dict:
                 for prop in species_property_dict[spec]:
@@ -694,7 +699,7 @@ def plot_scaling(
     write_plot : boolean : whether to write plot to file
     plot_directory : string : directory to write plot file
     '''
-    weak_dark = {
+    _weak_dark = {
         'res57000': {'particle.number': 8.82e6, 'core.number': 64,
                      'core.time': 385, 'wall.time': 6.0},
         'res7100': {'particle.number': 7.05e7, 'core.number': 512,

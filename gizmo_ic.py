@@ -62,8 +62,8 @@ class ReadClass(ut.io.SayClass):
         hal = self.read_halos(mass_limits)
         parts = self.read_particles()
 
-        if ('dark.2' in parts[0] and 'mass' in parts[0]['dark.2'] and
-                len(parts[0]['dark.2']['mass'])):
+        if ('dark2' in parts[0] and 'mass' in parts[0]['dark2'] and
+                len(parts[0]['dark2']['mass'])):
             rockstar_io.Particle.assign_lowres_mass(hal, parts[0], mass_limits)
 
         return parts, hal
@@ -111,7 +111,8 @@ class ReadClass(ut.io.SayClass):
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 'all', 'redshift', snapshot_redshift, self.simulation_directory,
-                properties=properties, assign_center=False, sort_dark_by_id=sort_dark_by_id)
+                properties=properties, assign_host_coordinates=False,
+                sort_dark_by_id=sort_dark_by_id)
 
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
@@ -172,7 +173,7 @@ class InitialConditionClass(ut.io.SayClass):
             part_fin, part_ini = part_ini, part_fin
 
         # determine which species are in catalog
-        species = ['dark', 'dark.2', 'dark.3', 'dark.4', 'dark.5', 'dark.6']
+        species = ['dark', 'dark2', 'dark3', 'dark4', 'dark5', 'dark6']
         for spec in list(species):
             if spec not in part_fin:
                 species.remove(spec)
@@ -396,7 +397,7 @@ class InitialConditionClass(ut.io.SayClass):
         Read = ReadClass(snapshot_redshifts, simulation_directory)
         parts = Read.read_particles()
 
-        center_position = ut.particle.get_center_position(
+        center_position = ut.particle.get_center_positions(
             parts[0], 'dark', method='center-of-mass', compare_centers=True)
 
         self.write_initial_positions(
