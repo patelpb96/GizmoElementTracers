@@ -705,25 +705,24 @@ class ReadClass(ut.io.SayClass):
         return parts
 
     def read_snapshots_simulations(
-        self, simulation_directories=[], species='all',
-        snapshot_value_kind='index', snapshot_value=600,
-        properties='all', element_indices=[0, 1, 6, 10], convert_float32=False,
-        assign_host_principal_axes=False):
+        self, species='all', snapshot_value_kind='index', snapshot_value=600,
+        simulation_directories=[], snapshot_directory='output/',
+        properties='all', element_indices=[0, 1, 6, 10], assign_host_principal_axes=False):
         '''
         Read snapshots at the same redshift from different simulations.
         Return as list of dictionaries.
 
         Parameters
         ----------
-        simulation_directories : list or list of lists :
-            list of simulation directories, or list of pairs of directory + simulation name
         species : string or list : name[s] of particle species to read
         snapshot_value_kind : string :
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_value : int or float : index or redshift or scale-factor of snapshot
+        simulation_directories : list or list of lists :
+            list of simulation directories, or list of pairs of directory + simulation name
+        snapshot_directory: string : directory of snapshot files within simulation_directory
         properties : string or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
-        convert_float32 : boolean : whether to convert all floats to 32 bit to save memory
         assign_host_principal_axes : boolean :
             whether to assign principal axes rotation tensor[s] of host galaxy[s]/halo[s]
 
@@ -747,13 +746,14 @@ class ReadClass(ut.io.SayClass):
 
         # first pass, read only header, to check that can read all simulations
         bad_snapshot_value = 0
-        for directory, simulation_name in simulation_directories:
+        for simulation_directory, simulation_name in simulation_directories:
             try:
                 _header = self.read_header(
-                    snapshot_value_kind, snapshot_value, directory, simulation_name=simulation_name)
+                    snapshot_value_kind, snapshot_value, simulation_directory, snapshot_directory,
+                    simulation_name)
             except Exception:
                 self.say('! could not read snapshot header at {} = {:.3f} in {}'.format(
-                         snapshot_value_kind, snapshot_value, directory))
+                         snapshot_value_kind, snapshot_value, simulation_directory))
                 bad_snapshot_value += 1
 
         if bad_snapshot_value:
@@ -766,8 +766,7 @@ class ReadClass(ut.io.SayClass):
             try:
                 part = self.read_snapshots(
                     species, snapshot_value_kind, snapshot_value, directory,
-                    simulation_name=simulation_name, properties=properties,
-                    element_indices=element_indices, convert_float32=convert_float32,
+                    snapshot_directory, simulation_name, properties, element_indices,
                     assign_host_principal_axes=assign_host_principal_axes)
 
                 if 'velocity' in properties:
