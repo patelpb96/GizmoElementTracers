@@ -1,6 +1,8 @@
-Instructions for install:  
+This package should function either as a subfolder in your `$PYTHONPATH`, or by installing it with `setup.py develop` (which should place an egg.link to the source code in a place that whichever `python` you used to install it knows where to look.
 
-1. create a directory $DIR
+## Instructions for installing as a package:  
+
+1. create any directory $DIR
 2. clone gizmo_analysis into $DIR
 3. copy setup.py from gizmo_analysis into $DIR (moving it will give you hg issues when pulling updates in the future)
 4. run python setup.py develop
@@ -10,13 +12,32 @@ In commands, that is:
 ```
 #!bash
 
-DIR=$HOME/code/wetzel_repos/
+DIR=$HOME/code/wetzel/
 mkdir -p $DIR
 cd $DIR
 hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis
 cp gizmo_analysis/setup.py .
 python setup.py develop
 ```
+
+## Instructions for placing in PYTHONPATH:
+
+1.  create any directory $DIR
+2.  add $DIR to your `$PYTHONPATH`
+3.  clone gizmo_analysis into $DIR
+
+In commands, that'd be something like:
+```
+#!bash
+
+DIR=$HOME/code/wetzel
+echo $PYTHONPATH=$DIR:$PYTHONPATH >> ~/.bashrc
+mkdir -p $DIR
+cd $DIR
+hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis
+```
+
+That is, you should end up with `$DIR/gizmo_analysis/gizmo_xxx.py`, with `$DIR` in your `$PYTHONPATH`
 
 You'll then be able to import gizmo_analysis.<whatever>
 
