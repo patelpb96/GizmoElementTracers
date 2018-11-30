@@ -62,9 +62,8 @@ class ReadClass(ut.io.SayClass):
         hal = self.read_halos(mass_limits)
         parts = self.read_particles()
 
-        if ('dark2' in parts[0] and 'mass' in parts[0]['dark2'] and
-                len(parts[0]['dark2']['mass'])):
-            rockstar_io.Particle.assign_lowres_mass(hal, parts[0], mass_limits)
+        if 'dark2' in parts[0] and 'mass' in parts[0]['dark2'] and len(parts[0]['dark2']['mass']):
+            rockstar_io.Particle.assign_lowres_mass(hal, parts[0])
 
         return parts, hal
 

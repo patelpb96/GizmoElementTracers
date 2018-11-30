@@ -55,23 +55,21 @@ def compress_snapshot(
     if directory_out and directory_out[-1] != '/':
         directory_out += '/'
 
-    file_path_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
+    path_file_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
 
-    if len(file_path_names):
-        if 'snapdir' in file_path_names[0]:
-            file_names = glob.glob(file_path_names[0] + '/*')
-        else:
-            file_names = file_path_names
+    if len(path_file_names):
+        if 'snapdir' in path_file_names[0]:
+            path_file_names = glob.glob(path_file_names[0] + '/*')
 
-        file_names.sort()
+        path_file_names.sort()
 
-        for file_name in file_names:
+        for path_file_name in path_file_names:
             if directory_out:
-                file_name_out = file_name.replace(directory, directory_out)
+                path_file_name_out = path_file_name.replace(directory, directory_out)
             else:
-                file_name_out = file_name
+                path_file_name_out = path_file_name
 
-            executable_i = '{} -o {} {}'.format(executable, file_name_out, file_name)
+            executable_i = '{} -o {} {}'.format(executable, path_file_name_out, path_file_name)
             ut.io.print_flush('executing:  {}'.format(executable_i))
             os.system(executable_i)
 

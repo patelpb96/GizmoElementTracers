@@ -38,9 +38,9 @@ class RuntimeClass(ut.io.SayClass):
         '''
         loop_number_max = 1000
 
-        file_name_base = ut.io.get_path(simulation_directory) + runtime_file_name
-        file_names = glob.glob(file_name_base)
-        file_in = open(file_names[0], 'r')
+        file_name = ut.io.get_path(simulation_directory) + runtime_file_name
+        path_file_names = glob.glob(file_name)
+        file_in = open(path_file_names[0], 'r')
 
         loop_i = 0
         mpi_number = None
@@ -112,9 +112,9 @@ class RuntimeClass(ut.io.SayClass):
                 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]
         scalefactors = ut.array.arrayize(scalefactors)
 
-        file_path_name = (
+        path_file_name = (
             ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name)
-        file_in = open(file_path_name, 'r')
+        file_in = open(path_file_name, 'r')
 
         wall_times = []
 

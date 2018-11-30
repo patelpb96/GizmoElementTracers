@@ -553,10 +553,11 @@ class ImageClass(ut.io.SayClass):
                 if hal is not None:
                     for hal_position, hal_radius in zip(hal_positions, hal_radiuss):
                         circle = plt.Circle(
-                            hal_position[plot_dimension_is], hal_radius, linewidth=1, fill=False)
+                            hal_position[plot_dimension_is], hal_radius, color='w', linewidth=1,
+                            fill=False)
                         subplot.add_artist(circle)
 
-                    circle = plt.Circle((0, 0), 10, color='black', fill=False)
+                    circle = plt.Circle((0, 0), 10, color='w', fill=False)
                     subplot.add_artist(circle)
 
                 #subplot.axis('equal')
