@@ -635,7 +635,7 @@ def test_file_compression(
         snapshot_indices = [snapshot_indices]
 
     for snapshot_index in snapshot_indices:
-        header = Read.read_header('index', snapshot_index, simulation_directory)
+        header = Read.read_header('index', snapshot_index, simulation_directory, verbose=False)
         if header_compression_name in header:
             if (compression_level is not None and
                     header[header_compression_name] != compression_level):
@@ -643,15 +643,15 @@ def test_file_compression(
         else:
             compression_none_snapshots.append(snapshot_index)
 
-    Say.say('tested {} snapshots: {} - {}'.format(
+    Say.say('* tested {} snapshots: {} - {}'.format(
         len(snapshot_indices), min(snapshot_indices), max(snapshot_indices)))
-    Say.say('{} are uncompressed'.format(len(compression_none_snapshots)))
+    Say.say('* {} are uncompressed'.format(len(compression_none_snapshots)))
     for snapshot_index in compression_none_snapshots:
-        Say.say('* {}'.format(snapshot_index))
-    Say.say('{} have wrong compression (level != {})'.format(
+        Say.say('    {}'.format(snapshot_index))
+    Say.say('* {} have wrong compression (level != {})'.format(
         len(compression_wrong_snapshots), compression_level))
     for snapshot_index in compression_wrong_snapshots:
-        Say.say('* {}'.format(snapshot_index))
+        Say.say('    {}'.format(snapshot_index))
 
 
 def test_stellar_mass_loss(

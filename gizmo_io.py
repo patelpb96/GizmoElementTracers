@@ -793,7 +793,7 @@ class ReadClass(ut.io.SayClass):
 
     def read_header(
         self, snapshot_value_kind='index', snapshot_value=600, simulation_directory='.',
-        snapshot_directory='output/', simulation_name=''):
+        snapshot_directory='output/', simulation_name='', verbose=True):
         '''
         Read header from snapshot file.
 
@@ -804,6 +804,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory : root directory of simulation
         snapshot_directory: string : directory of snapshot files within simulation_directory
         simulation_name : string : name to store for future identification
+        verbose : boolean : whether to print number of particles in snapshot
 
         Returns
         -------
@@ -884,18 +885,19 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
 
-        self.say('snapshot contains the following number of particles:')
-        # keep only species that have any particles
-        read_particle_number = 0
-        for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
-            spec_id = self.species_dict[spec_name]
-            self.say('  {:9s} (id = {}): {} particles'.format(
-                     spec_name, spec_id, header['particle.numbers.total'][spec_id]))
+        if verbose:
+            self.say('snapshot contains the following number of particles:')
+            # keep only species that have any particles
+            read_particle_number = 0
+            for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
+                spec_id = self.species_dict[spec_name]
+                self.say('  {:9s} (id = {}): {} particles'.format(
+                         spec_name, spec_id, header['particle.numbers.total'][spec_id]))
 
-            if header['particle.numbers.total'][spec_id] > 0:
-                read_particle_number += header['particle.numbers.total'][spec_id]
-            elif spec_name in self.species_read:
-                self.species_read.remove(spec_name)
+                if header['particle.numbers.total'][spec_id] > 0:
+                    read_particle_number += header['particle.numbers.total'][spec_id]
+                elif spec_name in self.species_read:
+                    self.species_read.remove(spec_name)
 
         if read_particle_number <= 0:
             raise OSError(
