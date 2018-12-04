@@ -195,7 +195,7 @@ class ParticleDictionaryClass(dict):
 
         Parameters
         ----------
-        property_name : string : name of property
+        property_name : str : name of property
         indices : array : indices of particles to select
         dict_only : bool : require property_name to be in self's dict - avoids endless recursion
 
@@ -536,42 +536,42 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        species : string or list : name[s] of particle species:
+        species : str or list : name[s] of particle species:
             'all' = all species in file
             'dark' = dark matter at highest resolution
             'dark2' = dark matter at lower resolution
             'gas' = gas
             'star' = stars
             'blackhole' = black holes, if run contains them
-        snapshot_value_kind : string :
+        snapshot_value_kind : str :
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_values : int or float or list thereof :
             index[s] or redshift[s] or scale-factor[s] of snapshot[s]
-        simulation_directory : string : directory of simulation
-        snapshot_directory: string : directory of snapshot files within simulation_directory
-        simulation_name : string : name to store for future identification
-        properties : string or list : name[s] of particle properties to read - options:
+        simulation_directory : str : directory of simulation
+        snapshot_directory: str : directory of snapshot files within simulation_directory
+        simulation_name : str : name to store for future identification
+        properties : str or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_dict
         element_indices : int or list : indices of elemental abundances to keep
             note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
-        separate_dark_lowres : boolean :
+        separate_dark_lowres : bool :
             whether to separate low-resolution dark matter into separate dicts according to mass
-        sort_dark_by_id : boolean : whether to sort dark-matter particles by id
-        convert_float32 : boolean : whether to convert all floats to 32 bit to save memory
+        sort_dark_by_id : bool : whether to sort dark-matter particles by id
+        convert_float32 : bool : whether to convert all floats to 32 bit to save memory
         host_number : int : number of hosts to assign and compute coordinates relative to
-        assign_host_coordinates : boolean :
+        assign_host_coordinates : bool :
             whether to assign position[s] and velocity[s] of host galaxy/halo[s]
-        assign_host_principal_axes : boolean :
+        assign_host_principal_axes : bool :
             whether to assign principal axes rotation tensor[s] of host galaxy[s]/halo[s]
         assign_host_orbits : booelan :
             whether to assign orbital properties wrt host galaxy[s]/halo[s]
-        assign_formation_coordinates : boolean :
+        assign_formation_coordinates : bool :
             whether to assign coordindates wrt the host galaxy at formation to stars
-        assign_index_pointers : boolean :
+        assign_index_pointers : bool :
             whether to assign index pointers from particles at z = 0 to particles in this snapshot
-        check_properties : boolean : whether to check sanity of particle properties after read in
+        check_properties : bool : whether to check sanity of particle properties after read in
 
         Returns
         -------
@@ -715,16 +715,16 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        species : string or list : name[s] of particle species to read
-        snapshot_value_kind : string :
+        species : str or list : name[s] of particle species to read
+        snapshot_value_kind : str :
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_value : int or float : index or redshift or scale-factor of snapshot
         simulation_directories : list or list of lists :
             list of simulation directories, or list of pairs of directory + simulation name
-        snapshot_directory: string : directory of snapshot files within simulation_directory
-        properties : string or list : name[s] of properties to read
+        snapshot_directory: str : directory of snapshot files within simulation_directory
+        properties : str or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
-        assign_host_principal_axes : boolean :
+        assign_host_principal_axes : bool :
             whether to assign principal axes rotation tensor[s] of host galaxy[s]/halo[s]
 
         Returns
@@ -799,12 +799,12 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        snapshot_value_kind : string : input snapshot number kind: 'index', 'redshift'
+        snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
-        snapshot_directory: string : directory of snapshot files within simulation_directory
-        simulation_name : string : name to store for future identification
-        verbose : boolean : whether to print number of particles in snapshot
+        snapshot_directory: str : directory of snapshot files within simulation_directory
+        simulation_name : str : name to store for future identification
+        verbose : bool : whether to print number of particles in snapshot
 
         Returns
         -------
@@ -856,8 +856,7 @@ class ReadClass(ut.io.SayClass):
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
-        if verbose:
-            self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n')
+        self.say('* reading header from:  {}'.format(path_file_name.strip('./')), verbose)
 
         # open snapshot file
         with h5py.File(path_file_name, 'r') as file_in:
@@ -873,9 +872,9 @@ class ReadClass(ut.io.SayClass):
             header['is.cosmological'] = True
         else:
             header['is.cosmological'] = False
-            self.say('assuming that simulation is not cosmological')
+            self.say('assuming that simulation is not cosmological', verbose)
             self.say('read h = {:.3f}, omega_matter_0 = {:.3f}, omega_lambda_0 = {:.3f}'.format(
-                     header['hubble'], header['omega_matter'], header['omega_lambda']))
+                     header['hubble'], header['omega_matter'], header['omega_lambda']), verbose)
 
         # convert header quantities
         if header['is.cosmological']:
@@ -886,15 +885,13 @@ class ReadClass(ut.io.SayClass):
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
 
-        if verbose:
-            self.say('snapshot contains the following number of particles:')
+        self.say('snapshot contains the following number of particles:', verbose)
         # keep only species that have any particles
         read_particle_number = 0
         for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
             spec_id = self.species_dict[spec_name]
-            if verbose:
-                self.say('  {:9s} (id = {}): {} particles'.format(
-                         spec_name, spec_id, header['particle.numbers.total'][spec_id]))
+            self.say('  {:9s} (id = {}): {} particles'.format(
+                     spec_name, spec_id, header['particle.numbers.total'][spec_id]), verbose)
 
             if header['particle.numbers.total'][spec_id] > 0:
                 read_particle_number += header['particle.numbers.total'][spec_id]
@@ -922,7 +919,7 @@ class ReadClass(ut.io.SayClass):
 
         header['catalog.kind'] = 'particle'
 
-        print()
+        self.say('', verbose)
 
         return header
 
@@ -935,16 +932,16 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        snapshot_value_kind : string : input snapshot number kind: 'index', 'redshift'
+        snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
-        snapshot_directory: string : directory of snapshot files within simulation_directory
-        properties : string or list : name[s] of particle properties to read - options:
+        snapshot_directory: str : directory of snapshot files within simulation_directory
+        properties : str or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_dict
         element_indices : int or list : indices of elements to keep
             note: 0 = total metals, 1 = helium, 10 = iron, None or 'all' = read all elements
-        convert_float32 : boolean : whether to convert all floats to 32 bit to save memory
+        convert_float32 : bool : whether to convert all floats to 32 bit to save memory
 
         Returns
         -------
@@ -1201,9 +1198,9 @@ class ReadClass(ut.io.SayClass):
         part : dictionary class : catalog of particles at snapshot
         header : dict : header dictionary
         particle_subsample_factor : int : factor to periodically subsample particles, to save memory
-        separate_dark_lowres : boolean :
+        separate_dark_lowres : bool :
             whether to separate low-resolution dark matter into separate dicts according to mass
-        sort_dark_by_id : boolean : whether to sort dark-matter particles by id
+        sort_dark_by_id : bool : whether to sort dark-matter particles by id
         '''
         # if dark2 contains different masses (refinements), split into separate dicts
         species_name = 'dark2'
@@ -1335,12 +1332,12 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directory : string : directory to check for files
+        directory : str : directory to check for files
         snapshot_index : int : index of snapshot: if None or 'all', get all snapshots in directory
 
         Returns
         -------
-        path_file_name[s] : string or list thereof : (relative) path + name of file[s]
+        path_file_name[s] : str or list thereof : (relative) path + name of file[s]
         [file_indices : list of ints : indices of snapshot files]
         '''
         directory = ut.io.get_path(directory)
@@ -1382,7 +1379,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directory : string : directory of simulation (where directory of initial conditions is)
+        directory : str : directory of simulation (where directory of initial conditions is)
 
         Returns
         -------
@@ -1511,10 +1508,10 @@ class ReadClass(ut.io.SayClass):
         Parameters
         ----------
         part : dictionary class : catalog of particles at snapshot
-        species_name : string : which particle species to use to define center
+        species_name : str : which particle species to use to define center
         part_indices : array : list of indices of particle to use to define center
             use this to exclude particles that you know are not relevant
-        method : string : method of centering: 'center-of-mass', 'potential'
+        method : str : method of centering: 'center-of-mass', 'potential'
         host_number : int : number of hosts to assign
         '''
         if (species_name in part and 'position' in part[species_name] and
@@ -1620,7 +1617,7 @@ class ReadClass(ut.io.SayClass):
         Parameters
         ----------
         part : dictionary class : catalog of particles at snapshot
-        species : string or list : particle species to compute
+        species : str or list : particle species to compute
         center_positions : array or array of arrays : center position[s] to use
         center_velocities : array or array of arrays : center velocity[s] to use
         '''
@@ -1658,18 +1655,18 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        species : string or list : name[s] of particle species to delete:
+        species : str or list : name[s] of particle species to delete:
             'gas' = gas
             'dark' = dark matter at highest resolution
             'dark2' = dark matter at lower resolution
             'star' = stars
             'blackhole' = black holes
-        action : string : what to do to snapshot file: 'delete', 'velocity'
+        action : str : what to do to snapshot file: 'delete', 'velocity'
         value_adjust : float : value by which to adjust property (if not deleting)
-        snapshot_value_kind : string : input snapshot number kind: 'index', 'redshift'
+        snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
-        snapshot_directory : string : directory of snapshot files within simulation_directory
+        snapshot_directory : str : directory of snapshot files within simulation_directory
         '''
         if np.isscalar(species):
             species = [species]  # ensure is list

@@ -39,8 +39,8 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         '''
         Parameters
         ----------
-        species_name : string : name of particle species to track
-        directory : string : directory where to write files
+        species_name : str : name of particle species to track
+        directory : str : directory where to write files
         reference_snapshot_index : int :
             reference snapshot to compute particle index pointers relative to
         '''
@@ -177,11 +177,11 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles at reference snapshot (usually z = 0)
-        match_property : string :
+        match_property : str :
             some particles have the same id. this is the property to use to match them.
             options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
         match_propery_tolerance : float : fractional tolerance for matching via match_property
-        test_property : string : additional property to use to test matching
+        test_property : str : additional property to use to test matching
         snapshot_indices : array-like : snapshot indices at which to assign index pointers
         thread_number : int : number of threads for parallelization
         '''
@@ -403,8 +403,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         '''
         Parameters
         ----------
-        species : string : name of particle species to track
-        directory : string : directory to write files
+        species : str : name of particle species to track
+        directory : str : directory to write files
         reference_snapshot_index : float :
             reference snapshot to compute particle index pointers relative to
         host_distance_limits : list :
@@ -636,7 +636,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         Parameters
         ----------
         part : dict : catalog of particles at a snapshot
-        write : boolean : whether to write to file (instead of read)
+        write : bool : whether to write to file (instead of read)
         '''
         file_name = '{}_form_coordinates_{:03d}'.format(
             self.species_name, part.snapshot['index'])

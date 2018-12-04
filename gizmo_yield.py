@@ -31,10 +31,10 @@ def get_nucleosynthetic_yields(
 
     Parameters
     ----------
-    event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+    event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float :
         total metallicity of star prior to event, relative to solar (sun_metal_mass_fraction)
-    normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
+    normalize : bool : whether to normalize yields to be mass fractions (instead of masses)
 
     Returns
     -------
@@ -146,13 +146,13 @@ def plot_nucleosynthetic_yields(
 
     Parameters
     ----------
-    event_kind : string : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+    event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float : total metallicity of star prior to event, relative to solar
-    normalize : boolean : whether to normalize yields to be mass fractions (instead of masses)
-    axis_y_scaling : string : scaling along y-axis: 'log', 'linear'
+    normalize : bool : whether to normalize yields to be mass fractions (instead of masses)
+    axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
     axis_y_limits : list : min and max limits of y-axis
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     title_dict = {

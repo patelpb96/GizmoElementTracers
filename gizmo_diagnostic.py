@@ -28,8 +28,8 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : string : top-level directory of simulation
-        runtime_file_name : string : name of run-time file name (set in submission script)
+        simulation_directory : str : top-level directory of simulation
+        runtime_file_name : str : name of run-time file name (set in submission script)
 
         Returns
         -------
@@ -82,10 +82,10 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : string : directory of simulation
-        output_directory : string : directory of output files within simulation directory
+        simulation_directory : str : directory of simulation
+        output_directory : str : directory of output files within simulation directory
         core_number : int : total number of CPU cores (input instead of reading from run-time file)
-        runtime_file_name : string : name of run-time file to read CPU info
+        runtime_file_name : str : name of run-time file to read CPU info
         wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
         scalefactors : array-like : list of scale-factors at which to print run times
 
@@ -178,9 +178,9 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directories : string or list : top-level directory[s] of simulation[s]
-        output_directory : string : directory of output files within simulation directory
-        runtime_file_name : string : name of run-time file  to read CPU info
+        simulation_directories : str or list : top-level directory[s] of simulation[s]
+        output_directory : str : directory of output files within simulation directory
+        runtime_file_name : str : name of run-time file  to read CPU info
         wall_times_restart : float or list :
             wall time[s] [sec] of previous run[s] (if restart from snapshot)
         scalefactors : array-like : list of scale-factors at which to print run times
@@ -247,14 +247,14 @@ class ContaminationClass(ut.io.SayClass):
         part : dict : catalog of particles at snapshot
         distance_limits : list : min and max limits for distance from galaxy
         distance_bin_width : float : width of each distance bin (in units of distance_scaling)
-        distance_scaling : string : 'log', 'linear'
+        distance_scaling : str : 'log', 'linear'
         halo_radius : float : radius of halo [kpc physical]
-        scale_to_halo_radius : boolean : whether to scale distance to halo_radius
+        scale_to_halo_radius : bool : whether to scale distance to halo_radius
         center_position : array : position of galaxy/halo center
         axis_y_limits : list : min and max limits for y-axis
-        axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
-        write_plot : boolean : whether to write figure to file
-        plot_directory : string : directory to write figure file
+        axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
+        write_plot : bool : whether to write figure to file
+        plot_directory : str : directory to write figure file
         figure_index : int : index of figure for matplotlib
         '''
         virial_kind = '200m'
@@ -445,7 +445,7 @@ class ContaminationClass(ut.io.SayClass):
         hal_index: int : index of halo
         distance_max : float : maximum distance from halo center to check
         distance_bin_width : float : width of distance bin for printing
-        scale_to_halo_radius : boolean : whether to scale distances by virial radius
+        scale_to_halo_radius : bool : whether to scale distances by virial radius
         '''
         distance_scaling = 'linear'
         distance_limits = [0, distance_max]
@@ -467,7 +467,7 @@ class ContaminationClass(ut.io.SayClass):
         Parameters
         ----------
         redshift : float : redshift of snapshot
-        simulation_directory : string : top-level directory of simulation
+        simulation_directory : str : top-level directory of simulation
         '''
         distance_bin_width = 0.01
         distance_limits_phys = [10, 2000]  # [kpc physical]
@@ -503,11 +503,11 @@ def print_properties_statistics(
 
     Parameters
     ----------
-    species : string or list : name[s] of particle species to print
-    snapshot_value_kind : string : input snapshot number kind: index, redshift
+    species : str or list : name[s] of particle species to print
+    snapshot_value_kind : str : input snapshot number kind: index, redshift
     snapshot_value : int or float : index (number) of snapshot file
     simulation_directory : root directory of simulation
-    snapshot_directory: string : directory of snapshot files within simulation_directory
+    snapshot_directory: str : directory of snapshot files within simulation_directory
 
     Returns
     -------
@@ -535,8 +535,8 @@ def print_properties_snapshots(
 
     Parameters
     ----------
-    simulation_directory : string : directory of simulation
-    snapshot_directory : string : directory of snapshot files
+    simulation_directory : str : directory of simulation
+    snapshot_directory : str : directory of snapshot files
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
     element_indices = [0, 1]
@@ -735,12 +735,12 @@ def plot_scaling(
 
     Parameters
     ----------
-    scaling_kind : string : 'strong', 'weak'
-    time_kind : string : 'node', 'core', 'wall', 'speedup', 'efficiency'
-    axis_x_scaling : string : scaling along x-axis: 'log', 'linear'
-    axis_y_scaling : string : scaling along y-axis: 'log', 'linear'
-    write_plot : boolean : whether to write plot to file
-    plot_directory : string : directory to write plot file
+    scaling_kind : str : 'strong', 'weak'
+    time_kind : str : 'node', 'core', 'wall', 'speedup', 'efficiency'
+    axis_x_scaling : str : scaling along x-axis: 'log', 'linear'
+    axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
+    write_plot : bool : whether to write plot to file
+    plot_directory : str : directory to write plot file
     '''
     _weak_dark = {
         'res57000': {'particle.number': 8.82e6, 'core.number': 64,

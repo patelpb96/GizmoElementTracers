@@ -41,10 +41,10 @@ def compress_snapshot(
 
     Parameters
     ----------
-    directory : string : directory of snapshot
-    directory_out : string : directory to write compressed snapshot
+    directory : str : directory of snapshot
+    directory_out : str : directory to write compressed snapshot
     snapshot_index : int : index of snapshot
-    analysis_directory : string : directory of analysis code
+    analysis_directory : str : directory of analysis code
     '''
     executable = '{} {}/manipulate_hdf5/compactify_hdf5.py -L 0'.format(
         python_executable, analysis_directory)
@@ -81,10 +81,10 @@ def compress_snapshots(
 
     Parameters
     ----------
-    directory : string : directory of snapshots
-    directory_out : string : directory to write compressed snapshots
+    directory : str : directory of snapshots
+    directory_out : str : directory to write compressed snapshots
     snapshot_index_limits : list : min and max snapshot indices to compress
-    syncronize : boolean : whether to synchronize parallel tasks,
+    syncronize : bool : whether to synchronize parallel tasks,
         wait for each thread bundle to complete before starting new bundle
     '''
     snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
@@ -105,9 +105,9 @@ def delete_snapshots(
 
     Parameters
     ----------
-    snapshot_directory : string : directory of snapshots
+    snapshot_directory : str : directory of snapshots
     snapshot_index_limits : list : min and max snapshot indices to delete
-    delete_halos : boolean : whether to delete halo catalog files at same snapshot times
+    delete_halos : bool : whether to delete halo catalog files at same snapshot times
     '''
     snapshot_name_base = 'snap*_{:03d}*'
     if not snapshot_directory:
@@ -146,9 +146,9 @@ def rsync_snapshots(
 
     Parameters
     ----------
-    machine_name : string : 'pfe', 'stampede', 'bw', 'peloton'
-    directory_from : string : directory to copy from
-    directory_to : string : local directory to put snapshots
+    machine_name : str : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : str : directory to copy from
+    directory_to : str : local directory to put snapshots
     snapshot_indices : int or list : index[s] of snapshots to transfer
     '''
     snapshot_name_base = 'snap*_{:03d}*'
@@ -180,9 +180,9 @@ def rsync_simulation_files(
 
     Parameters
     ----------
-    machine_name : string : 'pfe', 'stampede', 'bw', 'peloton'
-    directory_from : string : directory to copy from
-    directory_to : string : directory to put files
+    machine_name : str : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : str : directory to copy from
+    directory_to : str : directory to put files
     '''
     excludes = [
         'output/',

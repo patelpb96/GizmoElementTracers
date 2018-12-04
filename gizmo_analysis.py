@@ -36,7 +36,7 @@ def print_properties_statistics(part, species='all'):
     Parameters
     ----------
     part : dict : catalog of particles (use this instead of reading in)
-    species : string or list : name[s] of particle species to print
+    species : str or list : name[s] of particle species to print
     '''
     Say = ut.io.SayClass(print_properties_statistics)
 
@@ -98,17 +98,17 @@ def plot_metal_v_distance(
     Parameters
     ----------
     part : dict or list : catalog[s] of particles at snapshot
-    species_name : string : name of particle species
-    metal_name : string : 'massfraction.X' or 'mass.X'
-    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
+    species_name : str : name of particle species
+    metal_name : str : 'massfraction.X' or 'mass.X'
+    axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
     distance_limits : list : min and max limits for distance from galaxy
     distance_bin_width : float : width of each distance bin (in units of distance_scaling)
-    distance_scaling : string : scaling of distance: 'log', 'linear'
+    distance_scaling : str : scaling of distance: 'log', 'linear'
     halo_radius : float : radius of halo [kpc physical]
-    scale_to_halo_radius : boolean : whether to scale distance to halo_radius
+    scale_to_halo_radius : bool : whether to scale distance to halo_radius
     center_positions : array : position[s] of galaxy center[s] [kpc comoving]
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     virial_kind = '200m'
@@ -227,9 +227,9 @@ class ImageClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        species_name : string : name of particle species to plot
-        weight_name : string : property to weight positions by
-        image_kind : string : 'histogram', 'histogram.3d', 'points'
+        species_name : str : name of particle species to plot
+        weight_name : str : property to weight positions by
+        image_kind : str : 'histogram', 'histogram.3d', 'points'
         dimensions_plot : list : which dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
         dimensions_select : list : which dimensions to use to select particles
@@ -238,24 +238,24 @@ class ImageClass(ut.io.SayClass):
         distance_bin_width : float : length pixel
         distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
         center_position : array-like : position of center
-        rotation : boolean or array : whether to rotate particles - two options:
+        rotation : bool or array : whether to rotate particles - two options:
           (a) if input array of eigen-vectors, will define rotation axes
           (b) if True, will rotate to align with principal axes defined by input species
         property_select : dict : (other) properties to select on: names as keys and limits as values
         part_indices : array : input selection indices for particles
         subsample_factor : int : factor by which periodically to sub-sample particles
-        use_column_units : boolean : whether to convert to particle number / cm^2
+        use_column_units : bool : whether to convert to particle number / cm^2
         image_limits : list : min and max limits to impose on image dynamic range (exposure)
-        background_color : string : name of color for background: 'white', 'black'
+        background_color : str : name of color for background: 'white', 'black'
         hal : dict : catalog of halos at snapshot
         hal_indices : array : indices of halos to plot
-        hal_position_kind : string : name of position to use for center of halo
-        hal_radius_kind : string : name of radius to use for size of halo
-        write_plot : boolean : whether to write figure to file
-        plot_name : string : name of file, including path (to override default naming scheme)
+        hal_position_kind : str : name of position to use for center of halo
+        hal_radius_kind : str : name of radius to use for size of halo
+        write_plot : bool : whether to write figure to file
+        plot_name : str : name of file, including path (to override default naming scheme)
             if plot_name ends in '/', assume that this is the directory,
             and write file with default naming scheme in that directory
-        add_simulation_name : boolean : whether to add name of simulation to figure name
+        add_simulation_name : bool : whether to add name of simulation to figure name
         figure_index : int : index of figure for matplotlib
         '''
         dimen_label = {0: 'x', 1: 'y', 2: 'z'}
@@ -605,14 +605,14 @@ class ImageClass(ut.io.SayClass):
 
         Parameters
         ----------
-        image_kind : string : 'histogram', 'histogram.3d'
+        image_kind : str : 'histogram', 'histogram.3d'
         dimension_list : list : indices of dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
         position_bin_number : number of pixels/bins across image
         position_limits : list or list of lists : min and max values of position to compute
         positions : array : 3-D positions
         weights : array : weight for each position
-        use_column_units : boolean : whether to convert to [number / cm^2]
+        use_column_units : bool : whether to convert to [number / cm^2]
         '''
         if '3d' in image_kind:
             # calculate maximum local density along projected dimension
@@ -699,13 +699,13 @@ def plot_property_distribution(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species_name : string : name of particle species
-    property_name : string : property name
+    species_name : str : name of particle species
+    property_name : str : property name
     property_limits : list : min and max limits of property
     property_bin_width : float : width of property bin (use this or property_bin_number)
     property_bin_number : int : number of bins within limits (use this or property_bin_width)
-    property_scaling : string : scaling of property: 'log', 'linear'
-    property_statistic : string : statistic to plot:
+    property_scaling : str : scaling of property: 'log', 'linear'
+    property_statistic : str : statistic to plot:
         'probability', 'probability.cum', 'histogram', 'histogram.cum'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
@@ -713,9 +713,9 @@ def plot_property_distribution(
     property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : 'log', 'linear'
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    axis_y_scaling : str : 'log', 'linear'
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     Say = ut.io.SayClass(plot_property_distribution)
@@ -806,23 +806,23 @@ def plot_property_v_property(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species_name : string : name of particle species
-    x_property_name : string : property name for x-axis
+    species_name : str : name of particle species
+    x_property_name : str : property name for x-axis
     x_property_limits : list : min and max limits to impose on x_property_name
-    x_property_scaling : string : 'log', 'linear'
-    y_property_name : string : property name for y-axis
+    x_property_scaling : str : 'log', 'linear'
+    y_property_name : str : property name for y-axis
     y_property_limits : list : min and max limits to impose on y_property_name
-    y_property_scaling : string : 'log', 'linear'
+    y_property_scaling : str : 'log', 'linear'
     property_bin_number : int : number of bins for histogram along each axis
-    weight_by_mass : boolean : whether to weight property by particle mass
+    weight_by_mass : bool : whether to weight property by particle mass
     host_distance_limits : list : min and max limits for distance from galaxy
     center_position : array : position of galaxy center
     property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indices : array : indices of particles from which to select
-    draw_statistics : boolean : whether to draw statistics (such as median) on figure
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
-    add_simulation_name : boolean : whether to add name of simulation to figure name
+    draw_statistics : bool : whether to draw statistics (such as median) on figure
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
+    add_simulation_name : bool : whether to add name of simulation to figure name
     figure_index : int : index of figure for matplotlib
     '''
     Say = ut.io.SayClass(plot_property_v_property)
@@ -960,21 +960,21 @@ def plot_property_v_distance(
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
-    species_name : string : name of particle species to compute mass from
+    species_name : str : name of particle species to compute mass from
         options: 'dark', 'star', 'gas', 'baryon', 'total'
-    property_name : string : property to get profile of
-    property_statistic : string : statistic/type to plot:
+    property_name : str : property to get profile of
+    property_statistic : str : statistic/type to plot:
         'sum, sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction,
         median, average'
-    property_scaling : string : scaling for property (y-axis): 'log', 'linear'
-    weight_by_mass : boolean : whether to weight property by particle mass
+    property_scaling : str : scaling for property (y-axis): 'log', 'linear'
+    weight_by_mass : bool : whether to weight property by particle mass
     property_limits : list : limits to impose on y-axis
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
-    distance_scaling : string : 'log', 'linear'
+    distance_scaling : str : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
         note : if 1, get profile along minor axis, if 2, get profile along 2 major axes
-    rotation : boolean or array : whether to rotate particles - two options:
+    rotation : bool or array : whether to rotate particles - two options:
       (a) if input array of eigen-vectors, will define rotation axes
       (b) if True, will rotate to align with principal axes stored in species dictionary
     other_axis_distance_limits : float :
@@ -984,13 +984,13 @@ def plot_property_v_distance(
     property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     distance_reference : float : reference distance at which to draw vertical line
-    plot_nfw : boolean : whether to overplot NFW profile: density ~ 1 / r
-    plot_fit : boolean : whether to overplot linear fit
+    plot_nfw : bool : whether to overplot NFW profile: density ~ 1 / r
+    plot_fit : bool : whether to overplot linear fit
     fit_distance_limits : list : min and max distance for fit
-    print_values : boolean : whether to print values plotted
-    get_values : boolean : whether to return values plotted
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    print_values : bool : whether to print values plotted
+    get_values : bool : whether to return values plotted
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     if isinstance(parts, dict):
@@ -1189,12 +1189,12 @@ def print_densities(
     rotation=True, center_positions=None, center_velocities=None):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
-    species_names : string or list thereof: name of particle species to compute densities of
+    species_names : str or list thereof: name of particle species to compute densities of
         options: 'dark', 'star', 'gas'
     distance_limitss : list of lists : min and max distances/positions
-    coordinate_system : string : which coordinates to get positions in:
+    coordinate_system : str : which coordinates to get positions in:
         'cartesian' (default), 'cylindrical', 'spherical'
-    rotation : boolean or array : whether to rotate particles - two options:
+    rotation : bool or array : whether to rotate particles - two options:
       (a) if input array of eigen-vectors, will define rotation axes
       (b) if True, will rotate to align with principal axes stored in species dictionary
     center_positions : array or list of arrays : position of center for each particle catalog
@@ -1255,16 +1255,16 @@ def plot_disk_orientation(
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
-    species_names : string or list : name[s] of particle species to compute
+    species_names : str or list : name[s] of particle species to compute
         options: 'star', 'gas', 'dark'
-    vary_property : string : which property to vary (along x-axis): 'distance', 'age'
+    vary_property : str : which property to vary (along x-axis): 'distance', 'age'
     property_limits : list : min and max property for binning
     property_bin_width : float : width of property bin
-    property_scaling : string : 'log', 'linear'
+    property_scaling : str : 'log', 'linear'
     distance_ref : float : reference distance to compute principal axes
     center_positions : array or list of arrays : position of center for each particle catalog
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     orientation_axis = [0, 0, 1]  # which principal axis to measure orientation angle of
@@ -1385,13 +1385,13 @@ def plot_velocity_distribution_of_halo(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species_name : string : name of particle species
-    property_name : string : property name
+    species_name : str : name of particle species
+    property_name : str : property name
     property_limits : list : min and max limits of property
     property_bin_width : float : width of property bin (use this or property_bin_number)
     property_bin_number : int : number of bins within limits (use this or property_bin_width)
-    property_scaling : string : scaling of property: 'log', 'linear'
-    property_statistic : string : statistic to plot:
+    property_scaling : str : scaling of property: 'log', 'linear'
+    property_statistic : str : statistic to plot:
         'probability', 'probability.cum', 'histogram', 'histogram.cum'
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
@@ -1399,9 +1399,9 @@ def plot_velocity_distribution_of_halo(
     property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : 'log', 'linear'
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    axis_y_scaling : str : 'log', 'linear'
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     Say = ut.io.SayClass(plot_property_distribution)
@@ -1601,21 +1601,21 @@ def plot_property_v_distance_halos(
     hal_indicess : array (halo catalog number x halo number) : indices of halos to plot
     gal : dict : catalog of observed galaxies
     gal_indices : array : indices of galaxies to plot
-    species_name : string : name of particle species to compute mass from
+    species_name : str : name of particle species to compute mass from
         options: 'dark', 'star', 'gas', 'baryon', 'total'
-    property_name : string : property to get profile of
-    property_statistic : string : statistic/type to plot:
+    property_name : str : property to get profile of
+    property_statistic : str : statistic/type to plot:
         'sum', sum.cum, density, density.cum, vel.circ, sum.fraction, sum.cum.fraction, median, ave'
-    property_scaling : string : scaling for property (y-axis): 'log', 'linear'
-    weight_by_mass : boolean : whether to weight property by particle mass
+    property_scaling : str : scaling for property (y-axis): 'log', 'linear'
+    weight_by_mass : bool : whether to weight property by particle mass
     property_limits : list : limits to impose on y-axis
     distance_limits : list : min and max distance for binning
     distance_bin_width : float : width of distance bin
-    distance_scaling : string : 'log', 'linear'
+    distance_scaling : str : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
     distance_reference : float : reference distance at which to draw vertical line
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     if isinstance(hals, dict):
@@ -1795,10 +1795,10 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         Parameters
         ----------
-        time_kind : string : time metric to use: 'time', 'time.lookback', 'redshift'
+        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
         time_limits : list : min and max limits of time_kind to impose
         time_width : float : width of time_kind bin (in units set by time_scaling)
-        time_scaling : string : scaling of time_kind: 'log', 'linear'
+        time_scaling : str : scaling of time_kind: 'log', 'linear'
         Cosmology : class : cosmology class, to convert between time metrics
 
         Returns
@@ -1856,10 +1856,10 @@ class StarFormHistoryClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : dictionary of particles
-        time_kind : string : time metric to use: 'time', 'time.lookback', 'redshift'
+        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
         time_limits : list : min and max limits of time_kind to impose
         time_width : float : width of time_kind bin (in units set by time_scaling)
-        time_scaling : string : scaling of time_kind: 'log', 'linear'
+        time_scaling : str : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of galaxy distance to select star particles
         center_position : list : position of galaxy centers [kpc comoving]
         property_select : dict : dictionary with property names as keys and limits as values
@@ -1946,20 +1946,20 @@ class StarFormHistoryClass(ut.io.SayClass):
         Parameters
         ----------
         parts : dict or list : catalog[s] of particles
-        sfh_kind : string : star form kind to plot:
+        sfh_kind : str : star form kind to plot:
             'form.rate', 'form.rate.specific', 'mass', 'mass.normalized'
-        time_kind : string : time kind to use: 'time', 'time.lookback' (wrt z = 0), 'redshift'
+        time_kind : str : time kind to use: 'time', 'time.lookback' (wrt z = 0), 'redshift'
         time_limits : list : min and max limits of time_kind to get
         time_width : float : width of time_kind bin
-        time_scaling : string : scaling of time_kind: 'log', 'linear'
+        time_scaling : str : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of distance to select star particles
         center_positions : list or list of lists : position[s] of galaxy centers [kpc comoving]
         property_select : dict : properties to select on: names as keys and limits as values
         part_indicess : array : part_indices of particles from which to select
         sfh_limits : list : min and max limits for y-axis
-        sfh_scaling : string : scaling of y-axis: 'log', 'linear'
-        write_plot : boolean : whether to write figure to file
-        plot_directory : string : directory to write figure file
+        sfh_scaling : str : scaling of y-axis: 'log', 'linear'
+        write_plot : bool : whether to write figure to file
+        plot_directory : str : directory to write figure file
         figure_index : int : index of figure for matplotlib
         '''
         if isinstance(parts, dict):
@@ -2062,20 +2062,20 @@ class StarFormHistoryClass(ut.io.SayClass):
         part : dict : catalog of particles
         hal : dict : catalog of halos at snapshot
         gal : dict : catalog of galaxies in the Local Group with SFHs
-        mass_kind : string : mass kind by which to select halos
+        mass_kind : str : mass kind by which to select halos
         mass_limits : list : min and max limits to impose on mass_kind
         property_select : dict : properties to select on: names as keys and limits as values
         hal_indices : index or array : index[s] of halo[s] whose particles to plot
-        sfh_kind : string : star form kind to plot:
+        sfh_kind : str : star form kind to plot:
             'rate', 'rate.specific', 'mass', 'mass.normalized'
         sfh_limits : list : min and max limits for y-axis
-        sfh_scaling : string : scailng of y-axis: 'log', 'linear'
-        time_kind : string : time kind to plot: 'time', 'time.lookback', 'age', 'redshift'
+        sfh_scaling : str : scailng of y-axis: 'log', 'linear'
+        time_kind : str : time kind to plot: 'time', 'time.lookback', 'age', 'redshift'
         time_limits : list : min and max limits of time_kind to plot
         time_width : float : width of time_kind bin
-        time_scaling : string : scaling of time_kind: 'log', 'linear'
-        write_plot : boolean : whether to write figure to file
-        plot_directory : string : directory to write figure file
+        time_scaling : str : scaling of time_kind: 'log', 'linear'
+        write_plot : bool : whether to write figure to file
+        plot_directory : str : directory to write figure file
         figure_index : int : index of figure for matplotlib
         '''
         time_limits = np.array(time_limits)
@@ -2340,13 +2340,13 @@ def explore_galaxy(
     hal : dict : catalog of halos at snapshot
     hal_index : int : index within halo catalog
     part : dict : catalog of particles at snapshot
-    species_plot : string or dict : which particle species to plot
+    species_plot : str or dict : which particle species to plot
     distance_max : float : max distance (radius) for galaxy image
     distance_bin_width : float : length of pixel for galaxy image
     distance_bin_number : int : number of pixels for galaxy image
-    plot_only_members : boolean : whether to plat only particles that are members of halo
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    plot_only_members : bool : whether to plat only particles that are members of halo
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     '''
     from rockstar_analysis import rockstar_analysis
 
@@ -2514,14 +2514,14 @@ def plot_density_profile_halo(
     Parameters
     ----------
     part : dict : catalog of particles at snapshot
-    species_name : string : name of particle species to plot
+    species_name : str : name of particle species to plot
     hal : dict : catalog of halos at snapshot
     hal_index : int : index of halo in catalog
     center_position : array : position to center profile (to use instead of halo position)
     distance_max : float : max distance (radius) for galaxy image
     distance_bin_width : float : length of pixel for galaxy image
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     distance_scaling = 'log'
@@ -2559,8 +2559,8 @@ def plot_density_profiles_halos(
     plot_only_members=False,
     write_plot=False, plot_directory='.', figure_index=0):
     '''
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     parts = []
@@ -2594,10 +2594,10 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 
     Parameters
     ----------
-    simulation_directory : string : root directory of simulation
+    simulation_directory : str : root directory of simulation
     redshifts : array-like : redshifts at which to get properties
         'all' = read and store all snapshots
-    species : string or list : name[s] of species to read and get properties of
+    species : str or list : name[s] of species to read and get properties of
 
     Returns
     -------
@@ -2679,16 +2679,16 @@ def plot_galaxy_property_v_time(
     ----------
     gals : dict : tabulated dictionary of host galaxy properties
     sfhs : dict : tabulated dictinnary of star-formation histories (computed at single snapshot)
-    property_name : string : name of star formation history property to plot:
+    property_name : str : name of star formation history property to plot:
         'rate', 'rate.specific', 'mass', 'mass.normalized'
-    time_kind : string : time kind to use: 'time', 'time.lookback', 'redshift'
+    time_kind : str : time kind to use: 'time', 'time.lookback', 'redshift'
     time_limits : list : min and max limits of time_kind to get
-    time_scaling : string : scaling of time_kind: 'log', 'linear'
+    time_scaling : str : scaling of time_kind: 'log', 'linear'
     snapshot_subsample_factor : int : factor by which to sub-sample snapshots from gals
     axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : string : scaling of y-axis: 'log', 'linear'
-    write_plot : boolean : whether to write figure to file
-    plot_directory : string : directory to write figure file
+    axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
     #Say = ut.io.SayClass(plot_galaxy_property_v_time)
@@ -2764,7 +2764,7 @@ def get_galaxy_mass_profiles_v_redshift(
 
     Parameters
     ----------
-    directory : string : directory of snapshot files
+    directory : str : directory of snapshot files
     redshifts : array-like : redshifts at which to get properties
     parts : list : list of particle dictionaries
 
@@ -2975,7 +2975,7 @@ class CompareSimulationsClass(ut.io.SayClass):
     def parse_inputs(self, parts=None, species=None, redshifts=None):
         '''
         parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
+        species : str or list : name[s] of particle species to read and analyze
         redshifts : float or list
         '''
         if parts is not None and isinstance(parts, dict):
@@ -3004,7 +3004,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
+        species : str or list : name[s] of particle species to read and analyze
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         '''
@@ -3035,7 +3035,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
+        species : str or list : name[s] of particle species to read and analyze
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         distance_max : float : maximum distance from center to plot
@@ -3086,7 +3086,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
+        species : str or list : name[s] of particle species to read and analyze
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         distance_bin_width : float : width of distance bin
@@ -3232,7 +3232,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
+        species : str or list : name[s] of particle species to read and analyze
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         property_bin_number : int : number of bins along each dimension for histogram
@@ -3297,13 +3297,13 @@ class CompareSimulationsClass(ut.io.SayClass):
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : string or list : name[s] of particle species to read and analyze
+        species : str or list : name[s] of particle species to read and analyze
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
         image_limits : list : min and max limits for image dyanmic range
-        align_principal_axes : boolean : whether to align plot axes with principal axes
+        align_principal_axes : bool : whether to align plot axes with principal axes
         '''
         properties = ['mass', 'position']
         plot_directory = self.plot_directory + 'image'
