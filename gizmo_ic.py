@@ -284,7 +284,7 @@ class InitialConditionClass(ut.io.SayClass):
                         np.sum(spec_select_number)))
             for spec_i, spec in enumerate(species):
                 Write.write('  species {:6}: number = {}'.format(spec, spec_select_number[spec_i]))
-            Write.write('# mass of all dark-matter particles:')
+            Write.write('# mass from all dark-matter particles:')
             if 'mass' in part_ini['dark']:
                 mass_dark_all = part_ini['dark']['mass'].sum()
             else:

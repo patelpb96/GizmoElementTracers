@@ -960,7 +960,7 @@ def plot_property_v_distance(
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
-    species_name : string : name of particle species to compute total mass of
+    species_name : string : name of particle species to compute mass from
         options: 'dark', 'star', 'gas', 'baryon', 'total'
     property_name : string : property to get profile of
     property_statistic : string : statistic/type to plot:
@@ -1601,7 +1601,7 @@ def plot_property_v_distance_halos(
     hal_indicess : array (halo catalog number x halo number) : indices of halos to plot
     gal : dict : catalog of observed galaxies
     gal_indices : array : indices of galaxies to plot
-    species_name : string : name of particle species to compute total mass of
+    species_name : string : name of particle species to compute mass from
         options: 'dark', 'star', 'gas', 'baryon', 'total'
     property_name : string : property to get profile of
     property_statistic : string : statistic/type to plot:

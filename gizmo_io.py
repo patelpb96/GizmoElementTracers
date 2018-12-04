@@ -286,12 +286,12 @@ class ParticleDictionaryClass(dict):
 
         # mass of element
         if 'mass.' in property_name:
-            # mass of individual element
+            # mass from individual element
             values = (self.prop('mass', indices, dict_only=True) *
                       self.prop(property_name.replace('mass.', 'massfraction.'), indices))
 
             if property_name == 'mass.hydrogen.neutral':
-                # mass of neutral hydrogen (excluding helium, metals, and ionized hydrogen)
+                # mass from neutral hydrogen (excluding helium, metals, and ionized hydrogen)
                 values = values * self.prop('hydrogen.neutral.fraction', indices, dict_only=True)
 
             return values
@@ -498,10 +498,11 @@ class ReadClass(ut.io.SayClass):
         '''
         Set properties for snapshot files.
         '''
-        self.snapshot_name_base = 'snap*[!txt]'  # avoid accidentally reading snapshot indices file
+        # this format avoids accidentally reading text file that contains snapshot indices
+        self.snapshot_name_base = 'snap*[!txt]'
         self.file_extension = '.hdf5'
 
-        self.gas_eos = 5 / 3  # gas equation of state
+        self.gas_eos = 5 / 3  # assumed equation of state of gas
 
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
@@ -851,7 +852,7 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
         self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n')
@@ -1038,7 +1039,7 @@ class ReadClass(ut.io.SayClass):
             header = self.read_header(
                 'index', snapshot_index, simulation_directory, snapshot_directory)
 
-        path_file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         self.say('* reading species: {}'.format(self.species_read))
 
@@ -1320,25 +1321,35 @@ class ReadClass(ut.io.SayClass):
                 for prop in part[spec_name]:
                     part[spec_name][prop] = part[spec_name][prop][::particle_subsample_factor]
 
-    def get_snapshot_file_name(self, directory, snapshot_index):
+    def get_snapshot_file_names_indices(self, directory, snapshot_index=None):
         '''
-        Get name (with relative path) of file to read in.
-        If multiple files per snapshot, get name of 0th one.
+        Get name of file or directory (with relative path) and index for all snapshots in directory.
+        If input valid snapshot_index, get its file name (if multiple files per snapshot, get name
+        of 0th one).
+        If input snapshot_index as None or 'all', get name of file/directory and index for each
+        snapshot file/directory.
 
         Parameters
         ----------
         directory : string : directory to check for files
-        snapshot_index : int : index of snapshot
+        snapshot_index : int : index of snapshot: if None or 'all', get all snapshots in directory
 
         Returns
         -------
-        path_file_name : string : (relative) path + name of file
+        path_file_name[s] : string or list thereof : (relative) path + name of file[s]
+        [file_indices : list of ints : indices of snapshot files]
         '''
         directory = ut.io.get_path(directory)
 
+        # get names and indices of all snapshot files in directory
         path_file_names, file_indices = ut.io.get_file_names(
             directory + self.snapshot_name_base, (int, float))
 
+        # if ask for all snapshots, return all files/directories and indices
+        if snapshot_index is None or snapshot_index == 'all':
+            return path_file_names, file_indices
+
+        # else get file name for single snapshot
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
@@ -1666,7 +1677,7 @@ class ReadClass(ut.io.SayClass):
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
 
-        path_file_name = self.get_snapshot_file_name(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n\n')
 
         ## read header ----------

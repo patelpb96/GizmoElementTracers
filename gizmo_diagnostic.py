@@ -611,6 +611,49 @@ def print_properties_snapshots(
             #Statistic.print_statistics()
 
 
+def test_file_compression(
+    snapshot_indices='all', simulation_directory='.', snapshot_directory='output',
+    compression_level=0):
+    '''
+    .
+    '''
+    header_compression_name = 'compression.level'
+
+    simulation_directory = ut.io.get_path(simulation_directory)
+    snapshot_directory = ut.io.get_path(snapshot_directory)
+
+    Say = ut.io.SayClass(test_file_compression)
+    Read = gizmo_io.ReadClass()
+
+    compression_wrong_snapshots = []
+    compression_none_snapshots = []
+
+    if snapshot_indices is None or snapshot_indices == 'all':
+        _path_file_names, snapshot_indices = Read.get_snapshot_file_names_indices(
+            simulation_directory + snapshot_directory)
+    elif np.isscalar(snapshot_indices):
+        snapshot_indices = [snapshot_indices]
+
+    for snapshot_index in snapshot_indices:
+        header = Read.read_header('index', snapshot_index, simulation_directory)
+        if header_compression_name in header:
+            if (compression_level is not None and
+                    header[header_compression_name] != compression_level):
+                compression_wrong_snapshots.append(snapshot_index)
+        else:
+            compression_none_snapshots.append(snapshot_index)
+
+    Say.say('tested {} snapshots: {} - {}'.format(
+        len(snapshot_indices), min(snapshot_indices), max(snapshot_indices)))
+    Say.say('{} are uncompressed'.format(len(compression_none_snapshots)))
+    for snapshot_index in compression_none_snapshots:
+        Say.say('* {}'.format(snapshot_index))
+    Say.say('{} have wrong compression (level != {})'.format(
+        len(compression_wrong_snapshots), compression_level))
+    for snapshot_index in compression_wrong_snapshots:
+        Say.say('* {}'.format(snapshot_index))
+
+
 def test_stellar_mass_loss(
     part_z0, part_z, metallicity_limits=[0.001, 10], metallicity_bin_width=0.2,
     form_time_width=5):
