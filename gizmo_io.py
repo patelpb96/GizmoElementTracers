@@ -856,7 +856,8 @@ class ReadClass(ut.io.SayClass):
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         self._is_first_print = True
-        self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n')
+        if verbose:
+            self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n')
 
         # open snapshot file
         with h5py.File(path_file_name, 'r') as file_in:
