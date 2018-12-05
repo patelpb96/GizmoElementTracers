@@ -15,7 +15,7 @@ import numpy as np
 # local ----
 import utilities as ut
 
-# default subset to keep for FIRE (65 snapshots)
+# default subset of snapshots (65 snapshots)
 snapshot_indices_keep = [
     0,  # z = 99
     20, 26, 33, 41, 52,  # z = 10 - 6
@@ -33,9 +33,29 @@ snapshot_indices_keep = [
 #===================================================================================================
 # compress files
 #===================================================================================================
+def compress_snapshots(
+    directory='output', directory_out='', snapshot_index_limits=[0, 600], thread_number=1):
+    '''
+    Compress all snapshots in input directory.
+
+    Parameters
+    ----------
+    directory : str : directory of snapshots
+    directory_out : str : directory to write compressed snapshots
+    snapshot_index_limits : list : min and max snapshot indices to compress
+    syncronize : bool : whether to synchronize parallel tasks,
+        wait for each thread bundle to complete before starting new bundle
+    '''
+    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+
+    args_list = [(directory, directory_out, snapshot_index) for snapshot_index in snapshot_indices]
+
+    ut.io.run_in_parallel(compress_snapshot, args_list, thread_number=thread_number)
+
+
 def compress_snapshot(
-    directory='output', directory_out='', snapshot_index=600,
-    analysis_directory='~/analysis', python_executable='python3'):
+    directory='output', directory_out='', snapshot_index=600, analysis_directory='~/analysis',
+    python_executable='python3'):
     '''
     Compress single snapshot (which may be multiple files) in input directory.
 
@@ -72,26 +92,6 @@ def compress_snapshot(
             executable_i = '{} -o {} {}'.format(executable, path_file_name_out, path_file_name)
             ut.io.print_flush('executing:  {}'.format(executable_i))
             os.system(executable_i)
-
-
-def compress_snapshots(
-    directory='output', directory_out='', snapshot_index_limits=[0, 600], thread_number=1):
-    '''
-    Compress all snapshots in input directory.
-
-    Parameters
-    ----------
-    directory : str : directory of snapshots
-    directory_out : str : directory to write compressed snapshots
-    snapshot_index_limits : list : min and max snapshot indices to compress
-    syncronize : bool : whether to synchronize parallel tasks,
-        wait for each thread bundle to complete before starting new bundle
-    '''
-    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
-
-    args_list = [(directory, directory_out, snapshot_index) for snapshot_index in snapshot_indices]
-
-    ut.io.run_in_parallel(compress_snapshot, args_list, thread_number=thread_number)
 
 
 #===================================================================================================
