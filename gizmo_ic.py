@@ -40,7 +40,7 @@ class ReadClass(ut.io.SayClass):
         Parameters
         ----------
         snapshot_redshifts : list : redshifts of initial and final snapshots
-        simulation_directory : string : root directory of simulation
+        simulation_directory : str : root directory of simulation
         '''
         # ensure lowest-redshift snapshot is first
         self.snapshot_redshifts = np.sort(snapshot_redshifts)
@@ -75,8 +75,8 @@ class ReadClass(ut.io.SayClass):
         Parameters
         ----------
         mass_limits : list : min and max halo mass to assign low-res DM mass
-        file_kind : string : kind of halo file: 'hdf5', 'out', 'ascii', 'hlist'
-        assign_nearest_neighbor : boolean : whether to assign nearest neighboring halo
+        file_kind : str : kind of halo file: 'hdf5', 'out', 'ascii', 'hlist'
+        assign_nearest_neighbor : bool : whether to assign nearest neighboring halo
 
         Returns
         -------
@@ -97,8 +97,8 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        properties : string or list : name[s] of particle properties to read
-        sort_dark_by_id : boolean : whether to sort dark-matter particles by id
+        properties : str or list : name[s] of particle properties to read
+        sort_dark_by_id : bool : whether to sort dark-matter particles by id
 
         Returns
         -------
@@ -155,10 +155,10 @@ class InitialConditionClass(ut.io.SayClass):
         center_position : list : center position at final snapshot
         distance_max : float : distance from center to select particles at final time
             [kpc physical or in units of R_halo]
-        scale_to_halo_radius : boolean : whether to scale distance to halo radius
+        scale_to_halo_radius : bool : whether to scale distance to halo radius
         halo_radius : float : radius of halo [kpc physical]
-        virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
-        region_kind : string : method to identify zoom-in regon at initial time:
+        virial_kind : str : virial kind to use to get halo radius (if not input halo_radius)
+        region_kind : str : method to identify zoom-in regon at initial time:
             'particles', 'convex-hull', 'cube'
         dark_mass : float : DM particle mass (if simulation has only DM at single resolution)
         '''
@@ -284,7 +284,7 @@ class InitialConditionClass(ut.io.SayClass):
                         np.sum(spec_select_number)))
             for spec_i, spec in enumerate(species):
                 Write.write('  species {:6}: number = {}'.format(spec, spec_select_number[spec_i]))
-            Write.write('# mass of all dark-matter particles:')
+            Write.write('# mass from all dark-matter particles:')
             if 'mass' in part_ini['dark']:
                 mass_dark_all = part_ini['dark']['mass'].sum()
             else:
@@ -352,9 +352,9 @@ class InitialConditionClass(ut.io.SayClass):
         hal_index : int : index of halo
         distance_max : float : distance from center to select particles at final time
             [kpc physical or in units of R_halo]
-        scale_to_halo_radius : boolean : whether to scale distance to halo radius
-        virial_kind : string : virial overdensity to define halo radius
-        region_kind : string : method to identify zoom-in regon at initial time:
+        scale_to_halo_radius : bool : whether to scale distance to halo radius
+        virial_kind : str : virial overdensity to define halo radius
+        region_kind : str : method to identify zoom-in regon at initial time:
             'particles', 'convex-hull', 'cube'
         dark_mass : float : DM particle mass (if simulation has only DM, at single resolution)
         '''
@@ -383,12 +383,12 @@ class InitialConditionClass(ut.io.SayClass):
         snapshot_redshifts : list : redshifts of final and initial snapshots
         distance_max : float : distance from center to select particles at final time
             [kpc physical, or in units of R_halo]
-        scale_to_halo_radius : boolean : whether to scale distance to halo radius
+        scale_to_halo_radius : bool : whether to scale distance to halo radius
         halo_radius : float : radius of halo [kpc physical]
-        virial_kind : string : virial kind to use to get halo radius (if not input halo_radius)
-        region_kind : string : method to determine zoom-in regon at initial time:
+        virial_kind : str : virial kind to use to get halo radius (if not input halo_radius)
+        region_kind : str : method to determine zoom-in regon at initial time:
             'particles', 'convex-hull', 'cube'
-        simulation_directory : string : directory of simulation
+        simulation_directory : str : directory of simulation
         '''
         if scale_to_halo_radius:
             assert distance_max > 1 and distance_max < 30
