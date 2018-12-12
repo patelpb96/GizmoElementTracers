@@ -196,7 +196,7 @@ class InitialConditionClass(ut.io.SayClass):
 
         self.say('using species: {}'.format(species))
 
-        center_position = ut.particle.parse_property(part_fin, 'position', center_position)
+        center_position = ut.particle.parse_property(part_fin, 'center_position', center_position)
 
         if scale_to_halo_radius:
             if not halo_radius:
