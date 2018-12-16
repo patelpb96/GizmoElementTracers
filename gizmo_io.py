@@ -903,11 +903,11 @@ class ReadClass(ut.io.SayClass):
                 'snapshot file[s] contain no particles of species = {}'.format(self.species_read))
 
         # check if simulation contains baryons
-        header['has.baryons'] = False
+        header['baryonic'] = False
         for spec_name in self.species_all:
             if 'dark' not in spec_name:
                 if header['particle.numbers.total'][self.species_dict[spec_name]] > 0:
-                    header['has.baryons'] = True
+                    header['baryonic'] = True
                     break
 
         # assign simulation name
@@ -1404,7 +1404,7 @@ class ReadClass(ut.io.SayClass):
             if len(path_file_names):
                 path_file_name = path_file_names[0]
                 self.say('* reading cosmological parameters from:  {}'.format(
-                         path_file_name.strip('./')), end='\n\n')
+                    path_file_name.strip('./')), end='\n\n')
                 # read cosmological parameters
                 with open(path_file_name, 'r') as file_in:
                     for line in file_in:
