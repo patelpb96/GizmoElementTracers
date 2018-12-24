@@ -793,7 +793,7 @@ class ReadClass(ut.io.SayClass):
 
     def read_header(
         self, snapshot_value_kind='index', snapshot_value=600, simulation_directory='.',
-        snapshot_directory='output/', snapshot_block_index=0, simulation_name='', verbose=True):
+        snapshot_directory='output/', simulation_name='', snapshot_block_index=0, verbose=True):
         '''
         Read header from snapshot file.
 
@@ -803,8 +803,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : root directory of simulation
         snapshot_directory: str : directory of snapshot files within simulation_directory
-        snapshot_block_index : int : index of file block (if multiple files per snapshot)
         simulation_name : str : name to store for future identification
+        snapshot_block_index : int : index of file block (if multiple files per snapshot)
         verbose : bool : whether to print number of particles in snapshot
 
         Returns
