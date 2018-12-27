@@ -187,6 +187,61 @@ def delete_snapshots(
 #===================================================================================================
 # transfer files
 #===================================================================================================
+def write_globus_batch_file(simulation_directory='.'):
+    '''
+    Use rsync to copy snapshot file[s].
+
+    Parameters
+    ----------
+    machine_name : str : 'pfe', 'stampede', 'bw', 'peloton'
+    directory_from : str : directory to copy from
+    directory_to : str : local directory to put snapshots
+    snapshot_indices : int or list : index[s] of snapshots to transfer
+    '''
+    transfer_items = [
+        'gizmo/',
+        'gizmo_config.sh',
+        'gizmo_parameters.txt',
+        'gizmo_parameters.txt-usedvalues',
+        'gizmo.out.txt',
+        'snapshot_times.txt',
+        'initial_condition/',
+
+        'track/',
+        'halo/rockstar_dm/catalog_hdf5/',
+    ]
+
+    snapshot_directory = 'output'
+    file_name = 'globus_batch.txt'
+
+    simulation_directory = ut.io.get_path(simulation_directory)
+
+    transfer_string = ''
+
+    for transfer_item in transfer_items:
+        if os.path.exists(simulation_directory + transfer_item):
+            command = '{} {}'
+            if transfer_item[-1] == '/':
+                transfer_item = transfer_item[:-1]
+                command += ' --recursive'
+            command = command.format(transfer_item, transfer_item) + '\n'
+            transfer_string += command
+
+    for snapshot_index in snapshot_indices_keep:
+        snapshot_name = '{}/snapdir_{:3d}'.format(snapshot_directory, snapshot_index)
+        if os.path.exists(simulation_directory + snapshot_name):
+            snapshot_string = '{} {} --recursive\n'.format(snapshot_name, snapshot_name)
+            transfer_string += snapshot_string
+
+        snapshot_name = '{}/snapshot_{:3d}.hdf5'.format(snapshot_directory, snapshot_index)
+        if os.path.exists(simulation_directory + snapshot_name):
+            snapshot_string = '{} {}\n'.format(snapshot_name, snapshot_name)
+            transfer_string += snapshot_string
+
+    with open(file_name, 'w') as file_out:
+        file_out.write(transfer_string)
+
+
 def rsync_snapshots(
     machine_name, simulation_directory_from='', simulation_directory_to='.',
     snapshot_indices=snapshot_indices_keep):
