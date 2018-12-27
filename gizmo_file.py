@@ -228,12 +228,12 @@ def write_globus_batch_file(simulation_directory='.'):
             transfer_string += command
 
     for snapshot_index in snapshot_indices_keep:
-        snapshot_name = '{}/snapdir_{:3d}'.format(snapshot_directory, snapshot_index)
+        snapshot_name = '{}/snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
         if os.path.exists(simulation_directory + snapshot_name):
             snapshot_string = '{} {} --recursive\n'.format(snapshot_name, snapshot_name)
             transfer_string += snapshot_string
 
-        snapshot_name = '{}/snapshot_{:3d}.hdf5'.format(snapshot_directory, snapshot_index)
+        snapshot_name = '{}/snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
         if os.path.exists(simulation_directory + snapshot_name):
             snapshot_string = '{} {}\n'.format(snapshot_name, snapshot_name)
             transfer_string += snapshot_string
@@ -344,11 +344,12 @@ def rsync_simulation_files(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise OSError('specify function: compress, delete, rsync')
+        raise OSError('specify function: compress, delete, rsync, globus')
 
     function_kind = str(sys.argv[1])
 
-    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind)
+    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind
+            or 'globus' in function_kind)
 
     if 'compress' in function_kind:
         directory = 'output'
@@ -372,6 +373,12 @@ if __name__ == '__main__':
             snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
 
         delete_snapshots(directory, snapshot_index_limits)
+
+    elif 'globus' in function_kind:
+        directory = '.'
+        if len(sys.argv) > 2:
+            directory = str(sys.argv[2])
+        write_globus_batch_file(directory)
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
