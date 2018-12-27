@@ -187,17 +187,73 @@ def delete_snapshots(
 #===================================================================================================
 # transfer files
 #===================================================================================================
-def write_globus_batch_file(simulation_directory='.'):
+def submit_globus_transfer(
+    simulation_path_directory='.', snapshot_directory='output', batch_file_name='globus_batch.txt',
+    machine_to='peloton'):
     '''
-    Use rsync to copy snapshot file[s].
+    Submit transfer of simulation files via globus.
 
     Parameters
     ----------
-    machine_name : str : 'pfe', 'stampede', 'bw', 'peloton'
-    directory_from : str : directory to copy from
-    directory_to : str : local directory to put snapshots
-    snapshot_indices : int or list : index[s] of snapshots to transfer
+    simulation_path_directory : str : '.' or full path + directory of simulation
+    snapshot_directory : str : directory of snapshot files
+    batch_file_name : str : name of file to write
+    machine_to : str : machine transfering to
     '''
+    # parse and set directory on stampede from which to transfer
+    simulation_path_directory = ut.io.get_path(simulation_path_directory)
+    if simulation_path_directory == './':
+        simulation_path_directory = os.getcwd()
+    if simulation_path_directory[-1] != '/':
+        simulation_path_directory += '/'
+
+    command = 'globus transfer $(globus bookmark show stampede){}'.format(
+        simulation_path_directory[1:])  # preceeding / already in globus bookmark
+
+    path_directories = simulation_path_directory.split('/')
+    simulation_directory = path_directories[-2]
+
+    # parse machine + directory to transfer to
+    if machine_to == 'peloton':
+        if 'elvis' in simulation_directory:
+            directory_to = 'm12_elvis'
+        else:
+            directory_to = simulation_directory.split('_')[0]
+        directory_to += '/' + simulation_directory + '/'
+
+        command += ' $(globus bookmark show peloton-scratch){}'.format(directory_to)
+
+    # set globus settings
+    command += ' --sync-level=checksum --preserve-mtime --verify-checksum'
+    command += ' --label "{}" --batch < {}'.format(simulation_directory, batch_file_name)
+
+    # create globus batch file
+    write_globus_batch_file(simulation_path_directory, snapshot_directory, batch_file_name)
+
+    print(command)
+
+    #os.system(command)
+
+
+def write_globus_batch_file(
+    simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'):
+    '''
+    Write batch file that sets files to transfer via globus.
+
+    Parameters
+    ----------
+    simulation_directory : str : base directory of simulation
+    snapshot_directory : str : directory of snapshot files
+    file_name : str : name of file to write
+    '''
+    simulation_directory = ut.io.get_path(simulation_directory)
+    snapshot_directory = ut.io.get_path(snapshot_directory)
+
+    print(simulation_directory)
+
+    transfer_string = ''
+
+    # general files
     transfer_items = [
         'gizmo/',
         'gizmo_config.sh',
@@ -205,19 +261,10 @@ def write_globus_batch_file(simulation_directory='.'):
         'gizmo_parameters.txt-usedvalues',
         'gizmo.out.txt',
         'snapshot_times.txt',
-        'initial_condition/',
 
         'track/',
         'halo/rockstar_dm/catalog_hdf5/',
     ]
-
-    snapshot_directory = 'output'
-    file_name = 'globus_batch.txt'
-
-    simulation_directory = ut.io.get_path(simulation_directory)
-
-    transfer_string = ''
-
     for transfer_item in transfer_items:
         if os.path.exists(simulation_directory + transfer_item):
             command = '{} {}'
@@ -227,13 +274,22 @@ def write_globus_batch_file(simulation_directory='.'):
             command = command.format(transfer_item, transfer_item) + '\n'
             transfer_string += command
 
+    # initial condition files
+    transfer_items = glob.glob(simulation_directory + 'initial_condition*/*')
+    for transfer_item in transfer_items:
+        if '.ics' not in transfer_item:
+            transfer_item = transfer_item.replace(simulation_directory, '')
+            command = '{} {}\n'.format(transfer_item, transfer_item)
+            transfer_string += command
+
+    # snapshot files
     for snapshot_index in snapshot_indices_keep:
-        snapshot_name = '{}/snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
+        snapshot_name = '{}snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
         if os.path.exists(simulation_directory + snapshot_name):
             snapshot_string = '{} {} --recursive\n'.format(snapshot_name, snapshot_name)
             transfer_string += snapshot_string
 
-        snapshot_name = '{}/snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
+        snapshot_name = '{}snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
         if os.path.exists(simulation_directory + snapshot_name):
             snapshot_string = '{} {}\n'.format(snapshot_name, snapshot_name)
             transfer_string += snapshot_string
@@ -344,12 +400,12 @@ def rsync_simulation_files(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise OSError('specify function: compress, delete, rsync, globus')
+        raise OSError('specify function: compress, delete, globus, rsync')
 
     function_kind = str(sys.argv[1])
 
-    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind
-            or 'globus' in function_kind)
+    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind or
+            'globus' in function_kind)
 
     if 'compress' in function_kind:
         directory = 'output'
@@ -378,7 +434,7 @@ if __name__ == '__main__':
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
-        write_globus_batch_file(directory)
+        submit_globus_transfer(directory)
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
