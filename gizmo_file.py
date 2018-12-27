@@ -185,22 +185,23 @@ def delete_snapshots(
 
 
 #===================================================================================================
-# transfer files
+# transfer files via globus
 #===================================================================================================
 def submit_globus_transfer(
     simulation_path_directory='.', snapshot_directory='output', batch_file_name='globus_batch.txt',
-    machine_to='peloton'):
+    machine_name='peloton'):
     '''
-    Submit transfer of simulation files via globus.
+    Submit globus transfer of simulation files.
+    Must initiate from Stampede.
 
     Parameters
     ----------
     simulation_path_directory : str : '.' or full path + directory of simulation
     snapshot_directory : str : directory of snapshot files
     batch_file_name : str : name of file to write
-    machine_to : str : machine transfering to
+    machine_name : str : name of machine transfering files to
     '''
-    # parse and set directory on stampede from which to transfer
+    # set directory from which to transfer
     simulation_path_directory = ut.io.get_path(simulation_path_directory)
     if simulation_path_directory == './':
         simulation_path_directory = os.getcwd()
@@ -208,13 +209,13 @@ def submit_globus_transfer(
         simulation_path_directory += '/'
 
     command = 'globus transfer $(globus bookmark show stampede){}'.format(
-        simulation_path_directory[1:])  # preceeding / already in globus bookmark
+        simulation_path_directory[1:])  # preceeding '/' already in globus bookmark
 
     path_directories = simulation_path_directory.split('/')
     simulation_directory = path_directories[-2]
 
     # parse machine + directory to transfer to
-    if machine_to == 'peloton':
+    if machine_name == 'peloton':
         if 'elvis' in simulation_directory:
             directory_to = 'm12_elvis'
         else:
@@ -223,16 +224,15 @@ def submit_globus_transfer(
 
         command += ' $(globus bookmark show peloton-scratch){}'.format(directory_to)
 
-    # set globus settings
+    # set globus parameters
     command += ' --sync-level=checksum --preserve-mtime --verify-checksum'
     command += ' --label "{}" --batch < {}'.format(simulation_directory, batch_file_name)
 
-    # create globus batch file
+    # write globus batch file
     write_globus_batch_file(simulation_path_directory, snapshot_directory, batch_file_name)
 
-    print(command)
-
-    #os.system(command)
+    print('executing:\n{}'.format(command))
+    os.system(command)
 
 
 def write_globus_batch_file(
@@ -248,8 +248,6 @@ def write_globus_batch_file(
     '''
     simulation_directory = ut.io.get_path(simulation_directory)
     snapshot_directory = ut.io.get_path(snapshot_directory)
-
-    print(simulation_directory)
 
     transfer_string = ''
 
@@ -298,6 +296,9 @@ def write_globus_batch_file(
         file_out.write(transfer_string)
 
 
+#===================================================================================================
+# transfer files via rsync
+#===================================================================================================
 def rsync_snapshots(
     machine_name, simulation_directory_from='', simulation_directory_to='.',
     snapshot_indices=snapshot_indices_keep):
@@ -324,15 +325,12 @@ def rsync_snapshots(
         snapshot_path_names += (
             directory_from + snapshot_name_base.format(snapshot_index) + ' ')
 
-    executable = 'rsync -ahvP --size-only '
-    executable += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
-    print('executing:  {}'.format(executable))
-    os.system(executable)
+    command = 'rsync -ahvP --size-only '
+    command += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
+    print('executing:\n{}'.format(command))
+    os.system(command)
 
 
-#===================================================================================================
-# transfer whole simulation
-#===================================================================================================
 def rsync_simulation_files(
     machine_name, directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE', directory_to='.'):
     '''
@@ -384,15 +382,15 @@ def rsync_simulation_files(
     directory_from = machine_name + ':' + ut.io.get_path(directory_from)
     directory_to = ut.io.get_path(directory_to)
 
-    executable = 'rsync -ahvP --size-only '
+    command = 'rsync -ahvP --size-only '
 
     arguments = ''
     for exclude in excludes:
         arguments += '--exclude="{}" '.format(exclude)
 
-    executable += arguments + directory_from + ' ' + directory_to + '.'
-    print('executing:  {}'.format(executable))
-    os.system(executable)
+    command += arguments + directory_from + ' ' + directory_to + '.'
+    print('executing:\n{}'.format(command))
+    os.system(command)
 
 
 #===================================================================================================
