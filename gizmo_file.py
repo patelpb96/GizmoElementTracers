@@ -144,156 +144,120 @@ Compress = CompressClass()
 
 
 #===================================================================================================
-# delete files
-#===================================================================================================
-def delete_snapshots(
-    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False):
-    '''
-    Delete all snapshots in given directory within snapshot_index_limits,
-    except for those in snapshot_indices_keep list.
-
-    Parameters
-    ----------
-    snapshot_directory : str : directory of snapshots
-    snapshot_index_limits : list : min and max snapshot indices to delete
-    delete_halos : bool : whether to delete halo catalog files at same snapshot times
-    '''
-    snapshot_name_base = 'snap*_{:03d}*'
-    if not snapshot_directory:
-        snapshot_directory = 'output/'
-
-    halo_name_base = 'halos_{:03d}*'
-    halo_directory = 'halo/rockstar_dm/catalog/'
-
-    if snapshot_directory[-1] != '/':
-        snapshot_directory += '/'
-
-    if snapshot_index_limits is None or not len(snapshot_index_limits):
-        snapshot_index_limits = [1, 599]
-    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
-
-    for snapshot_index in snapshot_indices:
-        if snapshot_index not in snapshot_indices_keep:
-            snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
-            print('* deleting:  {}'.format(snapshot_name))
-            os.system('rm -rf {}'.format(snapshot_name))
-
-            if delete_halos:
-                halo_name = halo_directory + halo_name_base.format(snapshot_index)
-                print('* deleting:  {}'.format(halo_name))
-                os.system('rm -rf {}'.format(halo_name))
-
-
-#===================================================================================================
 # transfer files via globus
 #===================================================================================================
-def submit_globus_transfer(
-    simulation_path_directory='.', snapshot_directory='output', batch_file_name='globus_batch.txt',
-    machine_name='peloton'):
-    '''
-    Submit globus transfer of simulation files.
-    Must initiate from Stampede.
+class GlobusClass(ut.io.SayClass):
 
-    Parameters
-    ----------
-    simulation_path_directory : str : '.' or full path + directory of simulation
-    snapshot_directory : str : directory of snapshot files
-    batch_file_name : str : name of file to write
-    machine_name : str : name of machine transfering files to
-    '''
-    # set directory from which to transfer
-    simulation_path_directory = ut.io.get_path(simulation_path_directory)
-    if simulation_path_directory == './':
-        simulation_path_directory = os.getcwd()
-    if simulation_path_directory[-1] != '/':
-        simulation_path_directory += '/'
+    def submit_transfer(
+        self, simulation_path_directory='.', snapshot_directory='output',
+        batch_file_name='globus_batch.txt', machine_name='peloton'):
+        '''
+        Submit globus transfer of simulation files.
+        Must initiate from Stampede.
 
-    command = 'globus transfer $(globus bookmark show stampede){}'.format(
-        simulation_path_directory[1:])  # preceeding '/' already in globus bookmark
+        Parameters
+        ----------
+        simulation_path_directory : str : '.' or full path + directory of simulation
+        snapshot_directory : str : directory of snapshot files within simulation_directory
+        batch_file_name : str : name of file to write
+        machine_name : str : name of machine transfering files to
+        '''
+        # set directory from which to transfer
+        simulation_path_directory = ut.io.get_path(simulation_path_directory)
+        if simulation_path_directory == './':
+            simulation_path_directory = os.getcwd()
+        if simulation_path_directory[-1] != '/':
+            simulation_path_directory += '/'
 
-    path_directories = simulation_path_directory.split('/')
-    simulation_directory = path_directories[-2]
+        command = 'globus transfer $(globus bookmark show stampede){}'.format(
+            simulation_path_directory[1:])  # preceeding '/' already in globus bookmark
 
-    # parse machine + directory to transfer to
-    if machine_name == 'peloton':
-        if 'elvis' in simulation_directory:
-            directory_to = 'm12_elvis'
-        else:
-            directory_to = simulation_directory.split('_')[0]
-        directory_to += '/' + simulation_directory + '/'
+        path_directories = simulation_path_directory.split('/')
+        simulation_directory = path_directories[-2]
 
-        command += ' $(globus bookmark show peloton-scratch){}'.format(directory_to)
+        # parse machine + directory to transfer to
+        if machine_name == 'peloton':
+            if 'elvis' in simulation_directory:
+                directory_to = 'm12_elvis'
+            else:
+                directory_to = simulation_directory.split('_')[0]
+            directory_to += '/' + simulation_directory + '/'
 
-    # set globus parameters
-    command += ' --sync-level=checksum --preserve-mtime --verify-checksum'
-    command += ' --label "{}" --batch < {}'.format(simulation_directory, batch_file_name)
+            command += ' $(globus bookmark show peloton-scratch){}'.format(directory_to)
 
-    # write globus batch file
-    write_globus_batch_file(simulation_path_directory, snapshot_directory, batch_file_name)
+        # set globus parameters
+        command += ' --sync-level=checksum --preserve-mtime --verify-checksum'
+        command += ' --label "{}" --batch < {}'.format(simulation_directory, batch_file_name)
 
-    print('executing:\n{}'.format(command))
-    os.system(command)
+        # write globus batch file
+        self.write_batch_file(simulation_path_directory, snapshot_directory, batch_file_name)
+
+        self.say('* executing:\n{}\n'.format(command))
+        os.system(command)
+
+    def write_batch_file(
+        self, simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'):
+        '''
+        Write batch file that sets files to transfer via globus.
+
+        Parameters
+        ----------
+        simulation_directory : str : directory of simulation
+        snapshot_directory : str : directory of snapshot files within simulation_directory
+        file_name : str : name of batch file to write
+        '''
+        simulation_directory = ut.io.get_path(simulation_directory)
+        snapshot_directory = ut.io.get_path(snapshot_directory)
+
+        transfer_string = ''
+
+        # general files
+        transfer_items = [
+            'gizmo/',
+            'gizmo_config.sh',
+            'gizmo_parameters.txt',
+            'gizmo_parameters.txt-usedvalues',
+            'gizmo.out.txt',
+            'snapshot_times.txt',
+            'notes.txt',
+
+            'track/',
+            'halo/rockstar_dm/catalog_hdf5/',
+        ]
+        for transfer_item in transfer_items:
+            if os.path.exists(simulation_directory + transfer_item):
+                command = '{} {}'
+                if transfer_item[-1] == '/':
+                    transfer_item = transfer_item[:-1]
+                    command += ' --recursive'
+                command = command.format(transfer_item, transfer_item) + '\n'
+                transfer_string += command
+
+        # initial condition files
+        transfer_items = glob.glob(simulation_directory + 'initial_condition*/*')
+        for transfer_item in transfer_items:
+            if '.ics' not in transfer_item:
+                transfer_item = transfer_item.replace(simulation_directory, '')
+                command = '{} {}\n'.format(transfer_item, transfer_item)
+                transfer_string += command
+
+        # snapshot files
+        for snapshot_index in snapshot_indices_keep:
+            snapshot_name = '{}snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
+            if os.path.exists(simulation_directory + snapshot_name):
+                snapshot_string = '{} {} --recursive\n'.format(snapshot_name, snapshot_name)
+                transfer_string += snapshot_string
+
+            snapshot_name = '{}snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
+            if os.path.exists(simulation_directory + snapshot_name):
+                snapshot_string = '{} {}\n'.format(snapshot_name, snapshot_name)
+                transfer_string += snapshot_string
+
+        with open(file_name, 'w') as file_out:
+            file_out.write(transfer_string)
 
 
-def write_globus_batch_file(
-    simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'):
-    '''
-    Write batch file that sets files to transfer via globus.
-
-    Parameters
-    ----------
-    simulation_directory : str : base directory of simulation
-    snapshot_directory : str : directory of snapshot files
-    file_name : str : name of file to write
-    '''
-    simulation_directory = ut.io.get_path(simulation_directory)
-    snapshot_directory = ut.io.get_path(snapshot_directory)
-
-    transfer_string = ''
-
-    # general files
-    transfer_items = [
-        'gizmo/',
-        'gizmo_config.sh',
-        'gizmo_parameters.txt',
-        'gizmo_parameters.txt-usedvalues',
-        'gizmo.out.txt',
-        'snapshot_times.txt',
-
-        'track/',
-        'halo/rockstar_dm/catalog_hdf5/',
-    ]
-    for transfer_item in transfer_items:
-        if os.path.exists(simulation_directory + transfer_item):
-            command = '{} {}'
-            if transfer_item[-1] == '/':
-                transfer_item = transfer_item[:-1]
-                command += ' --recursive'
-            command = command.format(transfer_item, transfer_item) + '\n'
-            transfer_string += command
-
-    # initial condition files
-    transfer_items = glob.glob(simulation_directory + 'initial_condition*/*')
-    for transfer_item in transfer_items:
-        if '.ics' not in transfer_item:
-            transfer_item = transfer_item.replace(simulation_directory, '')
-            command = '{} {}\n'.format(transfer_item, transfer_item)
-            transfer_string += command
-
-    # snapshot files
-    for snapshot_index in snapshot_indices_keep:
-        snapshot_name = '{}snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
-        if os.path.exists(simulation_directory + snapshot_name):
-            snapshot_string = '{} {} --recursive\n'.format(snapshot_name, snapshot_name)
-            transfer_string += snapshot_string
-
-        snapshot_name = '{}snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
-        if os.path.exists(simulation_directory + snapshot_name):
-            snapshot_string = '{} {}\n'.format(snapshot_name, snapshot_name)
-            transfer_string += snapshot_string
-
-    with open(file_name, 'w') as file_out:
-        file_out.write(transfer_string)
+Globus = GlobusClass()
 
 
 #===================================================================================================
@@ -327,7 +291,7 @@ def rsync_snapshots(
 
     command = 'rsync -ahvP --size-only '
     command += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
-    print('executing:\n{}'.format(command))
+    print('\n* executing:\n{}\n'.format(command))
     os.system(command)
 
 
@@ -389,8 +353,51 @@ def rsync_simulation_files(
         arguments += '--exclude="{}" '.format(exclude)
 
     command += arguments + directory_from + ' ' + directory_to + '.'
-    print('executing:\n{}'.format(command))
+    print('\n* executing:\n{}\n'.format(command))
     os.system(command)
+
+
+#===================================================================================================
+# delete files
+#===================================================================================================
+def delete_snapshots(
+    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False):
+    '''
+    Delete all snapshots in given directory within snapshot_index_limits,
+    except for those in snapshot_indices_keep list.
+
+    Parameters
+    ----------
+    snapshot_directory : str : directory of snapshots
+    snapshot_index_limits : list : min and max snapshot indices to delete
+    delete_halos : bool : whether to delete halo catalog files at same snapshot times
+    '''
+    snapshot_name_base = 'snap*_{:03d}*'
+    if not snapshot_directory:
+        snapshot_directory = 'output/'
+
+    halo_name_base = 'halos_{:03d}*'
+    halo_directory = 'halo/rockstar_dm/catalog/'
+
+    if snapshot_directory[-1] != '/':
+        snapshot_directory += '/'
+
+    if snapshot_index_limits is None or not len(snapshot_index_limits):
+        snapshot_index_limits = [1, 599]
+    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+
+    print()
+    for snapshot_index in snapshot_indices:
+        if snapshot_index not in snapshot_indices_keep:
+            snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
+            print('* deleting:  {}'.format(snapshot_name))
+            os.system('rm -rf {}'.format(snapshot_name))
+
+            if delete_halos:
+                halo_name = halo_directory + halo_name_base.format(snapshot_index)
+                print('* deleting:  {}'.format(halo_name))
+                os.system('rm -rf {}'.format(halo_name))
+    print()
 
 
 #===================================================================================================
@@ -398,12 +405,12 @@ def rsync_simulation_files(
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise OSError('specify function: compress, delete, globus, rsync')
+        raise OSError('specify function to run: compress, globus, rsync, delete')
 
     function_kind = str(sys.argv[1])
 
-    assert ('compress' in function_kind or 'delete' in function_kind or 'rsync' in function_kind or
-            'globus' in function_kind)
+    assert ('compress' in function_kind or 'rsync' in function_kind or 'globus' in function_kind or
+            'delete' in function_kind)
 
     if 'compress' in function_kind:
         directory = 'output'
@@ -417,22 +424,11 @@ if __name__ == '__main__':
 
         Compress.compress_snapshots(directory, snapshot_index_limits=snapshot_index_limits)
 
-    elif 'delete' in function_kind:
-        directory = 'output'
-        if len(sys.argv) > 3:
-            directory = str(sys.argv[3])
-
-        snapshot_index_limits = None
-        if len(sys.argv) > 4:
-            snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
-
-        delete_snapshots(directory, snapshot_index_limits)
-
     elif 'globus' in function_kind:
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
-        submit_globus_transfer(directory)
+        Globus.submit_transfer(directory)
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
@@ -445,3 +441,14 @@ if __name__ == '__main__':
 
         rsync_simulation_files(machine_name, simulation_directory_from, simulation_directory_to)
         rsync_snapshots(machine_name, simulation_directory_from, simulation_directory_to)
+
+    elif 'delete' in function_kind:
+        directory = 'output'
+        if len(sys.argv) > 3:
+            directory = str(sys.argv[3])
+
+        snapshot_index_limits = None
+        if len(sys.argv) > 4:
+            snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
+
+        delete_snapshots(directory, snapshot_index_limits)
