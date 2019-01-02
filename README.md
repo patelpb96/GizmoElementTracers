@@ -8,7 +8,7 @@ Python package for reading and analyzing Gizmo simulations.
 
 This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) python package for low-level utility functions.
 
-I develop this package using Python 3.7 and recommend that you use it. However, I have tried to maintain backward compatibility with Python 2.7.
+I develop this package using Python 3.7 and recommend that you use it too.
 
 
 ---
@@ -24,7 +24,7 @@ I develop this package using Python 3.7 and recommend that you use it. However, 
 * run diagnostics on simulations
 
 ## gizmo_file.py
-* delete snapshot files or transfer them across machines
+* compress, delete, or transfer snapshot files across machines
 
 ## gizmo_ic.py
 * generate cosmological zoom-in initial conditions from snapshot files
@@ -59,7 +59,7 @@ Unless otherwise noted, all quantities are in (or converted to during read-in) t
 ---
 # License
 
-Copyright 2014-2018 by Andrew Wetzel <arwetzel@gmail.com>.
+Copyright 2014-2019 by Andrew Wetzel <arwetzel@gmail.com>.
 
 In summary, you are free to use, edit, share, and do whatever you want. But please keep me informed. Have fun!
 
