@@ -6,7 +6,7 @@ Python package for reading and analyzing Gizmo simulations.
 ---
 # Requirements
 
-This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) python package for low-level utility functions.
+This package relies on and requires my [utilities/](https://bitbucket.org/awetzel/utilities) python package for low-level utility functions.
 
 I develop this package using Python 3.7 and recommend that you use it too.
 
