@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Analyze Gizmo simulations.
+High-level analysis/plotting of particle data Gizmo simulations.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
@@ -219,7 +219,7 @@ class ImageClass(ut.io.SayClass):
         use_column_units=None, image_limits=[None, None],
         background_color='black',
         hal=None, hal_indices=None, hal_position_kind='position', hal_radius_kind='radius',
-        write_plot=False, plot_name='', figure_index=1):
+        write_plot=False, plot_directory='', figure_index=1):
         '''
         Plot image of the positions of given partcle species, using either a single panel for
         2 dimensions or 3 panels for all axis permutations.
@@ -252,9 +252,8 @@ class ImageClass(ut.io.SayClass):
         hal_position_kind : str : name of position to use for center of halo
         hal_radius_kind : str : name of radius to use for size of halo
         write_plot : bool : whether to write figure to file
-        plot_name : str : name of file, including path (to override default naming scheme)
-            if plot_name ends in '/', assume that this is the directory,
-            and write file with default naming scheme in that directory
+        plot_directory : str : path + directory where to write file
+            if ends in '.pdf', override default file naming convention and use input name
         add_simulation_name : bool : whether to add name of simulation to figure name
         figure_index : int : index of figure for matplotlib
         '''
@@ -567,14 +566,13 @@ class ImageClass(ut.io.SayClass):
 
             hist_valuess = np.array(histogram_valuesss)
 
-        # get name and directory for plot file
-        if plot_name and plot_name[-1] == '/':
-            plot_directory = plot_name
-            plot_name = ''
-        else:
+        # get name and directory to write plot file
+        if '.pdf' in plot_directory:
+            # use input file name, write in current directory
+            plot_name = plot_directory
             plot_directory = '.'
-
-        if not plot_name:
+        else:
+            # generate default file name
             prefix = part.info['simulation.name']
 
             prop = 'position'
@@ -661,9 +659,9 @@ class ImageClass(ut.io.SayClass):
         '''
         Write 2-D histogram values of image to file.
         '''
-        plot_name = self.plot_name + '.txt'
+        file_name = self.plot_name + '.txt'
 
-        with open(plot_name, 'w') as file_out:
+        with open(file_name, 'w') as file_out:
             Write = ut.io.WriteClass(file_out, print_stdout=False)
             Write.write('# pixel (smoothing) scale is {:.2f} kpc'.format(
                         self.histogram_xs[1] - self.histogram_xs[0]))
@@ -2368,14 +2366,14 @@ def explore_galaxy(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), part_indices=part_indices,
-                write_plot=write_plot, plot_name=plot_directory, figure_index=10)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=10)
 
             # image of all nearby particles
             Image.plot_image(
                 part, 'star', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max * 4, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi),
-                write_plot=write_plot, plot_name=plot_directory, figure_index=11)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=11)
 
             plot_property_distribution(
                 part, 'star', 'velocity.total', [0, None], 2, None, 'linear', 'histogram',
@@ -2446,14 +2444,14 @@ def explore_galaxy(
                 part, 'dark', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('star.position', hi), background_color='black',
-                write_plot=write_plot, plot_name=plot_directory, figure_index=20)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=20)
 
             # DM image centered on DM halo
             Image.plot_image(
                 part, 'dark', 'mass', 'histogram',
                 [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                 hal.prop('position', hi), background_color='black',
-                write_plot=write_plot, plot_name=plot_directory, figure_index=21)
+                write_plot=write_plot, plot_directory=plot_directory, figure_index=21)
 
             plot_property_v_distance(
                 part, 'dark', 'mass', 'density', 'log', False, None,
@@ -2489,13 +2487,13 @@ def explore_galaxy(
                     part, 'gas', 'mass', 'histogram',
                     [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                     hal.prop('star.position', hi), part_indices=part_indices,
-                    write_plot=write_plot, plot_name=plot_directory, figure_index=30)
+                    write_plot=write_plot, plot_directory=plot_directory, figure_index=30)
 
                 Image.plot_image(
                     part, 'gas', 'mass.neutral', 'histogram',
                     [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width, distance_bin_number,
                     hal.prop('star.position', hi), part_indices=part_indices,
-                    write_plot=write_plot, plot_name=plot_directory, figure_index=31)
+                    write_plot=write_plot, plot_directory=plot_directory, figure_index=31)
             else:
                 fig = plt.figure(10)
                 fig.clf()
@@ -3323,7 +3321,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                         rotation=align_principal_axes, image_limits=[10 ** 6, 10 ** 10.5],
                         background_color='black',
-                        write_plot=True, plot_name=plot_directory,
+                        write_plot=True, plot_directory=plot_directory,
                     )
 
                 species_name = 'gas'
@@ -3333,7 +3331,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                         rotation=align_principal_axes, image_limits=[10 ** 4, 10 ** 9],
                         background_color='black',
-                        write_plot=True, plot_name=plot_directory,
+                        write_plot=True, plot_directory=plot_directory,
                     )
 
                 species_name = 'dark'
@@ -3343,7 +3341,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [0, 1, 2], [0, 1, 2], distance_max, distance_bin_width,
                         rotation=align_principal_axes, image_limits=[10 ** 5.5, 10 ** 9],
                         background_color='black',
-                        write_plot=True, plot_name=plot_directory,
+                        write_plot=True, plot_directory=plot_directory,
                     )
 
 
