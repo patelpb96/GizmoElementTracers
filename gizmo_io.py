@@ -438,11 +438,11 @@ class ParticleDictionaryClass(dict):
                     values = ut.coordinate.get_coordinates_rotated(
                         values, self.host_rotation_tensors[host_index])
 
-            if 'cylindrical' in property_name or 'spherical' in property_name:
+            if '.cyl' in property_name or '.spher' in property_name:
                 # convert to cylindrical or spherical coordinates
-                if 'cylindrical' in property_name:
+                if '.cyl' in property_name:
                     coordinate_system = 'cylindrical'
-                elif 'spherical' in property_name:
+                elif '.spher' in property_name:
                     coordinate_system = 'spherical'
 
                 if 'distance' in property_name:
