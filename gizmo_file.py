@@ -132,9 +132,10 @@ class CompressClass(ut.io.SayClass):
                     snapshot_block_index=snapshot_block_index, verbose=verbose)
                 if header_compression_name in header:
                     if (compression_level is not None and
-                            header[header_compression_name] != compression_level):
+                            header[header_compression_name] != compression_level and
+                            snapshot_index not in compression_wrong_snapshots):
                         compression_wrong_snapshots.append(snapshot_index)
-                else:
+                elif snapshot_index not in compression_none_snapshots:
                     compression_none_snapshots.append(snapshot_index)
 
         self.say('* tested {} snapshots [{}, {}]'.format(
