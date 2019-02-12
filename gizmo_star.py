@@ -172,8 +172,7 @@ class SupernovaIaClass:
                 return 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((ages - 50) / 10) ** 2)  # [Myr ^ -1]
             elif kind == 'maoz':
                 # Maoz & Graur 2017
-                return 2e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] best-fit volumetric
-                #return 3e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] hybrid
+                return 2.5e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] best-fit volumetric
                 #return 6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] galaxy clusters
 
         assert ia_kind in ['mannucci', 'maoz']

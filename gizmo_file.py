@@ -99,7 +99,7 @@ class CompressClass(ut.io.SayClass):
 
     def test_compression(
         self, snapshot_indices='all', simulation_directory='.', snapshot_directory='output',
-        compression_level=0):
+        compression_level=0, verbose=False):
         '''
         Read headers from all snapshot files in simulation_directory to check whether files have
         been compressed.
@@ -114,22 +114,30 @@ class CompressClass(ut.io.SayClass):
         compression_wrong_snapshots = []
         compression_none_snapshots = []
 
+        snapshot_block_number = 1
+
         if snapshot_indices is None or snapshot_indices == 'all':
-            _path_file_names, snapshot_indices = Read.get_snapshot_file_names_indices(
+            path_file_names, snapshot_indices = Read.get_snapshot_file_names_indices(
                 simulation_directory + snapshot_directory)
+            if 'snapdir' in path_file_names[0]:
+                snapshot_file_names = glob.glob(path_file_names[0] + '/*')
+                snapshot_block_number = len(snapshot_file_names)
         elif np.isscalar(snapshot_indices):
             snapshot_indices = [snapshot_indices]
 
         for snapshot_index in snapshot_indices:
-            header = Read.read_header('index', snapshot_index, simulation_directory, verbose=False)
-            if header_compression_name in header:
-                if (compression_level is not None and
-                        header[header_compression_name] != compression_level):
-                    compression_wrong_snapshots.append(snapshot_index)
-            else:
-                compression_none_snapshots.append(snapshot_index)
+            for snapshot_block_index in range(snapshot_block_number):
+                header = Read.read_header(
+                    'index', snapshot_index, simulation_directory,
+                    snapshot_block_index=snapshot_block_index, verbose=verbose)
+                if header_compression_name in header:
+                    if (compression_level is not None and
+                            header[header_compression_name] != compression_level):
+                        compression_wrong_snapshots.append(snapshot_index)
+                else:
+                    compression_none_snapshots.append(snapshot_index)
 
-        self.say('* tested {} snapshots: {} - {}'.format(
+        self.say('* tested {} snapshots [{}, {}]'.format(
             len(snapshot_indices), min(snapshot_indices), max(snapshot_indices)))
         self.say('* {} are uncompressed'.format(len(compression_none_snapshots)))
         if len(compression_none_snapshots):

@@ -435,6 +435,7 @@ class ParticleDictionaryClass(dict):
 
                 if 'principal' in property_name:
                     # align with host principal axes
+                    assert len(self.host_rotation_tensors), 'need to assign host principal axes!'
                     values = ut.coordinate.get_coordinates_rotated(
                         values, self.host_rotation_tensors[host_index])
 
