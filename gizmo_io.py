@@ -1371,6 +1371,13 @@ class ReadClass(ut.io.SayClass):
         if self.file_extension not in path_file_names and isinstance(snapshot_block_index, int):
             # got snapshot directory with multiple files, return snapshot_block_index one
             path_file_names = ut.io.get_file_names(path_file_names + '/' + self.snapshot_name_base)
+
+            if snapshot_block_index > 1:
+                # if using non-default snapshot block, need to ensure file names are
+                # sorted 'naturally' by block number (0, 1, 2, ... instead of 0, 1, 10, ...)
+                import natsort
+                path_file_names = natsort.natsorted(path_file_names)
+
             if (len(path_file_names) and
                     '.{}.'.format(snapshot_block_index) in path_file_names[snapshot_block_index]):
                 path_file_names = path_file_names[snapshot_block_index]
