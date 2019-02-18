@@ -1141,7 +1141,7 @@ class ReadClass(ut.io.SayClass):
         else:
             self.say('* reading particles from:')
 
-        # loop over all files at given snapshot
+        # loop over all file blocks at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
             file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
