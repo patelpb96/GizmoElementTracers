@@ -659,16 +659,27 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name].info = part.info
 
             # store information about snapshot time
-            time = part.Cosmology.get_time(header['redshift'], 'redshift')
-            part.snapshot = {
-                'index': snapshot_index,
-                'redshift': header['redshift'],
-                'scalefactor': header['scalefactor'],
-                'time': time,
-                'time.lookback': part.Cosmology.get_time(0) - time,
-                'time.hubble': (ut.constant.Gyr_per_sec /
-                                part.Cosmology.get_hubble_parameter(header['redshift'])),
-            }
+            if header['is.cosmological']:
+                time = part.Cosmology.get_time(header['redshift'], 'redshift')
+                part.snapshot = {
+                    'index': snapshot_index,
+                    'redshift': header['redshift'],
+                    'scalefactor': header['scalefactor'],
+                    'time': time,
+                    'time.lookback': part.Cosmology.get_time(0) - time,
+                    'time.hubble': (ut.constant.Gyr_per_sec /
+                                    part.Cosmology.get_hubble_parameter(header['redshift'])),
+                }
+            else:
+                part.snapshot = {
+                    'index': snapshot_index,
+                    'redshift': -1,
+                    'scalefactor': -1,
+                    'time': header['time'],
+                    'time.lookback': -1,
+                    'time.hubble': -1,
+                }
+
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
 
