@@ -660,7 +660,7 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name].info = part.info
 
             # store information about snapshot time
-            if header['is.cosmological']:
+            if header['cosmological']:
                 time = part.Cosmology.get_time(header['redshift'], 'redshift')
                 part.snapshot = {
                     'index': snapshot_index,
