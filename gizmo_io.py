@@ -447,14 +447,15 @@ class ParticleDictionaryClass(dict):
 
                 if 'principal' in property_name:
                     # align with host principal axes
+                    assert len(self.host_rotation_tensors), 'need to assign host principal axes!'
                     values = ut.coordinate.get_coordinates_rotated(
                         values, self.host_rotation_tensors[host_index])
 
-            if 'cylindrical' in property_name or 'spherical' in property_name:
+            if '.cyl' in property_name or '.spher' in property_name:
                 # convert to cylindrical or spherical coordinates
-                if 'cylindrical' in property_name:
+                if '.cyl' in property_name:
                     coordinate_system = 'cylindrical'
-                elif 'spherical' in property_name:
+                elif '.spher' in property_name:
                     coordinate_system = 'spherical'
 
                 if 'distance' in property_name:
@@ -637,7 +638,7 @@ class ReadClass(ut.io.SayClass):
                 element_indices, convert_float32, header)
 
             # read/get (additional) cosmological parameters
-            if header['is.cosmological']:
+            if header['cosmological']:
                 part.Cosmology = self.get_cosmology(
                     simulation_directory, header['omega_lambda'], header['omega_matter'],
                     hubble=header['hubble'])
@@ -821,7 +822,7 @@ class ReadClass(ut.io.SayClass):
 
     def read_header(
         self, snapshot_value_kind='index', snapshot_value=600, simulation_directory='.',
-        snapshot_directory='output/', simulation_name='', verbose=True):
+        snapshot_directory='output/', simulation_name='', snapshot_block_index=0, verbose=True):
         '''
         Read header from snapshot file.
 
@@ -832,6 +833,7 @@ class ReadClass(ut.io.SayClass):
         simulation_directory : root directory of simulation
         snapshot_directory: str : directory of snapshot files within simulation_directory
         simulation_name : str : name to store for future identification
+        snapshot_block_index : int : index of file block (if multiple files per snapshot)
         verbose : bool : whether to print number of particles in snapshot
 
         Returns
@@ -881,7 +883,8 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(
+            snapshot_directory, snapshot_index, snapshot_block_index)
 
         self._is_first_print = True
         self.say('* reading header from:  {}'.format(path_file_name.strip('./')), verbose)
@@ -897,15 +900,15 @@ class ReadClass(ut.io.SayClass):
         # determine whether simulation is cosmological
         if (0 < header['hubble'] < 1 and 0 < header['omega_matter'] <= 1 and
                 0 < header['omega_lambda'] <= 1):
-            header['is.cosmological'] = True
+            header['cosmological'] = True
         else:
-            header['is.cosmological'] = False
+            header['cosmological'] = False
             self.say('assuming that simulation is not cosmological', verbose)
             self.say('read h = {:.3f}, omega_matter_0 = {:.3f}, omega_lambda_0 = {:.3f}'.format(
                      header['hubble'], header['omega_matter'], header['omega_lambda']), verbose)
 
         # convert header quantities
-        if header['is.cosmological']:
+        if header['cosmological']:
             header['scalefactor'] = float(header['time'])
             del(header['time'])
             header['box.length/h'] = float(header['box.length'])
@@ -931,11 +934,11 @@ class ReadClass(ut.io.SayClass):
                 'snapshot file[s] contain no particles of species = {}'.format(self.species_read))
 
         # check if simulation contains baryons
-        header['has.baryons'] = False
+        header['baryonic'] = False
         for spec_name in self.species_all:
             if 'dark' not in spec_name:
                 if header['particle.numbers.total'][self.species_dict[spec_name]] > 0:
-                    header['has.baryons'] = True
+                    header['baryonic'] = True
                     break
 
         # assign simulation name
@@ -1174,7 +1177,7 @@ class ReadClass(ut.io.SayClass):
         else:
             self.say('* reading particles from:')
 
-        # loop over all files at given snapshot
+        # loop over all file blocks at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
             file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
@@ -1309,7 +1312,7 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name]['smooth.length'] /= 2.8
 
             if 'form.scalefactor' in part[spec_name]:
-                if header['is.cosmological']:
+                if header['cosmological']:
                     pass
                 else:
                     part[spec_name]['form.scalefactor'] /= header['hubble']  # convert to [Gyr]
@@ -1358,7 +1361,8 @@ class ReadClass(ut.io.SayClass):
                 for prop in part[spec_name]:
                     part[spec_name][prop] = part[spec_name][prop][::particle_subsample_factor]
 
-    def get_snapshot_file_names_indices(self, directory, snapshot_index=None):
+    def get_snapshot_file_names_indices(
+        self, directory, snapshot_index=None, snapshot_block_index=0):
         '''
         Get name of file or directory (with relative path) and index for all snapshots in directory.
         If input valid snapshot_index, get its file name (if multiple files per snapshot, get name
@@ -1370,6 +1374,8 @@ class ReadClass(ut.io.SayClass):
         ----------
         directory : str : directory to check for files
         snapshot_index : int : index of snapshot: if None or 'all', get all snapshots in directory
+        snapshot_block_index : int : index of file block (if multiple files per snapshot)
+            if None or 'all', return names of all file blocks for snapshot
 
         Returns
         -------
@@ -1377,6 +1383,9 @@ class ReadClass(ut.io.SayClass):
         [file_indices : list of ints : indices of snapshot files]
         '''
         directory = ut.io.get_path(directory)
+
+        assert (isinstance(snapshot_block_index, int) or snapshot_block_index is None or
+                snapshot_block_index == 'all')
 
         # get names and indices of all snapshot files in directory
         path_file_names, file_indices = ut.io.get_file_names(
@@ -1393,17 +1402,26 @@ class ReadClass(ut.io.SayClass):
             raise OSError(
                 'cannot find snapshot index = {} in:  {}'.format(snapshot_index, path_file_names))
 
-        path_file_name = path_file_names[np.where(file_indices == snapshot_index)[0][0]]
+        path_file_names = path_file_names[np.where(file_indices == snapshot_index)[0][0]]
 
-        if self.file_extension not in path_file_name:
-            # got snapshot directory with multiple files, return only 0th one
-            path_file_names = ut.io.get_file_names(path_file_name + '/' + self.snapshot_name_base)
-            if len(path_file_names) and '.0.' in path_file_names[0]:
-                path_file_name = path_file_names[0]
+        if self.file_extension not in path_file_names and isinstance(snapshot_block_index, int):
+            # got snapshot directory with multiple files, return snapshot_block_index one
+            path_file_names = ut.io.get_file_names(path_file_names + '/' + self.snapshot_name_base)
+
+            if snapshot_block_index > 1:
+                # if using non-default snapshot block, need to ensure file names are
+                # sorted 'naturally' by block number (0, 1, 2, ... instead of 0, 1, 10, ...)
+                import natsort
+                path_file_names = natsort.natsorted(path_file_names)
+
+            if (len(path_file_names) and
+                    '.{}.'.format(snapshot_block_index) in path_file_names[snapshot_block_index]):
+                path_file_names = path_file_names[snapshot_block_index]
             else:
-                raise OSError('cannot find 0th snapshot file in:  {}'.format(path_file_names))
+                raise OSError('cannot find snapshot file block {} in:  {}'.format(
+                    snapshot_block_index, path_file_names))
 
-        return path_file_name
+        return path_file_names
 
     def get_cosmology(
         self, directory='.', omega_lambda=None, omega_matter=None, omega_baryon=None, hubble=None,
@@ -1440,7 +1458,7 @@ class ReadClass(ut.io.SayClass):
             if len(path_file_names):
                 path_file_name = path_file_names[0]
                 self.say('* reading cosmological parameters from:  {}'.format(
-                         path_file_name.strip('./')), end='\n\n')
+                    path_file_name.strip('./')), end='\n\n')
                 # read cosmological parameters
                 with open(path_file_name, 'r') as file_in:
                     for line in file_in:
