@@ -644,6 +644,9 @@ class ReadClass(ut.io.SayClass):
                     hubble=header['hubble'])
                 for spec_name in part:
                     part[spec_name].Cosmology = part.Cosmology
+            else:
+                # need this later for unit conversions
+                header['scalefactor'] = 1.0
 
             # adjust properties for each species
             self.adjust_particle_properties(
@@ -675,14 +678,11 @@ class ReadClass(ut.io.SayClass):
                 part.snapshot = {
                     'index': snapshot_index,
                     'redshift': 0,
-                    'scalefactor': 1,
+                    'scalefactor': 1.0,
                     'time': header['time'],
                     'time.lookback': 0,
                     'time.hubble': 13.6,
                 }
-
-                # need this later for unit conversions
-                header['scalefactor'] = 1  
 
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
