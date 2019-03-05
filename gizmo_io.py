@@ -674,12 +674,15 @@ class ReadClass(ut.io.SayClass):
             else:
                 part.snapshot = {
                     'index': snapshot_index,
-                    'redshift': -1,
-                    'scalefactor': -1,
+                    'redshift': 0,
+                    'scalefactor': 1,
                     'time': header['time'],
-                    'time.lookback': -1,
-                    'time.hubble': -1,
+                    'time.lookback': 0,
+                    'time.hubble': 13.6,
                 }
+
+                # need this later for unit conversions
+                header['scalefactor'] = 1  
 
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
