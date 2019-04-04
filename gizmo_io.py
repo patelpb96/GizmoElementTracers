@@ -632,21 +632,21 @@ class ReadClass(ut.io.SayClass):
             header = self.read_header(
                 'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name)
 
+            if not header['cosmological']:
+                header['scalefactor'] = 1.0
+
             # read particles from snapshot file[s]
             part = self.read_particles(
                 'index', snapshot_index, simulation_directory, snapshot_directory, properties,
                 element_indices, convert_float32, header)
 
             # read/get (additional) cosmological parameters
-            if header['cosmological']:
-                part.Cosmology = self.get_cosmology(
-                    simulation_directory, header['omega_lambda'], header['omega_matter'],
-                    hubble=header['hubble'])
-                for spec_name in part:
-                    part[spec_name].Cosmology = part.Cosmology
-            else:
-                # need this later for unit conversions
-                header['scalefactor'] = 1.0
+            # if header['cosmological']:
+            part.Cosmology = self.get_cosmology(
+                simulation_directory, header['omega_lambda'], header['omega_matter'],
+                hubble=header['hubble'])
+            for spec_name in part:
+                part[spec_name].Cosmology = part.Cosmology
 
             # adjust properties for each species
             self.adjust_particle_properties(
