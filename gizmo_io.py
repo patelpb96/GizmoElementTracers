@@ -1618,7 +1618,9 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
-    def assign_host_principal_axes(self, part, distance_max=15, mass_percent=90, age_percent=30):
+    def assign_host_principal_axes(
+        self, part, species_name='star', distance_max=15, mass_percent=90, age_percent=30,
+        temperature_limits=[0, 1e4]):
         '''
         Assign rotation vectors of principal axes (via moment of inertia tensor) of host
         galaxy[s]/halo[s], using stars for baryonic simulations.
@@ -1626,33 +1628,40 @@ class ReadClass(ut.io.SayClass):
         Parameters
         ----------
         part : dictionary class : catalog of particles at snapshot
+        species_name : string : name of particle species to use to determine
         distance_max : float : maximum distance to select particles [kpc physical]
         mass_percent : float : keep particles within the distance that encloses mass percent
             [0, 100] of all particles within distance_max
-        age_percent : float : keep youngest age_percent of particles within distance cut
+        age_percent : float : keep youngest age_percent of (star) particles within distance cut
+        temperature_limits : list : min and max temperature to keep (gas) particles
         '''
-        spec_name = 'star'
-
-        if spec_name not in part or not len(part[spec_name]['position']):
-            self.say('! catalog not contain star particles, so cannot assign principal axes')
+        if species_name not in part or not len(part[species_name]['position']):
+            self.say('! catalog not contain {} particles, cannot assign principal axes'.format(
+                species_name))
             return
 
         self.say('* assigning principal axes of host galaxy[s]/halo[s]:')
-        self.say('using {} particles at distance < {} kpc'.format(spec_name, distance_max))
+        self.say('using {} particles at distance < {} kpc'.format(species_name, distance_max))
 
         if mass_percent:
             self.say('using distance that encloses {}% of mass'.format(mass_percent))
 
-        if age_percent:
-            if ('form.scalefactor' not in part[spec_name] or
-                    not len(part[spec_name]['form.scalefactor'])):
-                self.say('! catalog not contain {} ages'.format(spec_name))
-                self.say('so assigning principal axes using all {} particles'.format(spec_name))
+        if species_name == 'star' and age_percent:
+            if ('form.scalefactor' not in part[species_name] or
+                    not len(part[species_name]['form.scalefactor'])):
+                self.say('! catalog not contain {} ages'.format(species_name))
+                self.say('so assigning principal axes using all {} particles'.format(species_name))
             else:
-                self.say('using youngest {}% of {} particles'.format(age_percent, spec_name))
+                self.say('using youngest {}% of {} particles'.format(age_percent, species_name))
+
+        if species_name == 'gas' and temperature_limits is not None and len(temperature_limits):
+            if ('temperature' not in part[species_name] or
+                    not len(part[species_name]['temperature'])):
+                self.say('! catalog not contain {} temperature'.format(species_name))
+                self.say('so assigning principal axes using all {} particles'.format(species_name))
 
         principal_axes = ut.particle.get_principal_axes(
-            part, spec_name, distance_max, mass_percent, age_percent,
+            part, species_name, distance_max, mass_percent, age_percent,
             center_positions=part.host_positions, return_array=False, print_results=False)
 
         part.host_rotation_tensors = principal_axes['rotation.tensor']
