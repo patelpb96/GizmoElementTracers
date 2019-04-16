@@ -11,7 +11,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
-# system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
@@ -97,7 +96,7 @@ def get_nucleosynthetic_yields(
         yield_dict['magnesium'] = 0.0987
         yield_dict['silicon'] = 0.0933
         yield_dict['sulphur'] = 0.0397
-        yield_dict['calcium'] = 0.00458
+        yield_dict['calcium'] = 0.00458  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
         yield_dict['iron'] = 0.0741
 
         yield_nitrogen_orig = np.float(yield_dict['nitrogen'])

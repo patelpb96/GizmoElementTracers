@@ -13,7 +13,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
-# system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np

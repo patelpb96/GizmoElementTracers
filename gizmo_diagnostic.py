@@ -6,7 +6,6 @@ Diagnose Gizmo simulations.
 @author: Andrew Wetzel <arwetzel@gmail.com>
 '''
 
-# system ----
 from __future__ import absolute_import, division, print_function
 import collections
 import os
@@ -624,8 +623,8 @@ def test_stellar_mass_loss(
 
     species = 'star'
 
-    if 'index_pointers' not in part_z.__dict__:
-        gizmo_track.ParticleIndexPointer.io_pointers(part_z)
+    if 'Pointer' not in part_z.__dict__:
+        gizmo_track.ParticlePointerIO.io_pointers(part_z)
 
     MetalBin = ut.binning.BinClass(
         metallicity_limits, metallicity_bin_width, include_max=True, scaling='log')
@@ -638,7 +637,7 @@ def test_stellar_mass_loss(
 
     part_indices_z0 = ut.array.get_indices(
         part_z0[species].prop('form.time') * 1000, form_time_limits)
-    part_indices_z = part_z.index_pointers[part_indices_z0]
+    part_indices_z = part_z.Pointer.get_pointers('star', 'star', part_indices_z0)
 
     Say.say('* stellar mass loss across {:.3f} Gyr in metallicity bins for {} particles'.format(
             part_z0.snapshot['time'] - part_z.snapshot['time'], part_indices_z0.size))

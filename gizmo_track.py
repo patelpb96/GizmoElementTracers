@@ -13,7 +13,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
-# system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatability
 import sys
 import collections
@@ -29,160 +28,272 @@ TRACK_DIRECTORY = 'track/'
 #===================================================================================================
 # utility
 #===================================================================================================
-class ParticleIndexPointerClass(ut.io.SayClass):
+class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
     '''
-    Compute particle index pointers for tracking particles across time.
+    Dictionary class to store and compute particle pointer indices (and species names),
+    for tracking star and gas particles across snapshots.
+    '''
+
+    def __init__(self, part_z0=None, part_z=None, species_names=['star', 'gas'], id_name='id'):
+        '''
+        Given input particle catalogs, store summary info about snapshots and particle counts.
+
+        Parameters
+        ----------
+        part_z0 : dict : catalog of particles at the reference (later) snapshot
+        part_z : dict : catalog of particles at the earlier snapshot
+        species_names : str or list : name[s] of particle species to track
+        id_name : str : dictionary key of particle id
+        '''
+        self.z0_name = 'z0.'  # prefactor name for reference (latest) snapshot
+        self.z_name = 'z.'  # prefactor name for the earlier snapshot
+        self.zi_name = 'zi.'  # prefactor name for an intermediate snapshot
+        self.pointer_index_name = self.z0_name + 'to.' + self.z_name + 'index'
+
+        # if no input particle catalogs, leave uninitialized
+        if part_z0 is not None and part_z is not None:
+            self['species'] = species_names
+
+            z0 = self.z0_name
+            z = self.z_name
+
+            # initialize particle counters
+            self[z0 + 'particle.number'] = 0
+            self[z + 'particle.number'] = 0
+            for spec in species_names:
+                self[z0 + spec + '.number'] = part_z0[spec][id_name].size
+                self[z0 + spec + '.index.limits'] = [
+                    self[z0 + 'particle.number'],
+                    self[z0 + 'particle.number'] + part_z0[spec][id_name].size]
+                self[z0 + 'particle.number'] += part_z0[spec][id_name].size
+
+                self[z + spec + '.number'] = part_z[spec][id_name].size
+                self[z + spec + '.index.limits'] = [
+                    self[z + 'particle.number'],
+                    self[z + 'particle.number'] + part_z[spec][id_name].size]
+                self[z + 'particle.number'] += part_z[spec][id_name].size
+
+            self[z0 + 'snapshot.index'] = part_z0.snapshot['index']
+            self[z + 'snapshot.index'] = part_z.snapshot['index']
+
+            # initialize pointer indices
+            # set null values safely to negative, so will trip an index error if try to use
+            self[self.pointer_index_name] = ut.array.get_array_null(self[z0 + 'particle.number'])
+
+    def get_pointers(
+        self, species_name_from='star', species_names_to='star', part_indices=None, forward=False,
+        return_array=True, z_ref_name='z0.'):
+        '''
+        Get pointer indices (and species) from species_name_from particles at the
+        reference (later) snapshot to species_names_to particles the earlier snapshot.
+        If enable forward, get pointers going forward in time (from z to z_ref) instead.
+
+        Parameters
+        ----------
+        species_name_from : str : name of species at the reference (later, z0) snapshot
+        species_names_to : str or list :
+            name[s] of species to get pointers to at the (earlier, z) snapshot
+        part_indices : arr : indices of particles at the reference (later, z0) snapshot
+        forward : bool : whether instead to get pointers from the (earlier, z) snapshot to the
+            reference (later, z0) snapshot, tracking forward in time
+        return_array : bool : if tracking single species at both snapshots, return just array of
+            pointer indices (and not a pointer dictionary that includes species names)
+        z_ref_name : str : prefactor name for reference (later) snapshot: 'z0', 'zi'
+
+        Returns
+        -------
+        pointer : arr or dict :
+            array of pointer indices between snapshots
+            OR
+            dictionary that contains both pointer indices and species names
+        '''
+        # parse inputs
+        assert np.isscalar(species_name_from)
+
+        if species_names_to is None or not len(species_names_to):
+            species_names_to = species_name_from
+        elif species_names_to == 'all':
+            species_names_to = self['species']
+        if np.isscalar(species_names_to):
+            species_names_to = [species_names_to]
+
+        if z_ref_name[-1] != '.':
+            z_ref_name += '.'
+
+        if forward:
+            # track forward in time, from snapshot z to the reference (z0) snapshot
+            z_from = self.z_name
+            z_to = z_ref_name
+            if (species_name_from == 'star' and len(species_names_to) == 1 and
+                    species_names_to[0] == 'gas'):
+                self.say('! gas particles cannot have star particle progenitors')
+                return
+        else:
+            # track backwards in time, from the reference (z0) snapshot to snapshot z
+            z_from = z_ref_name
+            z_to = self.z_name
+            if (species_name_from == 'gas' and len(species_names_to) == 1 and
+                    species_names_to[0] == 'star'):
+                self.say('! gas particles cannot have star particle progenitors')
+                return
+
+        pointer_index_name = z_from + 'to.' + z_to + 'index'
+        if forward and pointer_index_name not in self:
+            self.assign_forward_pointers(z_ref_name)
+
+        if part_indices is None:
+            part_indices = ut.array.get_arange(self[z_from + species_name_from + '.number'])
+
+        # if tracking multiple species, adjust input particle indices to be concatenated indices
+        part_indices = part_indices + self[z_from + species_name_from + '.index.limits'][0]
+
+        # store as pointer species and indices as dictionary
+        pointer = {}
+
+        # get pointer indices (concatenated, if tracking multiple species)
+        pointer['index'] = self[pointer_index_name][part_indices]
+
+        # if tracking multiple species, initialize species names
+        if len(species_names_to) > 1:
+            pointer['species'] = np.zeros(part_indices.size, dtype='<U4')
+
+        for spec in species_names_to:
+            # get pointer indices for this species
+            pis = ut.array.get_indices(
+                pointer['index'], self[z_to + spec + '.index.limits'], verbose=False)
+            # adjust back to particle indices
+            pointer['index'][pis] -= self[z_to + spec + '.index.limits'][0]
+            if len(species_names_to) > 1:
+                # if tracking multiple species, assign species names
+                pointer['species'][pis] = spec
+            else:
+                # tracking single species - set pointers to other species to be null
+                pis = np.setdiff1d(np.arange(part_indices.size), pis)
+                pointer['index'][pis] = pointer['index'].min()
+
+        # if tracking single species, can return just array of pointer indices
+        if len(species_names_to) == 1 and return_array:
+            pointer = pointer['index']
+
+        return pointer
+
+    def assign_forward_pointers(self, z_ref_name=''):
+        '''
+        Assign pointer indices going forward in time, from the earlier (z) snapshot to the
+        reference (later) snapshot.
+        Currently, if gas particles split, assigns only one split gas particle as a descendant.
+        TODO: deal with gas particle splitting
+
+        Parameters
+        ----------
+        z_ref_name : str : name prefactor for reference (later) snapshot: 'z0', 'zi'
+        '''
+        if z_ref_name:
+            z0 = z_ref_name
+            if z0[-1] != '.':
+                z0 += '.'
+        else:
+            z0 = self.z0_name
+
+        z = self.z_name
+
+        # get pointers that have valid (non-null) values
+        masks_valid = (self[z0 + 'to.' + z + 'index'] >= 0)
+        pointers_valid = self[z0 + 'to.' + z + 'index'][masks_valid]
+
+        # sanity check
+        if pointers_valid.max() >= self[z + 'particle.number']:
+            self.say('! particle catalog at snapshot {} has {} valid pointers'.format(
+                self[z + 'snapshot.index'], self[z + 'particle.number']))
+            self.say('but {}->{} pointer index max = {}'.format(z0, z, pointers_valid.max()))
+            self.say('thus, {}->{} pointers do not point to all particles at snapshot {}'.format(
+                z0, z, self[z + 'snapshot.index']))
+            self.say('increasing size of reverse pointer array to accomodate missing particles')
+            z_particle_number = pointers_valid.max() + 1
+        else:
+            z_particle_number = self[z + 'particle.number']
+
+        # initialize pointer indices
+        # set null values safely to negative, so will trip an index error if try to use
+        self[z + 'to.' + z0 + 'index'] = ut.array.get_array_null(z_particle_number)
+        self[z + 'to.' + z0 + 'index'][pointers_valid] = ut.array.get_arange(
+            self[z0 + 'to.' + z + 'index'].size)[masks_valid]
+
+    def add_intermediate_pointers(self, ParticlePointer):
+        '''
+        Add pointers between an intermediate snapshot (zi) and the earlier snapshot (z), to allow
+        tracking between these two snapshots.
+        The intermediate snapshot (zi) must be between the reference (z0) snapshot and the earlier
+        (z) snapshot.
+
+        Parameters
+        ----------
+        ParticlePointer : dict class : pointers to an intemediate snapshot (between z0 and z)
+        '''
+        assert (ParticlePointer[ParticlePointer.z_name + 'snapshot.index'] <
+                self[self.z0_name + 'snapshot.index'])
+        assert (ParticlePointer[ParticlePointer.z_name + 'snapshot.index'] >
+                self[self.z_name + 'snapshot.index'])
+
+        for k in ParticlePointer:
+            if self.z_name in k:
+                self[k.replace(self.z_name, self.zi_name)] = ParticlePointer[k]
+
+        z = self.z_name
+        z0 = self.z0_name
+
+        if z + 'to.' + z0 + 'index' not in ParticlePointer:
+            ParticlePointer.assign_forward_pointers()
+        pointer_indices_from = ParticlePointer[z + 'to.' + z0 + 'index']
+        pointer_indices_to = self[z0 + 'to.' + z + 'index']
+        self[self.zi_name + 'to.' + z + 'index'] = pointer_indices_to[pointer_indices_from]
+
+
+class ParticlePointerIOClass(ut.io.SayClass):
+    '''
+    Read/write particle pointer indicies (and species names), for tracking star and gas particles
+    across snapshots.
     '''
 
     def __init__(
-        self, species_name='star', directory=TRACK_DIRECTORY, reference_snapshot_index=600):
+        self, species_names=['star', 'gas'], id_name='id', directory=TRACK_DIRECTORY,
+        reference_snapshot_index=600):
         '''
         Parameters
         ----------
-        species_name : str : name of particle species to track
-        directory : str : directory where to write files
+        species_names : str or list : name[s] of particle species to track
+        id_name : str : dictionary key of particle id
+        directory : str : directory where to read/write files
         reference_snapshot_index : int :
-            reference snapshot to compute particle index pointers relative to
+            index of reference (later) snapshot to compute particle pointers relative to
         '''
-        self.species_name = species_name
+        self.species_names = species_names
+        if np.isscalar(self.species_names):
+            self.species_names = [self.species_names]  # ensure is list
+
+        self.id_name = id_name
         self.directory = directory
         self.Read = gizmo_io.ReadClass()
         self.reference_snapshot_index = reference_snapshot_index
 
-    def _write_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot):
-        '''
-        Assign to each particle a pointer from its index at the reference snapshot (usually z = 0)
-        to its index at another snapshot_index.
-        Write the particle index pointers to a file.
-
-        Parameters
-        ----------
-        part_z0 : dict : catalog of particles at reference snapshot (usually z = 0)
-        snapshot_index : int : snapshot index to assign particle index pointers to
-        count_tot : dict : diagnostic counters
-        '''
-        # read particles at this snapshot
-        # need to do this first to get the exact scale-factor of snapshot
-        part_z = self.Read.read_snapshots(
-            self.species_name, 'index', snapshot_index,
-            properties=['id', self.match_property, self.test_property], element_indices=[0],
-            assign_host_coordinates=False, check_properties=False)
-
-        if self.species_name not in part_z or not len(part_z[self.species_name]['id']):
-            return
-
-        # diagnostic
-        pis_multiple = ut.particle.get_indices_id_kind(part_z, self.species_name, 'multiple')
-        self.say('* {} {} particles have redundant id at snapshot {}'.format(
-            pis_multiple.size, self.species_name, snapshot_index))
-
-        # initialize pointer array
-        # set null values to negative and will return error if called as index
-        part_pointers = ut.array.get_array_null(part_z0[self.species_name]['id'].size)
-
-        count = {
-            'id no match': 0,
-            'match prop no match': 0,
-            'match prop redundant': 0,
-            'test prop offset': 0,
-        }
-
-        for part_z_index, part_z_id in enumerate(part_z[self.species_name]['id']):
-            try:
-                part_z0_indices = part_z0[self.species_name].id_to_index[part_z_id]
-            except (IndexError, KeyError):
-                count['id no match'] += 1
-                continue
-
-            if np.isscalar(part_z0_indices):
-                # particle id is unique - easy case
-                part_pointers[part_z0_indices] = part_z_index
-            else:
-                # particle id is redundant - tricky case
-                # loop through particles with this id, use match_property to match
-                # sanity check
-                match_props = part_z0[self.species_name].prop(self.match_property, part_z0_indices)
-                if np.unique(match_props).size != part_z0_indices.size:
-                    count['match prop redundant'] += 1
-
-                match_prop_z = part_z[self.species_name].prop(self.match_property, part_z_index)
-
-                for part_z0_index in part_z0_indices:
-                    match_prop_z0 = part_z0[self.species_name].prop(
-                        self.match_property, part_z0_index)
-                    if self.match_property == 'id.child':
-                        if match_prop_z0 == match_prop_z:
-                            part_pointers[part_z0_index] = part_z_index
-                            break
-                    else:
-                        if (np.abs((match_prop_z0 - match_prop_z) / match_prop_z) <
-                                self.match_propery_tolerance):
-                            part_pointers[part_z0_index] = part_z_index
-                            break
-                else:
-                    count['match prop no match'] += 1
-
-        if count['id no match']:
-            self.say('! {} {} particles not have id match at snapshot {}'.format(
-                     count['id no match'], self.species_name, snapshot_index))
-        if count['match prop no match']:
-            self.say('! {} {} particles not have {} match at snapshot {}'.format(
-                     count['match prop no match'], self.species_name, self.match_property,
-                     snapshot_index))
-        if count['match prop redundant']:
-            self.say('! {} {} particles have redundant {} at snapshot {}'.format(
-                     count['match prop redundant'], self.species_name, self.match_property,
-                     snapshot_index))
-
-        # more sanity checks
-
-        part_z0_indices = np.where(part_pointers >= 0)[0]
-        # ensure same number of particles assigned at z0 as in snapshot at z
-        if part_z0_indices.size != part_z[self.species_name]['id'].size:
-            self.say('! {} {} particles at snapshot {}'.format(
-                     part_z[self.species_name]['id'].size, self.species_name, snapshot_index))
-            self.say('but matched to {} particles at snapshot {}'.format(
-                     part_z0_indices.size, part_z0.snapshot['index']))
-        else:
-            # check using test property
-            if (self.test_property and self.test_property != self.match_property and
-                    count['id no match'] == count['match prop no match'] == 0):
-                part_pointers_good = part_pointers[part_z0_indices]
-                prop_difs = np.abs(
-                    (part_z[self.species_name].prop(self.test_property, part_pointers_good) -
-                     part_z0[self.species_name].prop(self.test_property, part_z0_indices)) /
-                    part_z[self.species_name].prop(self.test_property, part_pointers_good))
-                count['test prop offset'] = np.sum(prop_difs > self.match_propery_tolerance)
-
-                if count['test prop offset']:
-                    self.say('! {} matched particles have different {} at snapshot {} v {}'.format(
-                             count['test prop offset'], self.test_property, snapshot_index,
-                             part_z0.snapshot['index']))
-
-        for k in count:
-            count_tot[k] += count[k]
-
-        # write file for this snapshot
-        self.io_pointers(None, snapshot_index, part_pointers)
-
     def write_pointers_to_snapshots(
         self, part=None, match_property='id.child', match_propery_tolerance=1e-6,
-        test_property='form.scalefactor', snapshot_indices=[], thread_number=1):
+        test_property='massfraction.metals', snapshot_indices=[], thread_number=1):
         '''
-        Assign to each particle a pointer from its index at the reference snapshot (usually z = 0)
-        to its index at all other snapshots, to make it easier to track particles across time.
-        Write particle index pointers to file, one file for each snapshot beyond the
-        reference snapshot.
+        Assign to each particle a pointer from its index at the reference (later) snapshot
+        to its index (and species name) at all other (earlier) snapshots,
+        to track particles across time.
+        Write particle pointers to file, one file for each snapshot besides the reference snapshot.
 
         Parameters
         ----------
-        part : dict : catalog of particles at reference snapshot (usually z = 0)
+        part : dict : catalog of particles at reference (later, z0) snapshot
         match_property : str :
-            some particles have the same id. this is the property to use to match them.
+            some particles have the same id, so this is the property to use to match them.
             options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
         match_propery_tolerance : float : fractional tolerance for matching via match_property
         test_property : str : additional property to use to test matching
-        snapshot_indices : array-like : snapshot indices at which to assign index pointers
+        snapshot_indices : array-like : snapshot indices at which to assign pointers
         thread_number : int : number of threads for parallelization
         '''
         assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
@@ -190,32 +301,33 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         if part is None:
             # read particles at reference snapshot (typically z = 0)
             # get list of properties relevant to use in matching
-            properties_read = ['id', 'id.child']
+            properties_read = [self.id_name, 'id.child']
             if match_property not in properties_read:
                 properties_read.append(match_property)
             if test_property and test_property not in properties_read:
                 properties_read.append(test_property)
             part = self.Read.read_snapshots(
-                self.species_name, 'index', self.reference_snapshot_index,
+                self.species_names, 'index', self.reference_snapshot_index,
                 properties=properties_read, element_indices=[0], assign_host_coordinates=False,
                 check_properties=False)
 
-        # older snapshot files do not have id.child - use abundance of total metals instead
-        if match_property == 'id.child' and 'id.child' not in part[self.species_name]:
+        # older simulations do not have id.child - use abundance of total metals instead
+        if match_property == 'id.child' and 'id.child' not in part[self.species_names[0]]:
             self.say('input match_property = {} does not exist in snapshot {}'.format(
                 match_property, part.snapshot['index']))
             match_property = 'massfraction.metals'
-            self.say('switching to using: {}'.format(match_property))
+            self.say('instead, using: {}'.format(match_property))
             if match_property not in properties_read:
                 properties_read.append(match_property)
                 part = self.Read.read_snapshots(
-                    self.species_name, 'redshift', 0, properties=properties_read,
+                    self.species_names, 'redshift', 0, properties=properties_read,
                     element_indices=[0], assign_host_coordinates=False, check_properties=False)
 
-        assert part[self.species_name].prop(match_property) is not None
-
-        if test_property:
-            assert part[self.species_name].prop(test_property) is not None
+        for spec_name in self.species_names:
+            assert spec_name in part
+            assert part[spec_name].prop(match_property) is not None
+            if test_property:
+                assert part[spec_name].prop(test_property) is not None
 
         # get list of snapshot indices to assign
         if snapshot_indices is None or not len(snapshot_indices):
@@ -225,12 +337,18 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         snapshot_indices = snapshot_indices[::-1]  # work backwards in time
 
         # diagnostic
-        pis_multiple = ut.particle.get_indices_id_kind(part, self.species_name, 'multiple')
-        self.say('* {} {} particles have redundant id'.format(pis_multiple.size, self.species_name))
+        pindices_mult = ut.particle.get_indices_by_id_uniqueness(
+            part, self.species_names, self.id_name, 'multiple')
+        species_names_print = self.species_names[0]
+        if len(self.species_names) > 1:
+            for spec in self.species_names[1:]:
+                species_names_print += ' + {}'.format(spec)
+        self.say('* {} {} particles have redundant id at (reference) snapshot {}'.format(
+            pindices_mult.size, species_names_print, self.reference_snapshot_index))
 
-        # assign pointer from particle id to its index in list
+        # assign pointers at reference snapshot from particle id to index in catalog
         ut.particle.assign_id_to_index(
-            part, self.species_name, 'id', 0, store_as_dict=True, print_diagnostic=False)
+            part, self.species_names, self.id_name, store_as_dict=True, verbose=False)
 
         self.match_property = match_property
         self.match_propery_tolerance = match_propery_tolerance
@@ -262,6 +380,7 @@ class ParticleIndexPointerClass(ut.io.SayClass):
             pool.join()
 
         # print cumulative diagnostics
+        print()
         if count['id no match']:
             self.say('! {} total not have id match!'.format(count['id no match']))
         if count['match prop no match']:
@@ -273,24 +392,240 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         if count['test prop offset']:
             self.say('! {} total have offset {}'.format(count['test prop offset'], test_property))
 
-    def io_pointers(self, part=None, snapshot_index=None, part_pointers=None, directory=None):
+    def _write_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot):
         '''
-        Read or write, for each star particle at the reference snapshot (usually z = 0),
-        its index at another snapshot.
-        If input particle catalog (part), add index pointers to its dictionary class,
-        else return index pointers as an array.
+        Assign to each particle a pointer from its index at the reference (later, z0) snapshot
+        to its index (and species name) at a (earlier, z) snapshot.
+        Write the particle pointers to file.
 
         Parameters
         ----------
-        part : dict : catalog of particles at a snapshot
-        snapshot_index : int : index of snapshot (if not input part)
-        part_pointers : array : particle index pointers (if writing)
+        part_z0 : dict : catalog of particles at the reference (later, z0) snapshot
+        snapshot_index : int : snapshot index to assign pointers to at the (earlier, z) snapshot
+        count_tot : dict : diagnostic counters
+        '''
+        # read particles at this snapshot
+        # need to do this to get the exact scale-factor of snapshot
+        part_z = self.Read.read_snapshots(
+            self.species_names, 'index', snapshot_index,
+            properties=[self.id_name, self.match_property, self.test_property], element_indices=[0],
+            assign_host_coordinates=False, check_properties=False)
+
+        for spec in self.species_names:
+            if spec not in part_z or not len(part_z[spec][self.id_name]):
+                return
+
+        # diagnostic
+        species_names_print = self.species_names[0]
+        if len(self.species_names) > 1:
+            for spec in self.species_names[1:]:
+                species_names_print += ' + {}'.format(spec)
+
+        pindices_mult = ut.particle.get_indices_by_id_uniqueness(
+            part_z, self.species_names, self.id_name, 'multiple')
+
+        self.say('* {} {} particles have redundant id at snapshot {}'.format(
+            pindices_mult.size, species_names_print, snapshot_index))
+
+        count = {
+            'id no match': 0,
+            'match prop redundant': 0,
+            'match prop no match': 0,
+            'test prop offset': 0,
+        }
+
+        # dictionary class to store pointers and meta-data
+        ParticlePointer = ParticlePointerDictionaryClass(
+            part_z0, part_z, self.species_names, self.id_name)
+        pointer_index_name = ParticlePointer.pointer_index_name
+        z = ParticlePointer.z_name
+
+        for spec in self.species_names:
+            # get particle index offest (non-zero if concatenating multiple species)
+            total_index_offset = ParticlePointer[z + spec + '.index.limits'][0]
+
+            id_no_match_number = 0
+            match_prop_redundant_number = 0
+            match_prop_no_match_number = 0
+            for part_z_index, part_z_id in enumerate(part_z[spec][self.id_name]):
+                try:
+                    # can point to multiple particles at reference z0 snapshot
+                    part_z0_list = part_z0.id_to_index[part_z_id]
+                except (IndexError, KeyError):
+                    id_no_match_number += 1
+                    continue
+
+                # get index in concatenated list
+                part_z_total_index = part_z_index + total_index_offset
+
+                if np.ndim(part_z0_list) == 1:
+                    # particle id is unique - easy case
+                    part_z0_total_index = part_z0_list[2]
+                    ParticlePointer[pointer_index_name][part_z0_total_index] = part_z_total_index
+                else:
+                    # particle id is redundant - tricky case
+                    # loop through particles with this id, use match_property to match
+                    # sanity check
+                    match_props = [
+                        part_z0[z0_spec].prop(self.match_property, z0_index)
+                        for z0_spec, z0_index, z0_total_index in part_z0_list]
+                    if np.unique(match_props).size != len(part_z0_list):
+                        match_prop_redundant_number += 1
+
+                    z_match_prop = part_z[spec].prop(self.match_property, part_z_index)
+
+                    for z0_spec, z0_index, z0_total_index in part_z0_list:
+                        z0_match_prop = part_z0[z0_spec].prop(self.match_property, z0_index)
+
+                        if self.match_property == 'id.child':
+                            if z0_match_prop == z_match_prop:
+                                ParticlePointer[pointer_index_name][z0_total_index] = (
+                                    part_z_total_index)
+                                break
+                        else:
+                            frac_dif = np.abs((z0_match_prop - z_match_prop) / z_match_prop)
+                            if frac_dif < self.match_propery_tolerance:
+                                ParticlePointer[pointer_index_name][z0_total_index] = (
+                                    part_z_total_index)
+                                break
+                    else:
+                        match_prop_no_match_number += 1
+
+            if id_no_match_number:
+                self.say('! {} {} particles not have id match at snapshot {}'.format(
+                    id_no_match_number, spec, snapshot_index))
+                count['id no match'] += id_no_match_number
+            if match_prop_redundant_number:
+                self.say('! {} {} particles have redundant {} at snapshot {}'.format(
+                    match_prop_redundant_number, spec, self.match_property,
+                    snapshot_index))
+                count['match prop redundant'] += match_prop_redundant_number
+            if match_prop_no_match_number:
+                self.say('! {} {} particles not have {} match at snapshot {}'.format(
+                    match_prop_no_match_number, spec, self.match_property, snapshot_index))
+                count['match prop no match'] += match_prop_no_match_number
+
+        # sanity checks
+        part_z0_total_indices = np.where(ParticlePointer[pointer_index_name] >= 0)[0]
+        # ensure same number of pointers from z0 to z as particles in snapshot at z
+        if part_z0_total_indices.size != ParticlePointer[z + 'particle.number']:
+            self.say('! {} {} particles at snapshot {},'.format(
+                ParticlePointer[z + 'particle.number'], species_names_print, snapshot_index))
+            self.say('but matched to only {} particles at snapshot {}'.format(
+                part_z0_total_indices.size, part_z0.snapshot['index']))
+        else:
+            # check using test property - only valid for stars!
+            if (self.test_property and self.test_property != self.match_property and
+                    'star' in self.species_names and
+                    count['id no match'] == count['match prop no match'] == 0):
+
+                z_star_indices = ParticlePointer.get_pointers('star', 'star', return_array=True)
+                z0_star_indices = np.where(z_star_indices >= 0)[0]
+                z_star_indices = z_star_indices[z0_star_indices]
+
+                prop_difs = np.abs(
+                    (part_z['star'].prop(self.test_property, z_star_indices) -
+                     part_z0['star'].prop(self.test_property, z0_star_indices)) /
+                    part_z['star'].prop(self.test_property, z_star_indices))
+                count['test prop offset'] = np.sum(prop_difs > self.match_propery_tolerance)
+
+                if count['test prop offset']:
+                    self.say('! {} matched particles have different {} at snapshot {} v {}'.format(
+                             count['test prop offset'], self.test_property, snapshot_index,
+                             part_z0.snapshot['index']))
+
+        for k in count:
+            count_tot[k] += count[k]
+
+        # write file for this snapshot
+        self.io_pointers(ParticlePointer=ParticlePointer)
+
+    def io_pointers(self, part=None, snapshot_index=None, ParticlePointer=None, directory=None):
+        '''
+        Read or write, for each star particle at the reference (later, z0) snapshot
+        its pointer index (and species name) to the other (earlier, z) snapshot.
+        If input particle catalog (part), append pointers as dictionary class to part,
+        else return pointers as a dictionary class.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles at a the (earlier, z) snapshot
+        snapshot_index : int : index of the (earlier, z) snapshot to read
+        ParticlePointer : dict class : particle pointer class (if writing)
+        directory : str: directory of file
 
         Returns
         -------
-        part_pointers : array :
-            particle index pointers from reference snapshot (usually z = 0) to another snapshot
+        ParticlePointer : dict class : particle pointers
         '''
+        if part is not None:
+            snapshot_index = part.snapshot['index']
+        elif ParticlePointer is not None:
+            snapshot_index = ParticlePointer['z.snapshot.index']
+        else:
+            assert snapshot_index is not None
+
+        file_name = ''
+        for spec in self.species_names:
+            file_name += '{}_'.format(spec)
+        file_name += 'pointers_{:03d}'.format(snapshot_index)
+
+        if directory is None:
+            directory = self.directory
+
+        if ParticlePointer is not None:
+            # write to file
+            directory = ut.io.get_path(directory, create_path=True)
+            for k in ParticlePointer:
+                # hdf5 writer needs to receive numpy arrays
+                ParticlePointer[k] = np.asarray(ParticlePointer[k])
+                if k == 'species':
+                    # hdf5 writer no support unicode
+                    ParticlePointer[k] = ParticlePointer[k].astype('|S4')
+            ut.io.file_hdf5(directory + file_name, ParticlePointer)
+
+        else:
+            # read from file
+            directory = ut.io.get_path(directory)
+            dict_in = ut.io.file_hdf5(directory + file_name)
+
+            ParticlePointer = ParticlePointerDictionaryClass()
+            for k in dict_in:
+                if 'number' in k or 'snapshot.index' in k:
+                    ParticlePointer[k] = dict_in[k].item()  # convert to float/int
+                elif k == 'species':
+                    ParticlePointer[k] = dict_in[k].astype('<U4')  # store as unicode
+                else:
+                    ParticlePointer[k] = dict_in[k]
+
+            if part is None:
+                return ParticlePointer
+            else:
+                part.Pointer = ParticlePointer
+
+    def io_pointers_old_file_format(
+        self, part=None, snapshot_index=None, part_pointers=None, directory=None):
+        '''
+        This reads the old pointer files (star_indices_*.hdf5) and converts them into the new
+        dictionary class format.
+
+        Read or write, for each star particle at the reference snapshot (z0, usually z = 0),
+        its pointer index to another snapshot (z).
+        If input particle catalog (part), append pointers as dictionary class to part,
+        else return pointers as a dictionary class.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles at a (non-reference) snapshot (z)
+        snapshot_index : int : index of other (non-reference) snapshot to read
+        ParticlePointer : dict class : particle pointer class (if writing)
+        directory : str: directory of file
+
+        Returns
+        -------
+        ParticlePointer : dict class : particle pointers
+        '''
+        species_name = 'star'
         hdf5_dict_name = 'indices'
 
         if part is not None:
@@ -298,7 +633,7 @@ class ParticleIndexPointerClass(ut.io.SayClass):
         elif not snapshot_index:
             raise ValueError('! need to input either particle catalog or snapshot_index')
 
-        file_name = '{}_indices_{:03d}'.format(self.species_name, snapshot_index)
+        file_name = '{}_indices_{:03d}'.format(species_name, snapshot_index)
 
         if directory is None:
             directory = self.directory
@@ -311,107 +646,190 @@ class ParticleIndexPointerClass(ut.io.SayClass):
             # read from file
             directory = ut.io.get_path(directory)
             dict_in = ut.io.file_hdf5(directory + file_name)
-            part_pointers = dict_in[hdf5_dict_name]
+
+            ParticlePointer = ParticlePointerDictionaryClass()
+            particle_index_name = ParticlePointer.pointer_index_name
+            z0 = ParticlePointer.z0_name
+            z = ParticlePointer.z_name
+            ParticlePointer[particle_index_name] = dict_in[hdf5_dict_name]
+
+            part_z0_number = ParticlePointer[particle_index_name].size
+            ParticlePointer['species'] = [species_name]
+            ParticlePointer[z0 + 'particle.number'] = part_z0_number
+            ParticlePointer[z0 + species_name + '.number'] = part_z0_number
+            ParticlePointer[z0 + species_name + '.index.limits'] = [0, part_z0_number]
+            ParticlePointer[z0 + 'snapshot.index'] = 600
+
+            part_z_number = np.sum(ParticlePointer[particle_index_name] >= 0)
+            ParticlePointer[z + 'particle.number'] = part_z_number
+            ParticlePointer[z + species_name + '.number'] = part_z_number
+            ParticlePointer[z + species_name + '.index.limits'] = [0, part_z_number]
+            ParticlePointer[z + 'snapshot.index'] = snapshot_index
+
             if part is None:
-                return part_pointers
+                return ParticlePointer
             else:
-                part.index_pointers = part_pointers
+                part.Pointer = ParticlePointer
 
-    def get_pointers_reverse(self, part_pointers=None, snapshot_index=None):
+    def read_pointers_between_snapshots(
+        self, snapshot_index_from, snapshot_index_to, species_name='star', old_file_format=False):
         '''
-        Given input particle index pointers from the reference snapshot (usually z = 0) to another
-        snapshot, get 'reverse' index pointers from the other snapshot to the reference snapshot.
-
-        Parameters
-        ----------
-        part_pointers : array :
-            particle index pointers from the reference snapshot (usually z = 0) to another napshot
-        snapshot_index : int : index of snapshot to read pointers (if not input part_pointers)
-
-        Returns
-        -------
-        part_reverse_pointers : array :
-            particle index pointers from the other snapshot to the reference snapshot
-        '''
-        if part_pointers is None:
-            # read from file
-            part_pointers = self.io_pointers(snapshot_index=snapshot_index)
-
-        # get index pointers that have valid (non-null) values
-        masks_valid = (part_pointers >= 0)
-        part_pointers_valid = part_pointers[masks_valid]
-
-        part_number_at_z_ref = part_pointers.size
-        part_number_at_z = part_pointers_valid.size
-
-        # sanity check
-        if part_pointers_valid.max() >= part_number_at_z:
-            self.say('! input part_pointers has {} valid pointers'.format(part_number_at_z))
-            self.say('but its pointer index max = {}'.format(part_pointers_valid.max()))
-            self.say('thus it does not point to all particles at snapshot at z')
-            self.say('increasing size of reverse pointer array to accomodate missing particles')
-            part_number_at_z = part_pointers_valid.max() + 1
-
-        part_reverse_pointers = ut.array.get_array_null(part_number_at_z)
-        part_reverse_pointers[part_pointers_valid] = (
-            ut.array.get_arange(part_number_at_z_ref)[masks_valid])
-
-        return part_reverse_pointers
-
-    def get_pointers_between_snapshots(self, snapshot_index_from, snapshot_index_to):
-        '''
-        Get particle index pointers between any two snapshots.
-        Given input snapshot indices, get array of index pointers from snapshot_index_from to
+        Get particle pointer indices for single species between any two snapshots.
+        Given input snapshot indices, get array of pointer indices from snapshot_index_from to
         snapshot_index_to.
 
         Parameters
         ----------
-        snapshot_index_from : int : snapshot index to get index pointers from
+        snapshot_index_from : int : snapshot index to get pointers from
         snapshot_index_to : int : snapshot index to get pointers to
+        species_name : str : name of particle species to track
+        old_file_format : bool : whether to read old pointer index files (star_index_*.hdf5)
 
         Returns
         -------
         part_pointers : array :
-            particle index pointers from snapshot_index_from to snapshot_index_to
+            particle pointer indices from snapshot_index_from to snapshot_index_to
         '''
-        if snapshot_index_from == self.reference_snapshot_index:
-            part_pointers = self.io_pointers(snapshot_index=snapshot_index_to)
-        elif snapshot_index_to == self.reference_snapshot_index:
-            part_pointers_from = self.io_pointers(snapshot_index=snapshot_index_from)
-            part_pointers = self.get_pointers_reverse(part_pointers_from)
+        if old_file_format:
+            read_func = self.io_pointers_old_file_format
         else:
-            part_pointers_from = self.io_pointers(snapshot_index=snapshot_index_from)
-            part_pointers_to = self.io_pointers(snapshot_index=snapshot_index_to)
-            part_reverse_pointers_from = self.get_pointers_reverse(part_pointers_from)
-            part_pointers = part_pointers_to[part_reverse_pointers_from]
+            read_func = self.io_pointers
 
-        return part_pointers
+        if snapshot_index_from > snapshot_index_to:
+            forward = False
+        else:
+            forward = True
+
+        ParticlePointerTo = read_func(snapshot_index=snapshot_index_to)
+
+        if self.reference_snapshot_index in [snapshot_index_to, snapshot_index_from]:
+            pointer_indices = ParticlePointerTo.get_pointers(
+                species_name, species_name, forward=forward, return_array=True)
+        else:
+            ParticlePointerFrom = read_func(snapshot_index=snapshot_index_from)
+
+            if species_name == 'star':
+                # pointers from z_from to the reference (later, z0) snapshot
+                pointer_indices_from = ParticlePointerFrom.get_pointers(
+                    species_name, species_name, forward=True, return_array=True)
+                # pointers from the reference (later, z0) snapshot to z_to
+                pointer_indices_to = ParticlePointerTo.get_pointers(
+                    species_name, species_name, return_array=True)
+                # pointers from z_from to z_to
+                pointer_indices = pointer_indices_to[pointer_indices_from]
+            else:
+                # trickier case - use internal functions
+                if snapshot_index_from > snapshot_index_to:
+                    ParticlePointerZ1 = ParticlePointerFrom
+                    ParticlePointerZ2 = ParticlePointerTo
+                else:
+                    ParticlePointerZ2 = ParticlePointerFrom
+                    ParticlePointerZ1 = ParticlePointerTo
+
+                ParticlePointerZ2.add_intermediate_pointers(ParticlePointerZ1)
+                pointer_indices = ParticlePointerZ2.get_pointers(
+                    species_name, species_name, forward=forward, return_array=True, z_ref_name='zi')
+
+        return pointer_indices
 
 
-ParticleIndexPointer = ParticleIndexPointerClass()
+ParticlePointerIO = ParticlePointerIOClass()
 
 
-class ParticleCoordinateClass(ParticleIndexPointerClass):
+def test_particle_pointers(part, part_z1, part_z2):
+    '''
+    .
+    '''
+    ParticlePointerIO.io_pointers(part_z1)
+    ParticlePointerIO.io_pointers(part_z2)
+
+    part_z2.Pointer.add_intermediate_pointers(part_z1.Pointer)
+
+    for spec_from in ['star', 'gas']:
+        pointer_z1 = part_z1.Pointer.get_pointers(spec_from, 'all')
+        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all')
+        assert part[spec_from]['id'].size == pointer_z1['index'].size
+        assert part[spec_from]['id'].size == pointer_z2['index'].size
+
+        for spec_to in ['star', 'gas']:
+            pis_z1 = np.where(pointer_z1['species'] == spec_to)[0]
+            pis_z2 = np.where(pointer_z2['species'] == spec_to)[0]
+            if pis_z1.size:
+                masks = (part[spec_from]['id'][pis_z1] !=
+                         part_z1[spec_to]['id'][pointer_z1['index'][pis_z1]])
+                if np.max(masks):
+                    print('z0->z1', spec_from, spec_to, np.sum(masks))
+            if pis_z2.size:
+                masks = (part[spec_from]['id'][pis_z2] !=
+                         part_z2[spec_to]['id'][pointer_z2['index'][pis_z2]])
+                if np.max(masks):
+                    print('z0->z2', spec_from, spec_to, np.sum(masks))
+
+        pointer_z1 = part_z1.Pointer.get_pointers(spec_from, 'all', forward=True)
+        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all', forward=True)
+        assert part_z1[spec_from]['id'].size == pointer_z1['index'].size
+        assert part_z2[spec_from]['id'].size == pointer_z2['index'].size
+
+        for spec_to in ['star', 'gas']:
+            pis_z1 = np.where(pointer_z1['species'] == spec_to)[0]
+            pis_z2 = np.where(pointer_z2['species'] == spec_to)[0]
+            if pis_z1.size:
+                masks = (part_z1[spec_from]['id'][pis_z1] !=
+                         part[spec_to]['id'][pointer_z1['index'][pis_z1]])
+                if np.max(masks):
+                    print('z1->z0', spec_from, spec_to, np.sum(masks))
+            if pis_z2.size:
+                masks = (part_z2[spec_from]['id'][pis_z2] !=
+                         part[spec_to]['id'][pointer_z2['index'][pis_z2]])
+                if np.max(masks):
+                    print('z2->z0', spec_from, spec_to, np.sum(masks))
+
+        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all', z_ref_name='zi')
+        assert part_z1[spec_from]['id'].size == pointer_z2['index'].size
+
+        for spec_to in ['star', 'gas']:
+            pis_z2 = np.where(pointer_z2['species'] == spec_to)[0]
+            if pis_z2.size:
+                masks = (part_z1[spec_from]['id'][pis_z2] !=
+                         part_z2[spec_to]['id'][pointer_z2['index'][pis_z2]])
+                if np.max(masks):
+                    print('z1->z2', spec_from, spec_to, np.sum(masks))
+
+        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all', z_ref_name='zi', forward=True)
+        assert part_z2[spec_from]['id'].size == pointer_z2['index'].size
+
+        for spec_to in ['star', 'gas']:
+            pis_z2 = np.where(pointer_z2['species'] == spec_to)[0]
+            if pis_z2.size:
+                masks = (part_z2[spec_from]['id'][pis_z2] !=
+                         part_z1[spec_to]['id'][pointer_z2['index'][pis_z2]])
+                if np.max(masks):
+                    print('z2->z1', spec_from, spec_to, np.sum(masks))
+
+
+class ParticleCoordinateClass(ParticlePointerIOClass):
     '''
     Compute coordinates (3-D distances and 3-D velocities) wrt each primary host galaxy for all
     particles at the snapshot immediately after they form.
     '''
 
     def __init__(
-        self, species_name='star', directory=TRACK_DIRECTORY, reference_snapshot_index=600,
-        host_distance_limits=[0, 50]):
+        self, species_name='star', id_name='id', directory=TRACK_DIRECTORY,
+        reference_snapshot_index=600, host_distance_limits=[0, 50]):
         '''
         Parameters
         ----------
         species : str : name of particle species to track
         directory : str : directory to write files
+        id_name : str : dictionary key of id
         reference_snapshot_index : float :
-            reference snapshot to compute particle index pointers relative to
+            index of reference (later) snapshot to compute particle pointers from
         host_distance_limits : list :
             min and max distance [kpc physical] to select particles near the primary host[s] at the
             reference snapshot; use only these particles to find host center[s] at earlier snapshots
         '''
         self.species_name = species_name
+        self.id_name = id_name
         self.directory = directory
         self.reference_snapshot_index = reference_snapshot_index
         self.host_distance_limits = host_distance_limits
@@ -432,20 +850,22 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         Parameters
         ----------
-        part_z0 : dict : catalog of particles at the reference snapshot
+        part_z0 : dict : catalog of particles at the reference (latest) snapshot
         hosts_part_z0_indices : array :
-            indices of particles near all primary host[s] at the reference snapshot
+            indices of particles near all primary host[s] at the reference (latest) snapshot
         host_number : int : number of host galaxies to assign and compute coordinates relative to
-        snapshot_index : int : snapshot index at which to assign particle index pointers
+        snapshot_index : int : snapshot index at which to assign particle pointers to
         count_tot : dict : diagnostic counters
         '''
-        part_z0_indices = ut.array.get_arange(part_z0[self.species_name]['id'])
+        part_z0_indices = ut.array.get_arange(part_z0[self.species_name][self.id_name])
 
         if snapshot_index == part_z0.snapshot['index']:
             part_pointers = part_z0_indices
         else:
             try:
-                part_pointers = self.io_pointers(snapshot_index=snapshot_index)
+                ParticlePointer = self.io_pointers(snapshot_index=snapshot_index)
+                part_pointers = ParticlePointer.get_pointers(
+                    self.species_name, self.species_name, return_array=True)
             except Exception:
                 return
 
@@ -460,7 +880,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         if part_z0_indices.size > 0:
             part_z = self.Read.read_snapshots(
                 self.species_name, 'index', snapshot_index,
-                properties=['position', 'velocity', 'mass', 'id', 'form.scalefactor'],
+                properties=[self.id_name, 'position', 'velocity', 'mass', 'form.scalefactor'],
                 assign_host_coordinates=False, check_properties=True)
 
             # limit the coordinates of progenitor[s] of primary host[s] to particles that are near
@@ -481,8 +901,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
                 part_z_indices = part_z_indices[masks]
                 part_z0_indices = part_z0_indices[masks]
 
-            masks = (part_z0[self.species_name]['id'][part_z0_indices] ==
-                     part_z[self.species_name]['id'][part_z_indices])
+            masks = (part_z0[self.species_name][self.id_name][part_z0_indices] ==
+                     part_z[self.species_name][self.id_name][part_z_indices])
             count['id wrong'] = part_z_indices.size - np.sum(masks)
             if count['id wrong']:
                 self.say('! {} have wrong id match at snapshot {}!'.format(
@@ -559,7 +979,8 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             # read particles at z = 0
             part_z0 = self.Read.read_snapshots(
                 self.species_name, 'index', self.reference_snapshot_index,
-                properties=['position', 'velocity', 'mass', 'id', 'id.child', 'form.scalefactor'],
+                properties=[self.id_name, 'position', 'velocity', 'mass', 'id.child',
+                            'form.scalefactor'],
                 element_indices=[0], host_number=host_number, assign_host_coordinates=True,
                 check_properties=False)
 
@@ -580,7 +1001,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
 
         # store indices of particles near all primary hosts at z0
         hosts_part_z0_indices = np.zeros(
-            0, dtype=ut.array.parse_data_type(part_z0[self.species_name]['id'].size))
+            0, dtype=ut.array.parse_data_type(part_z0[self.species_name][self.id_name].size))
 
         for host_index in range(host_number):
             host_name = ut.catalog.get_host_name(host_index)
@@ -621,6 +1042,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             pool.join()
 
         # print cumulative diagnostics
+        print()
         if count['id none']:
             self.say('! {} total do not have valid id!'.format(count['id none']))
         if count['id wrong']:
@@ -644,7 +1066,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
         if write:
             directory = ut.io.get_path(self.directory, create_path=True)
             dict_out = collections.OrderedDict()
-            dict_out['id'] = part[self.species_name]['id']
+            dict_out['id'] = part[self.species_name][self.id_name]
             for prop in part[self.species_name]:
                 if 'form.host' in prop:
                     dict_out[prop] = part[self.species_name][prop]
@@ -660,7 +1082,7 @@ class ParticleCoordinateClass(ParticleIndexPointerClass):
             dict_in = ut.io.file_hdf5(directory + file_name)
 
             # sanity check
-            bad_id_number = np.sum(part[self.species_name]['id'] != dict_in['id'])
+            bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_in['id'])
             if bad_id_number:
                 self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
 
@@ -691,14 +1113,14 @@ ParticleCoordinate = ParticleCoordinateClass()
 #===================================================================================================
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise OSError('specify function: indices, coordinates, indices+coordinates')
+        raise OSError('specify function: pointers, coordinates, indices+coordinates')
 
     function_kind = str(sys.argv[1])
 
     assert ('indices' in function_kind or 'coordinates' in function_kind)
 
-    if 'indices' in function_kind:
-        ParticleIndexPointer.write_pointers_to_snapshots()
+    if 'pointers' in function_kind:
+        ParticlePointerIO.write_pointers_to_snapshots()
 
     if 'coordinates' in function_kind:
         ParticleCoordinate.write_formation_coordinates()

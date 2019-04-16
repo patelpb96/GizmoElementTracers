@@ -145,7 +145,6 @@ Some useful examples:
     etc
 '''
 
-# system ----
 from __future__ import absolute_import, division, print_function  # python 2 compatibility
 import os
 import collections
@@ -527,7 +526,7 @@ class ReadClass(ut.io.SayClass):
         separate_dark_lowres=False, sort_dark_by_id=False, convert_float32=False,
         host_number=1, assign_host_coordinates=True,
         assign_host_principal_axes=False, assign_host_orbits=False,
-        assign_formation_coordinates=False, assign_index_pointers=False,
+        assign_formation_coordinates=False, assign_pointers=False,
         check_properties=True):
         '''
         Read given properties for given particle species from simulation snapshot file[s].
@@ -570,8 +569,8 @@ class ReadClass(ut.io.SayClass):
             whether to assign orbital properties wrt host galaxy[s]/halo[s]
         assign_formation_coordinates : bool :
             whether to assign coordindates wrt the host galaxy at formation to stars
-        assign_index_pointers : bool :
-            whether to assign index pointers from particles at z = 0 to particles in this snapshot
+        assign_pointers : bool :
+            whether to assign pointers for tracking particles from z = 0 to this snapshot
         check_properties : bool : whether to check sanity of particle properties after read in
 
         Returns
@@ -683,7 +682,7 @@ class ReadClass(ut.io.SayClass):
             if assign_host_orbits and ('velocity' in properties or properties is 'all'):
                 self.assign_host_orbits(part, 'star', part.host_positions, part.host_velocities)
 
-            if 'star' in species and (assign_formation_coordinates or assign_index_pointers):
+            if 'star' in species and (assign_formation_coordinates or assign_pointers):
                 from . import gizmo_track
                 if assign_formation_coordinates:
                     # assign coordinates wrt host galaxy at formation
@@ -691,11 +690,11 @@ class ReadClass(ut.io.SayClass):
                         'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
                     ParticleCoordinate.io_formation_coordinates(part)
 
-                elif assign_index_pointers:
-                    # assign particle index pointers from z = 0 to this snapshot
-                    ParticleIndex = gizmo_track.ParticleIndexPointerClass(
-                        'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
-                    ParticleIndex.io_pointers(part)
+                elif assign_pointers:
+                    # assign particle pointers from z = 0 to this snapshot
+                    ParticlePointerIO = gizmo_track.ParticlePointerIOClass(
+                        'star', directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                    ParticlePointerIO.io_pointers(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
@@ -1255,6 +1254,11 @@ class ReadClass(ut.io.SayClass):
                 # convert to [km / s physical]
                 part[spec_name]['velocity'] *= np.sqrt(header['scalefactor'])
 
+            if 'acceleration' in part[spec_name]:
+                # convert to [km / s^2 physical]
+                # consistent with v^2 / r at z = 0.5, TO DO check at z = 0
+                part[spec_name]['acceleration'] *= header['hubble']
+
             if 'mass' in part[spec_name]:
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
@@ -1262,6 +1266,15 @@ class ReadClass(ut.io.SayClass):
             if 'bh.mass' in part[spec_name]:
                 # convert to [M_sun]
                 part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
+
+            if 'potential' in part[spec_name]:
+                # convert to [km^2 / s^2 physical]
+                # TO DO: check if Gizmo writes potential as m / r, in raw units?
+                # might need to add:
+                # M *= 1e10 / header['hubble'] to get Msun
+                # r /= header['hubble'] to get kpc physical
+                # G conversion?
+                part[spec_name]['potential'] /= header['scalefactor']
 
             if 'density' in part[spec_name]:
                 # convert to [M_sun / kpc^3 physical]
@@ -1292,20 +1305,6 @@ class ReadClass(ut.io.SayClass):
                     ut.constant.centi_per_kilo ** 2 * (self.gas_eos - 1) * molecular_weights /
                     ut.constant.boltzmann)
                 del(helium_mass_fracs, ys_helium, mus, molecular_weights)
-
-            if 'potential' in part[spec_name]:
-                # convert to [km^2 / s^2 physical]
-                # TO DO: check if Gizmo writes potential as m / r, in raw units?
-                # might need to add:
-                # M *= 1e10 / header['hubble'] to get Msun
-                # r /= header['hubble'] to get kpc physical
-                # G conversion?
-                part[spec_name]['potential'] /= header['scalefactor']
-
-            if 'acceleration' in part[spec_name]:
-                # convert to [km / s^2 physical]
-                # consistent with v^2 / r at z = 0.5, TO DO check at z = 0
-                part[spec_name]['acceleration'] *= header['hubble']
 
         # renormalize so potential max = 0
         renormalize_potential = False
