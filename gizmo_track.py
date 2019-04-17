@@ -278,7 +278,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
     def write_pointers_to_snapshots(
         self, part=None, match_property='id.child', match_propery_tolerance=1e-6,
-        test_property='massfraction.metals', snapshot_indices=[], thread_number=1):
+        test_property='form.scalefactor', snapshot_indices=[], thread_number=1):
         '''
         Assign to each particle a pointer from its index at the reference (later) snapshot
         to its index (and species name) at all other (earlier) snapshots,
@@ -290,7 +290,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         part : dict : catalog of particles at reference (later, z0) snapshot
         match_property : str :
             some particles have the same id, so this is the property to use to match them.
-            options (in order of preference): 'id.child', 'massfraction.metals', 'form.scalefactor'
+            options (in order of preference): 'id.child', 'form.scalefactor', 'massfraction.metals'
         match_propery_tolerance : float : fractional tolerance for matching via match_property
         test_property : str : additional property to use to test matching
         snapshot_indices : array-like : snapshot indices at which to assign pointers
@@ -411,9 +411,13 @@ class ParticlePointerIOClass(ut.io.SayClass):
             properties=[self.id_name, self.match_property, self.test_property], element_indices=[0],
             assign_host_coordinates=False, check_properties=False)
 
+        spec_count = 0
         for spec in self.species_names:
-            if spec not in part_z or not len(part_z[spec][self.id_name]):
-                return
+            if spec in part_z and len(part_z[spec][self.id_name]):
+                spec_count += 1
+        if not spec_count:
+            self.say('! no {} particles at snapshot {}'.format(self.species_names, snapshot_index))
+            return
 
         # diagnostic
         species_names_print = self.species_names[0]
@@ -580,7 +584,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
                 # hdf5 writer needs to receive numpy arrays
                 ParticlePointer[k] = np.asarray(ParticlePointer[k])
                 if k == 'species':
-                    # hdf5 writer no support unicode
+                    # hdf5 writer does not support unicode
                     ParticlePointer[k] = ParticlePointer[k].astype('|S4')
             ut.io.file_hdf5(directory + file_name, ParticlePointer)
 
