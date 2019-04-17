@@ -323,11 +323,11 @@ class ParticlePointerIOClass(ut.io.SayClass):
                     self.species_names, 'redshift', 0, properties=properties_read,
                     element_indices=[0], assign_host_coordinates=False, check_properties=False)
 
-        for spec_name in self.species_names:
-            assert spec_name in part
-            assert part[spec_name].prop(match_property) is not None
-            if test_property:
-                assert part[spec_name].prop(test_property) is not None
+        for spec in self.species_names:
+            assert spec in part
+            assert part[spec].prop(match_property) is not None
+            if test_property and spec == 'star':
+                assert part[spec].prop(test_property) is not None
 
         # get list of snapshot indices to assign
         if snapshot_indices is None or not len(snapshot_indices):
@@ -411,19 +411,19 @@ class ParticlePointerIOClass(ut.io.SayClass):
             properties=[self.id_name, self.match_property, self.test_property], element_indices=[0],
             assign_host_coordinates=False, check_properties=False)
 
-        spec_count = 0
-        for spec in self.species_names:
-            if spec in part_z and len(part_z[spec][self.id_name]):
-                spec_count += 1
-        if not spec_count:
-            self.say('! no {} particles at snapshot {}'.format(self.species_names, snapshot_index))
-            return
-
         # diagnostic
         species_names_print = self.species_names[0]
         if len(self.species_names) > 1:
             for spec in self.species_names[1:]:
                 species_names_print += ' + {}'.format(spec)
+
+        spec_count = 0
+        for spec in self.species_names:
+            if spec in part_z and len(part_z[spec][self.id_name]):
+                spec_count += 1
+        if not spec_count:
+            self.say('! no {} particles at snapshot {}'.format(species_names_print, snapshot_index))
+            return
 
         pindices_mult = ut.particle.get_indices_by_id_uniqueness(
             part_z, self.species_names, self.id_name, 'multiple')
