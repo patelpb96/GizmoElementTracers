@@ -82,7 +82,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
     def get_pointers(
         self, species_name_from='star', species_names_to='star', part_indices=None, forward=False,
-        return_array=True, z_ref_name='z0.'):
+        intermediate_z=False, return_array=True):
         '''
         Get pointer indices (and species) from species_name_from particles at the
         reference (later) snapshot to species_names_to particles the earlier snapshot.
@@ -94,11 +94,14 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
         species_names_to : str or list :
             name[s] of species to get pointers to at the (earlier, z) snapshot
         part_indices : arr : indices of particles at the reference (later, z0) snapshot
-        forward : bool : whether instead to get pointers from the (earlier, z) snapshot to the
-            reference (later, z0) snapshot, tracking forward in time
+        forward : bool : whether to get pointers from the (earlier, z) snapshot to the
+            reference (later, z0) snapshot, that is, tracking forward in time
+            default (forward=False) is tracking backwards in time
+        intermediate_z : bool :
+            whether to get pointers between z and an intermediate snapshot (z > 0)
+            default (intermediate_z=False) is to get pointers to/from z0
         return_array : bool : if tracking single species at both snapshots, return just array of
             pointer indices (and not a pointer dictionary that includes species names)
-        z_ref_name : str : prefactor name for reference (later) snapshot: 'z0', 'zi'
 
         Returns
         -------
@@ -117,8 +120,10 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
         if np.isscalar(species_names_to):
             species_names_to = [species_names_to]
 
-        if z_ref_name[-1] != '.':
-            z_ref_name += '.'
+        if intermediate_z:
+            z_ref_name = self.zi_name
+        else:
+            z_ref_name = self.z0_name
 
         if forward:
             # track forward in time, from snapshot z to the reference (z0) snapshot
@@ -139,7 +144,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         pointer_index_name = z_from + 'to.' + z_to + 'index'
         if forward and pointer_index_name not in self:
-            self.assign_forward_pointers(z_ref_name)
+            self.assign_forward_pointers(intermediate_z)
 
         if part_indices is None:
             part_indices = ut.array.get_arange(self[z_from + species_name_from + '.number'])
@@ -177,7 +182,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         return pointer
 
-    def assign_forward_pointers(self, z_ref_name=''):
+    def assign_forward_pointers(self, intermediate_z=False):
         '''
         Assign pointer indices going forward in time, from the earlier (z) snapshot to the
         reference (later) snapshot.
@@ -186,28 +191,27 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         Parameters
         ----------
-        z_ref_name : str : name prefactor for reference (later) snapshot: 'z0', 'zi'
+        intermediate_z : bool :
+            whether to get pointers between z and an intermediate snapshot (z > 0)
         '''
-        if z_ref_name:
-            z0 = z_ref_name
-            if z0[-1] != '.':
-                z0 += '.'
+        if intermediate_z:
+            z_ref = self.zi_name
         else:
-            z0 = self.z0_name
+            z_ref = self.z0_name
 
         z = self.z_name
 
         # get pointers that have valid (non-null) values
-        masks_valid = (self[z0 + 'to.' + z + 'index'] >= 0)
-        pointers_valid = self[z0 + 'to.' + z + 'index'][masks_valid]
+        masks_valid = (self[z_ref + 'to.' + z + 'index'] >= 0)
+        pointers_valid = self[z_ref + 'to.' + z + 'index'][masks_valid]
 
         # sanity check
         if pointers_valid.max() >= self[z + 'particle.number']:
             self.say('! particle catalog at snapshot {} has {} valid pointers'.format(
                 self[z + 'snapshot.index'], self[z + 'particle.number']))
-            self.say('but {}->{} pointer index max = {}'.format(z0, z, pointers_valid.max()))
+            self.say('but {}->{} pointer index max = {}'.format(z_ref, z, pointers_valid.max()))
             self.say('thus, {}->{} pointers do not point to all particles at snapshot {}'.format(
-                z0, z, self[z + 'snapshot.index']))
+                z_ref, z, self[z + 'snapshot.index']))
             self.say('increasing size of reverse pointer array to accomodate missing particles')
             z_particle_number = pointers_valid.max() + 1
         else:
@@ -215,9 +219,9 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         # initialize pointer indices
         # set null values safely to negative, so will trip an index error if try to use
-        self[z + 'to.' + z0 + 'index'] = ut.array.get_array_null(z_particle_number)
-        self[z + 'to.' + z0 + 'index'][pointers_valid] = ut.array.get_arange(
-            self[z0 + 'to.' + z + 'index'].size)[masks_valid]
+        self[z + 'to.' + z_ref + 'index'] = ut.array.get_array_null(z_particle_number)
+        self[z + 'to.' + z_ref + 'index'][pointers_valid] = ut.array.get_arange(
+            self[z_ref + 'to.' + z + 'index'].size)[masks_valid]
 
     def add_intermediate_pointers(self, ParticlePointer):
         '''
@@ -732,7 +736,8 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
                 ParticlePointerZ2.add_intermediate_pointers(ParticlePointerZ1)
                 pointer_indices = ParticlePointerZ2.get_pointers(
-                    species_name, species_name, forward=forward, return_array=True, z_ref_name='zi')
+                    species_name, species_name, forward=forward, intermediate_z=True,
+                    return_array=True)
 
         return pointer_indices
 
@@ -788,7 +793,7 @@ def test_particle_pointers(part, part_z1, part_z2):
                 if np.max(masks):
                     print('z2->z0', spec_from, spec_to, np.sum(masks))
 
-        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all', z_ref_name='zi')
+        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all', intermediate_z=True)
         assert part_z1[spec_from]['id'].size == pointer_z2['index'].size
 
         for spec_to in ['star', 'gas']:
@@ -799,7 +804,8 @@ def test_particle_pointers(part, part_z1, part_z2):
                 if np.max(masks):
                     print('z1->z2', spec_from, spec_to, np.sum(masks))
 
-        pointer_z2 = part_z2.Pointer.get_pointers(spec_from, 'all', z_ref_name='zi', forward=True)
+        pointer_z2 = part_z2.Pointer.get_pointers(
+            spec_from, 'all', intermediate_z=True, forward=True)
         assert part_z2[spec_from]['id'].size == pointer_z2['index'].size
 
         for spec_to in ['star', 'gas']:

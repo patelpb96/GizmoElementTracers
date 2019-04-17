@@ -682,7 +682,7 @@ class ReadClass(ut.io.SayClass):
             if assign_host_orbits and ('velocity' in properties or properties is 'all'):
                 self.assign_host_orbits(part, 'star', part.host_positions, part.host_velocities)
 
-            if 'star' in species and (assign_formation_coordinates or assign_pointers):
+            if assign_formation_coordinates or assign_pointers:
                 from . import gizmo_track
                 if assign_formation_coordinates:
                     # assign coordinates wrt host galaxy at formation
@@ -691,9 +691,9 @@ class ReadClass(ut.io.SayClass):
                     ParticleCoordinate.io_formation_coordinates(part)
 
                 elif assign_pointers:
-                    # assign particle pointers from z = 0 to this snapshot
+                    # assign star and gas particle pointers from z = 0 to this snapshot
                     ParticlePointerIO = gizmo_track.ParticlePointerIOClass(
-                        'star', directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                        directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
                     ParticlePointerIO.io_pointers(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
