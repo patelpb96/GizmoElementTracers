@@ -281,7 +281,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         self.reference_snapshot_index = reference_snapshot_index
 
     def write_pointers_to_snapshots(
-        self, part=None, match_property='id.child', match_propery_tolerance=1e-6,
+        self, part_z0=None, match_property='id.child', match_propery_tolerance=1e-6,
         test_property='form.scalefactor', snapshot_indices=[], thread_number=1):
         '''
         Assign to each particle a pointer from its index at the reference (later) snapshot
@@ -291,7 +291,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at reference (later, z0) snapshot
+        part_z0 : dict : catalog of particles at reference (later, z0) snapshot
         match_property : str :
             some particles have the same id, so this is the property to use to match them.
             options (in order of preference): 'id.child', 'form.scalefactor', 'massfraction.metals'
@@ -302,7 +302,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         '''
         assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
-        if part is None:
+        if part_z0 is None:
             # read particles at reference snapshot (typically z = 0)
             # get list of properties relevant to use in matching
             properties_read = [self.id_name, 'id.child']
@@ -310,39 +310,40 @@ class ParticlePointerIOClass(ut.io.SayClass):
                 properties_read.append(match_property)
             if test_property and test_property not in properties_read:
                 properties_read.append(test_property)
-            part = self.Read.read_snapshots(
+            part_z0 = self.Read.read_snapshots(
                 self.species_names, 'index', self.reference_snapshot_index,
                 properties=properties_read, element_indices=[0], assign_host_coordinates=False,
                 check_properties=False)
 
         # older simulations do not have id.child - use abundance of total metals instead
-        if match_property == 'id.child' and 'id.child' not in part[self.species_names[0]]:
+        if match_property == 'id.child' and 'id.child' not in part_z0[self.species_names[0]]:
             self.say('input match_property = {} does not exist in snapshot {}'.format(
-                match_property, part.snapshot['index']))
+                match_property, part_z0.snapshot['index']))
             match_property = 'massfraction.metals'
             self.say('instead, using: {}'.format(match_property))
             if match_property not in properties_read:
                 properties_read.append(match_property)
-                part = self.Read.read_snapshots(
-                    self.species_names, 'redshift', 0, properties=properties_read,
-                    element_indices=[0], assign_host_coordinates=False, check_properties=False)
+                part_z0 = self.Read.read_snapshots(
+                    self.species_names, 'index', self.reference_snapshot_index,
+                    properties=properties_read, element_indices=[0], assign_host_coordinates=False,
+                    check_properties=False)
 
         for spec in self.species_names:
-            assert spec in part
-            assert part[spec].prop(match_property) is not None
+            assert spec in part_z0
+            assert part_z0[spec].prop(match_property) is not None
             if test_property and spec == 'star':
-                assert part[spec].prop(test_property) is not None
+                assert part_z0[spec].prop(test_property) is not None
 
         # get list of snapshot indices to assign
         if snapshot_indices is None or not len(snapshot_indices):
             snapshot_indices = np.arange(
-                min(part.Snapshot['index']), max(part.Snapshot['index']) + 1)
-        snapshot_indices = np.setdiff1d(snapshot_indices, part.snapshot['index'])  # skip current
+                min(part_z0.Snapshot['index']), max(part_z0.Snapshot['index']) + 1)
+        snapshot_indices = np.setdiff1d(snapshot_indices, part_z0.snapshot['index'])  # skip current
         snapshot_indices = snapshot_indices[::-1]  # work backwards in time
 
         # diagnostic
         pindices_mult = ut.particle.get_indices_by_id_uniqueness(
-            part, self.species_names, self.id_name, 'multiple')
+            part_z0, self.species_names, self.id_name, 'multiple')
         species_names_print = self.species_names[0]
         if len(self.species_names) > 1:
             for spec in self.species_names[1:]:
@@ -352,7 +353,8 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
         # assign pointers at reference snapshot from particle id to index in catalog
         ut.particle.assign_id_to_index(
-            part, self.species_names, self.id_name, store_as_dict=True, verbose=False)
+            part_z0, self.species_names, self.id_name, store_as_dict=True, verbose=False)
+        self.say('assigned id->index pointers at snapshot {}'.format(self.reference_snapshot_index))
 
         self.match_property = match_property
         self.match_propery_tolerance = match_propery_tolerance
@@ -374,9 +376,9 @@ class ParticlePointerIOClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices:
             if thread_number > 1:
                 pool.apply_async(
-                    self._write_pointers_to_snapshot, (part, snapshot_index, count))
+                    self._write_pointers_to_snapshot, (None, snapshot_index, count))
             else:
-                self._write_pointers_to_snapshot(part, snapshot_index, count)
+                self._write_pointers_to_snapshot(part_z0, snapshot_index, count)
 
         # close threads
         if thread_number > 1:
@@ -408,12 +410,22 @@ class ParticlePointerIOClass(ut.io.SayClass):
         snapshot_index : int : snapshot index to assign pointers to at the (earlier, z) snapshot
         count_tot : dict : diagnostic counters
         '''
+        properties_read = [self.id_name, self.match_property, self.test_property]
+
+        # if not input, read particles at reference (z0) snaphsot
+        if part_z0 is None:
+            part_z0 = self.Read.read_snapshots(
+                self.species_names, 'index', self.reference_snapshot_index,
+                properties=properties_read, element_indices=[0], assign_host_coordinates=False,
+                check_properties=False)
+            ut.particle.assign_id_to_index(
+                part_z0, self.species_names, self.id_name, store_as_dict=True, verbose=False)
+
         # read particles at this snapshot
         # need to do this to get the exact scale-factor of snapshot
         part_z = self.Read.read_snapshots(
-            self.species_names, 'index', snapshot_index,
-            properties=[self.id_name, self.match_property, self.test_property], element_indices=[0],
-            assign_host_coordinates=False, check_properties=False)
+            self.species_names, 'index', snapshot_index, properties=properties_read,
+            element_indices=[0], assign_host_coordinates=False, check_properties=False)
 
         # diagnostic
         species_names_print = self.species_names[0]
@@ -457,7 +469,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
             match_prop_no_match_number = 0
             for part_z_index, part_z_id in enumerate(part_z[spec][self.id_name]):
                 try:
-                    # can point to multiple particles at reference z0 snapshot
+                    # can point to multiple particles at reference (later, z0) snapshot
                     part_z0_list = part_z0.id_to_index[part_z_id]
                 except (IndexError, KeyError):
                     id_no_match_number += 1
