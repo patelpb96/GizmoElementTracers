@@ -375,6 +375,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
         for snapshot_index in snapshot_indices:
             if thread_number > 1:
+                # causes memory errors if try to pass part_z0, so instead re-read part_z0 per thread
                 pool.apply_async(
                     self._write_pointers_to_snapshot, (None, snapshot_index, count))
             else:
@@ -836,22 +837,21 @@ class ParticleCoordinateClass(ParticlePointerIOClass):
     '''
 
     def __init__(
-        self, species_name='star', id_name='id', directory=TRACK_DIRECTORY,
-        reference_snapshot_index=600, host_distance_limits=[0, 50]):
+        self, species_name='star', directory=TRACK_DIRECTORY, reference_snapshot_index=600,
+        host_distance_limits=[0, 50]):
         '''
         Parameters
         ----------
         species : str : name of particle species to track
         directory : str : directory to write files
-        id_name : str : dictionary key of id
         reference_snapshot_index : float :
             index of reference (later) snapshot to compute particle pointers from
         host_distance_limits : list :
             min and max distance [kpc physical] to select particles near the primary host[s] at the
             reference snapshot; use only these particles to find host center[s] at earlier snapshots
         '''
+        self.id_name = 'id'
         self.species_name = species_name
-        self.id_name = id_name
         self.directory = directory
         self.reference_snapshot_index = reference_snapshot_index
         self.host_distance_limits = host_distance_limits

@@ -687,7 +687,7 @@ class ReadClass(ut.io.SayClass):
                 if assign_formation_coordinates:
                     # assign coordinates wrt host galaxy at formation
                     ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
-                        'star', simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                        directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
                     ParticleCoordinate.io_formation_coordinates(part)
 
                 elif assign_pointers:
