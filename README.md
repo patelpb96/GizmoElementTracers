@@ -1,6 +1,20 @@
-This package should function either as a subfolder in your `$PYTHONPATH`, or by installing it with `setup.py develop` (which should place an egg.link to the source code in a place that whichever `python` you used to install it knows where to look.
+# Description
 
-## Instructions for installing as a package:  
+Python package for reading and analyzing Gizmo simulations.
+
+
+---
+# Requirements
+
+This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
+
+I develop this package using Python 3.7 and recommend that you use the same version.
+
+
+---
+This package functions either as a subfolder in your `$PYTHONPATH` or by installing it with `setup.py develop`, which should place an egg.link to the source code in a place that whichever `python` you used to install it knows where to look.
+
+## Instructions for installing as a package:
 
 1. create any directory $DIR
 2. clone gizmo_analysis into $DIR
@@ -42,19 +56,6 @@ That is, you should end up with `$DIR/gizmo_analysis/gizmo_xxx.py`, with `$DIR` 
 You'll then be able to import gizmo_analysis.<whatever>
 
 To update the repo, cd into $DIR/gizmo_analysis and run hg pull && hg update.
-
-
-# Description
-
-Python package for reading and analyzing Gizmo simulations.
-
-
----
-# Requirements
-
-This package relies on my [utilities/](https://bitbucket.org/sheagk/utilities) Python package for low-level utility functions.
-
-I develop this package using Python 3.7 and recommend that you use it too.
 
 
 ---
