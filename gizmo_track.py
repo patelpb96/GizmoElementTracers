@@ -997,6 +997,9 @@ class ParticleCoordinateClass(ParticlePointerIOClass):
         host_number : int : number of host galaxies to assign and compute coordinates relative to
         thread_number : int : number of threads for parallelization
         '''
+        # if 'elvis' is in simulation directory name, force 2 hosts
+        host_number = ut.catalog.get_host_number_from_directory(host_number, './', os)
+        
         if part_z0 is None:
             # read particles at z = 0
             part_z0 = self.Read.read_snapshots(

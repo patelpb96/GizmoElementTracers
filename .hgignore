@@ -1,0 +1,12 @@
+syntax: glob
+
+*.pyc
+*.origsyntax: glob
+*.pyc
+.*~
+*~
+.ipynb_checkpoints/*
+.ipy-logs/*
+ipy-logs/*
+*.orig
+.idea/

@@ -358,6 +358,18 @@ class ParticleDictionaryClass(dict):
             return 1000 * (self.prop('mass', indices, dict_only=True) /
                            self.prop('density', indices, dict_only=True)) ** (1 / 3)
 
+        # internal energy of the gas, from the temperature etc -- i.e., unwinding internal energy -> temperature conversion (needed by Phil's code)
+        if 'internal.energy' in property_name:
+            helium_mass_fracs = self.prop('massfraction.helium')
+            gas_eos = 5. / 3
+            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
+            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
+            molecular_weights = mus * ut.constant.proton_mass
+
+            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
+
+            return values
+
         # formation time or coordinates
         if (('form.' in property_name or property_name == 'age') and
                 'host' not in property_name and 'distance' not in property_name and
@@ -494,12 +506,14 @@ class ReadClass(ut.io.SayClass):
     Read Gizmo snapshot[s].
     '''
 
-    def __init__(self):
+    def __init__(self, snapshot_name_base='snap*[!txt]', quiet=False):
         '''
         Set properties for snapshot files.
         '''
         # this format avoids accidentally reading text file that contains snapshot indices
-        self.snapshot_name_base = 'snap*[!txt]'
+        self.snapshot_name_base = snapshot_name_base
+        if '*' not in self.snapshot_name_base:
+            self.snapshot_name_base += '*'
         self.file_extension = '.hdf5'
 
         self.gas_eos = 5 / 3  # assumed equation of state of gas
@@ -517,6 +531,9 @@ class ReadClass(ut.io.SayClass):
 
         self.species_all = tuple(self.species_dict.keys())
         self.species_read = list(self.species_all)
+
+        self.quiet = quiet
+        self.verbose = not quiet
 
     def read_snapshots(
         self, species='all',
@@ -601,18 +618,21 @@ class ReadClass(ut.io.SayClass):
         host_number = ut.catalog.get_host_number_from_directory(
             host_number, simulation_directory, os)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
 
         # read all input snapshots
         for snapshot_value in snapshot_values:
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
 
             # read header from snapshot file
             header = self.read_header(
                 'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name)
+
+            if not header['cosmological']:
+                header['scalefactor'] = 1.0
 
             # read particles from snapshot file[s]
             part = self.read_particles(
@@ -620,12 +640,12 @@ class ReadClass(ut.io.SayClass):
                 element_indices, convert_float32, header)
 
             # read/get (additional) cosmological parameters
-            if header['cosmological']:
-                part.Cosmology = self.get_cosmology(
-                    simulation_directory, header['omega_lambda'], header['omega_matter'],
-                    hubble=header['hubble'])
-                for spec_name in part:
-                    part[spec_name].Cosmology = part.Cosmology
+            # if header['cosmological']:
+            part.Cosmology = self.get_cosmology(
+                simulation_directory, header['omega_lambda'], header['omega_matter'],
+                hubble=header['hubble'])
+            for spec_name in part:
+                part[spec_name].Cosmology = part.Cosmology
 
             # adjust properties for each species
             self.adjust_particle_properties(
@@ -642,16 +662,27 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name].info = part.info
 
             # store information about snapshot time
-            time = part.Cosmology.get_time(header['redshift'], 'redshift')
-            part.snapshot = {
-                'index': snapshot_index,
-                'redshift': header['redshift'],
-                'scalefactor': header['scalefactor'],
-                'time': time,
-                'time.lookback': part.Cosmology.get_time(0) - time,
-                'time.hubble': (ut.constant.Gyr_per_sec /
-                                part.Cosmology.get_hubble_parameter(header['redshift'])),
-            }
+            if header['cosmological']:
+                time = part.Cosmology.get_time(header['redshift'], 'redshift')
+                part.snapshot = {
+                    'index': snapshot_index,
+                    'redshift': header['redshift'],
+                    'scalefactor': header['scalefactor'],
+                    'time': time,
+                    'time.lookback': part.Cosmology.get_time(0) - time,
+                    'time.hubble': (ut.constant.Gyr_per_sec /
+                                    part.Cosmology.get_hubble_parameter(header['redshift'])),
+                }
+            else:
+                part.snapshot = {
+                    'index': snapshot_index,
+                    'redshift': 0,
+                    'scalefactor': 1.0,
+                    'time': header['time'],
+                    'time.lookback': 0,
+                    'time.hubble': 13.6,
+                }
+
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
 
@@ -849,8 +880,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
         else:
             snapshot_index = snapshot_value
 
@@ -1033,8 +1064,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
+            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
         else:
             snapshot_index = snapshot_value
 
@@ -1059,10 +1090,15 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name] = ParticleDictionaryClass()
 
                 # set element pointers if reading only subset of elements
-                if (element_indices is not None and len(element_indices) and
-                        element_indices != 'all'):
+                if (element_indices is not None and len(str(element_indices)) and
+                        str(element_indices) != 'all'):
                     if np.isscalar(element_indices):
                         element_indices = [element_indices]
+
+                    # need hydrogen if calculating temperature
+                    if 'InternalEnergy' in properties and 1 not in element_indices:
+                        element_indices = np.r_[element_indices, 1]
+
                     for element_i, element_index in enumerate(element_indices):
                         part[spec_name].element_pointer[element_index] = element_i
 
@@ -1078,12 +1114,12 @@ class ReadClass(ut.io.SayClass):
                     for file_i in range(1, header['file.number.per.snapshot']):
                         file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
                         # try each snapshot file
-                        file_in_i = h5py.File(file_name_i, 'r')
-                        part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
-                        if part_numbers_in_file_i[spec_id] > 0:
-                            # found one
-                            part_in = file_in_i['PartType' + str(spec_id)]
-                            break
+                        with h5py.File(file_name_i, 'r') as file_in_i:
+                            part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
+                            if part_numbers_in_file_i[spec_id] > 0:
+                                # found one
+                                part_in = file_in_i['PartType' + str(spec_id)]
+                                break
                     else:
                         # tried all files and still did not find particles of species
                         raise OSError('no {} particles in any snapshot file'.format(spec_name))
@@ -1100,13 +1136,16 @@ class ReadClass(ut.io.SayClass):
                         elif len(part_in[prop_in].shape) == 2:
                             prop_shape = [part_number_tot, part_in[prop_in].shape[1]]
                             if (prop_in == 'Metallicity' and element_indices is not None and
-                                    element_indices != 'all'):
+                                    str(element_indices) != 'all'):
                                 prop_shape = [part_number_tot, len(element_indices)]
 
                         # determine data type to store
                         prop_in_dtype = part_in[prop_in].dtype
                         if convert_float32 and prop_in_dtype == 'float64':
                             prop_in_dtype = np.float32
+                        else:
+                            if prop == 'mass':
+                                prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec_name][prop] = np.zeros(prop_shape, prop_in_dtype) - 1
@@ -1175,7 +1214,7 @@ class ReadClass(ut.io.SayClass):
                                         part_in[prop_in])
                                 elif len(part_in[prop_in].shape) == 2:
                                     if (prop_in == 'Metallicity' and element_indices is not None and
-                                            element_indices != 'all'):
+                                            str(element_indices) != 'all'):
                                         prop_in = part_in[prop_in][:, element_indices]
                                     else:
                                         prop_in = part_in[prop_in]
@@ -1701,8 +1740,8 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-        snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
+        snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n\n')
