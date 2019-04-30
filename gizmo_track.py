@@ -14,6 +14,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
 '''
 
 from __future__ import absolute_import, division, print_function  # python 2 compatability
+import os
 import sys
 import collections
 import numpy as np
@@ -999,7 +1000,7 @@ class ParticleCoordinateClass(ParticlePointerIOClass):
         '''
         # if 'elvis' is in simulation directory name, force 2 hosts
         host_number = ut.catalog.get_host_number_from_directory(host_number, './', os)
-        
+
         if part_z0 is None:
             # read particles at z = 0
             part_z0 = self.Read.read_snapshots(

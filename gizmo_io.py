@@ -358,7 +358,8 @@ class ParticleDictionaryClass(dict):
             return 1000 * (self.prop('mass', indices, dict_only=True) /
                            self.prop('density', indices, dict_only=True)) ** (1 / 3)
 
-        # internal energy of the gas, from the temperature etc -- i.e., unwinding internal energy -> temperature conversion (needed by Phil's code)
+        # internal energy of the gas
+        # undo the conversion from internal energy -> temperature
         if 'internal.energy' in property_name:
             helium_mass_fracs = self.prop('massfraction.helium')
             gas_eos = 5. / 3
@@ -366,7 +367,10 @@ class ParticleDictionaryClass(dict):
             mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
             molecular_weights = mus * ut.constant.proton_mass
 
-            values = self.prop('temperature') / (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights / ut.constant.boltzmann)
+            values = (
+                self.prop('temperature') /
+                (ut.constant.centi_per_kilo ** 2 * (gas_eos - 1) * molecular_weights /
+                 ut.constant.boltzmann))
 
             return values
 
@@ -506,9 +510,14 @@ class ReadClass(ut.io.SayClass):
     Read Gizmo snapshot[s].
     '''
 
-    def __init__(self, snapshot_name_base='snap*[!txt]', quiet=False):
+    def __init__(self, snapshot_name_base='snap*[!txt]', verbose=True):
         '''
         Set properties for snapshot files.
+
+        Parameters
+        ----------
+        snapshot_name_base : str : name base of snapshot files/directories
+        verbose : bool : whether to print diagnostics
         '''
         # this format avoids accidentally reading text file that contains snapshot indices
         self.snapshot_name_base = snapshot_name_base
@@ -532,8 +541,7 @@ class ReadClass(ut.io.SayClass):
         self.species_all = tuple(self.species_dict.keys())
         self.species_read = list(self.species_all)
 
-        self.quiet = quiet
-        self.verbose = not quiet
+        self.verbose = verbose
 
     def read_snapshots(
         self, species='all',
@@ -618,14 +626,15 @@ class ReadClass(ut.io.SayClass):
         host_number = ut.catalog.get_host_number_from_directory(
             host_number, simulation_directory, os)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
 
         # read all input snapshots
         for snapshot_value in snapshot_values:
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
+            snapshot_index = Snapshot.parse_snapshot_values(
+                snapshot_value_kind, snapshot_value, self.verbose)
 
             # read header from snapshot file
             header = self.read_header(
@@ -880,8 +889,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+            snapshot_index = Snapshot.parse_snapshot_values(
+                snapshot_value_kind, snapshot_value, self.verbose)
         else:
             snapshot_index = snapshot_value
 
@@ -1064,8 +1074,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
-            snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+            snapshot_index = Snapshot.parse_snapshot_values(
+                snapshot_value_kind, snapshot_value, self.verbose)
         else:
             snapshot_index = snapshot_value
 
@@ -1143,9 +1154,8 @@ class ReadClass(ut.io.SayClass):
                         prop_in_dtype = part_in[prop_in].dtype
                         if convert_float32 and prop_in_dtype == 'float64':
                             prop_in_dtype = np.float32
-                        else:
-                            if prop == 'mass':
-                                prop_in_dtype = np.float64  #added by Kareem (and ported by SGK)
+                        #elif prop == 'mass':
+                        #    prop_in_dtype = np.float64  # added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec_name][prop] = np.zeros(prop_shape, prop_in_dtype) - 1
@@ -1740,8 +1750,9 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, quiet=self.quiet)
-        snapshot_index = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_value, verbose=not self.quiet)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+        snapshot_index = Snapshot.parse_snapshot_values(
+            snapshot_value_kind, snapshot_value, self.verbose)
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n\n')

@@ -365,7 +365,7 @@ class MassLossClass(ut.io.SayClass):
     '''
     Compute mass loss from all channels (supernova II, Ia, stellar winds) as implemented in Gizmo.
     '''
-    
+
     def __init__(self):
         self.SupernovaII = SupernovaIIClass()
         self.SupernovaIa = SupernovaIaClass()
@@ -373,7 +373,7 @@ class MassLossClass(ut.io.SayClass):
         self.Spline = None
 
         from os.path import expanduser
-        self.filename = expanduser('~')+'/.gizmo_mass_loss_spline.pkl'
+        self.filename = expanduser('~') + '/.gizmo_mass_loss_spline.pkl'
 
     def get_rate(
         self, ages, metallicity=1, metal_mass_fraction=None, ia_kind='mannucci', ia_age_min=37.53):
@@ -457,8 +457,8 @@ class MassLossClass(ut.io.SayClass):
     def _make_mass_loss_fraction_spline(
         self, age_limits=[1, 14000], age_bin_width=0.2,
         metallicity_limits=[0.01, 3], metallicity_bin_width=0.1,
-        ia_kind='mannucci', ia_age_min=37.53, 
-        force_remake=False, save_spline=True):
+        ia_kind='mannucci', ia_age_min=37.53,
+        force_remake=False, save_spline=False):
         '''
         Create 2-D bivariate spline (in age and metallicity) for fractional mass loss via
         all stellar evolution channels.
@@ -472,8 +472,7 @@ class MassLossClass(ut.io.SayClass):
         metallicity_bin_width : float : width of metallicity bin
         ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
         ia_age_min : float : minimum age for supernova Ia to occur [Myr]
-        force_remake : bool : force a recalculation of the spline, even if the file
-            that contains it exists
+        force_remake : bool : force a recalculation of the spline, even if file exists
         save_spline : bool : save the spline to a pickle file for rapid loading in the future
         '''
         from os.path import isfile
@@ -512,7 +511,7 @@ class MassLossClass(ut.io.SayClass):
         print("Saved spline as {}".format(self.filename))
 
     def _load_mass_fraction_spline(self):
-        import pickle,os
+        import pickle
         with open(self.filename, 'rb') as f:
             self.Spline = pickle.load(f)
             print("Loaded spline from {}".format(self.filename))
