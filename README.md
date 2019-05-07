@@ -29,7 +29,7 @@ In commands, that is:
 DIR=$HOME/code/wetzel/
 mkdir -p $DIR
 cd $DIR
-hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis
+hg clone ssh://hg@bitbucket.org/awetzel/gizmo_analysis
 cp gizmo_analysis/setup.py .
 python setup.py develop
 ```
@@ -48,14 +48,14 @@ DIR=$HOME/code/wetzel
 echo $PYTHONPATH=$DIR:$PYTHONPATH >> ~/.bashrc
 mkdir -p $DIR
 cd $DIR
-hg clone ssh://hg@bitbucket.org/sheagk/gizmo_analysis
+hg clone ssh://hg@bitbucket.org/awetzel/gizmo_analysis
 ```
 
 That is, you should end up with `$DIR/gizmo_analysis/gizmo_xxx.py`, with `$DIR` in your `$PYTHONPATH`
 
 You'll then be able to import gizmo_analysis.<whatever>
 
-To update the repo, cd into $DIR/gizmo_analysis and run hg pull && hg update.
+To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 
 
 ---
