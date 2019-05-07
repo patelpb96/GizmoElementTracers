@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 Diagnose Gizmo simulations.
@@ -6,7 +6,6 @@ Diagnose Gizmo simulations.
 @author: Andrew Wetzel <arwetzel@gmail.com>
 '''
 
-from __future__ import absolute_import, division, print_function
 import collections
 import os
 import sys

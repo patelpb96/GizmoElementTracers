@@ -12,7 +12,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
-from __future__ import absolute_import, division, print_function
 import collections
 import numpy as np
 from scipy import integrate

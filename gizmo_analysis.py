@@ -19,7 +19,6 @@ import numpy as np
 from numpy import Inf
 import matplotlib
 from matplotlib import pyplot as plt
-from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 # local ----

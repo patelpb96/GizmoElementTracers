@@ -1,11 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(name='gizmo_analysis',
-      version='0.1',
-      description="Andrew Wetzel's analysis package",
+      version='1.0',
+      description="gizmo analysis package",
       url="https://bitbucket.org/awetzel/gizmo_analysis",
-      author='Andrew Wetzel, packaged for personal use by SheaGK',
-      author_email='sheagk@gmail.com',
+      author='Andrew Wetzel, Shea Garrison-Kimmel',
+      author_email='arwetzel@gmail.com',
       license='MIT',
-      packages=find_packages(), 
-      zip_safe=False)
+      packages=find_packages(),
+      zip_safe=False,
+)
