@@ -14,7 +14,7 @@ import numpy as np
 # local ----
 import utilities as ut
 from . import gizmo_io
-from . import gizmo_analysis
+from . import gizmo_plot
 
 
 class RuntimeClass(ut.io.SayClass):
@@ -521,7 +521,7 @@ def print_properties_statistics(
         snapshot_directory, '', None, None, assign_host_coordinates=False,
         separate_dark_lowres=False, sort_dark_by_id=False)
 
-    gizmo_analysis.print_properties_statistics(part, species)
+    gizmo_plot.print_properties_statistics(part, species)
 
 
 def print_properties_snapshots(

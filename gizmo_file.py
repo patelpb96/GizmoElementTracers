@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 '''
-Edit gizmo snapshot files: compress, delete, transfer across machines.
+Edit Gizmo snapshot files: compress, delete, transfer across machines.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 '''
 
-from __future__ import absolute_import, division, print_function  # python 2 compatability
 import os
 import sys
 import glob

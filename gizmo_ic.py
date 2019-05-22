@@ -20,7 +20,7 @@ from scipy import spatial
 # local ----
 import utilities as ut
 from . import gizmo_io
-from rockstar_analysis import rockstar_io
+from halo_analysis import halo_io
 
 
 #===================================================================================================
@@ -61,7 +61,7 @@ class ReadClass(ut.io.SayClass):
         parts = self.read_particles()
 
         if 'dark2' in parts[0] and 'mass' in parts[0]['dark2'] and len(parts[0]['dark2']['mass']):
-            rockstar_io.Particle.assign_lowres_mass(hal, parts[0])
+            halo_io.Particle.assign_lowres_mass(hal, parts[0])
 
         return parts, hal
 
@@ -80,11 +80,11 @@ class ReadClass(ut.io.SayClass):
         -------
         hal : dictionary class : catalog of halos at final snapshot
         '''
-        hal = rockstar_io.IO.read_catalogs(
+        hal = halo_io.IO.read_catalogs(
             'redshift', self.snapshot_redshifts[0], self.simulation_directory, file_kind=file_kind)
 
         if assign_nearest_neighbor:
-            rockstar_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rneig', 8000)
+            halo_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rneig', 8000)
 
         return hal
 

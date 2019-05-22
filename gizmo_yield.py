@@ -1,5 +1,5 @@
 '''
-Analyze nucleosynthetic yields in Gizmo.
+Analyze nucleosynthetic yields in Gizmo simulations.
 
 @author: Andrew Wetzel
 

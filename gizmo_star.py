@@ -1,6 +1,6 @@
 '''
 Analyze stellar evolution, including supernova rates, stellar mass loss, nucleosynthetic yields,
-as implemented in Gizmo.
+as implemented in Gizmo simulations.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 

@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
-
 '''
-High-level analysis/plotting of particle data Gizmo simulations.
+Plotting analysis of particle data from Gizmo simulations.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
@@ -13,7 +11,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
-from __future__ import absolute_import, division, print_function  # python 2 compatability
 import collections
 import numpy as np
 from numpy import Inf
@@ -787,6 +784,75 @@ def plot_property_distribution(
     plot_name = ut.plot.get_file_name(
         property_name, 'distribution', species_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
+
+
+def plot_velocity_v_age(
+    part, species_name='star',
+    x_property_name='age', x_property_limits=[0, 13.5], x_property_bin_width=0.25,
+    x_property_scaling='linear',
+    y_property_limits=[0, 70], y_property_scaling='linear',
+    center_position=None,
+    part_indices=None,
+    write_plot=False, plot_directory='.', figure_index=1):
+    '''
+    '''
+    center_position = ut.particle.parse_property(part, 'center_position', center_position)
+
+    if part_indices is None or not len(part_indices):
+        part_indices = ut.array.get_arange(part[species_name].prop(x_property_name))
+
+    distances = part[species_name].prop('host.distance.principal.cylindridal', part_indices)
+    part_indices = ut.array.get_indices(distances[:, 0], [7, 9], part_indices)
+    part_indices = ut.array.get_indices(distances[:, 1], [-1, 1], part_indices)
+
+    y_prop_values = part[species_name].prop(
+        'host.velocity.principal.cylindrical', part_indices)[:, 1]
+
+    Bin = ut.binning.BinClass(
+        x_property_limits, x_property_bin_width, scaling=x_property_scaling)
+
+    ages = part[species_name].prop(x_property_name, part_indices)
+    ages_future = ages * 10 ** np.random.normal(0, 0.04, ages.size)
+    ages_now = ages * 10 ** np.random.normal(0, 0.08, ages.size)
+    ages_past = ages * 10 ** np.random.normal(0, 0.18, ages.size)
+
+    stat = Bin.get_statistics_of_array(ages, y_prop_values)
+    stat_future = Bin.get_statistics_of_array(ages_future, y_prop_values)
+    stat_now = Bin.get_statistics_of_array(ages_now, y_prop_values)
+    stat_past = Bin.get_statistics_of_array(ages_past, y_prop_values)
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot, x_property_scaling, x_property_limits, ages,
+        y_property_scaling, y_property_limits, y_prop_values)
+
+    if 'log' in x_property_scaling:
+        _x_prop_values = ut.math.get_log(ages)
+    if 'log' in y_property_scaling:
+        y_prop_values = ut.math.get_log(y_prop_values)
+
+    axis_x_label = ut.plot.Label.get_label(
+        x_property_name, species_name=species_name, get_words=True)
+    subplot.set_xlabel(axis_x_label)
+    subplot.set_ylabel('$\sigma_v$ [km/s]')
+
+    colors = ut.plot.get_colors(4)
+
+    stat_name = 'std'
+    subplot.plot(stat['bin.mid'], 0.5 * stat[stat_name], color='black', alpha=0.7,
+                 label='no age uncertainty')
+    subplot.plot(stat['bin.mid'], 0.5 * stat_future[stat_name], color=colors[1], alpha=0.7,
+                 label='10% age uncertainty')
+    subplot.plot(stat['bin.mid'], 0.5 * stat_now[stat_name], color=colors[2], alpha=0.7,
+                 label='20% age uncertainty')
+    subplot.plot(stat['bin.mid'], 0.5 * stat_past[stat_name], color=colors[3], alpha=0.7,
+                 label='50% age uncertainty')
+
+    ut.plot.make_legends(subplot)
+
+    ut.plot.parse_output(write_plot, 'test', plot_directory)
 
 
 def plot_property_v_property(
@@ -2345,9 +2411,9 @@ def explore_galaxy(
     write_plot : bool : whether to write figure to file
     plot_directory : str : directory to write figure file
     '''
-    from rockstar_analysis import rockstar_analysis
+    from halo_analysis import halo_plot
 
-    rockstar_analysis.print_properties(hal, hal_index)
+    halo_plot.print_properties(hal, hal_index)
 
     hi = hal_index
 

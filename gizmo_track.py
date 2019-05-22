@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Track particles across snapshots.
+Track particles across snapshots in Gizmo simulations.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
@@ -13,7 +13,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
-from __future__ import absolute_import, division, print_function  # python 2 compatability
 import os
 import sys
 import collections

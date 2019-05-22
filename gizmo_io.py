@@ -145,7 +145,6 @@ Some useful examples:
     etc
 '''
 
-from __future__ import absolute_import, division, print_function  # python 2 compatibility
 import os
 import collections
 import h5py
