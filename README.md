@@ -6,9 +6,56 @@ Python package for reading and analyzing Gizmo simulations.
 ---
 # Requirements
 
-This package relies on the [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
+python 3, numpy, scipy, h5py, matplotlib.
+
+This package also requires the [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
 We develop this package using Python 3.7 and recommend that you use the same version.
+
+
+---
+# Contents
+
+## gizmo_io.py
+* read Gizmo snapshot files
+
+## gizmo_plot.py
+* plotting analysis of particle data
+
+## gizmo_diagnostic.py
+* run diagnostics on simulations
+
+## gizmo_file.py
+* compress, delete, or transfer snapshot files across machines
+
+## gizmo_ic.py
+* generate cosmological zoom-in initial conditions from snapshot files
+
+## gizmo_star.py
+* get/plot rates of supernovae and stellar winds, stellar mass loss, overall abundance yields, as used in Gizmo
+
+## gizmo_track.py
+* track star and gas particles across snapshots
+
+## gizmo_yield.py
+* get/plot information about nucleosynthetic yields, as used in Gizmo
+
+## gizmo_tutorial.ipynb
+* jupyter notebook tutorial for using this package
+
+
+---
+# Units
+
+Unless otherwise noted, all quantities are in (or converted to during read-in) these units (and combinations thereof):
+
+* mass [M_sun]
+* position [kpc comoving]
+* distance, radius [kpc physical]
+* velocity [km / s]
+* time [Gyr]
+* elemental abundance [(linear) mass fraction]
+* metallicity [log10(mass_fraction / mass_fraction_solar)], assuming Asplund et al 2009 for Solar
 
 
 ---
@@ -58,51 +105,6 @@ That is, you should end up with `$DIR/gizmo_analysis/gizmo_xxx.py`, with `$DIR` 
 You then will be able to import gizmo_analysis.<whatever>
 
 To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
-
-
----
-# Contents
-
-## gizmo_io.py
-* read Gizmo snapshot files
-
-## gizmo_plot.py
-* plotting analysis of particle data
-
-## gizmo_diagnostic.py
-* run diagnostics on simulations
-
-## gizmo_file.py
-* compress, delete, or transfer snapshot files across machines
-
-## gizmo_ic.py
-* generate cosmological zoom-in initial conditions from snapshot files
-
-## gizmo_star.py
-* get/plot rates of supernovae and stellar winds, stellar mass loss, overall abundance yields, as used in Gizmo
-
-## gizmo_track.py
-* track star and gas particles across snapshots
-
-## gizmo_yield.py
-* get/plot information about nucleosynthetic yields, as used in Gizmo
-
-## gizmo_tutorial.ipynb
-* jupyter notebook tutorial for using this package
-
-
----
-# Units
-
-Unless otherwise noted, all quantities are in (or converted to during read-in) these units (and combinations thereof):
-
-* mass [M_sun]
-* position [kpc comoving]
-* distance, radius [kpc physical]
-* velocity [km / s]
-* time [Gyr]
-* elemental abundance [(linear) mass fraction]
-* metallicity [log10(mass_fraction / mass_fraction_solar)], assuming Asplund et al 2009 for Solar
 
 
 ---
