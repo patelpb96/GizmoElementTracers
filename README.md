@@ -6,12 +6,14 @@ Python package for reading and analyzing Gizmo simulations.
 ---
 # Requirements
 
-This package relies on my [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
+This package relies on the [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
-I develop this package using Python 3.7 and recommend that you use the same version.
+We develop this package using Python 3.7 and recommend that you use the same version.
 
 
 ---
+# Installing
+
 This package functions either as a subfolder in your `$PYTHONPATH` or by installing it with `setup.py develop`, which should place an egg.link to the source code in a place that whichever `python` you used to install it knows where to look.
 
 ## Instructions for installing as a package:
@@ -40,7 +42,7 @@ python setup.py develop
 2.  add $DIR to your `$PYTHONPATH`
 3.  clone gizmo_analysis into $DIR
 
-In commands, that'd be something like:
+In commands, that would be something like:
 ```
 #!bash
 
@@ -53,7 +55,7 @@ hg clone ssh://hg@bitbucket.org/awetzel/gizmo_analysis
 
 That is, you should end up with `$DIR/gizmo_analysis/gizmo_xxx.py`, with `$DIR` in your `$PYTHONPATH`
 
-You'll then be able to import gizmo_analysis.<whatever>
+You then will be able to import gizmo_analysis.<whatever>
 
 To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 
@@ -62,10 +64,10 @@ To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 # Contents
 
 ## gizmo_io.py
-* read snapshot files
+* read Gizmo snapshot files
 
-## gizmo_analysis.py
-* high-level analysis and plotting of particle data
+## gizmo_plot.py
+* plotting analysis of particle data
 
 ## gizmo_diagnostic.py
 * run diagnostics on simulations
@@ -80,13 +82,13 @@ To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 * get/plot rates of supernovae and stellar winds, stellar mass loss, overall abundance yields, as used in Gizmo
 
 ## gizmo_track.py
-* track particles across snapshots
+* track star and gas particles across snapshots
 
 ## gizmo_yield.py
 * get/plot information about nucleosynthetic yields, as used in Gizmo
 
 ## gizmo_tutorial.ipynb
-* ipython/jupyter notebook tutorial for using this package and reading particles from snapshots
+* jupyter notebook tutorial for using this package
 
 
 ---
@@ -106,9 +108,9 @@ Unless otherwise noted, all quantities are in (or converted to during read-in) t
 ---
 # License
 
-Copyright 2014-2019 by Andrew Wetzel <arwetzel@gmail.com>.
+Copyright 2014-2019 by Andrew Wetzel <arwetzel@gmail.com> and Shea Garrison-Kimmel <sheagk@gmail.com>.
 
-In summary, you are free to use, edit, share, and do whatever you want. But please keep me informed. Have fun!
+In summary, you are free to use, edit, share, and do whatever you want. But please keep us informed and report bugs. Have fun!
 
 Less succinctly, this software is governed by the MIT License:
 
