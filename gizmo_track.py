@@ -23,6 +23,8 @@ from . import gizmo_io
 
 # default directory to store particle tracking files
 TRACK_DIRECTORY = 'track/'
+# dictionary key of particle id in catalog
+ID_NAME = 'id'
 
 
 #===================================================================================================
@@ -34,7 +36,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
     for tracking star and gas particles across snapshots.
     '''
 
-    def __init__(self, part_z0=None, part_z=None, species_names=['star', 'gas'], id_name='id'):
+    def __init__(self, part_z0=None, part_z=None, species_names=['star', 'gas']):
         '''
         Given input particle catalogs, store summary info about snapshots and particle counts.
 
@@ -45,6 +47,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
         species_names : str or list : name[s] of particle species to track
         id_name : str : dictionary key of particle id
         '''
+        self.id_name = ID_NAME
         self.z0_name = 'z0.'  # prefactor name for reference (latest) snapshot
         self.z_name = 'z.'  # prefactor name for the earlier snapshot
         self.zi_name = 'zi.'  # prefactor name for an intermediate snapshot
@@ -61,17 +64,17 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
             self[z0 + 'particle.number'] = 0
             self[z + 'particle.number'] = 0
             for spec in species_names:
-                self[z0 + spec + '.number'] = part_z0[spec][id_name].size
+                self[z0 + spec + '.number'] = part_z0[spec][self.id_name].size
                 self[z0 + spec + '.index.limits'] = [
                     self[z0 + 'particle.number'],
-                    self[z0 + 'particle.number'] + part_z0[spec][id_name].size]
-                self[z0 + 'particle.number'] += part_z0[spec][id_name].size
+                    self[z0 + 'particle.number'] + part_z0[spec][self.id_name].size]
+                self[z0 + 'particle.number'] += part_z0[spec][self.id_name].size
 
-                self[z + spec + '.number'] = part_z[spec][id_name].size
+                self[z + spec + '.number'] = part_z[spec][self.id_name].size
                 self[z + spec + '.index.limits'] = [
                     self[z + 'particle.number'],
-                    self[z + 'particle.number'] + part_z[spec][id_name].size]
-                self[z + 'particle.number'] += part_z[spec][id_name].size
+                    self[z + 'particle.number'] + part_z[spec][self.id_name].size]
+                self[z + 'particle.number'] += part_z[spec][self.id_name].size
 
             self[z0 + 'snapshot.index'] = part_z0.snapshot['index']
             self[z + 'snapshot.index'] = part_z.snapshot['index']
@@ -260,22 +263,20 @@ class ParticlePointerIOClass(ut.io.SayClass):
     '''
 
     def __init__(
-        self, species_names=['star', 'gas'], id_name='id', directory=TRACK_DIRECTORY,
+        self, species_names=['star', 'gas'], directory=TRACK_DIRECTORY,
         reference_snapshot_index=600):
         '''
         Parameters
         ----------
         species_names : str or list : name[s] of particle species to track
-        id_name : str : dictionary key of particle id
         directory : str : directory where to read/write files
         reference_snapshot_index : int :
             index of reference (later) snapshot to compute particle pointers relative to
         '''
+        self.id_name = ID_NAME
         self.species_names = species_names
         if np.isscalar(self.species_names):
             self.species_names = [self.species_names]  # ensure is list
-
-        self.id_name = id_name
         self.directory = directory
         self.Read = gizmo_io.ReadClass()
         self.reference_snapshot_index = reference_snapshot_index
@@ -573,7 +574,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         part : dict : catalog of particles at a the (earlier, z) snapshot
         snapshot_index : int : index of the (earlier, z) snapshot to read
         ParticlePointer : dict class : particle pointer class (if writing)
-        directory : str: directory of file
+        directory : str : directory of file
 
         Returns
         -------
@@ -830,7 +831,7 @@ def test_particle_pointers(part, part_z1, part_z2):
                     print('z2->z1', spec_from, spec_to, np.sum(masks))
 
 
-class ParticleCoordinateClass(ParticlePointerIOClass):
+class ParticleCoordinateClass(ut.io.SayClass):
     '''
     Compute coordinates (3-D distances and 3-D velocities) wrt each primary host galaxy for all
     particles at the snapshot immediately after they form.
@@ -850,7 +851,7 @@ class ParticleCoordinateClass(ParticlePointerIOClass):
             min and max distance [kpc physical] to select particles near the primary host[s] at the
             reference snapshot; use only these particles to find host center[s] at earlier snapshots
         '''
-        self.id_name = 'id'
+        self.id_name = ID_NAME
         self.species_name = species_name
         self.directory = directory
         self.reference_snapshot_index = reference_snapshot_index
@@ -884,11 +885,14 @@ class ParticleCoordinateClass(ParticlePointerIOClass):
         if snapshot_index == part_z0.snapshot['index']:
             part_pointers = part_z0_indices
         else:
+            ParticlePointerIO = ParticlePointerIOClass(
+                directory=self.directory, reference_snapshot_index=self.reference_snapshot_index)
             try:
-                ParticlePointer = self.io_pointers(snapshot_index=snapshot_index)
+                ParticlePointer = ParticlePointerIO.io_pointers(snapshot_index=snapshot_index)
                 part_pointers = ParticlePointer.get_pointers(
                     self.species_name, self.species_name, return_array=True)
-            except Exception:
+            except IOError:
+                self.say('! can not read pointers to snapshot {}'.format(snapshot_index))
                 return
 
         part_z0_indices = part_z0_indices[part_pointers >= 0]

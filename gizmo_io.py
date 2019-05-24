@@ -1627,7 +1627,7 @@ class ReadClass(ut.io.SayClass):
         print()
 
     def assign_host_principal_axes(
-        self, part, species_name='star', distance_max=15, mass_percent=90, age_percent=30,
+        self, part, species_name='star', distance_max=10, mass_percent=90, age_percent=25,
         temperature_limits=[0, 1e4]):
         '''
         Assign rotation vectors of principal axes (via moment of inertia tensor) of host
