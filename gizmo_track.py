@@ -457,8 +457,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         }
 
         # dictionary class to store pointers and meta-data
-        ParticlePointer = ParticlePointerDictionaryClass(
-            part_z0, part_z, self.species_names, self.id_name)
+        ParticlePointer = ParticlePointerDictionaryClass(part_z0, part_z, self.species_names)
         pointer_index_name = ParticlePointer.pointer_index_name
         z = ParticlePointer.z_name
 
