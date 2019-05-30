@@ -60,7 +60,7 @@ class ReadClass(ut.io.SayClass):
         parts = self.read_particles()
 
         if 'dark2' in parts[0] and 'mass' in parts[0]['dark2'] and len(parts[0]['dark2']['mass']):
-            from halo_analysis import halo_i
+            from halo_analysis import halo_io
             halo_io.Particle.assign_lowres_mass(hal, parts[0])
 
         return parts, hal
