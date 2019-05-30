@@ -852,6 +852,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         '''
         self.id_name = ID_NAME
         self.species_name = species_name
+        assert np.isscalar(self.species_name)
         self.directory = directory
         self.reference_snapshot_index = reference_snapshot_index
         self.host_distance_limits = host_distance_limits

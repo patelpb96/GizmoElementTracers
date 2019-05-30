@@ -3,7 +3,7 @@
 '''
 Read Gizmo snapshots, intended for use with FIRE-2 simulations.
 
-@author: Andrew Wetzel <arwetzel@gmail.com>
+@author: Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>
 
 
 Units: unless otherwise noted, all quantities are in (combinations of):
