@@ -453,7 +453,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
             return
 
         pindices_mult = ut.particle.get_indices_by_id_uniqueness(
-            part_z, species_names_in_snapshot, self.id_name, 'multiple')
+            part_z, species_names_z, self.id_name, 'multiple')
 
         self.say('* {} {} particles have redundant id at snapshot {}'.format(
             pindices_mult.size, species_names_print, snapshot_index))
