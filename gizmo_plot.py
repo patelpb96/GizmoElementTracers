@@ -284,7 +284,7 @@ class ImageClass(ut.io.SayClass):
             weights = part[species_name].prop(weight_name, part_indices)
 
         center_position = ut.particle.parse_property(part, 'center_position', center_position)
-
+        
         if center_position is not None and len(center_position):
             # re-orient to input center
             positions -= center_position
@@ -332,7 +332,7 @@ class ImageClass(ut.io.SayClass):
             if weights is not None:
                 weights = weights[masks]
         else:
-            raise ValueError('need to input center position')
+            raise ValueError('need to input center_position')
 
         if distance_bin_width is not None and distance_bin_width > 0:
             position_bin_number = int(

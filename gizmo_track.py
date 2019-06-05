@@ -436,15 +436,18 @@ class ParticlePointerIOClass(ut.io.SayClass):
                 species_names_print += ' + {}'.format(spec)
 
         spec_count = 0
+        species_names_in_snapshot = []  # species that are in catalog at this snapshot
         for spec in self.species_names:
             if spec in part_z and len(part_z[spec][self.id_name]):
                 spec_count += 1
+                species_names_in_snapshot.append(spec)
+            else:
+                self.say('! no {} particles at snapshot {}'.format(spec, snapshot_index))
         if not spec_count:
-            self.say('! no {} particles at snapshot {}'.format(species_names_print, snapshot_index))
             return
 
         pindices_mult = ut.particle.get_indices_by_id_uniqueness(
-            part_z, self.species_names, self.id_name, 'multiple')
+            part_z, species_names_in_snapshot, self.id_name, 'multiple')
 
         self.say('* {} {} particles have redundant id at snapshot {}'.format(
             pindices_mult.size, species_names_print, snapshot_index))
@@ -457,11 +460,11 @@ class ParticlePointerIOClass(ut.io.SayClass):
         }
 
         # dictionary class to store pointers and meta-data
-        ParticlePointer = ParticlePointerDictionaryClass(part_z0, part_z, self.species_names)
+        ParticlePointer = ParticlePointerDictionaryClass(part_z0, part_z, species_names_in_snapshot)
         pointer_index_name = ParticlePointer.pointer_index_name
         z = ParticlePointer.z_name
 
-        for spec in self.species_names:
+        for spec in species_names_in_snapshot:
             # get particle index offest (non-zero if concatenating multiple species)
             total_index_offset = ParticlePointer[z + spec + '.index.limits'][0]
 
@@ -537,7 +540,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         else:
             # check using test property - only valid for stars!
             if (self.test_property and self.test_property != self.match_property and
-                    'star' in self.species_names and
+                    'star' in species_names_in_snapshot and
                     count['id no match'] == count['match prop no match'] == 0):
 
                 z_star_indices = ParticlePointer.get_pointers('star', 'star', return_array=True)
