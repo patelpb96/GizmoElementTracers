@@ -72,7 +72,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
                 # check that species is in particle catalog
                 # early snapshots may not have star particles
-                if spec in part_z and len(part_z[spec][self.id_name])
+                if spec in part_z and len(part_z[spec][self.id_name]):
                     self[z + spec + '.number'] = part_z[spec][self.id_name].size
                     self[z + spec + '.index.limits'] = [
                         self[z + 'particle.number'],
@@ -406,7 +406,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         if count['test prop offset']:
             self.say('! {} total have offset {}'.format(count['test prop offset'], test_property))
 
-    def _write_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot):
+    def _write_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot={}):
         '''
         Assign to each particle a pointer from its index at the reference (later, z0) snapshot
         to its index (and species name) at a (earlier, z) snapshot.
@@ -442,11 +442,11 @@ class ParticlePointerIOClass(ut.io.SayClass):
                 species_names_print += ' + {}'.format(spec)
 
         spec_count = 0
-        species_names_in_snapshot = []  # species that are in catalog at this snapshot
+        species_names_z = []  # species that are in catalog at this snapshot
         for spec in self.species_names:
             if spec in part_z and len(part_z[spec][self.id_name]):
                 spec_count += 1
-                species_names_in_snapshot.append(spec)
+                species_names_z.append(spec)
             else:
                 self.say('! no {} particles at snapshot {}'.format(spec, snapshot_index))
         if not spec_count:
@@ -470,7 +470,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         pointer_index_name = ParticlePointer.pointer_index_name
         z = ParticlePointer.z_name
 
-        for spec in species_names_in_snapshot:
+        for spec in species_names_z:
             # get particle index offest (non-zero if concatenating multiple species)
             total_index_offset = ParticlePointer[z + spec + '.index.limits'][0]
 
@@ -540,13 +540,13 @@ class ParticlePointerIOClass(ut.io.SayClass):
         # ensure same number of pointers from z0 to z as particles in snapshot at z
         if part_z0_total_indices.size != ParticlePointer[z + 'particle.number']:
             self.say('! {} {} particles at snapshot {},'.format(
-                ParticlePointer[z + 'particle.number'], species_names_print, snapshot_index))
+                ParticlePointer[z + 'particle.number'], species_names_z, snapshot_index))
             self.say('but matched to only {} particles at snapshot {}'.format(
                 part_z0_total_indices.size, part_z0.snapshot['index']))
         else:
             # check using test property - only valid for stars!
             if (self.test_property and self.test_property != self.match_property and
-                    'star' in species_names_in_snapshot and
+                    'star' in species_names_z and
                     count['id no match'] == count['match prop no match'] == 0):
 
                 z_star_indices = ParticlePointer.get_pointers('star', 'star', return_array=True)
