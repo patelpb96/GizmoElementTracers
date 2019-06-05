@@ -70,11 +70,17 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
                     self[z0 + 'particle.number'] + part_z0[spec][self.id_name].size]
                 self[z0 + 'particle.number'] += part_z0[spec][self.id_name].size
 
-                self[z + spec + '.number'] = part_z[spec][self.id_name].size
-                self[z + spec + '.index.limits'] = [
-                    self[z + 'particle.number'],
-                    self[z + 'particle.number'] + part_z[spec][self.id_name].size]
-                self[z + 'particle.number'] += part_z[spec][self.id_name].size
+                # check that species is in particle catalog
+                # early snapshots may not have star particles
+                if spec in part_z and len(part_z[spec][self.id_name])
+                    self[z + spec + '.number'] = part_z[spec][self.id_name].size
+                    self[z + spec + '.index.limits'] = [
+                        self[z + 'particle.number'],
+                        self[z + 'particle.number'] + part_z[spec][self.id_name].size]
+                    self[z + 'particle.number'] += part_z[spec][self.id_name].size
+                else:
+                    self[z + spec + '.number'] = 0
+                    self[z + spec + '.index.limits'] = [0, 0]
 
             self[z0 + 'snapshot.index'] = part_z0.snapshot['index']
             self[z + 'snapshot.index'] = part_z.snapshot['index']
@@ -460,7 +466,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         }
 
         # dictionary class to store pointers and meta-data
-        ParticlePointer = ParticlePointerDictionaryClass(part_z0, part_z, species_names_in_snapshot)
+        ParticlePointer = ParticlePointerDictionaryClass(part_z0, part_z, self.species_names)
         pointer_index_name = ParticlePointer.pointer_index_name
         z = ParticlePointer.z_name
 
