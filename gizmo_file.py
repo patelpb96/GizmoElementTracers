@@ -35,36 +35,36 @@ snapshot_indices_keep = [
 class CompressClass(ut.io.SayClass):
 
     def compress_snapshots(
-        self, directory='output', directory_out='', snapshot_index_limits=[0, 600],
-        thread_number=1):
-        '''
-        Compress all snapshots in input directory.
+            self, snapshot_directory='output', snapshot_directory_out='', snapshot_index_limits=[0, 600],
+            thread_number=1):
+            '''
+            Compress all snapshots in input directory.
 
-        Parameters
-        ----------
-        directory : str : directory of snapshots
-        directory_out : str : directory to write compressed snapshots
-        snapshot_index_limits : list : min and max snapshot indices to compress
-        syncronize : bool : whether to synchronize parallel tasks,
-            wait for each thread bundle to complete before starting new bundle
-        '''
-        snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+            Parameters
+            ----------
+            snapshot_directory : str : directory of snapshots
+            snapshot_directory_out : str : directory to write compressed snapshots
+            snapshot_index_limits : list : min and max snapshot indices to compress
+            syncronize : bool : whether to synchronize parallel tasks,
+                wait for each thread bundle to complete before starting new bundle
+            '''
+            snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-        args_list = [(directory, directory_out, snapshot_index)
-                     for snapshot_index in snapshot_indices]
+            args_list = [(snapshot_directory, snapshot_directory_out, snapshot_index)
+                        for snapshot_index in snapshot_indices]
 
-        ut.io.run_in_parallel(self.compress_snapshot, args_list, thread_number=thread_number)
+            ut.io.run_in_parallel(self.compress_snapshot, args_list, thread_number=thread_number)
 
     def compress_snapshot(
-        self, directory='output', directory_out='', snapshot_index=600,
+        self, snapshot_directory='output', snapshot_directory_out='', snapshot_index=600,
         analysis_directory='~/analysis', python_executable='python3'):
         '''
         Compress single snapshot (which may be multiple files) in input directory.
 
         Parameters
         ----------
-        directory : str : directory of snapshot
-        directory_out : str : directory to write compressed snapshot
+        snapshot_directory : str : directory of snapshot
+        snapshot_directory_out : str : directory to write compressed snapshot
         snapshot_index : int : index of snapshot
         analysis_directory : str : directory of analysis code
         '''
@@ -72,12 +72,12 @@ class CompressClass(ut.io.SayClass):
             python_executable, analysis_directory)
         snapshot_name_base = 'snap*_{:03d}*'
 
-        if directory[-1] != '/':
-            directory += '/'
-        if directory_out and directory_out[-1] != '/':
-            directory_out += '/'
+        if snapshot_directory[-1] != '/':
+            snapshot_directory += '/'
+        if snapshot_directory_out and snapshot_directory_out[-1] != '/':
+            snapshot_directory_out += '/'
 
-        path_file_names = glob.glob(directory + snapshot_name_base.format(snapshot_index))
+        path_file_names = glob.glob(snapshot_directory + snapshot_name_base.format(snapshot_index))
 
         if len(path_file_names):
             if 'snapdir' in path_file_names[0]:
@@ -86,8 +86,8 @@ class CompressClass(ut.io.SayClass):
             path_file_names.sort()
 
             for path_file_name in path_file_names:
-                if directory_out:
-                    path_file_name_out = path_file_name.replace(directory, directory_out)
+                if snapshot_directory_out:
+                    path_file_name_out = path_file_name.replace(snapshot_directory, snapshot_directory_out)
                 else:
                     path_file_name_out = path_file_name
 
@@ -424,7 +424,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
 
-        snapshot_index_max = 600
+        snapshot_index_limits = [0, 600]
         if len(sys.argv) > 3:
             snapshot_index_max = int(sys.argv[3])
             snapshot_index_limits = [0, snapshot_index_max]

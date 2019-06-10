@@ -621,9 +621,10 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
 
-        # if 'elvis' is in simulation directory name, force 2 hosts
-        host_number = ut.catalog.get_host_number_from_directory(
-            host_number, simulation_directory, os)
+        if assign_host_coordinates:
+            # if 'elvis' is in simulation directory name, force 2 hosts
+            host_number = ut.catalog.get_host_number_from_directory(
+                host_number, simulation_directory, os)
 
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
         snapshot_values = ut.array.arrayize(snapshot_values)
@@ -726,13 +727,13 @@ class ReadClass(ut.io.SayClass):
                 if assign_formation_coordinates:
                     # assign coordinates wrt host galaxy at formation
                     ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
-                        directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                        track_directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
                     ParticleCoordinate.io_formation_coordinates(part)
 
                 elif assign_pointers:
                     # assign star and gas particle pointers from z = 0 to this snapshot
                     ParticlePointerIO = gizmo_track.ParticlePointerIOClass(
-                        directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
+                        track_directory=simulation_directory + gizmo_track.TRACK_DIRECTORY)
                     ParticlePointerIO.io_pointers(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list

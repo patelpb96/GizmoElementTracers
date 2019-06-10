@@ -288,8 +288,9 @@ class ParticlePointerIOClass(ut.io.SayClass):
             self.species_names = [self.species_names]  # ensure is list
         self.track_directory = track_directory
         self.snapshot_directory = snapshot_directory
-        self.Read = gizmo_io.ReadClass()
         self.reference_snapshot_index = reference_snapshot_index
+
+        self.Read = gizmo_io.ReadClass()
 
     def write_pointers_to_snapshots(
         self, part_z0=None, match_property='id.child', match_propery_tolerance=1e-6,
@@ -352,7 +353,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
             snapshot_indices = np.arange(
                 min(part_z0.Snapshot['index']), max(part_z0.Snapshot['index']) + 1)
         snapshot_indices = np.setdiff1d(snapshot_indices, part_z0.snapshot['index'])  # skip current
-        snapshot_indices = snapshot_indices[::-1]  # work backwards in time
+        snapshot_indices = np.sort(snapshot_indices)[::-1]  # work backwards in time
 
         # diagnostic
         pindices_mult = ut.particle.get_indices_by_id_uniqueness(
