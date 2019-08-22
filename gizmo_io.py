@@ -1671,7 +1671,7 @@ class ReadClass(ut.io.SayClass):
 
         principal_axes = ut.particle.get_principal_axes(
             part, species_name, distance_max, mass_percent, age_percent,
-            center_positions=part.host_positions, return_array=False, print_results=False)
+            center_positions=part.host_positions, return_array=False, verbose=False)
 
         part.host_rotation_tensors = principal_axes['rotation.tensor']
         for spec_name in part:

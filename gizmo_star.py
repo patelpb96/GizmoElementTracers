@@ -167,11 +167,17 @@ class SupernovaIaClass:
         def get_rate(ages, kind):
             if kind == 'mannucci':
                 # Mannucci, Della Valle, & Panagia 2006
-                return 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((ages - 50) / 10) ** 2)  # [Myr ^ -1]
+                rate = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((ages - 50) / 10) ** 2)  # [Myr ^ -1]
             elif kind == 'maoz':
                 # Maoz & Graur 2017
-                return 2.5e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] best-fit volumetric
-                #return 6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] galaxy clusters
+                rate = 2.6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1], my compromise fit
+                # fit to volumetric, Hubble-time-integrated Ia N/M = 1.3 +/- 0.1 per 1000 Msun
+                #rate = 2.1e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] 
+                # fit to field galaxies, Hubble-time-integrated Ia N/M = 1.6 +/- 0.1 per 1000 Msun
+                #rate = 2.6e-7 * (ages / 1e3) ** -1.13  # [Myr ^ -1]
+                # fit to galaxy clusters, Hubble-time-integrated Ia N/M = 5.4 +/- 0.1 per 1000 Msun
+                #rate = 6.7e-7 * (ages / 1e3) ** -1.39  # [Myr ^ -1]
+            return rate
 
         assert ia_kind in ['mannucci', 'maoz']
 

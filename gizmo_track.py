@@ -290,7 +290,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
         self.snapshot_directory = snapshot_directory
         self.reference_snapshot_index = reference_snapshot_index
 
-        self.Read = gizmo_io.ReadClass()
+        self.GizmoRead = gizmo_io.ReadClass()
 
     def io_pointers(self, part=None, snapshot_index=None, ParticlePointer=None, track_directory=None):
         '''
@@ -515,7 +515,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
                 properties_read.append(match_property)
             if test_property and test_property not in properties_read:
                 properties_read.append(test_property)
-            part_z0 = self.Read.read_snapshots(
+            part_z0 = self.GizmoRead.read_snapshots(
                 self.species_names, 'index', self.reference_snapshot_index,
                 snapshot_directory=self.snapshot_directory,
                 properties=properties_read, element_indices=[0], assign_host_coordinates=False,
@@ -529,7 +529,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
             self.say('instead, using: {}'.format(match_property))
             if match_property not in properties_read:
                 properties_read.append(match_property)
-                part_z0 = self.Read.read_snapshots(
+                part_z0 = self.GizmoRead.read_snapshots(
                     self.species_names, 'index', self.reference_snapshot_index,
                     snapshot_directory=self.snapshot_directory,
                     properties=properties_read, element_indices=[0], assign_host_coordinates=False,
@@ -622,7 +622,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
         # if not input, read particles at reference (z0) snaphsot
         if part_z0 is None:
-            part_z0 = self.Read.read_snapshots(
+            part_z0 = self.GizmoRead.read_snapshots(
                 self.species_names, 'index', self.reference_snapshot_index,
                 snapshot_directory=self.snapshot_directory,
                 properties=properties_read, element_indices=[0], assign_host_coordinates=False,
@@ -632,7 +632,7 @@ class ParticlePointerIOClass(ut.io.SayClass):
 
         # read particles at this snapshot
         # need to do this to get the exact scale-factor of snapshot
-        part_z = self.Read.read_snapshots(
+        part_z = self.GizmoRead.read_snapshots(
             self.species_names, 'index', snapshot_index, snapshot_directory=self.snapshot_directory,
             properties=properties_read,
             element_indices=[0], assign_host_coordinates=False, check_properties=False)
@@ -879,7 +879,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         self.reference_snapshot_index = reference_snapshot_index
         self.host_distance_limits = host_distance_limits
 
-        self.Read = gizmo_io.ReadClass()
+        self.GizmoRead = gizmo_io.ReadClass()
 
         # set numpy data type to store coordinates
         self.coordinate_dtype = np.float32
@@ -960,7 +960,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         if part_z0 is None:
             # read particles at z = 0
-            part_z0 = self.Read.read_snapshots(
+            part_z0 = self.GizmoRead.read_snapshots(
                 self.species_name, 'index', self.reference_snapshot_index,
                 snapshot_directory=self.snapshot_directory,
                 properties=[self.id_name, 'position', 'velocity', 'mass', 'id.child',
@@ -1072,7 +1072,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         }
 
         if part_z0_indices.size > 0:
-            part_z = self.Read.read_snapshots(
+            part_z = self.GizmoRead.read_snapshots(
                 self.species_name, 'index', snapshot_index, 
                 snapshot_directory=self.snapshot_directory,
                 properties=[self.id_name, 'position', 'velocity', 'mass', 'form.scalefactor'],
@@ -1081,7 +1081,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             # limit the coordinates of progenitor[s] of primary host[s] to particles that are near
             # the primary host[s] at the reference snapshot
             hosts_part_z_indices = part_pointers[hosts_part_z0_indices]
-            self.Read.assign_host_coordinates(
+            self.GizmoRead.assign_host_coordinates(
                 part_z, self.species_name, hosts_part_z_indices[hosts_part_z_indices >= 0],
                 host_number=host_number)
 
@@ -1112,7 +1112,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 part_z.host_velocities)
 
             # compute rotation vectors for principal axes from young stars within R_90
-            self.Read.assign_host_principal_axes(part_z)
+            self.GizmoRead.assign_host_principal_axes(part_z)
 
             #galaxy_radius_max = 15  # [kpc physical]
             #principal_axes = ut.particle.get_principal_axes(

@@ -137,7 +137,8 @@ class InitialConditionClass(ut.io.SayClass):
     '''
 
     def write_initial_positions(
-        self, parts, center_position=None, distance_max=7, scale_to_halo_radius=True,
+        self, parts, center_position=None, host_index=0,
+        distance_max=7, scale_to_halo_radius=True,
         halo_radius=None, virial_kind='200m', region_kind='convex-hull', dark_mass=None):
         '''
         Select dark-matter particles at final snapshot, print their positions at initial snapshot.
@@ -153,6 +154,8 @@ class InitialConditionClass(ut.io.SayClass):
         ----------
         parts : list of dicts : catalogs of particles at final and initial snapshots
         center_position : list : center position at final snapshot
+        host_index : int : index of host halo to use to get position of 
+            (if not input center_position)
         distance_max : float : distance from center to select particles at final time
             [kpc physical or in units of R_halo]
         scale_to_halo_radius : bool : whether to scale distance to halo radius
@@ -196,12 +199,14 @@ class InitialConditionClass(ut.io.SayClass):
 
         self.say('using species: {}'.format(species))
 
-        center_position = ut.particle.parse_property(part_fin, 'center_position', center_position)
+        center_position = ut.particle.parse_property(
+            part_fin, 'center_position', center_position, host_index)
 
         if scale_to_halo_radius:
             if not halo_radius:
                 halo_prop = ut.particle.get_halo_properties(
-                    part_fin, 'all', virial_kind, center_position=center_position)
+                    part_fin, 'all', virial_kind, host_index=host_index, 
+                    center_position=center_position)
                 halo_radius = halo_prop['radius']
             distance_max *= halo_radius
 
@@ -365,7 +370,7 @@ class InitialConditionClass(ut.io.SayClass):
         halo_radius = hal['radius'][hal_index]
 
         self.write_initial_positions(
-            parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
+            parts, center_position, 0, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
             region_kind, dark_mass)
 
     def read_write_initial_positions_from_zoom(
@@ -400,7 +405,7 @@ class InitialConditionClass(ut.io.SayClass):
             parts[0], 'dark', method='center-of-mass', compare_centers=True)[0]
 
         self.write_initial_positions(
-            parts, center_position, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
+            parts, center_position, 0, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
             region_kind)
 
 

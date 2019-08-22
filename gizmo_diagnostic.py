@@ -234,7 +234,8 @@ class ContaminationClass(ut.io.SayClass):
     def plot_contamination_v_distance(
         self, part,
         distance_limits=[10, 2000], distance_bin_width=0.01, distance_scaling='log',
-        halo_radius=None, scale_to_halo_radius=False, center_position=None,
+        halo_radius=None, scale_to_halo_radius=False, 
+        center_position=None, host_index=0,
         axis_y_limits=[0.0001, 1], axis_y_scaling='log',
         write_plot=False, plot_directory='.', figure_index=1):
         '''
@@ -249,6 +250,7 @@ class ContaminationClass(ut.io.SayClass):
         halo_radius : float : radius of halo [kpc physical]
         scale_to_halo_radius : bool : whether to scale distance to halo_radius
         center_position : array : position of galaxy/halo center
+        host_index : int : index of host halo to get position of (if not input center_position)
         axis_y_limits : list : min and max limits for y-axis
         axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
         write_plot : bool : whether to write figure to file
@@ -257,7 +259,8 @@ class ContaminationClass(ut.io.SayClass):
         '''
         virial_kind = '200m'
 
-        center_position = ut.particle.parse_property(part, 'center_position', center_position)
+        center_position = ut.particle.parse_property(
+            part, 'center_position', center_position, host_index)
 
         if scale_to_halo_radius:
             assert halo_radius and halo_radius > 0
