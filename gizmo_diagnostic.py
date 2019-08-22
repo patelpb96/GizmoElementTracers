@@ -234,7 +234,7 @@ class ContaminationClass(ut.io.SayClass):
     def plot_contamination_v_distance(
         self, part,
         distance_limits=[10, 2000], distance_bin_width=0.01, distance_scaling='log',
-        halo_radius=None, scale_to_halo_radius=False, 
+        halo_radius=None, scale_to_halo_radius=False,
         center_position=None, host_index=0,
         axis_y_limits=[0.0001, 1], axis_y_scaling='log',
         write_plot=False, plot_directory='.', figure_index=1):

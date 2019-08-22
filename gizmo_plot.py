@@ -202,13 +202,13 @@ def plot_metal_v_distance(
 
 
 def plot_kernel(
-    kernel_kind='cubic', function_kinds=['density', 'mass', 'potential', 'acceleration'], 
-    distance_limits=[0, 1], distance_bin_width = 0.001, ratio_newtonian=False,
+    kernel_kind='cubic', function_kinds=['density', 'mass', 'potential', 'acceleration'],
+    distance_limits=[0, 1], distance_bin_width=0.001, ratio_newtonian=False,
     write_plot=False, plot_directory='.', figure_index=1):
     '''
     .
     '''
-    distances = np.arange(distance_bin_width, max(distance_limits) + distance_bin_width, 
+    distances = np.arange(distance_bin_width, max(distance_limits) + distance_bin_width,
                           distance_bin_width)
 
     kernel_values = np.zeros((len(function_kinds), distances.size))
@@ -326,7 +326,7 @@ class ImageClass(ut.io.SayClass):
 
         center_position = ut.particle.parse_property(
             part, 'center_position', center_position, host_index)
-        
+
         if center_position is not None and len(center_position):
             # re-orient to input center
             positions -= center_position
@@ -1323,7 +1323,8 @@ def print_densities(
 
         for spec_name in species_names:
             distances = ut.particle.get_distances_wrt_center(
-                part, spec_name, None, center_positions[part_i], rotation, host_index, 'cylindrical')
+                part, spec_name, None, center_positions[part_i], rotation, host_index,
+                'cylindrical')
 
             pis = None
             for dimen_i in range(len(distance_limitss)):
@@ -1504,7 +1505,7 @@ def plot_velocity_distribution_of_halo(
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
     center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
-    host_index : int : index of host galaxy/halo to get position and/or velocity of 
+    host_index : int : index of host galaxy/halo to get position and/or velocity of
         (if not input them)
     property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indicess : array or list of arrays : indices of particles from which to select
@@ -1780,8 +1781,8 @@ def plot_property_v_distance_halos(
                         part_indices = None
 
                     pro_hal = SpeciesProfile.get_profiles(
-                        part, species_name, property_name, property_statistic, weight_by_mass, 
-                        center_position=hal[position_kind][hal_i], 
+                        part, species_name, property_name, property_statistic, weight_by_mass,
+                        center_position=hal[position_kind][hal_i],
                         center_velocity=hal[velocity_kind][hal_i], part_indicess=part_indices)
 
                     pros_cat.append(pro_hal)
@@ -2070,7 +2071,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_scaling : str : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of distance to select star particles
         center_positions : list or list of lists : position[s] of galaxy centers [kpc comoving]
-        host_index : int : index of host galaxy/halo to get position of 
+        host_index : int : index of host galaxy/halo to get position of
             (if not input center_position)
         property_select : dict : properties to select on: names as keys and limits as values
         part_indicess : array : part_indices of particles from which to select
@@ -2498,7 +2499,7 @@ def explore_galaxy(
 
             plot_property_distribution(
                 part, 'star', 'velocity.total', [0, None], 2, None, 'linear', 'histogram',
-                [], hal.prop('star.position', hi), hal.prop('star.velocity', hi), 0, {}, 
+                [], hal.prop('star.position', hi), hal.prop('star.velocity', hi), 0, {},
                 part_indices, [0, None], 'linear', write_plot, plot_directory, figure_index=12)
 
             try:
@@ -2510,7 +2511,7 @@ def explore_galaxy(
             plot_property_distribution(
                 part, 'star', element_name, [-4, 1], 0.1, None, 'linear', 'histogram',
                 part_indicess=part_indices,
-                axis_y_limits=[0, None], axis_y_scaling='linear', write_plot=write_plot, 
+                axis_y_limits=[0, None], axis_y_scaling='linear', write_plot=write_plot,
                 plot_directory=plot_directory, figure_index=13)
 
             plot_property_v_distance(
@@ -2546,8 +2547,8 @@ def explore_galaxy(
                 write_plot=write_plot, plot_directory=plot_directory, figure_index=17)
 
             StarFormHistory.plot_star_form_history(
-                part, 'mass.normalized', 'time.lookback', [13.6, 0], 0.2, 'linear', 
-                part_indicess=part_indices, sfh_limits=[0, 1], sfh_scaling='linear', 
+                part, 'mass.normalized', 'time.lookback', [13.6, 0], 0.2, 'linear',
+                part_indicess=part_indices, sfh_limits=[0, 1], sfh_scaling='linear',
                 write_plot=write_plot, plot_directory=plot_directory, figure_index=18)
 
         if 'dark' in species_plot and 'dark' in part:

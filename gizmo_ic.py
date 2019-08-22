@@ -154,7 +154,7 @@ class InitialConditionClass(ut.io.SayClass):
         ----------
         parts : list of dicts : catalogs of particles at final and initial snapshots
         center_position : list : center position at final snapshot
-        host_index : int : index of host halo to use to get position of 
+        host_index : int : index of host halo to use to get position of
             (if not input center_position)
         distance_max : float : distance from center to select particles at final time
             [kpc physical or in units of R_halo]
@@ -205,7 +205,7 @@ class InitialConditionClass(ut.io.SayClass):
         if scale_to_halo_radius:
             if not halo_radius:
                 halo_prop = ut.particle.get_halo_properties(
-                    part_fin, 'all', virial_kind, host_index=host_index, 
+                    part_fin, 'all', virial_kind, host_index=host_index,
                     center_position=center_position)
                 halo_radius = halo_prop['radius']
             distance_max *= halo_radius

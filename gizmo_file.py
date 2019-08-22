@@ -35,8 +35,8 @@ snapshot_indices_keep = [
 class CompressClass(ut.io.SayClass):
 
     def compress_snapshots(
-            self, snapshot_directory='output', snapshot_directory_out='', snapshot_index_limits=[0, 600],
-            thread_number=1):
+            self, snapshot_directory='output', snapshot_directory_out='',
+            snapshot_index_limits=[0, 600], thread_number=1):
             '''
             Compress all snapshots in input directory.
 
@@ -51,7 +51,7 @@ class CompressClass(ut.io.SayClass):
             snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
             args_list = [(snapshot_directory, snapshot_directory_out, snapshot_index)
-                        for snapshot_index in snapshot_indices]
+                         for snapshot_index in snapshot_indices]
 
             ut.io.run_in_parallel(self.compress_snapshot, args_list, thread_number=thread_number)
 
@@ -87,7 +87,8 @@ class CompressClass(ut.io.SayClass):
 
             for path_file_name in path_file_names:
                 if snapshot_directory_out:
-                    path_file_name_out = path_file_name.replace(snapshot_directory, snapshot_directory_out)
+                    path_file_name_out = path_file_name.replace(
+                        snapshot_directory, snapshot_directory_out)
                 else:
                     path_file_name_out = path_file_name
 
