@@ -588,9 +588,9 @@ class ReadClass(ut.io.SayClass):
         assign_host_coordinates : bool :
             whether to assign position[s] and velocity[s] of host galaxy/halo[s]
         assign_host_principal_axes : bool :
-            whether to assign principal axes rotation tensor[s] of host galaxy[s]/halo[s]
+            whether to assign principal axes rotation tensor[s] of host galaxy/halo[s]
         assign_host_orbits : booelan :
-            whether to assign orbital properties wrt host galaxy[s]/halo[s]
+            whether to assign orbital properties wrt host galaxy/halo[s]
         assign_formation_coordinates : bool :
             whether to assign coordindates wrt the host galaxy at formation to stars
         assign_pointers : bool :
@@ -700,7 +700,7 @@ class ReadClass(ut.io.SayClass):
             for spec_name in part:
                 part[spec_name].Snapshot = part.Snapshot
 
-            # initialize arrays to store position[s] and velocity[s] of host galaxy[s]/halo[s]
+            # initialize arrays to store position[s] and velocity[s] of host galaxy/halo[s]
             # store both single 'default' host and array of hosts (for LG-like pairs)
             part.host_positions = []
             part.host_velocities = []
@@ -718,7 +718,7 @@ class ReadClass(ut.io.SayClass):
             if assign_host_coordinates and assign_host_principal_axes:
                 self.assign_host_principal_axes(part)
 
-            # store orbital properties wrt host galaxy[s]/halo[s]
+            # store orbital properties wrt host galaxy/halo[s]
             if assign_host_orbits and ('velocity' in properties or properties is 'all'):
                 self.assign_host_orbits(part, 'star', part.host_positions, part.host_velocities)
 
@@ -748,7 +748,8 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots_simulations(
         self, species='all', snapshot_value_kind='index', snapshot_value=600,
         simulation_directories=[], snapshot_directory='output/',
-        properties='all', element_indices=[0, 1, 6, 10], assign_host_principal_axes=False):
+        properties='all', element_indices=[0, 1, 6, 10], assign_host_principal_axes=False, 
+        assign_host_orbits=False):
         '''
         Read snapshots at the same redshift from different simulations.
         Return as list of dictionaries.
@@ -765,7 +766,9 @@ class ReadClass(ut.io.SayClass):
         properties : str or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
         assign_host_principal_axes : bool :
-            whether to assign principal axes rotation tensor[s] of host galaxy[s]/halo[s]
+            whether to assign principal axes rotation tensor[s] of host galaxy/halo[s]
+        assign_host_orbits : booelan :
+            whether to assign orbital properties wrt host galaxy/halo[s]
 
         Returns
         -------
@@ -815,7 +818,7 @@ class ReadClass(ut.io.SayClass):
                 part = None
 
             if part is not None:
-                if 'velocity' in properties:
+                if assign_host_orbits and 'velocity' in properties:
                     self.assign_host_orbits(part, 'gas')
 
                 parts.append(part)
@@ -1567,8 +1570,7 @@ class ReadClass(ut.io.SayClass):
     def assign_host_coordinates(
         self, part, species_name='', part_indices=None, method='center-of-mass', host_number=1):
         '''
-        Assign center position[s] [kpc comoving] and velocity[s] [km / s] wrt host
-        galaxy[s]/halo[s].
+        Assign center position[s] [kpc comoving] and velocity[s] [km / s] wrt host galaxy/halo[s].
         Use species_name, if defined, else default to stars for baryonic simulation or
         dark matter for dark matter-only simulation.
 
@@ -1633,7 +1635,7 @@ class ReadClass(ut.io.SayClass):
         temperature_limits=[0, 1e4]):
         '''
         Assign rotation vectors of principal axes (via moment of inertia tensor) of host
-        galaxy[s]/halo[s], using stars for baryonic simulations.
+        galaxy/halo[s], using stars for baryonic simulations.
 
         Parameters
         ----------
@@ -1650,7 +1652,7 @@ class ReadClass(ut.io.SayClass):
                 species_name))
             return
 
-        self.say('* assigning principal axes of host galaxy[s]/halo[s]:')
+        self.say('* assigning principal axes of host galaxy/halo[s]:')
         self.say('using {} particles at distance < {} kpc'.format(species_name, distance_max))
 
         if mass_percent:
@@ -1688,7 +1690,7 @@ class ReadClass(ut.io.SayClass):
 
     def assign_host_orbits(self, part, species=[], host_positions=None, host_velocities=None):
         '''
-        Assign derived orbital properties wrt single center to species.
+        Assign derived orbital properties wrt single center to particle species.
 
         Parameters
         ----------

@@ -3086,7 +3086,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         from . import gizmo_io
         self.Read = gizmo_io.ReadClass()
 
-        self.properties = ['mass', 'position', 'velocity', 'form.scalefactor', 'massfraction']
+        self.properties = ['mass', 'position', 'form.scalefactor', 'massfraction']
 
         self.galaxy_radius_limits = galaxy_radius_limits
         self.galaxy_profile_radius_limits = galaxy_profile_radius_limits
