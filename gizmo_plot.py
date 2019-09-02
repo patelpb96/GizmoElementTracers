@@ -3182,8 +3182,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             for spec in ut.array.get_list_combined(species, parts[0], 'intersect'):
                 for part in parts:
                     gal = ut.particle.get_galaxy_properties(
-                        part, spec, 'mass.percent', mass_fraction, 'both', distance_max, 
-                        rotation_distance_max=distance_max)
+                        part, spec, 'mass.percent', mass_fraction, 'both', distance_max)
                     gals.append(gal)
 
                 self.say('\n# species = {}'.format(spec))
