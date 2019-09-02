@@ -2773,7 +2773,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
         for spec in species:
             for mass_percent in mass_percents:
                 gal_prop = ut.particle.get_galaxy_properties(
-                    part, spec, 'mass.percent', mass_percent, star_distance_max)
+                    part, spec, 'mass.percent', mass_percent, distance_max=star_distance_max)
                 k = '{}.radius.{:.0f}'.format(spec, mass_percent)
                 gal[k].append(gal_prop['radius'])
                 k = '{}.mass.{:.0f}'.format(spec, mass_percent)
@@ -2967,7 +2967,8 @@ def get_galaxy_mass_profiles_v_redshift(
 
         # get radius_90 as fiducial
         gal_90 = ut.particle.get_galaxy_properties(
-            part, profile_species_name, 'mass.percent', mass_percent, star_distance_max)
+            part, profile_species_name, 'mass.percent', mass_percent, 
+            distance_max=star_distance_max)
 
         principal_axes = ut.particle.get_principal_axes(
             part, profile_species_name, gal_90['radius'])
@@ -2979,20 +2980,21 @@ def get_galaxy_mass_profiles_v_redshift(
             mass_percent_name = '{:.0f}'.format(mass_percent)
 
             gal = ut.particle.get_galaxy_properties(
-                part, profile_species_name, 'mass.percent', mass_percent, star_distance_max)
+                part, profile_species_name, 'mass.percent', mass_percent, 
+                distance_max=star_distance_max)
             gal['radius.3d.' + mass_percent_name].append(gal['radius'])
             gal['mass.3d.' + mass_percent_name].append(gal['mass'])
 
             gal_minor = ut.particle.get_galaxy_properties(
-                part, profile_species_name, 'mass.percent', mass_percent, star_distance_max,
-                axis_kind='minor', rotation_tensor=principal_axes['rotation.tensor'],
+                part, profile_species_name, 'mass.percent', mass_percent, 'minor', 
+                star_distance_max, rotation_tensor=principal_axes['rotation.tensor'],
                 other_axis_distance_limits=[0, gal_90['radius']])
             gal['radius.minor.' + mass_percent_name].append(gal_minor['radius'])
             gal['mass.minor.' + mass_percent_name].append(gal_minor['mass'])
 
             gal_major = ut.particle.get_galaxy_properties(
-                part, profile_species_name, 'mass.percent', mass_percent, star_distance_max,
-                axis_kind='major', rotation_tensor=principal_axes['rotation.tensor'],
+                part, profile_species_name, 'mass.percent', mass_percent, 'major', 
+                star_distance_max, rotation_tensor=principal_axes['rotation.tensor'],
                 other_axis_distance_limits=[0, gal_minor['radius']])
             gal['radius.major.' + mass_percent_name].append(gal_major['radius'])
             gal['mass.major.' + mass_percent_name].append(gal_major['radius'])
@@ -3084,7 +3086,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         from . import gizmo_io
         self.Read = gizmo_io.ReadClass()
 
-        self.properties = ['mass', 'position', 'form.scalefactor', 'massfraction']
+        self.properties = ['mass', 'position', 'velocity', 'form.scalefactor', 'massfraction']
 
         self.galaxy_radius_limits = galaxy_radius_limits
         self.galaxy_profile_radius_limits = galaxy_profile_radius_limits
@@ -3180,8 +3182,8 @@ class CompareSimulationsClass(ut.io.SayClass):
             for spec in ut.array.get_list_combined(species, parts[0], 'intersect'):
                 for part in parts:
                     gal = ut.particle.get_galaxy_properties(
-                        part, spec, 'mass.percent', mass_fraction, distance_max,
-                        axis_kind='both', rotation_distance_max=distance_max)
+                        part, spec, 'mass.percent', mass_fraction, 'both', distance_max, 
+                        rotation_distance_max=distance_max)
                     gals.append(gal)
 
                 self.say('\n# species = {}'.format(spec))

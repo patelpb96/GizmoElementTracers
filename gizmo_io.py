@@ -792,7 +792,7 @@ class ReadClass(ut.io.SayClass):
                 _header = self.read_header(
                     snapshot_value_kind, snapshot_value, simulation_directory, snapshot_directory,
                     simulation_name)
-            except Exception:
+            except IOError:
                 self.say('! could not read snapshot header at {} = {:.3f} in {}'.format(
                          snapshot_value_kind, snapshot_value, simulation_directory))
                 bad_snapshot_value += 1
@@ -809,16 +809,17 @@ class ReadClass(ut.io.SayClass):
                     species, snapshot_value_kind, snapshot_value, directory,
                     snapshot_directory, simulation_name, properties, element_indices,
                     assign_host_principal_axes=assign_host_principal_axes)
+            except IOError:
+                self.say('! could not read snapshot at {} = {} in {}'.format(
+                         snapshot_value_kind, snapshot_value, directory))
+                part = None
 
+            if part is not None:
                 if 'velocity' in properties:
                     self.assign_host_orbits(part, 'gas')
 
                 parts.append(part)
                 directories_read.append(directory)
-
-            except Exception:
-                self.say('! could not read snapshot at {} = {} in {}'.format(
-                         snapshot_value_kind, snapshot_value, directory))
 
         if not len(parts):
             self.say('! could not read any snapshots at {} = {}'.format(
