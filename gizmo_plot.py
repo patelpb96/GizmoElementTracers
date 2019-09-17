@@ -1398,7 +1398,7 @@ def plot_disk_orientation(
         # compute reference principal axes using all stars out to distance_ref
         principal_axes = ut.particle.get_principal_axes(
             part, 'star', distance_ref, age_limits=[0, 1], center_position=center_positions[part_i],
-            host_index=host_index, print_results=False)
+            host_index=host_index, verbose=False)
         axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation.tensor'])
         #axis_rotation_ref = np.dot(orientation_axis, part['star'].host_rotation_tensors[0])
 
@@ -1423,7 +1423,7 @@ def plot_disk_orientation(
 
                 principal_axes = ut.particle.get_principal_axes(
                     part, spec_name, distance_max, center_position=center_positions[part_i],
-                    host_index=host_index, part_indicess=part_indices, print_results=False)
+                    host_index=host_index, part_indicess=part_indices, verbose=False)
 
                 # get orientation of axis of interest
                 axis_rotation = np.dot(orientation_axis, principal_axes['rotation.tensor'])
