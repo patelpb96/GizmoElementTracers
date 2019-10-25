@@ -17,11 +17,26 @@ import numpy as np
 import utilities as ut
 
 
+# elemental abundances (mass fraction) of the Sun that Gizmo assumes
+sun_massfraction = {}
+sun_massfraction['metals'] = 0.02  # total metal mass fraction
+sun_massfraction['helium'] = 0.28
+sun_massfraction['carbon'] = 3.26e-3
+sun_massfraction['nitrogen'] = 1.32e-3
+sun_massfraction['oxygen'] = 8.65e-3
+sun_massfraction['neon'] = 2.22e-3
+sun_massfraction['magnesium'] = 9.31e-4
+sun_massfraction['silicon'] = 1.08e-3
+sun_massfraction['sulphur'] = 6.44e-4
+sun_massfraction['calcium'] = 1.01e-4
+sun_massfraction['iron'] = 1.73e-3
+
+
 #===================================================================================================
 # nucleosynthetic yields
 #===================================================================================================
 def get_nucleosynthetic_yields(
-    event_kind='supernova.ii', star_metallicity=1.0, normalize=True):
+    event_kind='supernova.ii', star_metallicity=1.0, star_massfraction={}, normalize=True):
     '''
     Get nucleosynthetic element yields, according to input event_kind.
     Note: this only returns the *additional* nucleosynthetic yields that Gizmo adds to the
@@ -31,7 +46,10 @@ def get_nucleosynthetic_yields(
     ----------
     event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float :
-        total metallicity of star prior to event, relative to solar (sun_metal_mass_fraction)
+        total metallicity of star prior to event, 
+        fraction relative to solar (solar = sun_metal_mass_fraction)
+    star_massfraction : dict : dictionary of elemental mass fractions in star
+        need to input this to get higher-order correction of yields
     normalize : bool : whether to normalize yields to be mass fractions (instead of masses)
 
     Returns
@@ -39,8 +57,6 @@ def get_nucleosynthetic_yields(
     yields : ordered dictionary : yield mass [M_sun] or mass fraction for each element
         can covert to regular dictionary via dict(yields) or list of values via yields.values()
     '''
-    sun_metal_mass_fraction = 0.02  # total metal mass fraction of sun that Gizmo assumes
-
     yield_dict = collections.OrderedDict()
     yield_dict['metals'] = 0.0
     yield_dict['helium'] = 0.0
@@ -56,7 +72,13 @@ def get_nucleosynthetic_yields(
 
     assert event_kind in ['wind', 'supernova.ii', 'supernova.ia']
 
-    star_metal_mass_fraction = star_metallicity * sun_metal_mass_fraction
+    if len(star_massfraction):
+        # input full array of stellar elemental mass fractions
+        for element_name in yield_dict:
+            assert element_name in star_massfraction
+        star_metal_mass_fraction = star_massfraction['metals']
+    else:
+        star_metal_mass_fraction = star_metallicity * sun_massfraction['metals']
 
     if event_kind == 'wind':
         # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
@@ -70,10 +92,11 @@ def get_nucleosynthetic_yields(
 
         # oxygen yield strongly depends on initial metallicity of star
         if star_metal_mass_fraction < 0.033:
-            yield_dict['oxygen'] *= star_metal_mass_fraction / sun_metal_mass_fraction
+            yield_dict['oxygen'] *= star_metal_mass_fraction / sun_massfraction['metals']
         else:
             yield_dict['oxygen'] *= 1.65
 
+        # sum total metal mass (not including hydrogen or helium)
         for k in yield_dict:
             if k is not 'helium':
                 yield_dict['metals'] += yield_dict[k]
@@ -98,16 +121,15 @@ def get_nucleosynthetic_yields(
         yield_dict['calcium'] = 0.00458  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
         yield_dict['iron'] = 0.0741
 
-        yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
+        #yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
 
         # nitrogen yield strongly depends on initial metallicity of star
         if star_metal_mass_fraction < 0.033:
-            yield_dict['nitrogen'] *= star_metal_mass_fraction / sun_metal_mass_fraction
+            yield_dict['nitrogen'] *= star_metal_mass_fraction / sun_massfraction['metals']
         else:
             yield_dict['nitrogen'] *= 1.65
-
-        # correct total metal mass for nitrogen correction
-        yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
+        # correct total metal mass for nitrogen
+        #yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
@@ -128,6 +150,18 @@ def get_nucleosynthetic_yields(
         yield_dict['calcium'] = 0.012
         yield_dict['iron'] = 0.743
 
+    if len(star_massfraction):
+        # enforce that yields obey pre-existing surface abundances
+        # allow for larger abundances in the progenitor star - usually irrelevant
+        pure_mass_fraction = 1 - star_metal_mass_fraction
+        for element_name in yield_dict:
+            if yield_dict[element_name] > 0:
+                # apply yield only to non-metal mass of star
+                yield_dict[element_name] *= pure_mass_fraction
+                yield_dict[element_name] += (star_massfraction[element_name] -
+                                             sun_massfraction[element_name])
+                yield_dict[element_name] = np.clip(yield_dict[element_name], 0, 1)
+
     if normalize:
         for k in yield_dict:
             yield_dict[k] /= ejecta_mass
@@ -136,7 +170,7 @@ def get_nucleosynthetic_yields(
 
 
 def plot_nucleosynthetic_yields(
-    event_kind='wind', star_metallicity=0.1, normalize=False,
+    event_kind='wind', star_metallicity=0.1, star_massfraction={}, normalize=False,
     axis_y_scaling='linear', axis_y_limits=[1e-3, None],
     write_plot=False, plot_directory='.', figure_index=1):
     '''
@@ -145,7 +179,9 @@ def plot_nucleosynthetic_yields(
     Parameters
     ----------
     event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
-    star_metallicity : float : total metallicity of star prior to event, relative to solar
+    star_metallicity : float : total metallicity of star, fraction wrt to solar
+    star_massfraction : dict : dictionary of elemental mass fractions in star
+        need to input this to get higher-order correction of yields
     normalize : bool : whether to normalize yields to be mass fractions (instead of masses)
     axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
     axis_y_limits : list : min and max limits of y-axis
@@ -159,7 +195,7 @@ def plot_nucleosynthetic_yields(
         'supernova.ia': 'Supernova: Ia',
     }
 
-    yield_dict = get_nucleosynthetic_yields(event_kind, star_metallicity, normalize)
+    yield_dict = get_nucleosynthetic_yields(event_kind, star_metallicity, normalize=normalize)
 
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
