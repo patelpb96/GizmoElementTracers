@@ -427,10 +427,13 @@ if __name__ == '__main__':
 
         snapshot_index_limits = [0, 600]
         if len(sys.argv) > 3:
-            snapshot_index_max = int(sys.argv[3])
-            snapshot_index_limits = [0, snapshot_index_max]
+            snapshot_index_min = int(sys.argv[3])
+            snapshot_index_max = 600
+            if len(sys.argv) > 4:
+                snapshot_index_max = int(sys.argv[4])
+            snapshot_indices = np.arange(snapshot_index_min, snapshot_index_max + 1)
 
-        Compress.compress_snapshots(directory, snapshot_index_limits=snapshot_index_limits)
+        Compress.test_compression(snapshot_indices, directory)
 
     elif 'globus' in function_kind:
         directory = '.'
