@@ -3137,7 +3137,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if len(redshifts) > 1:
                 parts = self.Read.read_snapshots_simulations(
-                    simulation_directories, species, 'redshift', redshift, self.properties)
+                    species, 'redshift', redshift, simulation_directories, 
+                    properties=self.properties)
 
             if 'star' in species:
                 self.print_masses_sizes(parts, 'star', simulation_directories, redshifts)
@@ -3176,7 +3177,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if len(redshifts) > 1:
                 parts = self.Read.read_snapshots_simulations(
-                    simulation_directories, species, 'redshift', redshift, properties)
+                    species, 'redshift', redshift, simulation_directories, properties=properties)
 
             gals = []
             for spec in ut.array.get_list_combined(species, parts[0], 'intersect'):
@@ -3219,7 +3220,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if len(redshifts) > 1:
                 parts = self.Read.read_snapshots_simulations(
-                    simulation_directories, species, 'redshift', redshift, self.properties)
+                    species, 'redshift', redshift, simulation_directories, 
+                    properties=self.properties)
 
             if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
                 plot_property_v_distance(
@@ -3436,7 +3438,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if len(redshifts) > 1:
                 parts = self.Read.read_snapshots_simulations(
-                    simulation_directories, species, 'redshift', redshift, properties)
+                    species, 'redshift', redshift, simulation_directories, properties=properties)
 
             for part in parts:
                 species_name = 'star'

@@ -118,12 +118,14 @@ class CompressClass(ut.io.SayClass):
         # get all snapshot file names and indices in directory
         path_file_names, file_snapshot_indices = Read.get_snapshot_file_names_indices(
             simulation_directory + snapshot_directory)
-        # get number of block files per snapshot
+
         if 'snapdir' in path_file_names[0]:
+            # get number of block files per snapshot
             snapshot_file_names = glob.glob(path_file_names[0] + '/*')
             snapshot_block_number = len(snapshot_file_names)
-        # if input snapshot indices, limit to those
+
         if snapshot_indices is not None and snapshot_indices != 'all':
+            # input snapshot indices, so limit to those
             if np.isscalar(snapshot_indices):
                 snapshot_indices = [snapshot_indices]
             snapshot_indices = np.intersect1d(snapshot_indices, file_snapshot_indices)
