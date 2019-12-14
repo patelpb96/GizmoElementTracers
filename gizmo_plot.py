@@ -3387,7 +3387,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             for part in parts:
                 species_name = 'star'
                 if species_name in part:
-                    if 'massfraction' in parts[0][spec]:
+                    if 'massfraction' in parts[0][species_name]:
                         try:
                             plot_property_v_property(
                                 part, species_name,
