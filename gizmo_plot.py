@@ -3264,17 +3264,22 @@ class CompareSimulationsClass(ut.io.SayClass):
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-                plot_property_v_distance(
-                    parts, spec, 'metallicity.total', 'median', 'linear', True, [None, None],
-                    self.halo_profile_radius_limits, distance_bin_width,
-                    write_plot=True, plot_directory=self.plot_directory,
-                )
+                if 'massfraction' in parts[0][spec]:
+                    try:
+                        plot_property_v_distance(
+                            parts, spec, 'metallicity.total', 'median', 'linear', True, 
+                            [None, None], self.halo_profile_radius_limits, distance_bin_width,
+                            write_plot=True, plot_directory=self.plot_directory,
+                        )
 
-                plot_property_distribution(
-                    parts, spec, 'metallicity.total', [-5, 1.3], 0.1, None, 'linear',
-                    'probability', self.halo_profile_radius_limits, axis_y_limits=[1e-4, None],
-                    write_plot=True, plot_directory=self.plot_directory,
-                )
+                        plot_property_distribution(
+                            parts, spec, 'metallicity.total', [-5, 1.3], 0.1, None, 'linear',
+                            'probability', self.halo_profile_radius_limits, 
+                            axis_y_limits=[1e-4, None], write_plot=True, 
+                            plot_directory=self.plot_directory,
+                        )
+                    except Exception:
+                        pass
 
                 """
                 if 'velocity' in parts[0][prop]:
@@ -3299,29 +3304,37 @@ class CompareSimulationsClass(ut.io.SayClass):
                     write_plot=True, plot_directory=self.plot_directory,
                 )
 
-                plot_property_v_distance(
-                    parts, spec, 'metallicity.fe', 'median', 'linear', True,
-                    [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
-                    write_plot=True, plot_directory=self.plot_directory,
-                )
+                if 'massfraction' in parts[0][spec]:
+                    try:
+                        plot_property_v_distance(
+                            parts, spec, 'metallicity.fe', 'median', 'linear', True,
+                            [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
+                            write_plot=True, plot_directory=self.plot_directory,
+                        )
 
-                plot_property_v_distance(
-                    parts, spec, 'metallicity.mg - metallicity.fe', 'median', 'linear', True,
-                    [None, None], self.galaxy_profile_radius_limits, distance_bin_width,
-                    write_plot=True, plot_directory=self.plot_directory,
-                )
+                        plot_property_distribution(
+                            parts, spec, 'metallicity.fe', [-5, 1.3], 0.1, None, 'linear',
+                            'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
+                            write_plot=True, plot_directory=self.plot_directory,
+                        )
+                    except Exception:
+                        pass
 
-                plot_property_distribution(
-                    parts, spec, 'metallicity.fe', [-5, 1.3], 0.1, None, 'linear',
-                    'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
-                    write_plot=True, plot_directory=self.plot_directory,
-                )
+                    try:
+                        plot_property_v_distance(
+                            parts, spec, 'metallicity.mg - metallicity.fe', 'median', 'linear', 
+                            True, [None, None], self.galaxy_profile_radius_limits, 
+                            distance_bin_width, write_plot=True, plot_directory=self.plot_directory,
+                        )
 
-                plot_property_distribution(
-                    parts, spec, 'metallicity.mg - metallicity.fe', [-1.7, 0.6], 0.1, None,
-                    'linear', 'probability', self.galaxy_radius_limits, axis_y_limits=[1e-4, None],
-                    write_plot=True, plot_directory=self.plot_directory,
-                )
+                        plot_property_distribution(
+                            parts, spec, 'metallicity.mg - metallicity.fe', [-1.7, 0.6], 0.1, None,
+                            'linear', 'probability', self.galaxy_radius_limits, 
+                            axis_y_limits=[1e-4, None], write_plot=True, 
+                            plot_directory=self.plot_directory,
+                        )
+                    except Exception:
+                        pass
 
                 if 'form.scalefactor' in parts[0][spec] and redshift <= 5:
                     plot_property_v_distance(
@@ -3368,35 +3381,42 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         for redshift in redshifts:
             if len(redshifts) > 1:
-                parts = self.Read.read_snapshot_imulations(
+                parts = self.Read.read_snapshot_simulations(
                     simulation_directories, species, 'redshift', redshift, self.properties)
 
             for part in parts:
                 species_name = 'star'
                 if species_name in part:
-                    plot_property_v_property(
-                        part, species_name,
-                        'metallicity.fe', [-3, 1], 'linear',
-                        'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
-                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
-                        draw_statistics=False,
-                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+                    if 'massfraction' in parts[0][spec]:
+                        try:
+                            plot_property_v_property(
+                                part, species_name,
+                                'metallicity.fe', [-3, 1], 'linear',
+                                'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
+                                property_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                                draw_statistics=False, write_plot=True, 
+                                plot_directory=plot_directory, add_simulation_name=True,
+                            )
 
-                    plot_property_v_property(
-                        part, species_name,
-                        'age', [0, 13.5], 'linear',
-                        'metallicity.fe', [-3, 1], 'linear',
-                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
-                        draw_statistics=True,
-                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+                            plot_property_v_property(
+                                part, species_name,
+                                'age', [0, 13.5], 'linear',
+                                'metallicity.fe', [-3, 1], 'linear',
+                                property_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                                draw_statistics=True, write_plot=True, 
+                                plot_directory=plot_directory, add_simulation_name=True,
+                            )
 
-                    plot_property_v_property(
-                        part, species_name,
-                        'age', [0, 13.5], 'linear',
-                        'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
-                        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
-                        draw_statistics=True,
-                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+                            plot_property_v_property(
+                                part, species_name,
+                                'age', [0, 13.5], 'linear',
+                                'metallicity.mg - metallicity.fe', [-0.5, 0.55], 'linear',
+                                property_bin_number, host_distance_limits=self.galaxy_radius_limits,
+                                draw_statistics=True, write_plot=True, 
+                                plot_directory=plot_directory, add_simulation_name=True,
+                            )
+                        except Exception:
+                            pass
 
                 species_name = 'gas'
                 if 0:  # species_name in part:
@@ -3406,7 +3426,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'temperature', [10, 1e7], 'log',
                         property_bin_number, host_distance_limits=self.galaxy_radius_limits,
                         draw_statistics=False,
-                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,)
+                        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,
+                    )
 
     def plot_images(
         self, parts=None, species=['star', 'gas'], simulation_directories=None,
