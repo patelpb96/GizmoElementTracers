@@ -851,10 +851,10 @@ def test_particle_pointers(part, part_z1, part_z2):
 
 class ParticleCoordinateClass(ut.io.SayClass):
     '''
-    Compute coordinates (3-D distances and 3-D velocities) wrt each primary host galaxy for all
-    particles at the snapshot immediately after they form.
-    In computing primary host coordinate[s] at each previous snapshots, use only star particles within 
-    host_distance_limits of each primary host at the reference snapshot.
+    Compute coordinates (3-D distances and 3-D velocities) wrt each primary host galaxy for each
+    particle at the snapshot immediately after it forms.
+    In computing primary host coordinate[s] at each previous snapshots, use only star particles 
+    within host_distance_limits of each primary host at the reference (latest) snapshot.
     '''
 
     def __init__(
@@ -932,15 +932,15 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     pass
                 elif prop in ['host.positions', 'center.position']:
                     if np.ndim(dict_in[prop]) == 2:
-                        dict_in[prop] = np.array([dict_in[prop]])  # deal with older files
+                        dict_in[prop] = np.array([dict_in[prop]])  # deal with older track files
                     part[self.species_name].host_positions_at_snapshots = dict_in[prop]
                 elif prop in ['host.velocities', 'center.velocity']:
                     if np.ndim(dict_in[prop]) == 2:
-                        dict_in[prop] = np.array([dict_in[prop]])  # deal with older files
+                        dict_in[prop] = np.array([dict_in[prop]])  # deal with older track files
                     part[self.species_name].host_velocities_at_snapshots = dict_in[prop]
                 elif prop in ['host.rotation.tensors', 'principal.axes.vectors']:
                     if np.ndim(dict_in[prop]) == 3:
-                        dict_in[prop] = np.array([dict_in[prop]])  # deal with older files
+                        dict_in[prop] = np.array([dict_in[prop]])  # deal with older track files
                     part[self.species_name].host_rotation_tensors_at_snapshots = dict_in[prop]
                 else:
                     # store coordinates at formation
@@ -975,19 +975,19 @@ class ParticleCoordinateClass(ut.io.SayClass):
             min(part_z0.Snapshot['index']), max(part_z0.Snapshot['index']) + 1)
         snapshot_indices = np.sort(snapshot_indices)[::-1]  # work backwards in time
 
-        # store position and velocity of the primary host galaxy[s] at each snapshot
+        # initialize and store position and velocity of the primary host galaxy[s] at each snapshot
         part_z0[self.species_name].host_positions_at_snapshots = np.zeros(
             [part_z0.Snapshot['index'].size, host_number, 3], self.coordinate_dtype) + np.nan
         part_z0[self.species_name].host_velocities_at_snapshots = np.zeros(
             [part_z0.Snapshot['index'].size, host_number, 3], self.coordinate_dtype) + np.nan
 
-        # store principal axes rotation tensor of the primary host galaxy[s] at each snapshot
+        # initialize and store principal axes rotation tensor of the primary host galaxy[s] 
+        # at each snapshot
         part_z0[self.species_name].host_rotation_tensors_at_snapshots = np.zeros(
             [part_z0.Snapshot['index'].size, host_number, 3, 3], self.coordinate_dtype) + np.nan
 
-        # store indices of particles near all primary hosts at z0
-        hosts_part_z0_indices = np.zeros(
-            0, dtype=ut.array.parse_data_type(part_z0[self.species_name][self.id_name].size))
+        # initialize and store indices of particles near all primary hosts at the reference snapshot
+        hosts_part_z0_indicess = []
 
         for host_index in range(host_number):
             host_name = ut.catalog.get_host_name(host_index)
@@ -995,9 +995,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
             part_z0_indices = ut.array.get_indices(
                 part_z0[self.species_name].prop(host_name + 'distance.total'),
                 self.host_distance_limits)
-            hosts_part_z0_indices = np.concatenate((hosts_part_z0_indices, part_z0_indices))
+            hosts_part_z0_indicess.append(part_z0_indices)
 
-            # store particle formation coordinate properties, initialize to nan
+            # initialize and store particle formation coordinates
             for prop in self.form_host_coordiante_kinds:
                 prop = prop.replace('host.', host_name)  # update host name (if necessary)
                 part_z0[self.species_name][prop] = np.zeros(
@@ -1017,10 +1017,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
             if thread_number > 1:
                 pool.apply(
                     self._write_formation_coordinates,
-                    (part_z0, hosts_part_z0_indices, host_number, snapshot_index, count))
+                    (part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count))
             else:
                 self._write_formation_coordinates(
-                    part_z0, hosts_part_z0_indices, host_number, snapshot_index, count)
+                    part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count)
 
         # close threads
         if thread_number > 1:
@@ -1035,7 +1035,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             self.say('! {} total not have id match!'.format(count['id wrong']))
 
     def _write_formation_coordinates(
-        self, part_z0, hosts_part_z0_indices, host_number, snapshot_index, count_tot):
+        self, part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count_tot):
         '''
         Assign to each particle its coordinates (position and velocity) wrt the primary host.
         Write to file.
@@ -1043,8 +1043,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         Parameters
         ----------
         part_z0 : dict : catalog of particles at the reference (latest) snapshot
-        hosts_part_z0_indices : array :
-            indices of particles near all primary host[s] at the reference (latest) snapshot
+        hosts_part_z0_indices : list of arrays :
+            indices of particles near each primary host at the reference (latest) snapshot
         host_number : int : number of host galaxies to assign and compute coordinates relative to
         snapshot_index : int : snapshot index at which to assign particle pointers to
         count_tot : dict : diagnostic counters
@@ -1054,6 +1054,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         if snapshot_index == part_z0.snapshot['index']:
             part_pointers = part_z0_indices
         else:
+            # read pointer indices from reference snapshot to this snapshot
             ParticlePointerIO = ParticlePointerIOClass(
                 track_directory=self.track_directory, 
                 reference_snapshot_index=self.reference_snapshot_index)
@@ -1082,10 +1083,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
             # limit the coordinates of progenitor[s] of primary host[s] to particles that are near
             # the primary host[s] at the reference snapshot
-            hosts_part_z_indices = part_pointers[hosts_part_z0_indices]
+            hosts_part_z_indicess = []
+            for host_i in range(host_number):
+                hosts_part_z_indices = hosts_part_z0_indicess[host_i]
+                hosts_part_z_indicess.append(hosts_part_z_indices[hosts_part_z_indices >= 0])
+
             self.GizmoRead.assign_host_coordinates(
-                part_z, self.species_name, hosts_part_z_indices[hosts_part_z_indices >= 0],
-                host_number=host_number)
+                part_z, self.species_name, hosts_part_z_indicess, host_number, 
+                exclusion_distance=None)
 
             part_z_indices = part_pointers[part_z0_indices]
 

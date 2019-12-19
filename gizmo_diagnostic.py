@@ -270,42 +270,44 @@ class ContaminationClass(ut.io.SayClass):
 
         profile_mass = collections.OrderedDict()
         profile_mass['total'] = {}
-        for spec in part:
-            profile_mass[spec] = {}
+        for spec_name in part:
+            profile_mass[spec_name] = {}
 
         profile_mass_ratio = {}
         profile_number = {}
 
-        for spec in part:
+        for spec_name in part:
             distances = ut.coordinate.get_distances(
-                part[spec]['position'], center_position, part.info['box.length'],
+                part[spec_name]['position'], center_position, part.info['box.length'],
                 part.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
             if scale_to_halo_radius:
                 distances /= halo_radius
-            profile_mass[spec] = DistanceBin.get_sum_profile(distances, part[spec]['mass'])
+            profile_mass[spec_name] = DistanceBin.get_sum_profile(
+                distances, part[spec_name]['mass'])
 
         # initialize total mass
-        for prop in profile_mass[spec]:
+        for prop in profile_mass[spec_name]:
             if 'distance' not in prop:
                 profile_mass['total'][prop] = 0
             else:
-                profile_mass['total'][prop] = profile_mass[spec][prop]
+                profile_mass['total'][prop] = profile_mass[spec_name][prop]
 
         # compute mass fractions relative to total mass
-        for spec in part:
-            for prop in profile_mass[spec]:
+        for spec_name in part:
+            for prop in profile_mass[spec_name]:
                 if 'distance' not in prop:
-                    profile_mass['total'][prop] += profile_mass[spec][prop]
+                    profile_mass['total'][prop] += profile_mass[spec_name][prop]
 
-        for spec in part:
-            profile_mass_ratio[spec] = {
-                'sum': profile_mass[spec]['sum'] / profile_mass['total']['sum'],
-                'sum.cum': profile_mass[spec]['sum.cum'] / profile_mass['total']['sum.cum'],
+        for spec_name in part:
+            profile_mass_ratio[spec_name] = {
+                'sum': profile_mass[spec_name]['sum'] / profile_mass['total']['sum'],
+                'sum.cum': profile_mass[spec_name]['sum.cum'] / profile_mass['total']['sum.cum'],
             }
-            profile_number[spec] = {
-                'sum': np.int64(np.round(profile_mass[spec]['sum'] / part[spec]['mass'][0])),
-                'sum.cum': np.int64(np.round(
-                    profile_mass[spec]['sum.cum'] / part[spec]['mass'][0])),
+            profile_number[spec_name] = {
+                'sum': np.int64(
+                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])),
+                'sum.cum': np.int64(
+                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'][0])),
             }
 
         # print diagnostics
@@ -325,9 +327,9 @@ class ContaminationClass(ut.io.SayClass):
             if dark_name in part:
                 species_lowres_dark.append(dark_name)
 
-        for spec in species_lowres_dark:
+        for spec_name in species_lowres_dark:
             self.say('* {}'.format(spec))
-            if profile_mass[spec]['sum.cum'][-1] == 0:
+            if profile_mass[spec_name]['sum.cum'][-1] == 0:
                 self.say('  none. yay!')
                 continue
 
@@ -337,8 +339,8 @@ class ContaminationClass(ut.io.SayClass):
                 print_string = 'd < {:6.1f} kpc, d/R_halo < {:5.2f}: '
             print_string += 'mass_frac = {:.4f}, mass = {:.2e}, number = {:.0f}'
 
-            for dist_i in range(profile_mass[spec]['sum.cum'].size):
-                if profile_mass[spec]['sum.cum'][dist_i] > 0:
+            for dist_i in range(profile_mass[spec_name]['sum.cum'].size):
+                if profile_mass[spec_name]['sum.cum'][dist_i] > 0:
                     if scale_to_halo_radius:
                         distances_0 = distances_halo[dist_i]
                         distances_1 = distances_phys[dist_i]
@@ -351,12 +353,12 @@ class ContaminationClass(ut.io.SayClass):
 
                     self.say(print_string.format(
                         distances_0, distances_1,
-                        profile_mass_ratio[spec]['sum.cum'][dist_i],
-                        profile_mass[spec]['sum.cum'][dist_i],
-                        profile_number[spec]['sum.cum'][dist_i])
+                        profile_mass_ratio[spec_name]['sum.cum'][dist_i],
+                        profile_mass[spec_name]['sum.cum'][dist_i],
+                        profile_number[spec_name]['sum.cum'][dist_i])
                     )
 
-                    if spec != 'dark2':
+                    if spec_name != 'dark2':
                         # print only 1 distance bin for lower-resolution particles
                         break
 
@@ -383,11 +385,11 @@ class ContaminationClass(ut.io.SayClass):
         print('* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
               species, distances_phys[dist_i], distances_halo[dist_i]))
 
-        for spec in species_lowres_dark:
-            if species != 'dark2' and profile_number[spec]['sum.cum'][dist_i_halo] > 0:
+        for spec_name in species_lowres_dark:
+            if species != 'dark2' and profile_number[spec_name]['sum.cum'][dist_i_halo] > 0:
                 print('! {} {} particles within R_halo'.format(
                       profile_number[species]['sum.cum'][dist_i_halo], species))
-                dist_i = np.where(profile_number[spec]['sum.cum'] > 0)[0][0]
+                dist_i = np.where(profile_number[spec_name]['sum.cum'] > 0)[0][0]
                 print('! {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
                       species, distances_phys[dist_i], distances_halo[dist_i]))
         print()
@@ -418,10 +420,10 @@ class ContaminationClass(ut.io.SayClass):
                 x_ref = halo_radius
             subplot.plot([x_ref, x_ref], [1e-6, 1e6], color='black', linestyle=':', alpha=0.6)
 
-        for spec_i, spec in enumerate(species_lowres_dark):
+        for spec_i, spec_name in enumerate(species_lowres_dark):
             subplot.plot(
-                DistanceBin.mids, profile_mass_ratio[spec]['sum'], color=colors[spec_i], alpha=0.7,
-                label=spec)
+                DistanceBin.mids, profile_mass_ratio[spec_name]['sum'], color=colors[spec_i], 
+                alpha=0.7, label=spec)
 
         ut.plot.make_legends(subplot, 'best')
 
@@ -558,13 +560,13 @@ def print_properties_snapshots(
     species_read = species_property_dict.keys()
 
     properties_read = []
-    for spec in species_property_dict:
-        properties = species_property_dict[spec]
+    for spec_name in species_property_dict:
+        properties = species_property_dict[spec_name]
         if np.isscalar(properties):
             properties = [properties]
 
         prop_dict = {}
-        for prop in species_property_dict[spec]:
+        for prop in species_property_dict[spec_name]:
             prop_dict[prop] = []
 
             prop_read = prop.replace('.number', '')
@@ -575,7 +577,7 @@ def print_properties_snapshots(
                 properties_read.append('massfraction')
 
         # re-assign property list as dictionary so can store list of values
-        species_property_dict[spec] = prop_dict
+        species_property_dict[spec_name] = prop_dict
 
     for snapshot_i in Snapshot['index']:
         try:
@@ -585,11 +587,11 @@ def print_properties_snapshots(
                 properties_read, element_indices, assign_host_coordinates=False,
                 sort_dark_by_id=False)
 
-            for spec in species_property_dict:
-                for prop in species_property_dict[spec]:
+            for spec_name in species_property_dict:
+                for prop in species_property_dict[spec_name]:
                     try:
-                        prop_ext = property_statistic[prop]['function'](part[spec].prop(prop))
-                        species_property_dict[spec][prop].append(prop_ext)
+                        prop_ext = property_statistic[prop]['function'](part[spec_name].prop(prop))
+                        species_property_dict[spec_name][prop].append(prop_ext)
                     except Exception:
                         Say.say('! {} {} not in particle dictionary'.format(spec, prop))
         except Exception:
@@ -598,10 +600,10 @@ def print_properties_snapshots(
 
     Statistic = ut.statistic.StatisticClass()
 
-    for spec in species_property_dict:
+    for spec_name in species_property_dict:
         for prop in species_property_dict[prop]:
             prop_func_name = property_statistic[prop]['function.name']
-            prop_values = np.array(species_property_dict[spec][prop])
+            prop_values = np.array(species_property_dict[spec_name][prop])
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 

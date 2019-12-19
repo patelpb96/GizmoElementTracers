@@ -1568,7 +1568,8 @@ class ReadClass(ut.io.SayClass):
         print()
 
     def assign_host_coordinates(
-        self, part, species_name='', part_indices=None, method='center-of-mass', host_number=1):
+        self, part, species_name='', part_indicess=None, host_number=1, exclusion_distance=200, 
+        method='center-of-mass'):
         '''
         Assign center position[s] [kpc comoving] and velocity[s] [km / s] wrt host galaxy/halo[s].
         Use species_name, if defined, else default to stars for baryonic simulation or
@@ -1578,10 +1579,13 @@ class ReadClass(ut.io.SayClass):
         ----------
         part : dictionary class : catalog of particles at snapshot
         species_name : str : which particle species to use to define center
-        part_indices : array : list of indices of particle to use to define center
-            use this to exclude particles that you know are not relevant
-        method : str : method of centering: 'center-of-mass', 'potential'
+        part_indicess : array or list of arrays : 
+            list of indices of particles to use to define host center coordinates
+            if supply a list of arrays, use each list element for a different host
         host_number : int : number of hosts to assign
+        exclusion_distance : float :
+            radius around previous center to cut out particles for finding next center [kpc comoving]
+        method : str : method of centering: 'center-of-mass', 'potential'
         '''
         if (species_name in part and 'position' in part[species_name] and
                 len(part[species_name]['position'])):
@@ -1604,7 +1608,8 @@ class ReadClass(ut.io.SayClass):
         if 'position' in part[species_name]:
             # assign to overall dictionary
             part.host_positions = ut.particle.get_center_positions(
-                part, species_name, part_indices, method, host_number, return_array=False)
+                part, species_name, part_indicess, method, host_number, exclusion_distance, 
+                return_array=False)
             # assign to each species dictionary
             for spec_name in part:
                 part[spec_name].host_positions = part.host_positions
@@ -1617,7 +1622,7 @@ class ReadClass(ut.io.SayClass):
         if 'velocity' in part[species_name]:
             # assign to overall dictionary
             part.host_velocities = ut.particle.get_center_velocities(
-                part, species_name, part_indices, velocity_radius_max, part.host_positions,
+                part, species_name, part_indicess, velocity_radius_max, part.host_positions,
                 return_array=False)
             # assign to each species dictionary
             for spec_name in part:
@@ -1631,7 +1636,7 @@ class ReadClass(ut.io.SayClass):
         print()
 
     def assign_host_principal_axes(
-        self, part, species_name='star', distance_max=10, mass_percent=90, age_percent=25,
+        self, part, species_name='star', distance_max=10, mass_percent=100, age_percent=25,
         temperature_limits=[0, 1e4]):
         '''
         Assign rotation vectors of principal axes (via moment of inertia tensor) of host
@@ -1655,7 +1660,7 @@ class ReadClass(ut.io.SayClass):
         self.say('* assigning principal axes of host galaxy/halo[s]:')
         self.say('using {} particles at distance < {} kpc'.format(species_name, distance_max))
 
-        if mass_percent:
+        if mass_percent < 100:
             self.say('using distance that encloses {}% of mass'.format(mass_percent))
 
         if species_name == 'star' and age_percent:
