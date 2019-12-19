@@ -1085,7 +1085,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             # the primary host[s] at the reference snapshot
             hosts_part_z_indicess = []
             for host_i in range(host_number):
-                hosts_part_z_indices = hosts_part_z0_indicess[host_i]
+                hosts_part_z_indices = part_pointers[hosts_part_z0_indicess[host_i]]
                 hosts_part_z_indicess.append(hosts_part_z_indices[hosts_part_z_indices >= 0])
 
             self.GizmoRead.assign_host_coordinates(
