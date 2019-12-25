@@ -12,7 +12,6 @@ import sys
 import glob
 import numpy as np
 
-# local ----
 import utilities as ut
 from . import gizmo_io
 from . import gizmo_plot

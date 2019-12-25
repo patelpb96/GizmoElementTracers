@@ -16,7 +16,6 @@ import collections
 import numpy as np
 from scipy import integrate
 
-# local ----
 import utilities as ut
 
 

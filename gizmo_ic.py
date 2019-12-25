@@ -18,7 +18,6 @@ import sys
 import numpy as np
 from scipy import spatial
 
-# local ----
 import utilities as ut
 from . import gizmo_io
 

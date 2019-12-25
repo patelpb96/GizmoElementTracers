@@ -149,7 +149,7 @@ import os
 import collections
 import h5py
 import numpy as np
-# local ----
+
 import utilities as ut
 from . import gizmo_star
 
