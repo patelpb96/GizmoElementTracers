@@ -13,6 +13,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
 
 import collections
 import numpy as np
+
 # local ----
 import utilities as ut
 
@@ -32,11 +33,12 @@ sun_massfraction['calcium'] = 1.01e-4
 sun_massfraction['iron'] = 1.73e-3
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # nucleosynthetic yields
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 def get_nucleosynthetic_yields(
-    event_kind='supernova.ii', star_metallicity=1.0, star_massfraction={}, normalize=True):
+    event_kind='supernova.ii', star_metallicity=1.0, star_massfraction={}, normalize=True
+):
     '''
     Get nucleosynthetic element yields, according to input event_kind.
     Note: this only returns the *additional* nucleosynthetic yields that Gizmo adds to the
@@ -46,7 +48,7 @@ def get_nucleosynthetic_yields(
     ----------
     event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
     star_metallicity : float :
-        total metallicity of star prior to event, 
+        total metallicity of star prior to event,
         fraction relative to solar (solar = sun_metal_mass_fraction)
     star_massfraction : dict : dictionary of elemental mass fractions in star
         need to input this to get higher-order correction of yields
@@ -72,7 +74,7 @@ def get_nucleosynthetic_yields(
 
     assert event_kind in ['wind', 'supernova.ii', 'supernova.ia']
 
-    if len(star_massfraction):
+    if len(star_massfraction) > 0:
         # input full array of stellar elemental mass fractions
         for element_name in yield_dict:
             assert element_name in star_massfraction
@@ -98,7 +100,7 @@ def get_nucleosynthetic_yields(
 
         # sum total metal mass (not including hydrogen or helium)
         for k in yield_dict:
-            if k is not 'helium':
+            if k != 'helium':
                 yield_dict['metals'] += yield_dict[k]
 
     elif event_kind == 'supernova.ii':
@@ -121,7 +123,7 @@ def get_nucleosynthetic_yields(
         yield_dict['calcium'] = 0.00458  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
         yield_dict['iron'] = 0.0741
 
-        #yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
+        # yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
 
         # nitrogen yield strongly depends on initial metallicity of star
         if star_metal_mass_fraction < 0.033:
@@ -129,7 +131,7 @@ def get_nucleosynthetic_yields(
         else:
             yield_dict['nitrogen'] *= 1.65
         # correct total metal mass for nitrogen
-        #yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
+        # yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
@@ -150,7 +152,7 @@ def get_nucleosynthetic_yields(
         yield_dict['calcium'] = 0.012
         yield_dict['iron'] = 0.743
 
-    if len(star_massfraction):
+    if len(star_massfraction) > 0:
         # enforce that yields obey pre-existing surface abundances
         # allow for larger abundances in the progenitor star - usually irrelevant
         pure_mass_fraction = 1 - star_metal_mass_fraction
@@ -158,8 +160,9 @@ def get_nucleosynthetic_yields(
             if yield_dict[element_name] > 0:
                 # apply yield only to non-metal mass of star
                 yield_dict[element_name] *= pure_mass_fraction
-                yield_dict[element_name] += (star_massfraction[element_name] -
-                                             sun_massfraction[element_name])
+                yield_dict[element_name] += (
+                    star_massfraction[element_name] - sun_massfraction[element_name]
+                )
                 yield_dict[element_name] = np.clip(yield_dict[element_name], 0, 1)
 
     if normalize:
@@ -170,9 +173,16 @@ def get_nucleosynthetic_yields(
 
 
 def plot_nucleosynthetic_yields(
-    event_kind='wind', star_metallicity=0.1, star_massfraction={}, normalize=False,
-    axis_y_scaling='linear', axis_y_limits=[1e-3, None],
-    write_plot=False, plot_directory='.', figure_index=1):
+    event_kind='wind',
+    star_metallicity=0.1,
+    star_massfraction={},
+    normalize=False,
+    axis_y_scaling='linear',
+    axis_y_limits=[1e-3, None],
+    write_plot=False,
+    plot_directory='.',
+    figure_index=1,
+):
     '''
     Plot nucleosynthetic element yields, according to input event_kind.
 
@@ -195,7 +205,9 @@ def plot_nucleosynthetic_yields(
         'supernova.ia': 'Supernova: Ia',
     }
 
-    yield_dict = get_nucleosynthetic_yields(event_kind, star_metallicity, normalize=normalize)
+    yield_dict = get_nucleosynthetic_yields(
+        event_kind, star_metallicity, star_massfraction, normalize=normalize
+    )
 
     yield_indices = np.arange(1, len(yield_dict))
     yield_values = np.array(yield_dict.values())[yield_indices]
@@ -226,14 +238,17 @@ def plot_nucleosynthetic_yields(
         for yi in yield_indices:
             if yield_values[yi] > 0:
                 subplot.plot(
-                    yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi])
+                    yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi]
+                )
                 subplots[si].text(
-                    yield_indices[yi] * 0.98, yield_values[yi] * 0.6, yield_labels[yi])
+                    yield_indices[yi] * 0.98, yield_values[yi] * 0.6, yield_labels[yi]
+                )
 
         subplots[si].set_title(title_dict[event_kind])
 
         ut.plot.make_label_legend(
-            subplots[si], '$\\left[ Z / {\\rm Z}_\odot={:.3f} \\right]$'.format(star_metallicity))
+            subplots[si], '$\\left[ Z / Z_\odot={:.3f} \\right]$'.format(star_metallicity)
+        )
 
     plot_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)

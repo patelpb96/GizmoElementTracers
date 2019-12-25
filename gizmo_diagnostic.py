@@ -11,6 +11,7 @@ import os
 import sys
 import glob
 import numpy as np
+
 # local ----
 import utilities as ut
 from . import gizmo_io
@@ -18,6 +19,9 @@ from . import gizmo_plot
 
 
 class RuntimeClass(ut.io.SayClass):
+    '''
+    .
+    '''
 
     def get_cpu_numbers(self, simulation_directory='.', runtime_file_name='gizmo.out*'):
         '''
@@ -72,8 +76,14 @@ class RuntimeClass(ut.io.SayClass):
         return mpi_number, omp_number
 
     def print_run_times(
-        self, simulation_directory='.', output_directory='output/', core_number=None,
-        runtime_file_name='gizmo.out*', wall_time_restart=0, scalefactors=[]):
+        self,
+        simulation_directory='.',
+        output_directory='output/',
+        core_number=None,
+        runtime_file_name='gizmo.out*',
+        wall_time_restart=0,
+        scalefactors=[],
+    ):
         '''
         Print wall [and CPU] times (based on average per MPI task from cpu.txt) at scale-factors,
         for Gizmo simulation.
@@ -105,13 +115,28 @@ class RuntimeClass(ut.io.SayClass):
 
         file_name = 'cpu.txt'
 
-        if scalefactors is None or (not np.isscalar(scalefactors) and not len(scalefactors)):
+        if scalefactors is None or (not np.isscalar(scalefactors) and len(scalefactors) == 0):
             scalefactors = [
-                0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1.0]
+                0.2,
+                0.25,
+                0.3,
+                0.35,
+                0.4,
+                0.45,
+                0.5,
+                0.55,
+                0.6,
+                0.65,
+                0.7,
+                0.8,
+                0.9,
+                1.0,
+            ]
         scalefactors = ut.array.arrayize(scalefactors)
 
         path_file_name = (
-            ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name)
+            ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name
+        )
         file_in = open(path_file_name, 'r')
 
         wall_times = []
@@ -157,18 +182,43 @@ class RuntimeClass(ut.io.SayClass):
         redshifts = 1 / scalefactors - 1
 
         print('# scale-factor redshift wall-time[day] cpu-time[khr] run-time-percent')
-        for t_i in range(len(wall_times)):
-            print('{:.2f} {:5.2f} | {:6.2f}  {:7.1f}  {:3.0f}%'.format(
-                  scalefactors[t_i], redshifts[t_i], wall_times[t_i] / 24,
-                  cpu_times[t_i] / 1000, 100 * wall_times[t_i] / wall_times.max()))
+        for t_i, wall_time in enumerate(wall_times):
+            print(
+                '{:.2f} {:5.2f} | {:6.2f}  {:7.1f}  {:3.0f}%'.format(
+                    scalefactors[t_i],
+                    redshifts[t_i],
+                    wall_time / 24,
+                    cpu_times[t_i] / 1000,
+                    100 * wall_time / wall_times.max(),
+                )
+            )
 
         return scalefactors, redshifts, wall_times, cpu_times
 
     def print_run_times_ratios(
-        self, simulation_directories=['.'], output_directory='output/',
-        runtime_file_name='gizmo.out*', wall_times_restart=[],
-        scalefactors=[0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9,
-                      1.0]):
+        self,
+        simulation_directories=['.'],
+        output_directory='output/',
+        runtime_file_name='gizmo.out*',
+        wall_times_restart=[],
+        scalefactors=[
+            0.2,
+            0.25,
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6,
+            0.65,
+            0.7,
+            0.75,
+            0.8,
+            0.9,
+            1.0,
+        ],
+    ):
         '''
         Print ratios of wall times and CPU times (based on average per MPI taks from cpu.txt) at
         scale-factors, from different simulation directories, for Gizmo simulations.
@@ -196,8 +246,13 @@ class RuntimeClass(ut.io.SayClass):
 
         for d_i, directory in enumerate(simulation_directories):
             scalefactors, redshifts, wall_times, cpu_times = self.print_run_times(
-                directory, output_directory, None, runtime_file_name, wall_times_restart[d_i],
-                scalefactors)
+                directory,
+                output_directory,
+                None,
+                runtime_file_name,
+                wall_times_restart[d_i],
+                scalefactors,
+            )
             wall_timess.append(wall_times)
             cpu_timess.append(cpu_times)
 
@@ -207,8 +262,8 @@ class RuntimeClass(ut.io.SayClass):
                 snapshot_number_min = len(wall_times)
 
         # sanity check - simulations might not have run to each input scale-factor
-        scalefactors = scalefactors[: snapshot_number_min]
-        redshifts = redshifts[: snapshot_number_min]
+        scalefactors = scalefactors[:snapshot_number_min]
+        redshifts = redshifts[:snapshot_number_min]
 
         print('# scale-factor redshift', end='')
         for _ in range(1, len(wall_timess)):
@@ -232,12 +287,21 @@ class ContaminationClass(ut.io.SayClass):
     '''
 
     def plot_contamination_v_distance(
-        self, part,
-        distance_limits=[10, 2000], distance_bin_width=0.01, distance_scaling='log',
-        halo_radius=None, scale_to_halo_radius=False,
-        center_position=None, host_index=0,
-        axis_y_limits=[0.0001, 1], axis_y_scaling='log',
-        write_plot=False, plot_directory='.', figure_index=1):
+        self,
+        part,
+        distance_limits=[10, 2000],
+        distance_bin_width=0.01,
+        distance_scaling='log',
+        halo_radius=None,
+        scale_to_halo_radius=False,
+        center_position=None,
+        host_index=0,
+        axis_y_limits=[0.0001, 1],
+        axis_y_scaling='log',
+        write_plot=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
         '''
         Plot contamination from low-resolution particles v distance from center.
 
@@ -260,13 +324,15 @@ class ContaminationClass(ut.io.SayClass):
         virial_kind = '200m'
 
         center_position = ut.particle.parse_property(
-            part, 'center_position', center_position, host_index)
+            part, 'center_position', center_position, host_index
+        )
 
         if scale_to_halo_radius:
             assert halo_radius and halo_radius > 0
 
         DistanceBin = ut.binning.DistanceBinClass(
-            distance_scaling, distance_limits, distance_bin_width)
+            distance_scaling, distance_limits, distance_bin_width
+        )
 
         profile_mass = collections.OrderedDict()
         profile_mass['total'] = {}
@@ -278,12 +344,17 @@ class ContaminationClass(ut.io.SayClass):
 
         for spec_name in part:
             distances = ut.coordinate.get_distances(
-                part[spec_name]['position'], center_position, part.info['box.length'],
-                part.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
+                part[spec_name]['position'],
+                center_position,
+                part.info['box.length'],
+                part.snapshot['scalefactor'],
+                total_distance=True,
+            )  # [kpc physical]
             if scale_to_halo_radius:
                 distances /= halo_radius
             profile_mass[spec_name] = DistanceBin.get_sum_profile(
-                distances, part[spec_name]['mass'])
+                distances, part[spec_name]['mass']
+            )
 
         # initialize total mass
         for prop in profile_mass[spec_name]:
@@ -305,9 +376,11 @@ class ContaminationClass(ut.io.SayClass):
             }
             profile_number[spec_name] = {
                 'sum': np.int64(
-                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])),
+                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])
+                ),
                 'sum.cum': np.int64(
-                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'][0])),
+                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'][0])
+                ),
             }
 
         # print diagnostics
@@ -328,7 +401,7 @@ class ContaminationClass(ut.io.SayClass):
                 species_lowres_dark.append(dark_name)
 
         for spec_name in species_lowres_dark:
-            self.say('* {}'.format(spec))
+            self.say('* {}'.format(spec_name))
             if profile_mass[spec_name]['sum.cum'][-1] == 0:
                 self.say('  none. yay!')
                 continue
@@ -351,11 +424,14 @@ class ContaminationClass(ut.io.SayClass):
                         else:
                             distances_1 = np.nan
 
-                    self.say(print_string.format(
-                        distances_0, distances_1,
-                        profile_mass_ratio[spec_name]['sum.cum'][dist_i],
-                        profile_mass[spec_name]['sum.cum'][dist_i],
-                        profile_number[spec_name]['sum.cum'][dist_i])
+                    self.say(
+                        print_string.format(
+                            distances_0,
+                            distances_1,
+                            profile_mass_ratio[spec_name]['sum.cum'][dist_i],
+                            profile_mass[spec_name]['sum.cum'][dist_i],
+                            profile_number[spec_name]['sum.cum'][dist_i],
+                        )
                     )
 
                     if spec_name != 'dark2':
@@ -370,28 +446,49 @@ class ContaminationClass(ut.io.SayClass):
         else:
             dist_i_halo = 0
         if profile_number[species]['sum.cum'][dist_i_halo] > 0:
-            print('* {} {} particles within R_halo'.format(
-                  profile_number[species]['sum.cum'][dist_i_halo], species))
+            print(
+                '* {} {} particles within R_halo'.format(
+                    profile_number[species]['sum.cum'][dist_i_halo], species
+                )
+            )
         dist_i = np.where(profile_number[species]['sum.cum'] > 0)[0][0]
-        print('* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
-              species, distances_phys[dist_i], distances_halo[dist_i]))
+        print(
+            '* {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
+                species, distances_phys[dist_i], distances_halo[dist_i]
+            )
+        )
         dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.0001)[0][0]
-        print('* {} mass_ratio = 0.01% at d < {:.1f} kpc, {:.1f} R_halo'.format(
-              species, distances_phys[dist_i], distances_halo[dist_i]))
+        print(
+            '* {} mass_ratio = 0.01% at d < {:.1f} kpc, {:.1f} R_halo'.format(
+                species, distances_phys[dist_i], distances_halo[dist_i]
+            )
+        )
         dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.001)[0][0]
-        print('* {} mass_ratio = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
-              species, distances_phys[dist_i], distances_halo[dist_i]))
+        print(
+            '* {} mass_ratio = 0.1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
+                species, distances_phys[dist_i], distances_halo[dist_i]
+            )
+        )
         dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.01)[0][0]
-        print('* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
-              species, distances_phys[dist_i], distances_halo[dist_i]))
+        print(
+            '* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
+                species, distances_phys[dist_i], distances_halo[dist_i]
+            )
+        )
 
         for spec_name in species_lowres_dark:
             if species != 'dark2' and profile_number[spec_name]['sum.cum'][dist_i_halo] > 0:
-                print('! {} {} particles within R_halo'.format(
-                      profile_number[species]['sum.cum'][dist_i_halo], species))
+                print(
+                    '! {} {} particles within R_halo'.format(
+                        profile_number[species]['sum.cum'][dist_i_halo], species
+                    )
+                )
                 dist_i = np.where(profile_number[spec_name]['sum.cum'] > 0)[0][0]
-                print('! {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
-                      species, distances_phys[dist_i], distances_halo[dist_i]))
+                print(
+                    '! {} closest d = {:.1f} kpc, {:.1f} R_halo'.format(
+                        species, distances_phys[dist_i], distances_halo[dist_i]
+                    )
+                )
         print()
 
         if write_plot is None:
@@ -401,10 +498,10 @@ class ContaminationClass(ut.io.SayClass):
         _fig, subplot = ut.plot.make_figure(figure_index)
 
         ut.plot.set_axes_scaling_limits(
-            subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits)
+            subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits
+        )
 
-        subplot.set_ylabel(
-            '$M_{{\\rm species}} / M_{{\\rm total}}$')
+        subplot.set_ylabel('$M_{{\\rm species}} / M_{{\\rm total}}$')
         if scale_to_halo_radius:
             axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
         else:
@@ -422,21 +519,30 @@ class ContaminationClass(ut.io.SayClass):
 
         for spec_i, spec_name in enumerate(species_lowres_dark):
             subplot.plot(
-                DistanceBin.mids, profile_mass_ratio[spec_name]['sum'], color=colors[spec_i], 
-                alpha=0.7, label=spec)
+                DistanceBin.mids,
+                profile_mass_ratio[spec_name]['sum'],
+                color=colors[spec_i],
+                alpha=0.7,
+                label=spec_name,
+            )
 
         ut.plot.make_legends(subplot, 'best')
 
         distance_name = 'dist'
         if halo_radius and scale_to_halo_radius:
             distance_name += '.' + virial_kind
-        plot_name = ut.plot.get_file_name(
-            'mass.ratio', distance_name, snapshot_dict=part.snapshot)
+        plot_name = ut.plot.get_file_name('mass.ratio', distance_name, snapshot_dict=part.snapshot)
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
     def plot_contamination_v_distance_halo(
-        self, part, hal, hal_index, distance_max=7, distance_bin_width=0.5,
-        scale_to_halo_radius=True):
+        self,
+        part,
+        hal,
+        hal_index,
+        distance_max=7,
+        distance_bin_width=0.5,
+        scale_to_halo_radius=True,
+    ):
         '''
         Print information on contamination from lower-resolution particles around halo as a function
         of distance.
@@ -458,9 +564,18 @@ class ContaminationClass(ut.io.SayClass):
 
         halo_radius = hal['radius'][hal_index]
 
-        self.plot_lowres_contamination_v_distance(
-            part, distance_limits, distance_bin_width, None, distance_scaling, halo_radius,
-            scale_to_halo_radius, hal['position'][hal_index], axis_y_scaling, write_plot=None)
+        self.plot_contamination_v_distance(
+            part,
+            distance_limits,
+            distance_bin_width,
+            None,
+            distance_scaling,
+            halo_radius,
+            scale_to_halo_radius,
+            hal['position'][hal_index],
+            axis_y_scaling,
+            write_plot=None,
+        )
 
     def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
         '''
@@ -481,26 +596,47 @@ class ContaminationClass(ut.io.SayClass):
 
         Read = gizmo_io.ReadClass()
         part = Read.read_snapshots(
-            ['dark', 'dark2'], 'redshift', redshift, simulation_directory,
-            properties=['position', 'mass', 'potential'], assign_host_coordinates=True)
+            ['dark', 'dark2'],
+            'redshift',
+            redshift,
+            simulation_directory,
+            properties=['position', 'mass', 'potential'],
+            assign_host_coordinates=True,
+        )
 
         halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
 
         self.plot_contamination_v_distance(
-            part, distance_limits_phys, distance_bin_width, halo_radius=halo_prop['radius'],
-            scale_to_halo_radius=False, write_plot=True, plot_directory='plot')
+            part,
+            distance_limits_phys,
+            distance_bin_width,
+            halo_radius=halo_prop['radius'],
+            scale_to_halo_radius=False,
+            write_plot=True,
+            plot_directory='plot',
+        )
 
         self.plot_contamination_v_distance(
-            part, distance_limits_halo, distance_bin_width, halo_radius=halo_prop['radius'],
-            scale_to_halo_radius=True, write_plot=True, plot_directory='plot')
+            part,
+            distance_limits_halo,
+            distance_bin_width,
+            halo_radius=halo_prop['radius'],
+            scale_to_halo_radius=True,
+            write_plot=True,
+            plot_directory='plot',
+        )
 
 
 Contamination = ContaminationClass()
 
 
 def print_properties_statistics(
-    species='all', snapshot_value_kind='index', snapshot_value=600,
-    simulation_directory='.', snapshot_directory='output/'):
+    species='all',
+    snapshot_value_kind='index',
+    snapshot_value=600,
+    simulation_directory='.',
+    snapshot_directory='output/',
+):
     '''
     For each property of each species in particle catalog, print range and median.
 
@@ -522,16 +658,27 @@ def print_properties_statistics(
 
     Read = gizmo_io.ReadClass()
     part = Read.read_snapshots(
-        species, snapshot_value_kind, snapshot_value, simulation_directory,
-        snapshot_directory, '', None, None, assign_host_coordinates=False,
-        separate_dark_lowres=False, sort_dark_by_id=False)
+        species,
+        snapshot_value_kind,
+        snapshot_value,
+        simulation_directory,
+        snapshot_directory,
+        '',
+        None,
+        None,
+        assign_host_coordinates=False,
+        separate_dark_lowres=False,
+        sort_dark_by_id=False,
+    )
 
     gizmo_plot.print_properties_statistics(part, species)
 
 
 def print_properties_snapshots(
-    simulation_directory='.', snapshot_directory='output',
-    species_property_dict={'gas': ['smooth.length', 'number.density']}):
+    simulation_directory='.',
+    snapshot_directory='output',
+    species_property_dict={'gas': ['smooth.length', 'number.density']},
+):
     '''
     For each input property, get its extremum at each snapshot.
     Print statistics of property across all snapshots.
@@ -583,9 +730,17 @@ def print_properties_snapshots(
         try:
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
-                species_read, 'index', snapshot_i, simulation_directory, snapshot_directory, '',
-                properties_read, element_indices, assign_host_coordinates=False,
-                sort_dark_by_id=False)
+                species_read,
+                'index',
+                snapshot_i,
+                simulation_directory,
+                snapshot_directory,
+                '',
+                properties_read,
+                element_indices,
+                assign_host_coordinates=False,
+                sort_dark_by_id=False,
+            )
 
             for spec_name in species_property_dict:
                 for prop in species_property_dict[spec_name]:
@@ -593,10 +748,13 @@ def print_properties_snapshots(
                         prop_ext = property_statistic[prop]['function'](part[spec_name].prop(prop))
                         species_property_dict[spec_name][prop].append(prop_ext)
                     except Exception:
-                        Say.say('! {} {} not in particle dictionary'.format(spec, prop))
+                        Say.say('! {} {} not in particle dictionary'.format(spec_name, prop))
         except Exception:
-            Say.say('! cannot read snapshot index {} in {}'.format(
-                    snapshot_i, simulation_directory + snapshot_directory))
+            Say.say(
+                '! cannot read snapshot index {} in {}'.format(
+                    snapshot_i, simulation_directory + snapshot_directory
+                )
+            )
 
     Statistic = ut.statistic.StatisticClass()
 
@@ -607,16 +765,16 @@ def print_properties_snapshots(
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
-            Say.say('\n{} {} {}:'.format(spec, prop, prop_func_name))
+            Say.say('\n{} {} {}:'.format(spec_name, prop, prop_func_name))
             for stat_name in ['min', 'percent.16', 'median', 'percent.84', 'max']:
                 Say.say('{:10s} = {:.3f}'.format(stat_name, Statistic.stat[stat_name]))
 
-            #Statistic.print_statistics()
+            # Statistic.print_statistics()
 
 
 def test_stellar_mass_loss(
-    part_z0, part_z, metallicity_limits=[0.001, 10], metallicity_bin_width=0.2,
-    form_time_width=5):
+    part_z0, part_z, metallicity_limits=[0.001, 10], metallicity_bin_width=0.2, form_time_width=5
+):
     '''
     .
     '''
@@ -631,63 +789,87 @@ def test_stellar_mass_loss(
         gizmo_track.ParticlePointerIO.io_pointers(part_z)
 
     MetalBin = ut.binning.BinClass(
-        metallicity_limits, metallicity_bin_width, include_max=True, scaling='log')
+        metallicity_limits, metallicity_bin_width, include_max=True, scaling='log'
+    )
 
-    #MassLoss = gizmo_star.MassLossClass()
-    #MassLoss._make_mass_loss_fraction_spline(age_bin_width=0.2, metallicity_bin_width=0.1)
+    # MassLoss = gizmo_star.MassLossClass()
+    # MassLoss._make_mass_loss_fraction_spline(age_bin_width=0.2, metallicity_bin_width=0.1)
 
-    form_time_limits = [part_z.snapshot['time'] * 1000 - form_time_width,
-                        part_z.snapshot['time'] * 1000]
+    form_time_limits = [
+        part_z.snapshot['time'] * 1000 - form_time_width,
+        part_z.snapshot['time'] * 1000,
+    ]
 
     part_indices_z0 = ut.array.get_indices(
-        part_z0[species].prop('form.time') * 1000, form_time_limits)
+        part_z0[species].prop('form.time') * 1000, form_time_limits
+    )
     part_indices_z = part_z.Pointer.get_pointers('star', 'star', part_indices_z0)
 
-    Say.say('* stellar mass loss across {:.3f} Gyr in metallicity bins for {} particles'.format(
-            part_z0.snapshot['time'] - part_z.snapshot['time'], part_indices_z0.size))
+    Say.say(
+        '* stellar mass loss across {:.3f} Gyr in metallicity bins for {} particles'.format(
+            part_z0.snapshot['time'] - part_z.snapshot['time'], part_indices_z0.size
+        )
+    )
 
     # compute metallicity using solar abundance assumed in Gizmo
-    metallicities = (part_z0[species].prop('massfraction.metals', part_indices_z0) /
-                     gizmo_star.StellarWind.solar_metal_mass_fraction)
+    metallicities = (
+        part_z0[species].prop('massfraction.metals', part_indices_z0)
+        / gizmo_star.StellarWind.solar_metal_mass_fraction
+    )
 
     metal_bin_indices = MetalBin.get_bin_indices(metallicities)
 
     for metal_i, metallicity in enumerate(MetalBin.mids):
-        masks = (metal_bin_indices == metal_i)
+        masks = metal_bin_indices == metal_i
         if np.sum(masks):
             pis_z0 = part_indices_z0[masks]
             pis_z = part_indices_z[masks]
 
             mass_loss_fractions = (
-                (part_z[species]['mass'][pis_z] - part_z0[species]['mass'][pis_z0]) /
-                part_z[species]['mass'][pis_z])
+                part_z[species]['mass'][pis_z] - part_z0[species]['mass'][pis_z0]
+            ) / part_z[species]['mass'][pis_z]
 
             mass_loss_fractions_py = part_z0[species].prop('mass.loss.fraction', pis_z0)
-            #mass_loss_fractions_py = MassLoss.get_mass_loss_fraction_from_spline(
+            # mass_loss_fractions_py = MassLoss.get_mass_loss_fraction_from_spline(
             #    part_z0[species].prop('age', pis_z0) * 1000,
             #    metal_mass_fractions=part_z0[species].prop('massfraction.metals', pis_z0))
 
-            Say.say('Z = {:.3f}, N = {:4d} | gizmo {:.1f}%, python {:.1f}%, p/g = {:.3f}'.format(
-                metallicity, pis_z0.size,
-                100 * np.median(mass_loss_fractions), 100 * np.median(mass_loss_fractions_py),
-                np.median(mass_loss_fractions_py / mass_loss_fractions)))
+            Say.say(
+                'Z = {:.3f}, N = {:4d} | gizmo {:.1f}%, python {:.1f}%, p/g = {:.3f}'.format(
+                    metallicity,
+                    pis_z0.size,
+                    100 * np.median(mass_loss_fractions),
+                    100 * np.median(mass_loss_fractions_py),
+                    np.median(mass_loss_fractions_py / mass_loss_fractions),
+                )
+            )
 
     mass_loss_fractions = (
-        (part_z[species]['mass'][part_indices_z] - part_z0[species]['mass'][part_indices_z0]) /
-        part_z[species]['mass'][part_indices_z])
+        part_z[species]['mass'][part_indices_z] - part_z0[species]['mass'][part_indices_z0]
+    ) / part_z[species]['mass'][part_indices_z]
     mass_loss_fractions_py = part_z0[species].prop('mass.loss.fraction', part_indices_z0)
-    print('* all Z, N = {} | gizmo = {:.1f}%, python = {:.1f}%, p/g = {:.3f}'.format(
-          part_indices_z0.size, 100 * np.median(mass_loss_fractions),
-          100 * np.median(mass_loss_fractions_py),
-          np.median(mass_loss_fractions_py / mass_loss_fractions)))
+    print(
+        '* all Z, N = {} | gizmo = {:.1f}%, python = {:.1f}%, p/g = {:.3f}'.format(
+            part_indices_z0.size,
+            100 * np.median(mass_loss_fractions),
+            100 * np.median(mass_loss_fractions_py),
+            np.median(mass_loss_fractions_py / mass_loss_fractions),
+        )
+    )
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # performance and scaling
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 def plot_scaling(
-    scaling_kind='strong', resolution='res7100', time_kind='core',
-    axis_x_scaling='log', axis_y_scaling='linear', write_plot=False, plot_directory='.'):
+    scaling_kind='strong',
+    resolution='res7100',
+    time_kind='core',
+    axis_x_scaling='log',
+    axis_y_scaling='linear',
+    write_plot=False,
+    plot_directory='.',
+):
     '''
     Print simulation run times (wall or core).
     'speedup' := WT(1 CPU) / WT(N CPU) =
@@ -702,40 +884,50 @@ def plot_scaling(
     write_plot : bool : whether to write plot to file
     plot_directory : str : directory to write plot file
     '''
-    _weak_dark = {
-        'res57000': {'particle.number': 8.82e6, 'core.number': 64,
-                     'core.time': 385, 'wall.time': 6.0},
-        'res7100': {'particle.number': 7.05e7, 'core.number': 512,
-                    'core.time': 7135, 'wall.time': 13.9},
-        'res880': {'particle.number': 5.64e8, 'core.number': 2048,
-                   'core.time': 154355, 'wall.time': 75.4},
-    }
+    # weak_dark = {
+    #    'res57000': {'particle.number': 8.82e6, 'core.number': 64,
+    #                 'core.time': 385, 'wall.time': 6.0},
+    #    'res7100': {'particle.number': 7.05e7, 'core.number': 512,
+    #                'core.time': 7135, 'wall.time': 13.9},
+    #    'res880': {'particle.number': 5.64e8, 'core.number': 2048,
+    #               'core.time': 154355, 'wall.time': 75.4},
+    # }
 
     # stampede
-    """
-    weak_baryon = {
-        'res450000': {'particle.number': 1.10e6 * 2, 'core.number': 32,
-                      'core.time': 1003, 'wall.time': 31.34 * 1.5},
-        'res57000': {'particle.number': 8.82e6 * 2, 'core.number': 512,
-                     'core.time': 33143, 'wall.time': 64.73},
-        'res7100': {'particle.number': 7.05e7 * 2, 'core.number': 2048,
-                    'core.time': 1092193, 'wall.time': 350.88},
-        #'res880': {'particle.number': 5.64e8 * 2, 'core.number': 8192,
-        #           'core.time': 568228, 'wall.time': 69.4},
-        # projected
-        #'res880': {'particle.number': 5.64e8 * 2, 'core.number': 8192,
-        #           'core.time': 1.95e7, 'wall.time': 2380},
-    }
-    """
+    # weak_baryon = {
+    #    'res450000': {'particle.number': 1.10e6 * 2, 'core.number': 32,
+    #                  'core.time': 1003, 'wall.time': 31.34 * 1.5},
+    #    'res57000': {'particle.number': 8.82e6 * 2, 'core.number': 512,
+    #                 'core.time': 33143, 'wall.time': 64.73},
+    #    'res7100': {'particle.number': 7.05e7 * 2, 'core.number': 2048,
+    #                'core.time': 1092193, 'wall.time': 350.88},
+    #    #'res880': {'particle.number': 5.64e8 * 2, 'core.number': 8192,
+    #    #           'core.time': 568228, 'wall.time': 69.4},
+    #    # projected
+    #    #'res880': {'particle.number': 5.64e8 * 2, 'core.number': 8192,
+    #    #           'core.time': 1.95e7, 'wall.time': 2380},
+    # }
 
     # conversion to stampede 2
     weak_baryon = collections.OrderedDict()
     weak_baryon['res450000'] = {
-        'particle.number': 1.10e6 * 2, 'node.number': 1, 'node.time': 73, 'wall.time': 73}
+        'particle.number': 1.10e6 * 2,
+        'node.number': 1,
+        'node.time': 73,
+        'wall.time': 73,
+    }
     weak_baryon['res57000'] = {
-        'particle.number': 8.82e6 * 2, 'node.number': 8, 'node.time': 1904, 'wall.time': 239}
+        'particle.number': 8.82e6 * 2,
+        'node.number': 8,
+        'node.time': 1904,
+        'wall.time': 239,
+    }
     weak_baryon['res7100'] = {
-        'particle.number': 7.05e7 * 2, 'node.number': 64, 'node.time': 52000, 'wall.time': 821}
+        'particle.number': 7.05e7 * 2,
+        'node.number': 64,
+        'node.time': 52000,
+        'wall.time': 821,
+    }
 
     strong_baryon = collections.OrderedDict()
 
@@ -751,16 +943,14 @@ def plot_scaling(
     # did not have time to run these, so scale down from res880
     # scaled to run time to z = 3 using 2048
     # stampede
-    """
-    strong_baryon['res7100'] = {
-        'particle.number': 7e7 * 2,
-        'node.number': np.array([32, 64, 128, 256]),
-        'core.number': np.array([512, 1024, 2048, 4096]),
-        'wall.time': np.array([72.23, 40.13, 23.04, 21.22]),
-        'core.time': np.array([36984, 41093, 47182, 86945]),
-        'node.time': np.array([2312, 2568, 2949, 5434]),
-    }
-    """
+    # strong_baryon['res7100'] = {
+    #    'particle.number': 7e7 * 2,
+    #    'node.number': np.array([32, 64, 128, 256]),
+    #    'core.number': np.array([512, 1024, 2048, 4096]),
+    #    'wall.time': np.array([72.23, 40.13, 23.04, 21.22]),
+    #    'core.time': np.array([36984, 41093, 47182, 86945]),
+    #    'node.time': np.array([2312, 2568, 2949, 5434]),
+    # }
 
     # conversion to stampede 2
     # half the number of nodes and multipy node time by 1.17, multiply wall time by 2.34
@@ -791,13 +981,13 @@ def plot_scaling(
         elif time_kind == 'efficiency':
             times = strong['wall.time'][0] / strong['wall.time']
 
-        #subplot.set_xlabel('number of cores')
+        # subplot.set_xlabel('number of cores')
         subplot.set_xlabel('number of nodes')
 
         if resolution == 'res880':
             axis_x_limits = [1e2, 1.9e4]
         elif resolution == 'res7100':
-            #axis_x_limits = [3e2, 1e4]
+            # axis_x_limits = [3e2, 1e4]
             axis_x_limits = [10, 200]
 
         axis_x_kind = 'core.number'
@@ -827,7 +1017,8 @@ def plot_scaling(
             subplot.set_ylabel('parallel efficiency $T(1)/T(N)/N$')
 
         ut.plot.set_axes_scaling_limits(
-            subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits)
+            subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits
+        )
 
         subplot.plot(strong[axis_x_kind], times, '*-', linewidth=2.0, color='blue')
 
@@ -835,28 +1026,39 @@ def plot_scaling(
             subplot.plot([0, 3e4], [0, 3e4], '--', linewidth=1.5, color='black')
 
         if resolution == 'res880':
-            subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.1e9', color='black',
-                         transform=subplot.transAxes)
+            subplot.text(
+                0.1,
+                0.1,
+                'strong scaling:\nparticle number = 1.1e9',
+                color='black',
+                transform=subplot.transAxes,
+            )
         elif resolution == 'res7100':
-            subplot.text(0.1, 0.1, 'strong scaling:\nparticle number = 1.5e8', color='black',
-                         transform=subplot.transAxes)
+            subplot.text(
+                0.1,
+                0.1,
+                'strong scaling:\nparticle number = 1.5e8',
+                color='black',
+                transform=subplot.transAxes,
+            )
 
     elif scaling_kind == 'weak':
-        #dm_particle_numbers = np.array(
+        # dm_particle_numbers = np.array(
         #    [weak_dark[core_num]['particle.number'] for core_num in sorted(weak_dark.keys())])
-        baryon_particle_numbers = np.array(
-            [weak_baryon[i]['particle.number'] for i in weak_baryon])
+        baryon_particle_numbers = np.array([weak_baryon[i]['particle.number'] for i in weak_baryon])
 
         if time_kind == 'node':
-            #dm_times = np.array(
+            # dm_times = np.array(
             #    [weak_dark[core_num]['core.time'] for core_num in sorted(weak_dark.keys())])
             baryon_times = np.array([weak_baryon[i]['node.time'] for i in weak_baryon])
         elif time_kind == 'wall':
-            #resolutinon_ref = 'res880'
+            # resolutinon_ref = 'res880'
             resolutinon_ref = 'res7100'
-            ratio_ref = (weak_baryon[resolutinon_ref]['particle.number'] /
-                         weak_baryon[resolutinon_ref]['node.number'])
-            #dm_times = np.array(
+            ratio_ref = (
+                weak_baryon[resolutinon_ref]['particle.number']
+                / weak_baryon[resolutinon_ref]['node.number']
+            )
+            # dm_times = np.array(
             #    [weak_dark[core_num]['wall.time'] * ratio_ref /
             #     (weak_dark[core_num]['particle.number'] / weak_dark[core_num]['core.number'])
             #     for core_num in sorted(weak_dark.keys())])
@@ -864,7 +1066,7 @@ def plot_scaling(
 
         subplot.set_xlabel('number of particles')
 
-        #axis_x_limits = [6e6, 1.5e9]
+        # axis_x_limits = [6e6, 1.5e9]
         axis_x_limits = [1e6, 2e8]
 
         if time_kind == 'node':
@@ -874,18 +1076,21 @@ def plot_scaling(
             axis_y_limits = [10, 1000]
             subplot.set_ylabel('wall time to $z = 0$ [hr]')
             subplot.text(
-                0.05, 0.05,
+                0.05,
+                0.05,
                 'weak scaling:\nparticles / node = {:.1e}'.format(ratio_ref),
-                color='black', transform=subplot.transAxes,
+                color='black',
+                transform=subplot.transAxes,
             )
 
         ut.plot.set_axes_scaling_limits(
-            subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits)
+            subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits
+        )
 
-        #subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
-        #subplot.plot(mfm_particlgizmoe_numbers[:-1], mfm_times[:-1], '*-', linewidth=2.0,
-        #color='blue')
-        #subplot.plot(mfm_particle_numbers[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
+        # subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')
+        # subplot.plot(mfm_particlgizmoe_numbers[:-1], mfm_times[:-1], '*-', linewidth=2.0,
+        # color='blue')
+        # subplot.plot(mfm_particle_numbers[1:], mfm_times[1:], '*--', linewidth=2.0, color='blue',
         #             alpha=0.7)
         subplot.plot(baryon_particle_numbers, baryon_times, '*-', linewidth=2.0, color='blue')
 
@@ -893,17 +1098,21 @@ def plot_scaling(
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # running from command line
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 
     if len(sys.argv) <= 1:
         raise OSError('specify function: runtime, properties, extrema, contamination, delete')
 
     function_kind = str(sys.argv[1])
-    assert ('runtime' in function_kind or 'properties' in function_kind or
-            'extrema' in function_kind or 'contamination' in function_kind)
+    assert (
+        'runtime' in function_kind
+        or 'properties' in function_kind
+        or 'extrema' in function_kind
+        or 'contamination' in function_kind
+    )
 
     directory = '.'
 

@@ -17,14 +17,15 @@ Units: unless otherwise noted, all quantities are in (combinations of):
 import sys
 import numpy as np
 from scipy import spatial
+
 # local ----
 import utilities as ut
 from . import gizmo_io
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # read data
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 class ReadClass(ut.io.SayClass):
     '''
     Read particles and halo catalog.
@@ -59,14 +60,20 @@ class ReadClass(ut.io.SayClass):
         hal = self.read_halos(mass_limits)
         parts = self.read_particles()
 
-        if 'dark2' in parts[0] and 'mass' in parts[0]['dark2'] and len(parts[0]['dark2']['mass']):
+        if (
+            'dark2' in parts[0]
+            and 'mass' in parts[0]['dark2']
+            and len(parts[0]['dark2']['mass']) > 0
+        ):
             from halo_analysis import halo_io
+
             halo_io.Particle.assign_lowres_mass(hal, parts[0])
 
         return parts, hal
 
     def read_halos(
-        self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=False):
+        self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=False
+    ):
         '''
         Read halos at final snapshot.
 
@@ -83,15 +90,15 @@ class ReadClass(ut.io.SayClass):
         from halo_analysis import halo_io
 
         hal = halo_io.IO.read_catalogs(
-            'redshift', self.snapshot_redshifts[0], self.simulation_directory, file_kind=file_kind)
+            'redshift', self.snapshot_redshifts[0], self.simulation_directory, file_kind=file_kind
+        )
 
         if assign_nearest_neighbor:
             halo_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rneig', 8000)
 
         return hal
 
-    def read_particles(
-        self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
+    def read_particles(self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
         '''
         Read particles at final and initial snapshots.
 
@@ -109,9 +116,14 @@ class ReadClass(ut.io.SayClass):
         for snapshot_redshift in self.snapshot_redshifts:
             Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
-                'all', 'redshift', snapshot_redshift, self.simulation_directory,
-                properties=properties, assign_host_coordinates=False,
-                sort_dark_by_id=sort_dark_by_id)
+                'all',
+                'redshift',
+                snapshot_redshift,
+                self.simulation_directory,
+                properties=properties,
+                assign_host_coordinates=False,
+                sort_dark_by_id=sort_dark_by_id,
+            )
 
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
@@ -127,9 +139,9 @@ class ReadClass(ut.io.SayClass):
 Read = ReadClass()
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # generate region for initial conditions
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 class InitialConditionClass(ut.io.SayClass):
     '''
     Generate text file of positions of particles at the initial snapshot that are within the
@@ -137,9 +149,17 @@ class InitialConditionClass(ut.io.SayClass):
     '''
 
     def write_initial_positions(
-        self, parts, center_position=None, host_index=0,
-        distance_max=7, scale_to_halo_radius=True,
-        halo_radius=None, virial_kind='200m', region_kind='convex-hull', dark_mass=None):
+        self,
+        parts,
+        center_position=None,
+        host_index=0,
+        distance_max=7,
+        scale_to_halo_radius=True,
+        halo_radius=None,
+        virial_kind='200m',
+        region_kind='convex-hull',
+        dark_mass=None,
+    ):
         '''
         Select dark-matter particles at final snapshot, print their positions at initial snapshot.
 
@@ -183,9 +203,10 @@ class InitialConditionClass(ut.io.SayClass):
 
             # sanity check
             if 'id.to.index' not in part_ini[spec]:
-                if np.min(part_fin[spec]['id'] == part_ini[spec]['id']) == False:
-                    self.say('! species = {}: ids not match in final v initial catalogs'.format(
-                        spec))
+                if np.min(part_fin[spec]['id'] == part_ini[spec]['id']) is False:
+                    self.say(
+                        '! species = {}: ids not match in final v initial catalogs'.format(spec)
+                    )
                     return
 
         # sanity check
@@ -193,20 +214,27 @@ class InitialConditionClass(ut.io.SayClass):
             if species != ['dark']:
                 raise ValueError(
                     'input dark_mass = {:.3e} Msun, but catalog contains species = {}'.format(
-                        dark_mass, species))
+                        dark_mass, species
+                    )
+                )
             if scale_to_halo_radius and not halo_radius:
                 raise ValueError('cannot determine halo_radius without mass in particle catalog')
 
         self.say('using species: {}'.format(species))
 
         center_position = ut.particle.parse_property(
-            part_fin, 'center_position', center_position, host_index)
+            part_fin, 'center_position', center_position, host_index
+        )
 
         if scale_to_halo_radius:
             if not halo_radius:
                 halo_prop = ut.particle.get_halo_properties(
-                    part_fin, 'all', virial_kind, host_index=host_index,
-                    center_position=center_position)
+                    part_fin,
+                    'all',
+                    virial_kind,
+                    host_index=host_index,
+                    center_position=center_position,
+                )
                 halo_radius = halo_prop['radius']
             distance_max *= halo_radius
 
@@ -215,8 +243,12 @@ class InitialConditionClass(ut.io.SayClass):
         spec_select_number = []
         for spec in species:
             distances = ut.coordinate.get_distances(
-                part_fin[spec]['position'], center_position, part_fin.info['box.length'],
-                part_fin.snapshot['scalefactor'], total_distance=True)  # [kpc physical]
+                part_fin[spec]['position'],
+                center_position,
+                part_fin.info['box.length'],
+                part_fin.snapshot['scalefactor'],
+                total_distance=True,
+            )  # [kpc physical]
 
             indices_fin = ut.array.get_indices(distances, [0, distance_max])
 
@@ -236,19 +268,23 @@ class InitialConditionClass(ut.io.SayClass):
                 mass_select += dark_mass * indices_ini.size
             else:
                 raise ValueError(
-                    'no mass for species = {} but also no input dark_mass'.format(spec))
+                    'no mass for species = {} but also no input dark_mass'.format(spec)
+                )
 
             spec_select_number.append(indices_ini.size)
 
         positions_ini = np.array(positions_ini)
         poss_ini_limits = np.array(
-            [[positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
-             for dimen_i in range(positions_ini.shape[1])]
+            [
+                [positions_ini[:, dimen_i].min(), positions_ini[:, dimen_i].max()]
+                for dimen_i in range(positions_ini.shape[1])
+            ]
         )
 
         # properties of initial volume
         density_ini = part_ini.Cosmology.get_density(
-            'matter', part_ini.snapshot['redshift'], 'kpc comoving')
+            'matter', part_ini.snapshot['redshift'], 'kpc comoving'
+        )
         if part_ini.info['baryonic']:
             # subtract baryonic mass
             density_ini *= part_ini.Cosmology['omega_dm'] / part_ini.Cosmology['omega_matter']
@@ -264,7 +300,7 @@ class InitialConditionClass(ut.io.SayClass):
         volume_ini_cube = max(position_difs) ** 3
         mass_ini_cube = volume_ini_cube * density_ini  # assume cosmic density within volume
 
-        volume_ini_cuboid = 1.
+        volume_ini_cuboid = 1.0
         for dimen_i in range(positions_ini.shape[1]):
             volume_ini_cuboid *= position_difs[dimen_i]
         mass_ini_cuboid = volume_ini_cuboid * density_ini  # assume cosmic density within volume
@@ -275,18 +311,32 @@ class InitialConditionClass(ut.io.SayClass):
         with open(log_file_name, 'w') as file_out:
             Write = ut.io.WriteClass(file_out, print_stdout=True)
 
-            Write.write('# redshift: final = {:.3f}, initial = {:.3f}'.format(
-                        part_fin.snapshot['redshift'], part_ini.snapshot['redshift']))
+            Write.write(
+                '# redshift: final = {:.3f}, initial = {:.3f}'.format(
+                    part_fin.snapshot['redshift'], part_ini.snapshot['redshift']
+                )
+            )
             Write.write(
                 '# center of region at final time = [{:.3f}, {:.3f}, {:.3f}] kpc comoving'.format(
-                    center_position[0], center_position[1], center_position[2]))
-            Write.write('# radius of selection region at final time = {:.3f} kpc physical'.format(
-                        distance_max))
+                    center_position[0], center_position[1], center_position[2]
+                )
+            )
+            Write.write(
+                '# radius of selection region at final time = {:.3f} kpc physical'.format(
+                    distance_max
+                )
+            )
             if scale_to_halo_radius:
-                Write.write('  = {:.2f} x R_{}, R_{} = {:.2f} kpc physical'.format(
-                            distance_max / halo_radius, virial_kind, virial_kind, halo_radius))
-            Write.write('# number of particles in selection region at final time = {}'.format(
-                        np.sum(spec_select_number)))
+                Write.write(
+                    '  = {:.2f} x R_{}, R_{} = {:.2f} kpc physical'.format(
+                        distance_max / halo_radius, virial_kind, virial_kind, halo_radius
+                    )
+                )
+            Write.write(
+                '# number of particles in selection region at final time = {}'.format(
+                    np.sum(spec_select_number)
+                )
+            )
             for spec_i, spec in enumerate(species):
                 Write.write('  species {:6}: number = {}'.format(spec, spec_select_number[spec_i]))
             Write.write('# mass from all dark-matter particles:')
@@ -294,38 +344,53 @@ class InitialConditionClass(ut.io.SayClass):
                 mass_dark_all = part_ini['dark']['mass'].sum()
             else:
                 mass_dark_all = dark_mass * part_ini['dark']['id'].size
-            Write.write('  at highest-resolution in input catalog = {:.2e} M_sun'.format(
-                mass_dark_all))
+            Write.write(
+                '  at highest-resolution in input catalog = {:.2e} M_sun'.format(mass_dark_all)
+            )
             Write.write('  in selection region at final time = {:.2e} M_sun'.format(mass_select))
 
             Write.write('# within convex hull at initial time')
             Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
-            Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                        volume_ini_chull * ut.constant.mega_per_kilo ** 3))
+            Write.write(
+                '  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_chull * ut.constant.mega_per_kilo ** 3
+                )
+            )
 
             Write.write('# within encompassing cuboid at initial time')
             Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
-            Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                        volume_ini_cuboid * ut.constant.mega_per_kilo ** 3))
+            Write.write(
+                '  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_cuboid * ut.constant.mega_per_kilo ** 3
+                )
+            )
 
             Write.write('# within encompassing cube at initial time (for MUSIC FFT)')
             Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
-            Write.write('  volume = {:.1f} Mpc^3 comoving'.format(
-                        volume_ini_cube * ut.constant.mega_per_kilo ** 3))
+            Write.write(
+                '  volume = {:.1f} Mpc^3 comoving'.format(
+                    volume_ini_cube * ut.constant.mega_per_kilo ** 3
+                )
+            )
 
             Write.write('# position range at initial time')
             for dimen_i in range(positions_ini.shape[1]):
-                string = ('  {} [min, max, width] = [{:.2f}, {:.2f}, {:.2f}] kpc comoving\n' +
-                          '        [{:.9f}, {:.9f}, {:.9f}] box units')
+                string = (
+                    '  {} [min, max, width] = [{:.2f}, {:.2f}, {:.2f}] kpc comoving\n'
+                    + '        [{:.9f}, {:.9f}, {:.9f}] box units'
+                )
                 pos_min = np.min(poss_ini_limits[dimen_i])
                 pos_max = np.max(poss_ini_limits[dimen_i])
                 pos_width = np.max(poss_ini_limits[dimen_i]) - np.min(poss_ini_limits[dimen_i])
                 Write.write(
                     string.format(
-                        dimen_i, pos_min, pos_max, pos_width,
+                        dimen_i,
+                        pos_min,
+                        pos_max,
+                        pos_width,
                         pos_min / part_ini.info['box.length'],
                         pos_max / part_ini.info['box.length'],
-                        pos_width / part_ini.info['box.length']
+                        pos_width / part_ini.info['box.length'],
                     )
                 )
 
@@ -335,17 +400,31 @@ class InitialConditionClass(ut.io.SayClass):
                 # use convex hull to define initial region to reduce memory
                 ConvexHull = spatial.ConvexHull(positions_ini)
                 positions_ini = positions_ini[ConvexHull.vertices]
-                Write.write('# using convex hull with {} vertices to define initial volume'.format(
-                            positions_ini.shape[0]))
+                Write.write(
+                    '# using convex hull with {} vertices to define initial volume'.format(
+                        positions_ini.shape[0]
+                    )
+                )
 
         with open(file_name, 'w') as file_out:
             for pi in range(positions_ini.shape[0]):
-                file_out.write('{:.8f} {:.8f} {:.8f}\n'.format(
-                               positions_ini[pi, 0], positions_ini[pi, 1], positions_ini[pi, 2]))
+                file_out.write(
+                    '{:.8f} {:.8f} {:.8f}\n'.format(
+                        positions_ini[pi, 0], positions_ini[pi, 1], positions_ini[pi, 2]
+                    )
+                )
 
     def write_initial_positions_from_uniform_box(
-        self, parts, hal, hal_index, distance_max=10, scale_to_halo_radius=True, virial_kind='200m',
-        region_kind='convex-hull', dark_mass=None):
+        self,
+        parts,
+        hal,
+        hal_index,
+        distance_max=10,
+        scale_to_halo_radius=True,
+        virial_kind='200m',
+        region_kind='convex-hull',
+        dark_mass=None,
+    ):
         '''
         Generate and write initial condition positions from a uniform-resolution DM-only
         simulation with a halo catalog.
@@ -370,12 +449,27 @@ class InitialConditionClass(ut.io.SayClass):
         halo_radius = hal['radius'][hal_index]
 
         self.write_initial_positions(
-            parts, center_position, 0, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
-            region_kind, dark_mass)
+            parts,
+            center_position,
+            0,
+            distance_max,
+            scale_to_halo_radius,
+            halo_radius,
+            virial_kind,
+            region_kind,
+            dark_mass,
+        )
 
     def read_write_initial_positions_from_zoom(
-        self, snapshot_redshifts=[0, 99], distance_max=7, scale_to_halo_radius=True,
-        halo_radius=None, virial_kind='200m', region_kind='convex-hull', simulation_directory='.'):
+        self,
+        snapshot_redshifts=[0, 99],
+        distance_max=7,
+        scale_to_halo_radius=True,
+        halo_radius=None,
+        virial_kind='200m',
+        region_kind='convex-hull',
+        simulation_directory='.',
+    ):
         '''
         Generate and write initial condition points from a zoom-in simulation:
             (1) read particles
@@ -402,18 +496,26 @@ class InitialConditionClass(ut.io.SayClass):
         parts = Read.read_particles()
 
         center_position = ut.particle.get_center_positions(
-            parts[0], 'dark', method='center-of-mass', compare_centers=True)[0]
+            parts[0], 'dark', method='center-of-mass'
+        )[0]
 
         self.write_initial_positions(
-            parts, center_position, 0, distance_max, scale_to_halo_radius, halo_radius, virial_kind,
-            region_kind)
+            parts,
+            center_position,
+            0,
+            distance_max,
+            scale_to_halo_radius,
+            halo_radius,
+            virial_kind,
+            region_kind,
+        )
 
 
 InitialCondition = InitialConditionClass()
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # running from command line
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         raise OSError('must specify selection radius, in terms of R_200m')

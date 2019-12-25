@@ -10,6 +10,7 @@ import os
 import sys
 import glob
 import numpy as np
+
 # local ----
 import utilities as ut
 from gizmo_analysis import gizmo_io
@@ -17,47 +18,116 @@ from gizmo_analysis import gizmo_io
 # default subset of snapshots (65 snapshots)
 snapshot_indices_keep = [
     0,  # z = 99
-    20, 26, 33, 41, 52,  # z = 10 - 6
-    55, 57, 60, 64, 67,  # z = 5.8 - 5.0
-    71, 75, 79, 83, 88,  # z = 4.8 - 4.0
-    91, 93, 96, 99, 102, 105, 109, 112, 116, 120,  # z = 3.9 - 3.0
-    124, 128, 133, 137, 142, 148, 153, 159, 165, 172,  # z = 2.9 - 2.0
-    179, 187, 195, 204, 214, 225, 236, 248, 262, 277,  # z = 1.9 - 1.0
-    294, 312, 332, 356, 382, 412, 446, 486, 534,  # z = 0.9 - 0.1
-    539, 544, 550, 555, 561, 567, 573, 579, 585,  # z = 0.09 - 0.01
-    600
+    20,
+    26,
+    33,
+    41,
+    52,  # z = 10 - 6
+    55,
+    57,
+    60,
+    64,
+    67,  # z = 5.8 - 5.0
+    71,
+    75,
+    79,
+    83,
+    88,  # z = 4.8 - 4.0
+    91,
+    93,
+    96,
+    99,
+    102,
+    105,
+    109,
+    112,
+    116,
+    120,  # z = 3.9 - 3.0
+    124,
+    128,
+    133,
+    137,
+    142,
+    148,
+    153,
+    159,
+    165,
+    172,  # z = 2.9 - 2.0
+    179,
+    187,
+    195,
+    204,
+    214,
+    225,
+    236,
+    248,
+    262,
+    277,  # z = 1.9 - 1.0
+    294,
+    312,
+    332,
+    356,
+    382,
+    412,
+    446,
+    486,
+    534,  # z = 0.9 - 0.1
+    539,
+    544,
+    550,
+    555,
+    561,
+    567,
+    573,
+    579,
+    585,  # z = 0.09 - 0.01
+    600,
 ]
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # compress files
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 class CompressClass(ut.io.SayClass):
+    '''
+    .
+    '''
 
     def compress_snapshots(
-            self, snapshot_directory='output', snapshot_directory_out='',
-            snapshot_index_limits=[0, 600], thread_number=1):
-            '''
-            Compress all snapshots in input directory.
+        self,
+        snapshot_directory='output',
+        snapshot_directory_out='',
+        snapshot_index_limits=[0, 600],
+        thread_number=1,
+    ):
+        '''
+        Compress all snapshots in input directory.
 
-            Parameters
-            ----------
-            snapshot_directory : str : directory of snapshots
-            snapshot_directory_out : str : directory to write compressed snapshots
-            snapshot_index_limits : list : min and max snapshot indices to compress
-            syncronize : bool : whether to synchronize parallel tasks,
-                wait for each thread bundle to complete before starting new bundle
-            '''
-            snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+        Parameters
+        ----------
+        snapshot_directory : str : directory of snapshots
+        snapshot_directory_out : str : directory to write compressed snapshots
+        snapshot_index_limits : list : min and max snapshot indices to compress
+        syncronize : bool : whether to synchronize parallel tasks,
+            wait for each thread bundle to complete before starting new bundle
+        '''
+        snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-            args_list = [(snapshot_directory, snapshot_directory_out, snapshot_index)
-                         for snapshot_index in snapshot_indices]
+        args_list = [
+            (snapshot_directory, snapshot_directory_out, snapshot_index)
+            for snapshot_index in snapshot_indices
+        ]
 
-            ut.io.run_in_parallel(self.compress_snapshot, args_list, thread_number=thread_number)
+        ut.io.run_in_parallel(self.compress_snapshot, args_list, thread_number=thread_number)
 
     def compress_snapshot(
-        self, snapshot_directory='output', snapshot_directory_out='', snapshot_index=600,
-        analysis_directory='~/analysis', python_executable='python3'):
+        self,
+        snapshot_directory='output',
+        snapshot_directory_out='',
+        snapshot_index=600,
+        analysis_directory='~/analysis',
+        python_executable='python3',
+    ):
         '''
         Compress single snapshot (which may be multiple files) in input directory.
 
@@ -69,7 +139,8 @@ class CompressClass(ut.io.SayClass):
         analysis_directory : str : directory of analysis code
         '''
         executable = '{} {}/manipulate_hdf5/compactify_hdf5.py -L 0'.format(
-            python_executable, analysis_directory)
+            python_executable, analysis_directory
+        )
         snapshot_name_base = 'snap*_{:03d}*'
 
         if snapshot_directory[-1] != '/':
@@ -79,7 +150,7 @@ class CompressClass(ut.io.SayClass):
 
         path_file_names = glob.glob(snapshot_directory + snapshot_name_base.format(snapshot_index))
 
-        if len(path_file_names):
+        if len(path_file_names) > 0:
             if 'snapdir' in path_file_names[0]:
                 path_file_names = glob.glob(path_file_names[0] + '/*')
 
@@ -88,7 +159,8 @@ class CompressClass(ut.io.SayClass):
             for path_file_name in path_file_names:
                 if snapshot_directory_out:
                     path_file_name_out = path_file_name.replace(
-                        snapshot_directory, snapshot_directory_out)
+                        snapshot_directory, snapshot_directory_out
+                    )
                 else:
                     path_file_name_out = path_file_name
 
@@ -97,8 +169,13 @@ class CompressClass(ut.io.SayClass):
                 os.system(executable_i)
 
     def test_compression(
-        self, snapshot_indices='all', simulation_directory='.', snapshot_directory='output',
-        compression_level=0, verbose=False):
+        self,
+        snapshot_indices='all',
+        simulation_directory='.',
+        snapshot_directory='output',
+        compression_level=0,
+        verbose=False,
+    ):
         '''
         Read headers from all snapshot files in simulation_directory to check whether files have
         been compressed.
@@ -117,7 +194,8 @@ class CompressClass(ut.io.SayClass):
 
         # get all snapshot file names and indices in directory
         path_file_names, file_snapshot_indices = Read.get_snapshot_file_names_indices(
-            simulation_directory + snapshot_directory)
+            simulation_directory + snapshot_directory
+        )
 
         if 'snapdir' in path_file_names[0]:
             # get number of block files per snapshot
@@ -135,38 +213,57 @@ class CompressClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices:
             for snapshot_block_index in range(snapshot_block_number):
                 header = Read.read_header(
-                    'index', snapshot_index, simulation_directory,
-                    snapshot_block_index=snapshot_block_index, verbose=verbose)
+                    'index',
+                    snapshot_index,
+                    simulation_directory,
+                    snapshot_block_index=snapshot_block_index,
+                    verbose=verbose,
+                )
                 if header_compression_name in header:
-                    if (compression_level is not None and
-                            header[header_compression_name] != compression_level and
-                            snapshot_index not in compression_wrong_snapshots):
+                    if (
+                        compression_level is not None
+                        and header[header_compression_name] != compression_level
+                        and snapshot_index not in compression_wrong_snapshots
+                    ):
                         compression_wrong_snapshots.append(snapshot_index)
                 elif snapshot_index not in compression_none_snapshots:
                     compression_none_snapshots.append(snapshot_index)
 
-        self.say('* tested {} snapshots [{}, {}]'.format(
-            len(snapshot_indices), min(snapshot_indices), max(snapshot_indices)))
+        self.say(
+            '* tested {} snapshots [{}, {}]'.format(
+                len(snapshot_indices), min(snapshot_indices), max(snapshot_indices)
+            )
+        )
         self.say('* {} are uncompressed'.format(len(compression_none_snapshots)))
-        if len(compression_none_snapshots):
+        if len(compression_none_snapshots) > 0:
             self.say('{}'.format(compression_none_snapshots))
-        self.say('* {} have wrong compression (level != {})'.format(
-            len(compression_wrong_snapshots), compression_level))
-        if len(compression_wrong_snapshots):
+        self.say(
+            '* {} have wrong compression (level != {})'.format(
+                len(compression_wrong_snapshots), compression_level
+            )
+        )
+        if len(compression_wrong_snapshots) > 0:
             self.say('{}'.format(compression_wrong_snapshots))
 
 
 Compress = CompressClass()
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # transfer files via globus
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 class GlobusClass(ut.io.SayClass):
+    '''
+    .
+    '''
 
     def submit_transfer(
-        self, simulation_path_directory='.', snapshot_directory='output',
-        batch_file_name='globus_batch.txt', machine_name='peloton'):
+        self,
+        simulation_path_directory='.',
+        snapshot_directory='output',
+        batch_file_name='globus_batch.txt',
+        machine_name='peloton',
+    ):
         '''
         Submit globus transfer of simulation files.
         Must initiate from Stampede.
@@ -186,7 +283,8 @@ class GlobusClass(ut.io.SayClass):
             simulation_path_directory += '/'
 
         command = 'globus transfer $(globus bookmark show stampede){}'.format(
-            simulation_path_directory[1:])  # preceeding '/' already in globus bookmark
+            simulation_path_directory[1:]
+        )  # preceeding '/' already in globus bookmark
 
         path_directories = simulation_path_directory.split('/')
         simulation_directory = path_directories[-2]
@@ -212,7 +310,8 @@ class GlobusClass(ut.io.SayClass):
         os.system(command)
 
     def write_batch_file(
-        self, simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'):
+        self, simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'
+    ):
         '''
         Write batch file that sets files to transfer via globus.
 
@@ -236,7 +335,6 @@ class GlobusClass(ut.io.SayClass):
             'gizmo.out.txt',
             'snapshot_times.txt',
             'notes.txt',
-
             'track/',
             'halo/rockstar_dm/catalog_hdf5/',
         ]
@@ -276,12 +374,15 @@ class GlobusClass(ut.io.SayClass):
 Globus = GlobusClass()
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # transfer files via rsync
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 def rsync_snapshots(
-    machine_name, simulation_directory_from='', simulation_directory_to='.',
-    snapshot_indices=snapshot_indices_keep):
+    machine_name,
+    simulation_directory_from='',
+    simulation_directory_to='.',
+    snapshot_indices=snapshot_indices_keep,
+):
     '''
     Use rsync to copy snapshot file[s].
 
@@ -302,8 +403,7 @@ def rsync_snapshots(
 
     snapshot_path_names = ''
     for snapshot_index in snapshot_indices:
-        snapshot_path_names += (
-            directory_from + snapshot_name_base.format(snapshot_index) + ' ')
+        snapshot_path_names += directory_from + snapshot_name_base.format(snapshot_index) + ' '
 
     command = 'rsync -ahvP --size-only '
     command += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
@@ -312,7 +412,8 @@ def rsync_snapshots(
 
 
 def rsync_simulation_files(
-    machine_name, directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE', directory_to='.'):
+    machine_name, directory_from='/oldscratch/projects/xsede/GalaxiesOnFIRE', directory_to='.'
+):
     '''
     Use rsync to copy simulation files.
 
@@ -325,26 +426,20 @@ def rsync_simulation_files(
     excludes = [
         'output/',
         'restartfiles/',
-
         'ewald_spc_table_64_dbl.dat',
         'spcool_tables/',
         'TREECOOL',
-
         'energy.txt',
         'balance.txt',
         'GasReturn.txt',
         'HIIheating.txt',
         'MomWinds.txt',
         'SNeIIheating.txt',
-
         '*.ics',
-
         'snapshot_scale-factors.txt',
         'submit_gizmo*.py',
-
         '*.bin',
         '*.particles',
-
         '*.bak',
         '*.err',
         '*.pyc',
@@ -373,11 +468,12 @@ def rsync_simulation_files(
     os.system(command)
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # delete files
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 def delete_snapshots(
-    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False):
+    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False
+):
     '''
     Delete all snapshots in given directory within snapshot_index_limits,
     except for those in snapshot_indices_keep list.
@@ -398,7 +494,7 @@ def delete_snapshots(
     if snapshot_directory[-1] != '/':
         snapshot_directory += '/'
 
-    if snapshot_index_limits is None or not len(snapshot_index_limits):
+    if snapshot_index_limits is None or len(snapshot_index_limits) == 0:
         snapshot_index_limits = [1, 599]
     snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
@@ -416,17 +512,21 @@ def delete_snapshots(
     print()
 
 
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 # running from command line
-#===================================================================================================
+# --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         raise OSError('specify function to run: compress, globus, rsync, delete')
 
     function_kind = str(sys.argv[1])
 
-    assert ('compress' in function_kind or 'rsync' in function_kind or 'globus' in function_kind or
-            'delete' in function_kind)
+    assert (
+        'compress' in function_kind
+        or 'rsync' in function_kind
+        or 'globus' in function_kind
+        or 'delete' in function_kind
+    )
 
     if 'compress' in function_kind:
         directory = 'output'
@@ -451,8 +551,7 @@ if __name__ == '__main__':
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
-            raise OSError(
-                'imports: machine_name simulation_directory_from simulation_directory_to')
+            raise OSError('imports: machine_name simulation_directory_from simulation_directory_to')
 
         machine_name = str(sys.argv[2])
         simulation_directory_from = str(sys.argv[3])
