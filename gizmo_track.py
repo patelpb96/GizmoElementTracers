@@ -305,7 +305,7 @@ class ParticlePointerClass(ut.io.SayClass):
         ----------
         species_names : str or list : name[s] of particle species to track
         simulation_directory : str : directory of simulation
-        track_directory : str : directory of particle pointer files
+        track_directory : str : directory of files for particle pointers and formation coordinates
         snapshot_directory : str : directory of snapshot files (within simulation directory)
         reference_snapshot_index : int :
             index of reference (later) snapshot to compute particle pointers relative to
@@ -345,7 +345,7 @@ class ParticlePointerClass(ut.io.SayClass):
         snapshot_index : int : index of the (earlier, z) snapshot to read
         Pointer : dict class : particle pointers (if writing)
         simulation_directory : str : directory of simulation
-        track_directory : str : directory of pointer files
+        track_directory : str : directory of files for particle pointers and formation coordinates
 
         Returns
         -------
@@ -425,7 +425,7 @@ class ParticlePointerClass(ut.io.SayClass):
         snapshot_index : int : index of other (non-reference) snapshot to read
         Pointer : dict class : particle pointers (if writing)
         simulation_directory : str : directory of simulation
-        track_directory : str: directory of pointer files
+        track_directory : str: directory of files for particle pointers and formation coordinates
 
         Returns
         -------
@@ -1027,7 +1027,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         ----------
         species : str : name of particle species to track
         simulation_directory : str : directory of simulation
-        track_directory : str : directory of formation coordinate file
+        track_directory : str : directory of files for particle pointers and formation coordinates
         reference_snapshot_index : float :
             index of reference (later) snapshot to compute particle pointers from
         snapshot_directory : str : directory of snapshot files (within simulation directory)
@@ -1065,7 +1065,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         ----------
         part : dict : catalog of particles at a snapshot
         simulation_directory : str : directory of simulation
-        track_directory : str : directory of formation coordinate file
+        track_directory : str : directory of files for particle pointers and formation coordinates
         write : bool : whether to write to file (instead of read)
         '''
         file_name = '{}_form_coordinates_{:03d}'.format(self.species_name, part.snapshot['index'])
@@ -1145,7 +1145,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 'index',
                 self.reference_snapshot_index,
                 simulation_directory,
-                snapshot_directory=self.snapshot_directory,
+                self.snapshot_directory,
                 properties=[
                     self.id_name,
                     'position',

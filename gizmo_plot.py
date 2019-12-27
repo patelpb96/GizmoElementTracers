@@ -4506,7 +4506,11 @@ class CompareSimulationsClass(ut.io.SayClass):
         for redshift in redshifts:
             if len(redshifts) > 1:
                 parts = self.Read.read_snapshots_simulations(
-                    simulation_directories, species, 'redshift', redshift, self.properties
+                    species,
+                    'redshift',
+                    redshift,
+                    simulation_directories,
+                    properties=self.properties,
                 )
 
             for part in parts:

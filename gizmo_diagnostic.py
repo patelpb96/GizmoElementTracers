@@ -635,6 +635,7 @@ def print_properties_statistics(
     snapshot_value=600,
     simulation_directory='.',
     snapshot_directory='output/',
+    track_directory='track/',
 ):
     '''
     For each property of each species in particle catalog, print range and median.
@@ -646,6 +647,8 @@ def print_properties_statistics(
     snapshot_value : int or float : index (number) of snapshot file
     simulation_directory : root directory of simulation
     snapshot_directory: str : directory of snapshot files within simulation_directory
+    track_directory : str :
+        directory of files for particle pointers, formation coordinates, and host coordinates
 
     Returns
     -------
@@ -662,6 +665,7 @@ def print_properties_statistics(
         snapshot_value,
         simulation_directory,
         snapshot_directory,
+        track_directory,
         '',
         None,
         None,
@@ -675,7 +679,8 @@ def print_properties_statistics(
 
 def print_properties_snapshots(
     simulation_directory='.',
-    snapshot_directory='output',
+    snapshot_directory='output/',
+    track_directory='track/',
     species_property_dict={'gas': ['smooth.length', 'number.density']},
 ):
     '''
@@ -686,6 +691,8 @@ def print_properties_snapshots(
     ----------
     simulation_directory : str : directory of simulation
     snapshot_directory : str : directory of snapshot files
+    track_directory : str :
+        directory of files for particle pointers, formation coordinates, and host coordinates
     species_property_dict : dict : keys = species, values are string or list of property[s]
     '''
     element_indices = [0, 1]
@@ -734,6 +741,7 @@ def print_properties_snapshots(
                 snapshot_i,
                 simulation_directory,
                 snapshot_directory,
+                track_directory,
                 '',
                 properties_read,
                 element_indices,

@@ -599,6 +599,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_values=600,
         simulation_directory='.',
         snapshot_directory='output/',
+        track_directory='track/',
         simulation_name='',
         properties='all',
         element_indices=None,
@@ -634,7 +635,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_values : int or float or list thereof :
             index[s] or redshift[s] or scale-factor[s] of snapshot[s]
         simulation_directory : str : directory of simulation
-        snapshot_directory: str : directory of snapshot files within simulation_directory
+        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        track_directory : str :
+            directory of files for particle pointers, formation coordinates, and host coordinates
         simulation_name : str : name to store for future identification
         properties : str or list : name[s] of particle properties to read - options:
             'all' = all species in file
@@ -780,8 +783,6 @@ class ReadClass(ut.io.SayClass):
 
             # initialize arrays to store position[s] and velocity[s] of host galaxy/halo[s]
             # store both single 'default' host and array of hosts (for LG-like pairs)
-            part.host_positions = []
-            part.host_velocities = []
             for spec_name in part:
                 part[spec_name].host_positions = []
                 part[spec_name].host_velocities = []
@@ -790,7 +791,6 @@ class ReadClass(ut.io.SayClass):
                 self.assign_host_coordinates(part, host_number=host_number)
 
             # initialize arrays to store rotation tensor[s] that define principal axes of host[s]
-            part.host_rotations = []
             for spec_name in part:
                 part[spec_name].host_rotations = []
             if assign_host_coordinates and assign_host_principal_axes:
@@ -807,7 +807,7 @@ class ReadClass(ut.io.SayClass):
                     # assign coordinates wrt host galaxy at formation
                     ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
                         simulation_directory=simulation_directory,
-                        track_directory=gizmo_track.TRACK_DIRECTORY,
+                        track_directory=track_directory,
                     )
                     ParticleCoordinate.io_formation_coordinates(part)
 
@@ -815,7 +815,7 @@ class ReadClass(ut.io.SayClass):
                     # assign star and gas particle pointers from z = 0 to this snapshot
                     ParticlePointer = gizmo_track.ParticlePointerClass(
                         simulation_directory=simulation_directory,
-                        track_directory=gizmo_track.TRACK_DIRECTORY,
+                        track_directory=track_directory,
                     )
                     ParticlePointer.io_pointers(part)
 
@@ -835,6 +835,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value=600,
         simulation_directories=[],
         snapshot_directory='output/',
+        track_directory='track/',
         properties='all',
         element_indices=[0, 1, 6, 10],
         assign_host_principal_axes=False,
@@ -852,7 +853,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_value : int or float : index or redshift or scale-factor of snapshot
         simulation_directories : list or list of lists :
             list of simulation directories, or list of pairs of directory + simulation name
-        snapshot_directory: str : directory of snapshot files within simulation_directory
+        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        track_directory : str :
+            directory of files for particle pointers, formation coordinates, and host coordinates
         properties : str or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
         assign_host_principal_axes : bool :
@@ -867,9 +870,8 @@ class ReadClass(ut.io.SayClass):
         # parse list of directories
         if np.ndim(simulation_directories) == 0:
             raise ValueError(
-                'input simulation_directories = {} but need to input list'.format(
-                    simulation_directories
-                )
+                f'input simulation_directories = {simulation_directories} but need to input list'
+
             )
         elif np.ndim(simulation_directories) == 1:
             # assign null names
@@ -880,7 +882,7 @@ class ReadClass(ut.io.SayClass):
             pass
         elif np.ndim(simulation_directories) >= 3:
             raise ValueError(
-                'not sure how to parse simulation_directories = {}'.format(simulation_directories)
+                f'not sure how to parse simulation_directories = {simulation_directories}'
             )
 
         # first pass, read only header, to check that can read all simulations
@@ -903,7 +905,7 @@ class ReadClass(ut.io.SayClass):
                 bad_snapshot_value += 1
 
         if bad_snapshot_value:
-            self.say('\n! could not read {} snapshots'.format(bad_snapshot_value))
+            self.say(f'\n! could not read {bad_snapshot_value} snapshots')
             return
 
         parts = []
@@ -916,6 +918,7 @@ class ReadClass(ut.io.SayClass):
                     snapshot_value,
                     directory,
                     snapshot_directory,
+                    track_directory,
                     simulation_name,
                     properties,
                     element_indices,
@@ -2104,10 +2107,10 @@ def write_snapshot_text(part):
             '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n'
         )
 
-        for pi in range(len(part_spec['id'])):
+        for pi, pid in enumerate(part_spec['id']):
             file_out.write(
                 '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f}\n'.format(
-                    part_spec['id'][pi],
+                    pid,
                     part_spec['mass'][pi],
                     part_spec.prop('host.distance', pi)[0],
                     part_spec.prop('host.distance', pi)[1],
@@ -2128,10 +2131,10 @@ def write_snapshot_text(part):
             + ' density[M_sun/kpc^3] temperature[K]\n'
         )
 
-        for pi in range(len(part_spec['id'])):
+        for pi, pid in enumerate(part_spec['id']):
             file_out.write(
                 '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.2e} {:.2e}\n'.format(
-                    part_spec['id'][pi],
+                    pid,
                     part_spec['mass'][pi],
                     part_spec.prop('host.distance', pi)[0],
                     part_spec.prop('host.distance', pi)[1],
@@ -2154,10 +2157,10 @@ def write_snapshot_text(part):
             + ' age[Gyr]\n'
         )
 
-        for pi in range(len(part_spec['id'])):
+        for pi, pid in enumerate(part_spec['id']):
             file_out.write(
                 '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.3f}\n'.format(
-                    part_spec['id'][pi],
+                    pid,
                     part_spec['mass'][pi],
                     part_spec.prop('host.distance', pi)[0],
                     part_spec.prop('host.distance', pi)[1],
