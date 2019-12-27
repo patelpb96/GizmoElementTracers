@@ -356,17 +356,17 @@ class ContaminationClass(ut.io.SayClass):
             )
 
         # initialize total mass
-        for prop in profile_mass[spec_name]:
-            if 'distance' not in prop:
-                profile_mass['total'][prop] = 0
+        for prop_name in profile_mass[spec_name]:
+            if 'distance' not in prop_name:
+                profile_mass['total'][prop_name] = 0
             else:
-                profile_mass['total'][prop] = profile_mass[spec_name][prop]
+                profile_mass['total'][prop_name] = profile_mass[spec_name][prop_name]
 
         # compute mass fractions relative to total mass
         for spec_name in part:
-            for prop in profile_mass[spec_name]:
-                if 'distance' not in prop:
-                    profile_mass['total'][prop] += profile_mass[spec_name][prop]
+            for prop_name in profile_mass[spec_name]:
+                if 'distance' not in prop_name:
+                    profile_mass['total'][prop_name] += profile_mass[spec_name][prop_name]
 
         for spec_name in part:
             profile_mass_ratio[spec_name] = {
@@ -712,14 +712,14 @@ def print_properties_snapshots(
             properties = [properties]
 
         prop_dict = {}
-        for prop in species_property_dict[spec_name]:
-            prop_dict[prop] = []
+        for prop_name in species_property_dict[spec_name]:
+            prop_dict[prop_name] = []
 
-            prop_read = prop.replace('.number', '')
-            if prop_read not in properties_read:
-                properties_read.append(prop_read)
+            prop_name_read = prop_name.replace('.number', '')
+            if prop_name_read not in properties_read:
+                properties_read.append(prop_name_read)
 
-            if '.number' in prop and 'massfraction' not in properties_read:
+            if '.number' in prop_name and 'massfraction' not in properties_read:
                 properties_read.append('massfraction')
 
         # re-assign property list as dictionary so can store list of values
@@ -742,12 +742,14 @@ def print_properties_snapshots(
             )
 
             for spec_name in species_property_dict:
-                for prop in species_property_dict[spec_name]:
+                for prop_name in species_property_dict[spec_name]:
                     try:
-                        prop_ext = property_statistic[prop]['function'](part[spec_name].prop(prop))
-                        species_property_dict[spec_name][prop].append(prop_ext)
+                        prop_name_ext = property_statistic[prop_name]['function'](
+                            part[spec_name].prop(prop_name)
+                        )
+                        species_property_dict[spec_name][prop_name].append(prop_name_ext)
                     except Exception:
-                        Say.say('! {} {} not in particle dictionary'.format(spec_name, prop))
+                        Say.say('! {} {} not in particle dictionary'.format(spec_name, prop_name))
         except Exception:
             Say.say(
                 '! cannot read snapshot index {} in {}'.format(
@@ -758,13 +760,13 @@ def print_properties_snapshots(
     Statistic = ut.statistic.StatisticClass()
 
     for spec_name in species_property_dict:
-        for prop in species_property_dict[prop]:
-            prop_func_name = property_statistic[prop]['function.name']
-            prop_values = np.array(species_property_dict[spec_name][prop])
+        for prop_name in species_property_dict[prop_name]:
+            prop_func_name = property_statistic[prop_name]['function.name']
+            prop_values = np.array(species_property_dict[spec_name][prop_name])
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
-            Say.say('\n{} {} {}:'.format(spec_name, prop, prop_func_name))
+            Say.say('\n{} {} {}:'.format(spec_name, prop_name, prop_func_name))
             for stat_name in ['min', 'percent.16', 'median', 'percent.84', 'max']:
                 Say.say('{:10s} = {:.3f}'.format(stat_name, Statistic.stat[stat_name]))
 
@@ -785,7 +787,7 @@ def test_stellar_mass_loss(
     species = 'star'
 
     if 'Pointer' not in part_z.__dict__:
-        gizmo_track.ParticlePointerIO.io_pointers(part_z)
+        gizmo_track.ParticlePointer.io_pointers(part_z)
 
     MetalBin = ut.binning.BinClass(
         metallicity_limits, metallicity_bin_width, include_max=True, scaling='log'

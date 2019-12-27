@@ -19,9 +19,6 @@ from scipy import integrate
 import utilities as ut
 
 
-# --------------------------------------------------------------------------------------------------
-# nucleosynthetic yields
-# --------------------------------------------------------------------------------------------------
 # elemental abundances (mass fraction) of the Sun that Gizmo assumes
 sun_massfraction = {}
 sun_massfraction['metals'] = 0.02  # total metal mass fraction

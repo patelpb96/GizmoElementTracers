@@ -5,7 +5,7 @@ Analyze nucleosynthetic yields in Gizmo simulations.
 
 Units: unless otherwise noted, all quantities are in (combinations of):
     mass [M_sun]
-    position [kpc comoving]
+    position [kpc comovÎing]
     distance, radius [kpc physical]
     velocity [km / s]
     time [Gyr]
@@ -14,7 +14,6 @@ Units: unless otherwise noted, all quantities are in (combinations of):
 import collections
 import numpy as np
 
-# local ----
 import utilities as ut
 
 

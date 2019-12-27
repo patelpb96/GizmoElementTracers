@@ -126,9 +126,9 @@ class ReadClass(ut.io.SayClass):
 
             # if not sort dark particles, assign id-to-index coversion to track across snapshots
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
-                for spec in part:
-                    self.say('assigning id-to-index to species: {}'.format(spec))
-                    ut.catalog.assign_id_to_index(part[spec], 'id', 0)
+                for spec_name in part:
+                    self.say('assigning id-to-index to species: {}'.format(spec_name))
+                    ut.catalog.assign_id_to_index(part[spec_name], 'id', 0)
 
             parts.append(part)
 
@@ -194,32 +194,34 @@ class InitialConditionClass(ut.io.SayClass):
             part_fin, part_ini = part_ini, part_fin
 
         # determine which species are in catalog
-        species = ['dark', 'dark2', 'dark3', 'dark4', 'dark5', 'dark6']
-        for spec in list(species):
-            if spec not in part_fin:
-                species.remove(spec)
+        species_names = ['dark', 'dark2', 'dark3', 'dark4', 'dark5', 'dark6']
+        for spec_name in list(species_names):
+            if spec_name not in part_fin:
+                species_names.remove(spec_name)
                 continue
 
             # sanity check
-            if 'id.to.index' not in part_ini[spec]:
-                if np.min(part_fin[spec]['id'] == part_ini[spec]['id']) is False:
+            if 'id.to.index' not in part_ini[spec_name]:
+                if np.min(part_fin[spec_name]['id'] == part_ini[spec_name]['id']) is False:
                     self.say(
-                        '! species = {}: ids not match in final v initial catalogs'.format(spec)
+                        '! species = {}: ids not match in final v initial catalogs'.format(
+                            spec_name
+                        )
                     )
                     return
 
         # sanity check
         if dark_mass:
-            if species != ['dark']:
+            if species_names != ['dark']:
                 raise ValueError(
                     'input dark_mass = {:.3e} Msun, but catalog contains species = {}'.format(
-                        dark_mass, species
+                        dark_mass, species_names
                     )
                 )
             if scale_to_halo_radius and not halo_radius:
                 raise ValueError('cannot determine halo_radius without mass in particle catalog')
 
-        self.say('using species: {}'.format(species))
+        self.say('using species: {}'.format(species_names))
 
         center_position = ut.particle.parse_property(
             part_fin, 'center_position', center_position, host_index
@@ -240,9 +242,9 @@ class InitialConditionClass(ut.io.SayClass):
         mass_select = 0
         positions_ini = []
         spec_select_number = []
-        for spec in species:
+        for spec_name in species_names:
             distances = ut.coordinate.get_distances(
-                part_fin[spec]['position'],
+                part_fin[spec_name]['position'],
                 center_position,
                 part_fin.info['box.length'],
                 part_fin.snapshot['scalefactor'],
@@ -253,21 +255,21 @@ class InitialConditionClass(ut.io.SayClass):
 
             # if id-to-index array is in species dictionary
             # assume id not sorted, so have to convert between id and index
-            if 'id.to.index' in part_ini[spec]:
-                ids = part_fin[spec]['id'][indices_fin]
-                indices_ini = part_ini[spec]['id.to.index'][ids]
+            if 'id.to.index' in part_ini[spec_name]:
+                ids = part_fin[spec_name]['id'][indices_fin]
+                indices_ini = part_ini[spec_name]['id.to.index'][ids]
             else:
                 indices_ini = indices_fin
 
-            positions_ini.extend(part_ini[spec]['position'][indices_ini])
+            positions_ini.extend(part_ini[spec_name]['position'][indices_ini])
 
-            if 'mass' in part_ini[spec]:
-                mass_select += part_ini[spec]['mass'][indices_ini].sum()
+            if 'mass' in part_ini[spec_name]:
+                mass_select += part_ini[spec_name]['mass'][indices_ini].sum()
             elif dark_mass:
                 mass_select += dark_mass * indices_ini.size
             else:
                 raise ValueError(
-                    'no mass for species = {} but also no input dark_mass'.format(spec)
+                    'no mass for species = {} but also no input dark_mass'.format(spec_name)
                 )
 
             spec_select_number.append(indices_ini.size)
@@ -336,8 +338,10 @@ class InitialConditionClass(ut.io.SayClass):
                     np.sum(spec_select_number)
                 )
             )
-            for spec_i, spec in enumerate(species):
-                Write.write('  species {:6}: number = {}'.format(spec, spec_select_number[spec_i]))
+            for spec_i, spec_name in enumerate(species_names):
+                Write.write(
+                    '  species {:6}: number = {}'.format(spec_name, spec_select_number[spec_i])
+                )
             Write.write('# mass from all dark-matter particles:')
             if 'mass' in part_ini['dark']:
                 mass_dark_all = part_ini['dark']['mass'].sum()

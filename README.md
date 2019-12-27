@@ -32,13 +32,10 @@ We develop this package using Python 3.7 and recommend that you use the same ver
 * generate cosmological zoom-in initial conditions from snapshot files
 
 ## gizmo_star.py
-* get/plot rates of supernovae and stellar winds, stellar mass loss, overall abundance yields, as used in Gizmo
+* get/plot rates of supernovae and stellar winds, stellar mass loss, nucleosynthetic yields, as used in Gizmo
 
 ## gizmo_track.py
 * track star and gas particles across snapshots
-
-## gizmo_yield.py
-* get/plot information about nucleosynthetic yields, as used in Gizmo
 
 ## gizmo_tutorial.ipynb
 * jupyter notebook tutorial for using this package

@@ -77,13 +77,13 @@ def print_properties_statistics(part, species='all'):
     # Statistic = ut.statistic.StatisticClass()
 
     Say.say('printing minimum, median, maximum')
-    for spec in species_print:
-        Say.say('\n* {}'.format(spec))
-        for prop in species_property_dict[spec]:
+    for spec_name in species_print:
+        Say.say('\n* {}'.format(spec_name))
+        for prop_name in species_property_dict[spec_name]:
             try:
-                prop_values = part[spec].prop(prop)
+                prop_values = part[spec_name].prop(prop_name)
             except KeyError:
-                Say.say('{} not in catalog'.format(prop))
+                Say.say('{} not in catalog'.format(prop_name))
                 continue
 
             # Statistic.stat = Statistic.get_statistic_dict(prop_values)
@@ -97,7 +97,7 @@ def print_properties_statistics(part, species='all'):
                 number_format = '{:.1e}'
 
             print_string = '{}:  {},  {},  {}'.format(
-                prop, number_format, number_format, number_format
+                prop_name, number_format, number_format, number_format
             )
 
             Say.say(
@@ -1254,22 +1254,20 @@ def plot_property_v_property(
         cmap=color_map,
     )
 
-    """
-    valuess, _xs, _ys = np.histogram2d(
-        x_prop_values, y_prop_values, property_bin_number,
-        [axis_x_limits, axis_y_limits],
-        normed=False, weights=masses)
+    # valuess, _xs, _ys = np.histogram2d(
+    #    x_prop_values, y_prop_values, property_bin_number,
+    #    [axis_x_limits, axis_y_limits],
+    #    normed=False, weights=masses)
 
-    subplot.imshow(
-        valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
-        aspect='auto',
-        interpolation='nearest',
-        #interpolation='none',
-        extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
-        #vmin=valuess.min(), vmax=valuess.max(),
-        #label=label,
-    )
-    """
+    # subplot.imshow(
+    #    valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
+    #    aspect='auto',
+    #    interpolation='nearest',
+    #    #interpolation='none',
+    #    extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
+    #    #vmin=valuess.min(), vmax=valuess.max(),
+    #    #label=label,
+    # )
     # plt.colorbar()
 
     if draw_statistics:
@@ -1741,7 +1739,7 @@ def plot_disk_orientation(
             verbose=False,
         )
         axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation.tensor'])
-        # axis_rotation_ref = np.dot(orientation_axis, part['star'].host_rotation_tensors[0])
+        # axis_rotation_ref = np.dot(orientation_axis, part['star'].host_rotations[0])
 
         for spec_i, spec_name in enumerate(species_names):
             Say.say('  {}'.format(spec_name))
@@ -3309,15 +3307,13 @@ def explore_galaxy(
                 figure_index=22,
             )
 
-            """
-            plot_property_v_distance(
-                part, 'dark', 'velocity.total', 'std.cum', 'linear', True, None,
-                [0.1, distance_max], 0.1, 'log', 3,
-                center_positions=center_position, center_velocities=center_velocity,
-                part_indicess=part_indices,
-                distance_reference=distance_reference,
-                write_plot=write_plot, plot_directory=plot_directory, figure_index=23)
-            """
+            # plot_property_v_distance(
+            #    part, 'dark', 'velocity.total', 'std.cum', 'linear', True, None,
+            #    [0.1, distance_max], 0.1, 'log', 3,
+            #    center_positions=center_position, center_velocities=center_velocity,
+            #    part_indicess=part_indices,
+            #    distance_reference=distance_reference,
+            #    write_plot=write_plot, plot_directory=plot_directory, figure_index=23)
 
             plot_property_v_distance(
                 part,
@@ -3539,11 +3535,11 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
 
     gal = {'index': [], 'redshift': [], 'scalefactor': [], 'time': [], 'time.lookback': []}
 
-    for spec in species:
-        gal['{}.position'.format(spec)] = []
+    for spec_name in species:
+        gal['{}.position'.format(spec_name)] = []
         for mass_percent in mass_percents:
-            gal['{}.radius.{:.0f}'.format(spec, mass_percent)] = []
-            gal['{}.mass.{:.0f}'.format(spec, mass_percent)] = []
+            gal['{}.radius.{:.0f}'.format(spec_name, mass_percent)] = []
+            gal['{}.mass.{:.0f}'.format(spec_name, mass_percent)] = []
 
     if redshifts == 'all' or redshifts is None or redshifts == []:
         Snapshot = ut.simulation.SnapshotClass()
@@ -3566,18 +3562,18 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
         # get position and velocity
         gal['star.position'].append(part.host_positions[0])
 
-        for spec in species:
+        for spec_name in species:
             for mass_percent in mass_percents:
                 gal_prop = ut.particle.get_galaxy_properties(
-                    part, spec, 'mass.percent', mass_percent, distance_max=star_distance_max
+                    part, spec_name, 'mass.percent', mass_percent, distance_max=star_distance_max
                 )
-                k = '{}.radius.{:.0f}'.format(spec, mass_percent)
+                k = '{}.radius.{:.0f}'.format(spec_name, mass_percent)
                 gal[k].append(gal_prop['radius'])
-                k = '{}.mass.{:.0f}'.format(spec, mass_percent)
+                k = '{}.mass.{:.0f}'.format(spec_name, mass_percent)
                 gal[k].append(gal_prop['radius'])
 
-    for prop in gal:
-        gal[prop] = np.array(gal[prop])
+    for prop_name in gal:
+        gal[prop_name] = np.array(gal[prop_name])
 
     ut.io.file_pickle(simulation_directory + 'host_properties_v_time', gal)
 
@@ -3900,8 +3896,8 @@ def get_galaxy_mass_profiles_v_redshift(
         for k in ['distance', 'density']:
             gal['profile.minor.disk.' + k].append(pro[profile_species_name][k])
 
-    for prop in gal:
-        gal[prop] = np.array(gal[prop])
+    for prop_name in gal:
+        gal[prop_name] = np.array(gal[prop_name])
 
     return gal
 
@@ -4144,21 +4140,21 @@ class CompareSimulationsClass(ut.io.SayClass):
                 )
 
             gals = []
-            for spec in ut.array.get_list_combined(species, parts[0], 'intersect'):
+            for spec_name in ut.array.get_list_combined(species, parts[0], 'intersect'):
                 for part in parts:
                     gal = ut.particle.get_galaxy_properties(
-                        part, spec, 'mass.percent', mass_fraction, 'both', distance_max
+                        part, spec_name, 'mass.percent', mass_fraction, 'both', distance_max
                     )
                     gals.append(gal)
 
-                self.say('\n# species = {}'.format(spec))
+                self.say('\n# species = {}'.format(spec_name))
 
                 for part_i, part in enumerate(parts):
                     gal = gals[part_i]
                     self.say('\n{}'.format(part.info['simulation.name']))
                     self.say(
                         '* M_{},{} = {:.2e} Msun ({:.2f})'.format(
-                            spec, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']
+                            spec_name, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']
                         )
                     )
                     string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
@@ -4248,11 +4244,11 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_directory=self.plot_directory,
                 )
 
-            spec = 'dark'
-            if spec in parts[0]:
+            spec_name = 'dark'
+            if spec_name in parts[0]:
                 plot_property_v_distance(
                     parts,
-                    spec,
+                    spec_name,
                     'mass',
                     'sum.cum',
                     'log',
@@ -4266,7 +4262,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
                 plot_property_v_distance(
                     parts,
-                    spec,
+                    spec_name,
                     'mass',
                     'density',
                     'log',
@@ -4278,11 +4274,11 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_directory=self.plot_directory,
                 )
 
-            spec = 'gas'
-            if spec in parts[0]:
+            spec_name = 'gas'
+            if spec_name in parts[0]:
                 plot_property_v_distance(
                     parts,
-                    spec,
+                    spec_name,
                     'mass',
                     'sum.cum',
                     'log',
@@ -4294,11 +4290,11 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_directory=self.plot_directory,
                 )
 
-                if 'massfraction' in parts[0][spec]:
+                if 'massfraction' in parts[0][spec_name]:
                     try:
                         plot_property_v_distance(
                             parts,
-                            spec,
+                            spec_name,
                             'metallicity.total',
                             'median',
                             'linear',
@@ -4312,7 +4308,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
                         plot_property_distribution(
                             parts,
-                            spec,
+                            spec_name,
                             'metallicity.total',
                             [-5, 1.3],
                             0.1,
@@ -4327,20 +4323,18 @@ class CompareSimulationsClass(ut.io.SayClass):
                     except Exception:
                         pass
 
-                """
-                if 'velocity' in parts[0][prop]:
-                    plot_property_v_distance(
-                        parts, spec, 'host.velocity.rad', 'average', 'linear', True,
-                        [None, None], self.halo_profile_radius_limits, 0.25,
-                        write_plot=True, plot_directory=self.plot_directory,
-                    )
-                """
+                # if 'velocity' in parts[0][prop]:
+                #    plot_property_v_distance(
+                #        parts, spec, 'host.velocity.rad', 'average', 'linear', True,
+                #        [None, None], self.halo_profile_radius_limits, 0.25,
+                #        write_plot=True, plot_directory=self.plot_directory,
+                #    )
 
-            spec = 'star'
-            if spec in parts[0]:
+            spec_name = 'star'
+            if spec_name in parts[0]:
                 plot_property_v_distance(
                     parts,
-                    spec,
+                    spec_name,
                     'mass',
                     'sum.cum',
                     'log',
@@ -4354,7 +4348,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
                 plot_property_v_distance(
                     parts,
-                    spec,
+                    spec_name,
                     'mass',
                     'density',
                     'log',
@@ -4366,11 +4360,11 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_directory=self.plot_directory,
                 )
 
-                if 'massfraction' in parts[0][spec]:
+                if 'massfraction' in parts[0][spec_name]:
                     try:
                         plot_property_v_distance(
                             parts,
-                            spec,
+                            spec_name,
                             'metallicity.fe',
                             'median',
                             'linear',
@@ -4384,7 +4378,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
                         plot_property_distribution(
                             parts,
-                            spec,
+                            spec_name,
                             'metallicity.fe',
                             [-5, 1.3],
                             0.1,
@@ -4402,7 +4396,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     try:
                         plot_property_v_distance(
                             parts,
-                            spec,
+                            spec_name,
                             'metallicity.mg - metallicity.fe',
                             'median',
                             'linear',
@@ -4416,7 +4410,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
                         plot_property_distribution(
                             parts,
-                            spec,
+                            spec_name,
                             'metallicity.mg - metallicity.fe',
                             [-1.7, 0.6],
                             0.1,
@@ -4431,10 +4425,10 @@ class CompareSimulationsClass(ut.io.SayClass):
                     except Exception:
                         pass
 
-                if 'form.scalefactor' in parts[0][spec] and redshift <= 5:
+                if 'form.scalefactor' in parts[0][spec_name] and redshift <= 5:
                     plot_property_v_distance(
                         parts,
-                        spec,
+                        spec_name,
                         'age',
                         'average',
                         'linear',
