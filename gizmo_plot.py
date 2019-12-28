@@ -3765,7 +3765,7 @@ def get_galaxy_mass_profiles_v_redshift(
         gal['star.velocity'].append(part.host_velocities[0])
 
         gal['dark.position'].append(
-            ut.particle.get_center_positions(part, 'dark', method='potential')
+            ut.particle.get_center_positions(part, 'dark', weight_property='potential')
         )
         gal['dark.velocity'].append(
             ut.particle.get_center_velocities(part, 'dark', distance_max=dark_distance_max)

@@ -1052,6 +1052,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         # names of distances and velocities to write/read
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
+        self.file_name_base = f'{species_name}_form_coordinates' + '_{:03d}'
+
     def io_formation_coordinates(
         self, part, simulation_directory=None, track_directory=None, write=False
     ):
@@ -1059,7 +1061,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         Read or write, for each particle, at the first snapshot after it formed,
         its coordinates (3-D distances and 3-D velocities) wrt the host galaxy center,
         aligned with the principal axes of the host galaxy at that time.
-        If read, assign to particle catalog.
+        If reading, assign to input particle dictionary.
 
         Parameters
         ----------
@@ -1068,7 +1070,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         track_directory : str : directory of files for particle pointers and formation coordinates
         write : bool : whether to write to file (instead of read)
         '''
-        file_name = '{}_form_coordinates_{:03d}'.format(self.species_name, part.snapshot['index'])
+        file_name = self.file_name_base.format(part.snapshot['index'])
 
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
@@ -1099,24 +1101,111 @@ class ParticleCoordinateClass(ut.io.SayClass):
             # sanity check
             bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_in['id'])
             if bad_id_number:
-                self.say('! {} particles have mismatched id - bad!'.format(bad_id_number))
+                self.say(f'! {bad_id_number} particles have mismatched id, this is bad!')
 
             for prop_name in dict_in:
-                if prop_name == 'id':
-                    pass
-                elif prop_name in ['host.positions', 'center.position']:
+                if prop_name in ['host.positions', 'center.position']:
+                    if np.ndim(dict_in[prop_name]) == 2:
+                        dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
                     part.host_positions_all = dict_in[prop_name]
-                    part[self.species_name].host_positions_all = dict_in[prop_name]
+                    for spec_name in part:
+                        part[spec_name].host_positions_all = part.host_positions_all
                 elif prop_name in ['host.velocities', 'center.velocity']:
-                    part[self.species_name].host_velocities_all = dict_in[prop_name]
+                    if np.ndim(dict_in[prop_name]) == 2:
+                        dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
                     part.host_velocities_all = dict_in[prop_name]
+                    for spec_name in part:
+                        part[spec_name].host_velocities_all = part.host_velocities_all
                 elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
                     # compatible with all naming conventions
+                    if np.ndim(dict_in[prop_name]) == 3:
+                        dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
                     part.host_rotations_all = dict_in[prop_name]
-                    part[self.species_name].host_rotations_all = dict_in[prop_name]
+                    for spec_name in part:
+                        part[spec_name].host_rotations_all = part.host_rotations_all
+                elif prop_name == 'id':
+                    pass
                 else:
                     # store coordinates at formation
                     part[self.species_name][prop_name] = dict_in[prop_name]
+
+    def read_host_coordinates(
+        self, part, simulation_directory=None, track_directory=None, verbose=True
+    ):
+        '''
+        Read the positions, velocities, and principal axes rotation tensor of each host galaxy,
+        as computed via particle tracking and stored in the file for particle formation coordinates.
+        Assign to input particle dictionary.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles at a snapshot
+        simulation_directory : str : directory of simulation
+        track_directory : str : directory of files for particle pointers and formation coordinates
+        '''
+        file_name = self.file_name_base.format(part.snapshot['index'])
+
+        if simulation_directory is None:
+            simulation_directory = self.simulation_directory
+        else:
+            simulation_directory = ut.io.get_path(simulation_directory)
+
+        if track_directory is None:
+            track_directory = self.track_directory
+        else:
+            track_directory = ut.io.get_path(track_directory)
+
+        file_path_name = simulation_directory + track_directory + file_name
+        dict_in = ut.io.file_hdf5(file_path_name, verbose=False)
+
+        snapshot_index = part.snapshot['index']
+        for prop_name in dict_in:
+            if prop_name in ['host.positions', 'center.position']:
+                if np.ndim(dict_in[prop_name]) == 2:
+                    dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                part.host_positions_all = dict_in[prop_name]
+                part.host_positions = part.host_positions_all[:, snapshot_index]
+                for spec_name in part:
+                    part[spec_name].host_positions_all = part.host_positions_all
+                    part[spec_name].host_positions = part.host_positions
+
+            elif prop_name in ['host.velocities', 'center.velocity']:
+                if np.ndim(dict_in[prop_name]) == 2:
+                    dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                part.host_velocities_all = dict_in[prop_name]
+                part.host_velocities = part.host_velocities_all[:, snapshot_index]
+                for spec_name in part:
+                    part[spec_name].host_velocities_all = part.host_velocities_all
+                    part[spec_name].host_velocities = part.host_velocities
+
+            elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
+                # compatible with all naming conventions
+                if np.ndim(dict_in[prop_name]) == 3:
+                    dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                part.host_rotations_all = dict_in[prop_name]
+                part.host_rotations = part.host_rotations_all[:, snapshot_index]
+                for spec_name in part:
+                    part[spec_name].host_rotations_all = part.host_rotations_all
+                    part[spec_name].host_rotations = part.host_rotations
+
+        host_number = len(part.host_positions_all)
+        self.say(
+            f'* read position, velocity, and rotation for {host_number} host galaxy[s] from:'
+            + '  {}'.format(file_path_name.strip('./') + '.hdf5')
+        )
+
+        if verbose:
+            for host_i, host_position in enumerate(part.host_positions):
+                self.say(f'host{host_i + 1} position = (', end='')
+                ut.io.print_array(host_position, '{:.3f}', end='')
+                print(') [kpc comoving]')
+
+            for host_i, host_velocity in enumerate(part.host_velocities):
+                self.say(f'host{host_i + 1} velocity = (', end='')
+                ut.io.print_array(host_velocity, '{:.1f}', end='')
+                print(') [km / s]')
+
+            #print()
 
     def write_formation_coordinates(
         self, part_z0=None, host_number=1, thread_number=1, simulation_directory=None
@@ -1156,7 +1245,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 ],
                 element_indices=[0],
                 host_number=host_number,
-                assign_host_coordinates=True,
+                assign_host_coordinates='mass',
                 check_properties=False,
             )
 
@@ -1297,6 +1386,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 part_z,
                 self.species_name,
                 hosts_part_z_indicess,
+                'mass',
                 host_number,
                 exclusion_distance=None,
             )
@@ -1340,7 +1430,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             #    center_positions=part_z.host_positions, return_array=False)
 
             # store rotation vectors
-            part_z0[self.species_name].host_rotations_all[snapshot_index] = part_z.host_rotationss
+            part_z0[self.species_name].host_rotations_all[snapshot_index] = part_z.host_rotations
 
             for host_i in range(host_number):
                 # compute coordinates wrt primary host

@@ -499,7 +499,7 @@ class InitialConditionClass(ut.io.SayClass):
         parts = Read.read_particles()
 
         center_position = ut.particle.get_center_positions(
-            parts[0], 'dark', method='center-of-mass'
+            parts[0], 'dark', weight_property='center-of-mass'
         )[0]
 
         self.write_initial_positions(

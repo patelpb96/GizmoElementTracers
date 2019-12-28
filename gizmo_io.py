@@ -218,7 +218,7 @@ class ParticleDictionaryClass(dict):
             else:
                 return self[property_name]
         elif dict_only:
-            raise KeyError('property = {} is not in self\'s dictionary'.format(property_name))
+            raise KeyError(f'property = {property_name} is not in self\'s dictionary')
 
         # math relation, combining more than one property
         if (
@@ -235,7 +235,7 @@ class ParticleDictionaryClass(dict):
                     break
 
             if len(prop_names) == 1:
-                raise KeyError('not sure how to parse property = {}'.format(property_name))
+                raise KeyError(f'not sure how to parse property = {property_name}')
 
             # make copy so not change values in input catalog
             prop_values = np.array(self.prop(prop_names[0], indices))
@@ -348,7 +348,7 @@ class ParticleDictionaryClass(dict):
                     break
 
             if element_index is None:
-                raise KeyError('not sure how to parse property = {}'.format(property_name))
+                raise KeyError(f'not sure how to parse property = {property_name}')
 
             if indices is None:
                 values = self['massfraction'][:, element_index]
@@ -457,7 +457,7 @@ class ParticleDictionaryClass(dict):
                 host_name = 'host3.'
                 host_index = 2
             else:
-                raise ValueError('could not identify host name in {}'.format(property_name))
+                raise ValueError(f'could not identify host name in {property_name}')
 
             if 'form.' in property_name:
                 # special case: coordinates wrt primary host *at formation*
@@ -548,7 +548,7 @@ class ParticleDictionaryClass(dict):
                 pass
 
         # should not get this far without a return
-        raise KeyError('not sure how to parse property = {}'.format(property_name))
+        raise KeyError(f'not sure how to parse property = {property_name}')
 
 
 # --------------------------------------------------------------------------------------------------
@@ -575,6 +575,10 @@ class ReadClass(ut.io.SayClass):
         self.file_extension = '.hdf5'
 
         self.gas_eos = 5 / 3  # assumed equation of state of gas
+
+        from . import gizmo_track
+
+        self.track = gizmo_track
 
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
@@ -650,8 +654,16 @@ class ReadClass(ut.io.SayClass):
         sort_dark_by_id : bool : whether to sort dark-matter particles by id
         convert_float32 : bool : whether to convert all floats to 32 bit to save memory
         host_number : int : number of hosts to assign and compute coordinates relative to
-        assign_host_coordinates : bool :
-            whether to assign position[s] and velocity[s] of host galaxy/halo[s]
+        assign_host_coordinates : bool or str : whether to assign host coordinates
+            if a string, tells the code which method to use:
+                'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
+                    during particle tracking using only stars that are in each host at z = 0
+                'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
+                'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
+                    weighting each particle by that property
+            if True (default), will try a few methods in the following order of preference:
+                if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
+                if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
         assign_host_principal_axes : bool :
             whether to assign principal axes rotation tensor[s] of host galaxy/halo[s]
         assign_host_orbits : booelan :
@@ -679,7 +691,7 @@ class ReadClass(ut.io.SayClass):
             for spec_name in list(species):
                 if spec_name not in self.species_dict:
                     species.remove(spec_name)
-                    self.say('! not recognize input species = {}'.format(spec_name))
+                    self.say(f'! not recognize input species = {spec_name}')
         self.species_read = list(species)
 
         # read information about snapshot times
@@ -770,54 +782,55 @@ class ReadClass(ut.io.SayClass):
                     'scalefactor': 1.0,
                     'time': header['time'],
                     'time.lookback': 0,
-                    'time.hubble': 13.6,
+                    'time.hubble': None,
                 }
 
             for spec_name in part:
                 part[spec_name].snapshot = part.snapshot
 
-            # store information on all snapshot times - may or may not be initialized
+            # store information on all snapshot times
             part.Snapshot = Snapshot
             for spec_name in part:
                 part[spec_name].Snapshot = part.Snapshot
 
-            # initialize arrays to store position[s] and velocity[s] of host galaxy/halo[s]
-            # store both single 'default' host and array of hosts (for LG-like pairs)
+            # store list of  each host's position, velocity, principal axes rotation tensor
+            # store as lists to accommodate possibility of multiple hosts
+            # these already were initialized for the overlal particle class, but useful to
+            # store in each species dictionary as well
             for spec_name in part:
                 part[spec_name].host_positions = []
                 part[spec_name].host_velocities = []
+                part[spec_name].host_rotations = []
 
             if assign_host_coordinates:
-                self.assign_host_coordinates(part, host_number=host_number)
+                self.assign_host_coordinates(
+                    part,
+                    method=assign_host_coordinates,
+                    host_number=host_number,
+                    simulation_directory=simulation_directory,
+                    track_directory=track_directory,
+                )
 
-            # initialize arrays to store rotation tensor[s] that define principal axes of host[s]
-            for spec_name in part:
-                part[spec_name].host_rotations = []
-            if assign_host_coordinates and assign_host_principal_axes:
-                self.assign_host_principal_axes(part)
+                if assign_host_principal_axes and len(part.host_rotations) == 0:
+                    self.assign_host_principal_axes(part)
 
-            # store orbital properties wrt host galaxy/halo[s]
+            if assign_formation_coordinates:
+                # assign coordinates wrt each host galaxy at formation
+                ParticleCoordinate = self.track.ParticleCoordinateClass(
+                    simulation_directory=simulation_directory, track_directory=track_directory
+                )
+                ParticleCoordinate.io_formation_coordinates(part)
+
+            if assign_pointers:
+                # assign star and gas particle pointers from z = 0 to this snapshot
+                ParticlePointer = self.track.ParticlePointerClass(
+                    simulation_directory=simulation_directory, track_directory=track_directory
+                )
+                ParticlePointer.io_pointers(part)
+
+            # store orbital properties wrt each host galaxy/halo
             if assign_host_orbits and ('velocity' in properties or properties == 'all'):
                 self.assign_host_orbits(part, 'star', part.host_positions, part.host_velocities)
-
-            if assign_formation_coordinates or assign_pointers:
-                from . import gizmo_track
-
-                if assign_formation_coordinates:
-                    # assign coordinates wrt host galaxy at formation
-                    ParticleCoordinate = gizmo_track.ParticleCoordinateClass(
-                        simulation_directory=simulation_directory,
-                        track_directory=track_directory,
-                    )
-                    ParticleCoordinate.io_formation_coordinates(part)
-
-                elif assign_pointers:
-                    # assign star and gas particle pointers from z = 0 to this snapshot
-                    ParticlePointer = gizmo_track.ParticlePointerClass(
-                        simulation_directory=simulation_directory,
-                        track_directory=track_directory,
-                    )
-                    ParticlePointer.io_pointers(part)
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
@@ -871,7 +884,6 @@ class ReadClass(ut.io.SayClass):
         if np.ndim(simulation_directories) == 0:
             raise ValueError(
                 f'input simulation_directories = {simulation_directories} but need to input list'
-
             )
         elif np.ndim(simulation_directories) == 1:
             # assign null names
@@ -926,9 +938,7 @@ class ReadClass(ut.io.SayClass):
                 )
             except IOError:
                 self.say(
-                    '! could not read snapshot at {} = {} in {}'.format(
-                        snapshot_value_kind, snapshot_value, directory
-                    )
+                    f'! cannot read snapshot {snapshot_value_kind}={snapshot_value} in {directory}'
                 )
                 part = None
 
@@ -940,11 +950,7 @@ class ReadClass(ut.io.SayClass):
                 directories_read.append(directory)
 
         if len(parts) == 0:
-            self.say(
-                '! could not read any snapshots at {} = {}'.format(
-                    snapshot_value_kind, snapshot_value
-                )
-            )
+            self.say(f'! could not read any snapshots at {snapshot_value_kind} = {snapshot_value}')
             return
 
         if 'mass' in properties and 'star' in part:
@@ -1084,9 +1090,7 @@ class ReadClass(ut.io.SayClass):
                 self.species_read.remove(spec_name)
 
         if read_particle_number <= 0:
-            raise OSError(
-                'snapshot file[s] contain no particles of species = {}'.format(self.species_read)
-            )
+            raise OSError(f'snapshot file[s] contain no particles of species = {self.species_read}')
 
         # check if simulation contains baryons
         header['baryonic'] = False
@@ -1189,7 +1193,9 @@ class ReadClass(ut.io.SayClass):
             'BH_NProgs': 'prog.number',
         }
 
-        part = ut.array.DictClass()  # dictionary class to store properties for particle species
+        # dictionary class to store properties for particle species
+        part = ParticleDictionaryClass()
+        # part = ut.array.DictClass()
 
         # parse input list of properties to read
         if 'all' in properties or not properties:
@@ -1236,7 +1242,7 @@ class ReadClass(ut.io.SayClass):
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
-        self.say('* reading species: {}'.format(self.species_read))
+        self.say(f'* reading species: {self.species_read}')
 
         # open snapshot file
         with h5py.File(path_file_name, 'r') as file_in:
@@ -1272,7 +1278,7 @@ class ReadClass(ut.io.SayClass):
                 else:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
-                        raise OSError('no {} particles in snapshot file'.format(spec_name))
+                        raise OSError(f'no {spec_name} particles in snapshot file')
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
@@ -1286,7 +1292,7 @@ class ReadClass(ut.io.SayClass):
                                 break
                     else:
                         # tried all files and still did not find particles of species
-                        raise OSError('no {} particles in any snapshot file'.format(spec_name))
+                        raise OSError(f'no {spec_name} particles in any snapshot file')
 
                 props_print = []
                 ignore_flag = False  # whether ignored any properties in the file
@@ -1329,7 +1335,7 @@ class ReadClass(ut.io.SayClass):
 
                 if ignore_flag:
                     props_print.sort()
-                    self.say('* reading {} properties: {}'.format(spec_name, props_print))
+                    self.say(f'* reading {spec_name} properties: {props_print}')
 
                 # special case: particle mass is fixed and given in mass array in header
                 if 'Masses' in properties and 'Masses' not in part_in:
@@ -1447,7 +1453,7 @@ class ReadClass(ut.io.SayClass):
 
                     for prop_name in dark_lowres:
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
-                    self.say('{}: {} particles'.format(spec_name, spec_indices.size))
+                    self.say(f'{spec_name}: {spec_indices.size} particles')
 
                 del spec_indices
                 print()
@@ -1458,7 +1464,7 @@ class ReadClass(ut.io.SayClass):
             for spec_name in part:
                 if 'dark' in spec_name and 'id' in part[spec_name]:
                     indices_sorted = np.argsort(part[spec_name]['id'])
-                    self.say('{}: {} particles'.format(spec_name, indices_sorted.size))
+                    self.say(f'{spec_name}: {indices_sorted.size} particles')
                     for prop_name in part[spec_name]:
                         part[spec_name][prop_name] = part[spec_name][prop_name][indices_sorted]
             del indices_sorted
@@ -1531,7 +1537,7 @@ class ReadClass(ut.io.SayClass):
                 del (helium_mass_fracs, ys_helium, mus, molecular_weights)
 
         # renormalize so potential max = 0
-        renormalize_potential = False
+        renormalize_potential = True
         if renormalize_potential:
             potential_max = 0
             for spec_name in part:
@@ -1543,9 +1549,7 @@ class ReadClass(ut.io.SayClass):
         # sub-sample particles, for smaller memory
         if particle_subsample_factor is not None and particle_subsample_factor > 1:
             self.say(
-                '* periodically subsampling all particles by factor = {}'.format(
-                    particle_subsample_factor
-                ),
+                f'* periodically subsampling all particles by factor = {particle_subsample_factor}',
                 end='\n\n',
             )
             for spec_name in part:
@@ -1597,9 +1601,7 @@ class ReadClass(ut.io.SayClass):
         if snapshot_index < 0:
             snapshot_index = file_indices[snapshot_index]  # allow negative indexing of snapshots
         elif snapshot_index not in file_indices:
-            raise OSError(
-                'cannot find snapshot index = {} in:  {}'.format(snapshot_index, path_file_names)
-            )
+            raise OSError(f'cannot find snapshot index = {snapshot_index} in:  {path_file_names}')
 
         path_file_names = path_file_names[np.where(file_indices == snapshot_index)[0][0]]
 
@@ -1616,14 +1618,12 @@ class ReadClass(ut.io.SayClass):
 
             if (
                 len(path_file_names) > 0
-                and '.{}.'.format(snapshot_block_index) in path_file_names[snapshot_block_index]
+                and f'.{snapshot_block_index}.' in path_file_names[snapshot_block_index]
             ):
                 path_file_names = path_file_names[snapshot_block_index]
             else:
                 raise OSError(
-                    'cannot find snapshot file block {} in:  {}'.format(
-                        snapshot_block_index, path_file_names
-                    )
+                    f'cannot find snapshot file block {snapshot_block_index} in:  {path_file_names}'
                 )
 
         return path_file_names
@@ -1660,7 +1660,7 @@ class ReadClass(ut.io.SayClass):
             if value_test is not None:
                 frac_dif = np.abs((value - value_test) / value)
                 if frac_dif > frac_dif_max:
-                    print('! read {}, but previously assigned = {}'.format(line, value_test))
+                    print(f'! read {line}, but previously assigned = {value_test}')
             return value
 
         if directory:
@@ -1699,13 +1699,13 @@ class ReadClass(ut.io.SayClass):
             self.say('! missing cosmological parameters, assuming the following (from AGORA box):')
             if omega_baryon is None:
                 omega_baryon = 0.0455
-                self.say('assuming omega_baryon = {}'.format(omega_baryon))
+                self.say(f'assuming omega_baryon = {omega_baryon}')
             if sigma_8 is None:
                 sigma_8 = 0.807
-                self.say('assuming sigma_8 = {}'.format(sigma_8))
+                self.say(f'assuming sigma_8 = {sigma_8}')
             if n_s is None:
                 n_s = 0.961
-                self.say('assuming n_s = {}'.format(n_s))
+                self.say(f'assuming n_s = {n_s}')
             self.say('')
 
         Cosmology = ut.cosmology.CosmologyClass(
@@ -1784,9 +1784,11 @@ class ReadClass(ut.io.SayClass):
         part,
         species_name='',
         part_indicess=None,
+        method=True,
         host_number=1,
         exclusion_distance=200,
-        method='center-of-mass',
+        simulation_directory='.',
+        track_directory='track/',
     ):
         '''
         Assign center position[s] [kpc comoving] and velocity[s] [km / s] wrt host galaxy/halo[s].
@@ -1800,10 +1802,24 @@ class ReadClass(ut.io.SayClass):
         part_indicess : array or list of arrays :
             list of indices of particles to use to define host center coordinates
             if supply a list of arrays, use each list element for a different host
+        method : str : method to use to get host coordinates
+            if a string, tells the code which method to use:
+                'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
+                    during particle tracking using only stars that are in each host at z = 0
+                'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
+                'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
+                    weighting each particle by that property
+            if True (default), will try a few methods in the following order of preference:
+                if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
+                if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
         host_number : int : number of hosts to assign
         exclusion_distance : float :
-            radius around previous center to cut particles for finding next center [kpc comoving]
-        method : str : method of centering: 'center-of-mass', 'potential'
+            radius around previous host[s] center position[s] to exclude particles in
+            finding center of next host [kpc comoving]
+        simulation_directory : str : directory of simulation
+        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        track_directory : str :
+            directory of files for particle pointers, formation coordinates, and host coordinates
         '''
         if (
             species_name in part
@@ -1819,15 +1835,75 @@ class ReadClass(ut.io.SayClass):
             self.say('! catalog not contain star or dark particles, cannot assign host coordinates')
             return
 
-        if species_name == 'star':
-            velocity_radius_max = 15
-        elif species_name == 'dark':
-            velocity_radius_max = 30
+        assert method in [True, 'track', 'halo', 'mass', 'potential']
 
-        self.say('* assigning coordinates for {} host galaxy/halo[s]:'.format(host_number))
+        if method is True:
+            if species_name == 'star':
+                method = 'track'
+            elif species_name == 'dark':
+                method = 'halo'
+            else:
+                method = 'mass'
+
+        if method in ['mass', 'potential']:
+            self._compute_host_coordinates(
+                part, species_name, part_indicess, method, host_number, exclusion_distance
+            )
+        elif method in ['track', 'halo']:
+            try:
+                if method == 'track':
+                    # read coordinates of all hosts across all snapshots
+                    self.track.ParticleCoordinate.read_host_coordinates(
+                        part, simulation_directory, track_directory, verbose=True
+                    )
+                    if host_number != len(part.host_positions):
+                        self.say(
+                            f'! warning: input host_number = {host_number},'
+                            + f' but read coordinates for {len(part.host_positions)} hosts'
+                        )
+                        self.say(
+                            f'if you want to assign coordinates for {host_number} hosts,'
+                            + ' set assign_host_coordinates="mass"'
+                        )
+                elif method == 'halo':
+                    raise IOError  # placeholder for now
+            except IOError:
+                self.say(
+                    f'! cannot read {method} file to get host coordinates,'
+                    ' so will assign via iterative zoom'
+                )
+                method = 'mass'
+                self._compute_host_coordinates(
+                    part, species_name, part_indicess, method, host_number, exclusion_distance
+                )
+        else:
+            self.say(
+                f'! not recognize coordinate method = {method}, not assigning host coordinates'
+            )
+
+        print()
+
+    def _compute_host_coordinates(
+        self,
+        part,
+        species_name,
+        part_indicess,
+        method,
+        host_number,
+        exclusion_distance,
+        verbose=True,
+    ):
+        '''
+        Utility function for assign_host_coordinates().
+        '''
+        # max radius around each host position to includer particles to compute center velocity
+        if species_name == 'dark':
+            velocity_radius_max = 30
+        else:
+            velocity_radius_max = 10
 
         if 'position' in part[species_name]:
-            # assign to overall dictionary
+            # assign to particle dictionary
             part.host_positions = ut.particle.get_center_positions(
                 part,
                 species_name,
@@ -1836,45 +1912,30 @@ class ReadClass(ut.io.SayClass):
                 host_number,
                 exclusion_distance,
                 return_array=False,
+                verbose=verbose,
             )
-            # assign to each species dictionary
+            # assign to each particle species dictionary
             for spec_name in part:
                 part[spec_name].host_positions = part.host_positions
 
-            for host_position in part.host_positions:
-                self.say('position = (', end='')
-                ut.io.print_array(host_position, '{:.3f}', end='')
-                print(') [kpc comoving]')
-
         if 'velocity' in part[species_name]:
-            # assign to overall dictionary
+            # assign to particle dictionary
             part.host_velocities = ut.particle.get_center_velocities(
                 part,
                 species_name,
                 part_indicess,
+                method,
                 velocity_radius_max,
                 part.host_positions,
                 return_array=False,
+                verbose=verbose,
             )
-            # assign to each species dictionary
+            # assign to each particle species dictionary
             for spec_name in part:
                 part[spec_name].host_velocities = part.host_velocities
 
-            for host_velocity in part.host_velocities:
-                self.say('velocity = (', end='')
-                ut.io.print_array(host_velocity, '{:.1f}', end='')
-                print(') [km / s]')
-
-        print()
-
     def assign_host_principal_axes(
-        self,
-        part,
-        species_name='star',
-        distance_max=10,
-        mass_percent=100,
-        age_percent=25,
-        temperature_limits=[0, 1e4],
+        self, part, species_name='star', distance_max=10, mass_percent=100, age_percent=25
     ):
         '''
         Assign rotation tensors of principal axes (via the moment of inertia tensor) of each host
@@ -1888,40 +1949,7 @@ class ReadClass(ut.io.SayClass):
         mass_percent : float : keep particles within the distance that encloses mass percent
             [0, 100] of all particles within distance_max
         age_percent : float : keep youngest age_percent of (star) particles within distance cut
-        temperature_limits : list : min and max temperature to keep (gas) particles
         '''
-        if species_name not in part or len(part[species_name]['position']) == 0:
-            self.say(
-                '! catalog not contain {} particles, cannot assign principal axes'.format(
-                    species_name
-                )
-            )
-            return
-
-        self.say('* assigning principal axes of host galaxy/halo[s]:')
-        self.say('using {} particles at distance < {} kpc'.format(species_name, distance_max))
-
-        if mass_percent < 100:
-            self.say('using distance that encloses {}% of mass'.format(mass_percent))
-
-        if species_name == 'star' and age_percent:
-            if (
-                'form.scalefactor' not in part[species_name]
-                or len(part[species_name]['form.scalefactor']) == 0
-            ):
-                self.say('! catalog not contain {} ages'.format(species_name))
-                self.say('so assigning principal axes using all {} particles'.format(species_name))
-            else:
-                self.say('using youngest {}% of {} particles'.format(age_percent, species_name))
-
-        if species_name == 'gas' and temperature_limits is not None and len(temperature_limits) > 0:
-            if (
-                'temperature' not in part[species_name]
-                or len(part[species_name]['temperature']) == 0
-            ):
-                self.say('! catalog not contain {} temperature'.format(species_name))
-                self.say('so assigning principal axes using all {} particles'.format(species_name))
-
         principal_axes = ut.particle.get_principal_axes(
             part,
             species_name,
@@ -1930,23 +1958,13 @@ class ReadClass(ut.io.SayClass):
             age_percent,
             center_positions=part.host_positions,
             return_array=False,
-            verbose=False,
+            verbose=True,
         )
 
-        part.host_rotations = principal_axes['rotation.tensor']
-        for spec_name in part:
-            part[spec_name].host_rotations = part.host_rotations
-
-        for center_i in range(part.host_positions.shape[0]):
-            self.say(
-                'axis ratios: min/maj = {:.3f}, min/med = {:.3f}, med/maj = {:.3f}'.format(
-                    principal_axes['axis.ratios'][center_i, 0],
-                    principal_axes['axis.ratios'][center_i, 1],
-                    principal_axes['axis.ratios'][center_i, 2],
-                )
-            )
-
-        print()
+        if principal_axes is not None and len(principal_axes) > 0:
+            part.host_rotations = principal_axes['rotation.tensor']
+            for spec_name in part:
+                part[spec_name].host_rotations = part.host_rotations
 
     def assign_host_orbits(self, part, species=[], host_positions=None, host_velocities=None):
         '''
@@ -1963,7 +1981,7 @@ class ReadClass(ut.io.SayClass):
             species = ['star', 'gas', 'dark']
         species = ut.particle.parse_species(part, species)
 
-        self.say('* assigning orbital properties wrt galaxy/halo to {}'.format(species))
+        self.say(f'* assigning orbital properties wrt galaxy/halo to {species}')
 
         if host_positions is None:
             host_positions = part.host_positions
@@ -2049,10 +2067,10 @@ class ReadClass(ut.io.SayClass):
                 for _spec_i, spec_name in enumerate(species):
                     spec_id = self.species_dict[spec_name]
                     spec_in = 'PartType' + str(spec_id)
-                    self.say('adjusting species = {}'.format(spec_name))
+                    self.say(f'adjusting species = {spec_name}')
 
                     if 'delete' in action:
-                        self.say('deleting species = {}'.format(spec_name))
+                        self.say(f'deleting species = {spec_name}')
 
                         # zero numbers in header
                         part_number_in_file[spec_id] = 0
@@ -2061,7 +2079,7 @@ class ReadClass(ut.io.SayClass):
                         # delete properties
                         # for prop_name in file_in[spec_in]:
                         #    del(file_in[spec_in + '/' + prop_name])
-                        #    self.say('  deleting {}'.format(prop_name))
+                        #    self.say(f'  deleting {prop_name})
 
                         del file_in[spec_in]
 
