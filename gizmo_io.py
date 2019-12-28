@@ -1786,9 +1786,10 @@ class ReadClass(ut.io.SayClass):
         part_indicess=None,
         method=True,
         host_number=1,
-        exclusion_distance=200,
+        exclusion_distance=300,
         simulation_directory='.',
         track_directory='track/',
+        verbose=True,
     ):
         '''
         Assign center position[s] [kpc comoving] and velocity[s] [km / s] wrt host galaxy/halo[s].
@@ -1846,35 +1847,37 @@ class ReadClass(ut.io.SayClass):
                 method = 'mass'
 
         if method in ['mass', 'potential']:
-            self._compute_host_coordinates(
-                part, species_name, part_indicess, method, host_number, exclusion_distance
+            self._assign_host_coordinates_from_particles(
+                part, species_name, part_indicess, method, host_number, exclusion_distance, verbose
             )
         elif method in ['track', 'halo']:
             try:
                 if method == 'track':
                     # read coordinates of all hosts across all snapshots
                     self.track.ParticleCoordinate.read_host_coordinates(
-                        part, simulation_directory, track_directory, verbose=True
+                        part, simulation_directory, track_directory, verbose
                     )
                     if host_number != len(part.host_positions):
                         self.say(
                             f'! warning: input host_number = {host_number},'
-                            + f' but read coordinates for {len(part.host_positions)} hosts'
-                        )
-                        self.say(
-                            f'if you want to assign coordinates for {host_number} hosts,'
+                            + f' but read coordinates for {len(part.host_positions)} hosts\n'
+                            + f'  if you want to assign coordinates for {host_number} hosts,'
                             + ' set assign_host_coordinates="mass"'
                         )
+
                 elif method == 'halo':
-                    raise IOError  # placeholder for now
-            except IOError:
+                    self._assign_host_coordinates_from_halos(
+                        part, host_number, simulation_directory, verbose
+                    )
+
+            except (IOError, ImportError):
                 self.say(
-                    f'! cannot read {method} file to get host coordinates,'
-                    ' so will assign via iterative zoom'
+                    'so, will assign host coordinates via iterative zoom using particle mass'
                 )
                 method = 'mass'
-                self._compute_host_coordinates(
-                    part, species_name, part_indicess, method, host_number, exclusion_distance
+                self._assign_host_coordinates_from_particles(
+                    part, species_name, part_indicess, method, host_number, exclusion_distance,
+                    verbose
                 )
         else:
             self.say(
@@ -1883,7 +1886,7 @@ class ReadClass(ut.io.SayClass):
 
         print()
 
-    def _compute_host_coordinates(
+    def _assign_host_coordinates_from_particles(
         self,
         part,
         species_name,
@@ -1933,6 +1936,40 @@ class ReadClass(ut.io.SayClass):
             # assign to each particle species dictionary
             for spec_name in part:
                 part[spec_name].host_velocities = part.host_velocities
+
+    def _assign_host_coordinates_from_halos(
+        self, part, host_number, simulation_directory='.', verbose=True
+    ):
+        '''
+        Utility function for assign_host_coordinates().
+        '''
+        from halo_analysis import halo_io
+
+        hal = halo_io.IO.read_catalogs(
+            'index',
+            part.snapshot['index'],
+            simulation_directory,
+            assign_species=False,
+            assign_host=True,
+            host_number=host_number,
+        )
+
+        host_indices = np.array(
+            [hal.prop(f'host{host_i + 1}.index', 0) for host_i in range(host_number)]
+        )
+        part.host_positions = hal['position'][host_indices]
+        part.host_velocities = hal['velocity'][host_indices]
+
+        if verbose:
+            for host_i, host_position in enumerate(part.host_positions):
+                self.say(f'host{host_i + 1} position = (', end='')
+                ut.io.print_array(host_position, '{:.3f}', end='')
+                print(') [kpc comoving]')
+
+            for host_i, host_velocity in enumerate(part.host_velocities):
+                self.say(f'host{host_i + 1} velocity = (', end='')
+                ut.io.print_array(host_velocity, '{:.1f}', end='')
+                print(') [km / s]')
 
     def assign_host_principal_axes(
         self, part, species_name='star', distance_max=10, mass_percent=100, age_percent=25
