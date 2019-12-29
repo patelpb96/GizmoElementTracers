@@ -20,6 +20,7 @@ from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 
 import utilities as ut
+from . import gizmo_io
 
 
 # --------------------------------------------------------------------------------------------------
@@ -2928,8 +2929,6 @@ def plot_gas_neutral_fraction_v_redshift(
     .
     '''
     if parts is None:
-        from . import gizmo_io
-
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
         snapshot_indices = ut.array.get_indices(
             Snapshot['redshift'], [min(redshift_limits) * 0.99, max(redshift_limits) * 1.01]
@@ -3521,8 +3520,6 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     -------
     gal : dict : dictionary of host galaxy properties at input redshifts
     '''
-    from . import gizmo_io
-
     Read = gizmo_io.ReadClass()
 
     star_distance_max = 15
@@ -3702,8 +3699,6 @@ def get_galaxy_mass_profiles_v_redshift(
     -------
     dictionary of galaxy/halo properties at each redshift
     '''
-    from . import gizmo_io
-
     Read = gizmo_io.ReadClass()
 
     species_read = ['star', 'dark']
@@ -3985,8 +3980,6 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         Set directories and names of simulations to read.
         '''
-        from . import gizmo_io
-
         self.Read = gizmo_io.ReadClass()
 
         self.properties = ['mass', 'position', 'form.scalefactor', 'massfraction']
@@ -4733,8 +4726,6 @@ def compare_resolution(
     '''
     .
     '''
-    from . import gizmo_io
-
     if not simulation_names:
         simulation_names = []
 

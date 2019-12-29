@@ -12,7 +12,6 @@ import glob
 import numpy as np
 
 import utilities as ut
-from gizmo_analysis import gizmo_io
 
 # default subset of snapshots (65 snapshots)
 snapshot_indices_keep = [
@@ -179,12 +178,14 @@ class CompressClass(ut.io.SayClass):
         Read headers from all snapshot files in simulation_directory to check whether files have
         been compressed.
         '''
+        from . import gizmo_io
+
+        Read = gizmo_io.ReadClass()
+
         header_compression_name = 'compression.level'
 
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
-
-        Read = gizmo_io.ReadClass()
 
         compression_wrong_snapshots = []
         compression_none_snapshots = []

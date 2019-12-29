@@ -19,7 +19,6 @@ import numpy as np
 from scipy import spatial
 
 import utilities as ut
-from . import gizmo_io
 
 
 # --------------------------------------------------------------------------------------------------
@@ -56,6 +55,8 @@ class ReadClass(ut.io.SayClass):
         parts : list of dictionaries : catalogs of particles at initial and final snapshots
         hal : dictionary class : catalog of halos at final snapshot
         '''
+        from halo_analysis import halo_io
+
         hal = self.read_halos(mass_limits)
         parts = self.read_particles()
 
@@ -64,8 +65,6 @@ class ReadClass(ut.io.SayClass):
             and 'mass' in parts[0]['dark2']
             and len(parts[0]['dark2']['mass']) > 0
         ):
-            from halo_analysis import halo_io
-
             halo_io.Particle.assign_lowres_mass(hal, parts[0])
 
         return parts, hal
@@ -110,6 +109,8 @@ class ReadClass(ut.io.SayClass):
         -------
         parts : list : catalogs of particles at initial and final snapshots
         '''
+        from . import gizmo_io
+
         parts = []
 
         for snapshot_redshift in self.snapshot_redshifts:

@@ -151,7 +151,6 @@ import h5py
 import numpy as np
 
 import utilities as ut
-from . import gizmo_star
 
 
 # --------------------------------------------------------------------------------------------------
@@ -277,6 +276,7 @@ class ParticleDictionaryClass(dict):
         # stellar mass loss
         if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
             if self.MassLoss is None:
+                from . import gizmo_star
                 self.MassLoss = gizmo_star.MassLossClass()
 
             # fractional mass loss since formation
@@ -568,6 +568,10 @@ class ReadClass(ut.io.SayClass):
         snapshot_name_base : str : name base of snapshot files/directories
         verbose : bool : whether to print diagnostics
         '''
+        from . import gizmo_track
+
+        self.gizmo_track = gizmo_track
+
         # this format avoids accidentally reading text file that contains snapshot indices
         self.snapshot_name_base = snapshot_name_base
         if '*' not in self.snapshot_name_base:
@@ -575,10 +579,6 @@ class ReadClass(ut.io.SayClass):
         self.file_extension = '.hdf5'
 
         self.gas_eos = 5 / 3  # assumed equation of state of gas
-
-        from . import gizmo_track
-
-        self.track = gizmo_track
 
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
@@ -816,14 +816,14 @@ class ReadClass(ut.io.SayClass):
 
             if assign_formation_coordinates:
                 # assign coordinates wrt each host galaxy at formation
-                ParticleCoordinate = self.track.ParticleCoordinateClass(
+                ParticleCoordinate = self.gizmo_track.ParticleCoordinateClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
                 ParticleCoordinate.io_formation_coordinates(part)
 
             if assign_pointers:
                 # assign star and gas particle pointers from z = 0 to this snapshot
-                ParticlePointer = self.track.ParticlePointerClass(
+                ParticlePointer = self.gizmo_track.ParticlePointerClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
                 ParticlePointer.io_pointers(part)
@@ -1580,6 +1580,8 @@ class ReadClass(ut.io.SayClass):
         path_file_name[s] : str or list thereof : (relative) path + name of file[s]
         [file_indices : list of ints : indices of snapshot files]
         '''
+        import natsort
+
         directory = ut.io.get_path(directory)
 
         assert (
@@ -1612,8 +1614,6 @@ class ReadClass(ut.io.SayClass):
             if snapshot_block_index > 1:
                 # if using non-default snapshot block, need to ensure file names are
                 # sorted 'naturally' by block number (0, 1, 2, ... instead of 0, 1, 10, ...)
-                import natsort
-
                 path_file_names = natsort.natsorted(path_file_names)
 
             if (
@@ -1854,7 +1854,7 @@ class ReadClass(ut.io.SayClass):
             try:
                 if method == 'track':
                     # read coordinates of all hosts across all snapshots
-                    self.track.ParticleCoordinate.read_host_coordinates(
+                    self.gizmo_track.ParticleCoordinate.read_host_coordinates(
                         part, simulation_directory, track_directory, verbose
                     )
                     if host_number != len(part.host_positions):
