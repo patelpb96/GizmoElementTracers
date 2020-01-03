@@ -1148,8 +1148,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         self, part, simulation_directory=None, track_directory=None, verbose=True
     ):
         '''
-        Read the positions, velocities, and principal axes rotation tensor of each host galaxy,
-        as computed via particle tracking and stored in the file for particle formation coordinates.
+        Read the position, velocity, and principal axes rotation tensor of each host galaxy,
+        computed via particle tracking and stored in the file for particle formation coordinates.
         Assign to input particle dictionary.
 
         Parameters
@@ -1171,6 +1171,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
             track_directory = ut.io.get_path(track_directory)
 
         file_path_name = simulation_directory + track_directory + file_name
+
+        self.say(
+            f'* reading host[s] position, velocity, rotation from:'
+            + '  {}'.format(file_path_name.strip('./') + '.hdf5')
+        )
         dict_in = ut.io.file_hdf5(file_path_name, verbose=False)
 
         snapshot_index = part.snapshot['index']
@@ -1215,8 +1220,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         host_number = part.host_positions_all.shape[1]
         self.say(
-            f'* read position, velocity, rotation for {host_number} host galaxy[s] from:'
-            + '  {}'.format(file_path_name.strip('./') + '.hdf5')
+            f'read position, velocity, rotation for {host_number} host galaxy[s]'
         )
 
         if verbose:

@@ -2474,7 +2474,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         # plot ----------
         left = None
         if 'specific' in sfh_kind:
-            left = 0.21
+            left = 0.215
         _fig, subplot = ut.plot.make_figure(figure_index, left=left, axis_secondary='x')
 
         y_values = None
@@ -4433,18 +4433,18 @@ class CompareSimulationsClass(ut.io.SayClass):
                 plot_directory=self.plot_directory + 'z3/',
             )
 
-            #StarFormHistory.plot_star_form_history(
-            #    parts,
-            #    'form.rate.specific',
-            #    'time.lookback',
-            #    [None, 13],
-            #    0.4,
-            #    'linear',
-            #    galaxy_radius_limits,
-            #    sfh_limits=[None, None],
-            #    write_plot=True,
-            #    plot_directory=self.plot_directory,
-            #)
+            StarFormHistory.plot_star_form_history(
+                parts,
+                'form.rate.specific',
+                'time.lookback',
+                [None, 13],
+                0.4,
+                'linear',
+                galaxy_radius_limits,
+                sfh_limits=[None, None],
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
     def plot_properties_v_properties(
         self, parts, property_bin_number=100

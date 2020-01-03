@@ -1905,7 +1905,8 @@ class ReadClass(ut.io.SayClass):
                     )
 
             except (IOError, ImportError):
-                self.say('so, will assign host coordinates via iterative zoom using particle mass')
+                self.say('could not read file containing host coordinates')
+                self.say('instead will assign host coordinates via iterative zoom on particle mass')
                 method = 'mass'
                 self._assign_host_coordinates_from_particles(
                     part,
