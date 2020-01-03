@@ -1106,25 +1106,40 @@ class ParticleCoordinateClass(ut.io.SayClass):
             for prop_name in dict_in:
                 if prop_name in ['host.positions', 'center.position']:
                     if np.ndim(dict_in[prop_name]) == 2:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                            (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                        )  # update from old file format
                     part.host_positions_all = dict_in[prop_name]
                     for spec_name in part:
                         part[spec_name].host_positions_all = part.host_positions_all
+
                 elif prop_name in ['host.velocities', 'center.velocity']:
                     if np.ndim(dict_in[prop_name]) == 2:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                            (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                        )  # update from old file format
                     part.host_velocities_all = dict_in[prop_name]
                     for spec_name in part:
                         part[spec_name].host_velocities_all = part.host_velocities_all
+
                 elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
                     # compatible with all naming conventions
                     if np.ndim(dict_in[prop_name]) == 3:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                            (
+                                dict_in[prop_name].shape[0],
+                                1,
+                                dict_in[prop_name].shape[1],
+                                dict_in[prop_name].shape[2],
+                            )
+                        )  # update from old file format
                     part.host_rotations_all = dict_in[prop_name]
                     for spec_name in part:
                         part[spec_name].host_rotations_all = part.host_rotations_all
+
                 elif prop_name == 'id':
                     pass
+
                 else:
                     # store coordinates at formation
                     part[self.species_name][prop_name] = dict_in[prop_name]
@@ -1162,7 +1177,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
         for prop_name in dict_in:
             if prop_name in ['host.positions', 'center.position']:
                 if np.ndim(dict_in[prop_name]) == 2:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                        (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                    )  # update from old file format
                 part.host_positions_all = dict_in[prop_name]
                 part.host_positions = part.host_positions_all[snapshot_index]
                 for spec_name in part:
@@ -1171,7 +1188,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
             elif prop_name in ['host.velocities', 'center.velocity']:
                 if np.ndim(dict_in[prop_name]) == 2:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                        (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                    )  # update from old file format
                 part.host_velocities_all = dict_in[prop_name]
                 part.host_velocities = part.host_velocities_all[snapshot_index]
                 for spec_name in part:
@@ -1179,9 +1198,15 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     part[spec_name].host_velocities = part.host_velocities
 
             elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
-                # compatible with all naming conventions
                 if np.ndim(dict_in[prop_name]) == 3:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
+                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                        (
+                            dict_in[prop_name].shape[0],
+                            1,
+                            dict_in[prop_name].shape[1],
+                            dict_in[prop_name].shape[2],
+                        )
+                    )  # update from old file format
                 part.host_rotations_all = dict_in[prop_name]
                 part.host_rotations = part.host_rotations_all[snapshot_index]
                 for spec_name in part:
@@ -1205,7 +1230,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 ut.io.print_array(host_velocity, '{:.1f}', end='')
                 print(') [km / s]')
 
-            #print()
+            # print()
 
     def write_formation_coordinates(
         self, part_z0=None, host_number=1, thread_number=1, simulation_directory=None

@@ -852,8 +852,12 @@ class ReadClass(ut.io.SayClass):
         track_directory='track/',
         properties='all',
         element_indices=[0, 1, 6, 10],
+        assign_host_coordinates=True,
         assign_host_principal_axes=False,
         assign_host_orbits=False,
+        assign_formation_coordinates=False,
+        assign_pointers=False,
+        check_properties=True,
     ):
         '''
         Read snapshots at the same redshift from different simulations.
@@ -872,10 +876,25 @@ class ReadClass(ut.io.SayClass):
             directory of files for particle pointers, formation coordinates, and host coordinates
         properties : str or list : name[s] of properties to read
         element_indices : int or list : indices of elements to read
+        assign_host_coordinates : bool or str : whether to assign host coordinates
+            if a string, tells the code which method to use:
+                'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
+                    during particle tracking using only stars that are in each host at z = 0
+                'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
+                'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
+                    weighting each particle by that property
+            if True (default), will try a few methods in the following order of preference:
+                if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
+                if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
         assign_host_principal_axes : bool :
             whether to assign principal axes rotation tensor[s] of host galaxy/halo[s]
         assign_host_orbits : booelan :
             whether to assign orbital properties wrt host galaxy/halo[s]
+        assign_formation_coordinates : bool :
+            whether to assign coordindates wrt the host galaxy at formation to stars
+        assign_pointers : bool :
+            whether to assign pointers for tracking particles from z = 0 to this snapshot
+        check_properties : bool : whether to check sanity of particle properties after read in
 
         Returns
         -------
@@ -935,7 +954,12 @@ class ReadClass(ut.io.SayClass):
                     simulation_name,
                     properties,
                     element_indices,
+                    assign_host_coordinates=assign_host_coordinates,
                     assign_host_principal_axes=assign_host_principal_axes,
+                    assign_host_orbits=assign_host_orbits,
+                    assign_formation_coordinates=assign_formation_coordinates,
+                    assign_pointers=assign_pointers,
+                    check_properties=check_properties,
                 )
             except IOError:
                 self.say(
