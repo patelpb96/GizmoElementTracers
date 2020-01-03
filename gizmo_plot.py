@@ -2369,182 +2369,6 @@ class StarFormHistoryClass(ut.io.SayClass):
     .
     '''
 
-    def get_time_bin_dictionary(
-        self,
-        time_kind='redshift',
-        time_limits=[0, 10],
-        time_width=0.01,
-        time_scaling='linear',
-        Cosmology=None,
-    ):
-        '''
-        Get dictionary of time bin information.
-
-        Parameters
-        ----------
-        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
-        time_limits : list : min and max limits of time_kind to impose
-        time_width : float : width of time_kind bin (in units set by time_scaling)
-        time_scaling : str : scaling of time_kind: 'log', 'linear'
-        Cosmology : class : cosmology class, to convert between time metrics
-
-        Returns
-        -------
-        time_dict : dict
-        '''
-        assert time_kind in ['time', 'time.lookback', 'redshift', 'scalefactor']
-
-        time_limits = np.array(time_limits)
-
-        if 'log' in time_scaling:
-            if time_kind == 'redshift':
-                time_limits += 1  # convert to z + 1 so log is well-defined
-            times = 10 ** np.arange(
-                np.log10(time_limits.min()), np.log10(time_limits.max()) + time_width, time_width
-            )
-            if time_kind == 'redshift':
-                times -= 1
-        else:
-            times = np.arange(time_limits.min(), time_limits.max() + time_width, time_width)
-
-        # if input limits is reversed, get reversed array
-        if time_limits[1] < time_limits[0]:
-            times = times[::-1]
-
-        time_dict = {}
-
-        if 'time' in time_kind:
-            if 'lookback' in time_kind:
-                time_dict['time.lookback'] = times
-                time_dict['time'] = Cosmology.get_time(0) - times
-            else:
-                time_dict['time'] = times
-                time_dict['time.lookback'] = Cosmology.get_time(0) - times
-            time_dict['redshift'] = Cosmology.convert_time('redshift', 'time', time_dict['time'])
-            time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
-
-        else:
-            if 'redshift' in time_kind:
-                time_dict['redshift'] = times
-                time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
-            elif 'scalefactor' in time_kind:
-                time_dict['scalefactor'] = times
-                time_dict['redshift'] = 1 / time_dict['scalefactor'] - 1
-            time_dict['time'] = Cosmology.get_time(time_dict['redshift'])
-            time_dict['time.lookback'] = Cosmology.get_time(0) - time_dict['time']
-
-        return time_dict
-
-    def get_star_form_history(
-        self,
-        part,
-        time_kind='redshift',
-        time_limits=[0, 8],
-        time_width=0.1,
-        time_scaling='linear',
-        distance_limits=None,
-        center_position=None,
-        host_index=0,
-        property_select={},
-        part_indices=None,
-    ):
-        '''
-        Get array of times and star-formation rate at each time.
-
-        Parameters
-        ----------
-        part : dict : dictionary of particles
-        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
-        time_limits : list : min and max limits of time_kind to impose
-        time_width : float : width of time_kind bin (in units set by time_scaling)
-        time_scaling : str : scaling of time_kind: 'log', 'linear'
-        distance_limits : list : min and max limits of galaxy distance to select star particles
-        center_position : list : position of galaxy centers [kpc comoving]
-        host_index : int : index of host galaxy/halo to get position of (if not input it)
-        property_select : dict : dictionary with property names as keys and limits as values
-        part_indices : array : indices of star particles to select
-
-        Returns
-        -------
-        sfh : dictionary : arrays of SFH properties
-        '''
-        species = 'star'
-
-        if part_indices is None:
-            part_indices = ut.array.get_arange(part[species]['mass'])
-
-        if property_select:
-            part_indices = ut.catalog.get_indices_catalog(
-                part['star'], property_select, part_indices
-            )
-
-        center_position = ut.particle.parse_property(
-            part, 'center_position', center_position, host_index
-        )
-
-        if (
-            center_position is not None
-            and len(center_position) > 0
-            and distance_limits is not None
-            and len(distance_limits) > 0
-        ):
-            # [kpc physical]
-            distances = ut.coordinate.get_distances(
-                part['star']['position'][part_indices],
-                center_position,
-                part.info['box.length'],
-                part.snapshot['scalefactor'],
-                total_distance=True,
-            )
-            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
-
-        # get star particle formation times, sorted from earliest
-        part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
-        form_times = part[species].prop('form.time', part_indices_sort)
-        form_masses = part[species].prop('form.mass', part_indices_sort)
-        current_masses = part[species]['mass'][part_indices_sort]
-
-        # get time bins, ensure are ordered from earliest
-        time_dict = self.get_time_bin_dictionary(
-            time_kind, time_limits, time_width, time_scaling, part.Cosmology
-        )
-        time_bins = np.sort(time_dict['time'])
-        time_difs = np.diff(time_bins)
-
-        form_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(form_masses))
-        form_mass_difs = np.diff(form_mass_cum_bins)
-        form_rate_bins = form_mass_difs / time_difs / ut.constant.giga  # convert to [M_sun / yr]
-
-        current_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(current_masses))
-        current_mass_difs = np.diff(current_mass_cum_bins)
-
-        # convert to midpoints of bins
-        current_mass_cum_bins = (
-            current_mass_cum_bins[: current_mass_cum_bins.size - 1] + 0.5 * current_mass_difs
-        )
-        form_mass_cum_bins = (
-            form_mass_cum_bins[: form_mass_cum_bins.size - 1] + 0.5 * form_mass_difs
-        )
-
-        for k in time_dict:
-            time_dict[k] = time_dict[k][: time_dict[k].size - 1] + 0.5 * np.diff(time_dict[k])
-
-        # ensure ordering jives with ordering of input limits
-        if time_dict['time'][0] > time_dict['time'][1]:
-            form_rate_bins = form_rate_bins[::-1]
-            current_mass_cum_bins = current_mass_cum_bins[::-1]
-
-        sfh = {}
-        for k in time_dict:
-            sfh[k] = time_dict[k]
-        sfh['form.rate'] = form_rate_bins
-        sfh['form.rate.specific'] = form_rate_bins / form_mass_cum_bins
-        sfh['mass'] = current_mass_cum_bins
-        sfh['mass.normalized'] = current_mass_cum_bins / current_mass_cum_bins.max()
-        sfh['particle.number'] = form_times.size
-
-        return sfh
-
     def plot_star_form_history(
         self,
         parts=None,
@@ -2560,13 +2384,13 @@ class StarFormHistoryClass(ut.io.SayClass):
         part_indicess=None,
         sfh_limits=[],
         sfh_scaling='log',
+        verbose=False,
         write_plot=False,
         plot_directory='.',
         figure_index=1,
     ):
         '''
-        Plot star-formation rate history v time_kind.
-        Note: assumes instantaneous recycling of 30% for mass, should fix this for mass lass v time.
+        Plot star-formation history v time_kind.
 
         Parameters
         ----------
@@ -2618,7 +2442,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         sfh = {}
 
         for part_i, part in enumerate(parts):
-            sfh_p = self.get_star_form_history(
+            sfh_p = self._get_star_form_history(
                 part,
                 time_kind,
                 time_limits,
@@ -2637,11 +2461,12 @@ class StarFormHistoryClass(ut.io.SayClass):
             for k in sfh_p:
                 sfh[k].append(sfh_p[k])
 
-            self.say(
-                'star.mass max = {}'.format(
-                    ut.io.get_string_from_numbers(sfh_p['mass'].max(), 2, exponential=True)
+            if verbose:
+                self.say(
+                    'star.mass max = {}'.format(
+                        ut.io.get_string_from_numbers(sfh_p['mass'].max(), 2, exponential=True)
+                    )
                 )
-            )
 
         if time_kind == 'redshift' and 'log' in time_scaling:
             time_limits += 1  # convert to z + 1 so log is well-defined
@@ -2699,7 +2524,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         part=None,
         hal=None,
         gal=None,
-        mass_kind='star.mass.part',
+        mass_kind='star.mass',
         mass_limits=[1e5, 1e9],
         property_select={},
         hal_indices=None,
@@ -2715,8 +2540,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         figure_index=1,
     ):
         '''
-        Plot star-formation history v time_kind.
-        Note: assumes instantaneous recycling of 30% of mass, should fix this for mass lass v time.
+        Plot star-formation history v time_kind for multiple galaxies in a halo catalog.
 
         Parameters
         ----------
@@ -2765,7 +2589,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
             for hal_ii, hal_i in enumerate(hal_indices):
                 part_indices = hal.prop('star.indices', hal_i)
-                sfh_h = self.get_star_form_history(
+                sfh_h = self._get_star_form_history(
                     part,
                     time_kind,
                     time_limits,
@@ -2909,6 +2733,183 @@ class StarFormHistoryClass(ut.io.SayClass):
         if gal is not None:
             plot_name += '_lg'
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
+
+    def _get_time_bin_dictionary(
+        self,
+        time_kind='redshift',
+        time_limits=[0, 10],
+        time_width=0.01,
+        time_scaling='linear',
+        Cosmology=None,
+    ):
+        '''
+        Get dictionary of time bin information.
+
+        Parameters
+        ----------
+        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
+        time_limits : list : min and max limits of time_kind to impose
+        time_width : float : width of time_kind bin (in units set by time_scaling)
+        time_scaling : str : scaling of time_kind: 'log', 'linear'
+        Cosmology : class : cosmology class, to convert between time metrics
+
+        Returns
+        -------
+        time_dict : dict
+        '''
+        assert time_kind in ['time', 'time.lookback', 'redshift', 'scalefactor']
+
+        time_limits = np.array(time_limits)
+
+        if 'log' in time_scaling:
+            if time_kind == 'redshift':
+                time_limits += 1  # convert to z + 1 so log is well-defined
+            times = 10 ** np.arange(
+                np.log10(time_limits.min()), np.log10(time_limits.max()) + time_width, time_width
+            )
+            if time_kind == 'redshift':
+                times -= 1
+        else:
+            times = np.arange(time_limits.min(), time_limits.max() + time_width, time_width)
+
+        # if input limits is reversed, get reversed array
+        if time_limits[1] < time_limits[0]:
+            times = times[::-1]
+
+        time_dict = {}
+
+        if 'time' in time_kind:
+            if 'lookback' in time_kind:
+                time_dict['time.lookback'] = times
+                time_dict['time'] = Cosmology.get_time(0) - times
+            else:
+                time_dict['time'] = times
+                time_dict['time.lookback'] = Cosmology.get_time(0) - times
+            time_dict['redshift'] = Cosmology.convert_time('redshift', 'time', time_dict['time'])
+            time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
+
+        else:
+            if 'redshift' in time_kind:
+                time_dict['redshift'] = times
+                time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
+            elif 'scalefactor' in time_kind:
+                time_dict['scalefactor'] = times
+                time_dict['redshift'] = 1 / time_dict['scalefactor'] - 1
+            time_dict['time'] = Cosmology.get_time(time_dict['redshift'])
+            time_dict['time.lookback'] = Cosmology.get_time(0) - time_dict['time']
+
+        return time_dict
+
+    def _get_star_form_history(
+        self,
+        part,
+        time_kind='redshift',
+        time_limits=[0, 8],
+        time_width=0.1,
+        time_scaling='linear',
+        distance_limits=None,
+        center_position=None,
+        host_index=0,
+        property_select={},
+        part_indices=None,
+    ):
+        '''
+        Get array of times and star-formation rate at each time.
+
+        Parameters
+        ----------
+        part : dict : catalog of particles
+        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
+        time_limits : list : min and max limits of time_kind to impose
+        time_width : float : width of time_kind bin (in units set by time_scaling)
+        time_scaling : str : scaling of time_kind: 'log', 'linear'
+        distance_limits : list : min and max limits of galaxy distance to select star particles
+        center_position : list : position of galaxy centers [kpc comoving]
+        host_index : int : index of host galaxy/halo to get position of (if not input it)
+        property_select : dict : dictionary with property names as keys and limits as values
+        part_indices : array : indices of star particles to select
+
+        Returns
+        -------
+        sfh : dictionary : arrays of SFH properties
+        '''
+        species = 'star'
+
+        if part_indices is None:
+            part_indices = ut.array.get_arange(part[species]['mass'])
+
+        if property_select:
+            part_indices = ut.catalog.get_indices_catalog(
+                part['star'], property_select, part_indices
+            )
+
+        center_position = ut.particle.parse_property(
+            part, 'center_position', center_position, host_index
+        )
+
+        if (
+            center_position is not None
+            and len(center_position) > 0
+            and distance_limits is not None
+            and len(distance_limits) > 0
+        ):
+
+            distances = ut.coordinate.get_distances(
+                part['star']['position'][part_indices],
+                center_position,
+                part.info['box.length'],
+                part.snapshot['scalefactor'],
+                total_distance=True,
+            )  # [kpc physical]
+            part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
+
+        # get star particle formation times, sorted from earliest
+        part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
+        form_times = part[species].prop('form.time', part_indices_sort)
+        form_masses = part[species].prop('form.mass', part_indices_sort)
+        current_masses = part[species]['mass'][part_indices_sort]
+
+        # get time bins, ensure are ordered from earliest
+        time_dict = self._get_time_bin_dictionary(
+            time_kind, time_limits, time_width, time_scaling, part.Cosmology
+        )
+        time_bins = np.sort(time_dict['time'])
+        time_difs = np.diff(time_bins)
+
+        form_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(form_masses))
+        form_mass_difs = np.diff(form_mass_cum_bins)
+        form_rate_bins = form_mass_difs / time_difs / ut.constant.giga  # convert to [M_sun / yr]
+
+        current_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(current_masses))
+        current_mass_difs = np.diff(current_mass_cum_bins)
+
+        # convert to midpoints of bins
+        current_mass_cum_bins = (
+            current_mass_cum_bins[: current_mass_cum_bins.size - 1] + 0.5 * current_mass_difs
+        )
+        form_mass_cum_bins = (
+            form_mass_cum_bins[: form_mass_cum_bins.size - 1] + 0.5 * form_mass_difs
+        )
+
+        for k in time_dict:
+            time_dict[k] = time_dict[k][: time_dict[k].size - 1] + 0.5 * np.diff(time_dict[k])
+
+        # ensure that ordering jives with ordering of input limits
+        if time_dict['time'][0] > time_dict['time'][1]:
+            form_rate_bins = form_rate_bins[::-1]
+            current_mass_cum_bins = current_mass_cum_bins[::-1]
+            form_mass_cum_bins = form_mass_cum_bins[::-1]
+
+        sfh = {}
+        for k in time_dict:
+            sfh[k] = time_dict[k]
+        sfh['form.rate'] = form_rate_bins
+        sfh['form.rate.specific'] = form_rate_bins / form_mass_cum_bins
+        sfh['mass'] = current_mass_cum_bins
+        sfh['mass.normalized'] = current_mass_cum_bins / current_mass_cum_bins.max()
+        sfh['particle.number'] = form_times.size
+
+        return sfh
 
 
 StarFormHistory = StarFormHistoryClass()
@@ -3992,7 +3993,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         self.simulation_names = []
 
-    def parse_inputs(self, parts=None, species=None, redshifts=None):
+    def _parse_inputs(self, parts=None, species=None, redshifts=None):
         '''
         parts : list : dictionaries of particles at snapshot
         species : str or list : name[s] of particle species to read and analyze
@@ -4016,12 +4017,17 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         return parts, species, redshifts
 
-    def plot_all(
+    def plot(
         self,
         parts=None,
         species=['star', 'gas', 'dark'],
         simulation_directories=None,
         redshifts=[0],
+        galaxy_radius_limits=None,
+        plot_properties_v_distance=True,
+        plot_histories=True,
+        plot_properties_v_properties=True,
+        plot_images=True,
     ):
         '''
         Analyze and plot all quantities for all simulations at each redshift.
@@ -4033,10 +4039,10 @@ class CompareSimulationsClass(ut.io.SayClass):
         simulation_directories : list : simulation directories and names/labels for figure
         redshifts : float or list
         '''
-        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
+        parts, species, redshifts = self._parse_inputs(parts, species, redshifts)
 
         for redshift in redshifts:
-            if len(redshifts) > 1:
+            if len(redshifts) > 1 or parts is None:
                 parts = self.Read.read_snapshots_simulations(
                     species,
                     'redshift',
@@ -4046,671 +4052,555 @@ class CompareSimulationsClass(ut.io.SayClass):
                 )
 
             if 'star' in species:
-                self.print_masses_sizes(parts, 'star', simulation_directories, redshifts)
-            self.plot_properties(parts, species, simulation_directories, redshifts)
-            self.plot_properties_2d(parts, species, simulation_directories, redshifts)
-            self.plot_images(parts, ['star', 'gas'], simulation_directories, redshifts)
+                self.print_masses_sizes(parts, ['star'])
+            if plot_properties_v_distance:
+                self.plot_properties_v_distance(parts)
+            if plot_histories:
+                self.plot_histories(parts, galaxy_radius_limits)
+            if plot_properties_v_properties:
+                self.plot_properties_v_properties(parts)
+            if plot_images:
+                self.plot_images(parts)
 
-    def print_masses_sizes(
-        self,
-        parts=None,
-        species=['star'],
-        simulation_directories=None,
-        redshifts=[
-            1.5,
-            1.4,
-            1.3,
-            1.2,
-            1.1,
-            1.0,
-            0.9,
-            0.8,
-            0.7,
-            0.6,
-            0.55,
-            0.5,
-            0.45,
-            0.4,
-            0.35,
-            0.3,
-            0.29,
-            0.28,
-            0.27,
-            0.26,
-            0.25,
-            0.24,
-            0.23,
-            0.22,
-            0.21,
-            0.2,
-            0.19,
-            0.18,
-            0.17,
-            0.16,
-            0.15,
-            0.14,
-            0.13,
-            0.12,
-            0.11,
-            0.1,
-            0.09,
-            0.08,
-            0.07,
-            0.06,
-            0.05,
-            0.04,
-            0.03,
-            0.02,
-            0.01,
-            0,
-        ],
-        distance_max=20,
-    ):
+    def print_masses_sizes(self, parts, species=['star'], distance_max=20, mass_fraction=90):
         '''
-        Print 2-D sizes of galaxies.
+        Print masses and sizes of simulations / galaxies.
 
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
         species : str or list : name[s] of particle species to read and analyze
-        simulation_directories : list : simulation directories and names/labels for figure
-        redshifts : float or list
         distance_max : float : maximum distance from center to plot
+        mass_fraction : float : mass fraction (within distance_max) to determine edge of galaxy
         '''
-        properties = ['mass', 'position']
-        mass_fraction = 90
+        if species is not None and np.isscalar(species):
+            species = [species]
 
-        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
-
-        if parts is not None and redshifts is not None and len(redshifts) > 1:
-            self.say('! input particles at single snapshot but also input more than one redshift')
-            return
-
-        for redshift in redshifts:
-            if len(redshifts) > 1:
-                parts = self.Read.read_snapshots_simulations(
-                    species, 'redshift', redshift, simulation_directories, properties=properties
+        gals = []
+        for spec_name in ut.array.get_list_combined(species, parts[0], 'intersect'):
+            for part in parts:
+                gal = ut.particle.get_galaxy_properties(
+                    part, spec_name, 'mass.percent', mass_fraction, 'both', distance_max
                 )
+                gals.append(gal)
 
-            gals = []
-            for spec_name in ut.array.get_list_combined(species, parts[0], 'intersect'):
-                for part in parts:
-                    gal = ut.particle.get_galaxy_properties(
-                        part, spec_name, 'mass.percent', mass_fraction, 'both', distance_max
+            self.say('\n# species = {}'.format(spec_name))
+
+            for part_i, part in enumerate(parts):
+                gal = gals[part_i]
+                self.say('\n{}'.format(part.info['simulation.name']))
+                self.say(
+                    '* total M_{} = {} Msun, log = {:.2f}'.format(
+                        spec_name,
+                        ut.io.get_string_from_numbers(part[spec_name]['mass'].sum(), 2, True),
+                        np.log10(part[spec_name]['mass'].sum()),
                     )
-                    gals.append(gal)
-
-                self.say('\n# species = {}'.format(spec_name))
-
-                for part_i, part in enumerate(parts):
-                    gal = gals[part_i]
-                    self.say('\n{}'.format(part.info['simulation.name']))
-                    self.say(
-                        '* M_{},{} = {:.2e} Msun ({:.2f})'.format(
-                            spec_name, mass_fraction, gal['mass'], gal['mass'] / gals[0]['mass']
-                        )
+                )
+                self.say(
+                    '* M_{},{} = {} Msun, log = {:.2f}'.format(
+                        spec_name,
+                        mass_fraction,
+                        ut.io.get_string_from_numbers(gal['mass'], 2, True),
+                        np.log10(gal['mass']),
                     )
-                    string = '* R_major,{} = {:.1f} kpc ({:.2f}), R_minor,{} = {:.1f} kpc ({:.2f})'
-                    self.say(
-                        string.format(
-                            mass_fraction,
-                            gal['radius.major'],
-                            gal['radius.major'] / gals[0]['radius.major'],
-                            mass_fraction,
-                            gal['radius.minor'],
-                            gal['radius.minor'] / gals[0]['radius.minor'],
-                        )
+                )
+                string = '* R_major,{}, R_minor,{}  = {:.1f}, {:.1f} kpc'
+                self.say(
+                    string.format(
+                        mass_fraction,
+                        mass_fraction,
+                        gal['radius.major'],
+                        gal['radius.minor'],
                     )
-            print()
+                )
+        print()
 
-    def plot_properties(
-        self,
-        parts=None,
-        species=['star', 'gas', 'dark'],
-        simulation_directories=None,
-        redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        distance_bin_width=0.1,
-    ):
+    def plot_properties_v_distance(self, parts, distance_bin_width=0.1):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
-        simulation_directories : list : simulation directories and names/labels for figure
-        redshifts : float or list
         distance_bin_width : float : width of distance bin
         '''
-        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
+        if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
+            plot_property_v_distance(
+                parts,
+                'total',
+                'mass',
+                'vel.circ',
+                'linear',
+                False,
+                [0, None],
+                [0.1, self.halo_profile_radius_limits[1]],
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
-        for redshift in redshifts:
-            if len(redshifts) > 1:
-                parts = self.Read.read_snapshots_simulations(
-                    species,
-                    'redshift',
-                    redshift,
-                    simulation_directories,
-                    properties=self.properties,
-                )
+            plot_property_v_distance(
+                parts,
+                'total',
+                'mass',
+                'sum.cum',
+                'log',
+                False,
+                [None, None],
+                self.halo_profile_radius_limits,
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
-            if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
-                plot_property_v_distance(
-                    parts,
-                    'total',
-                    'mass',
-                    'vel.circ',
-                    'linear',
-                    False,
-                    [0, None],
-                    [0.1, self.halo_profile_radius_limits[1]],
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
+            plot_property_v_distance(
+                parts,
+                'baryon',
+                'mass',
+                'sum.cum.fraction',
+                'linear',
+                False,
+                [0, 2],
+                [10, 2000],
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
-                plot_property_v_distance(
-                    parts,
-                    'total',
-                    'mass',
-                    'sum.cum',
-                    'log',
-                    False,
-                    [None, None],
-                    self.halo_profile_radius_limits,
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
+        spec_name = 'dark'
+        if spec_name in parts[0]:
+            plot_property_v_distance(
+                parts,
+                spec_name,
+                'mass',
+                'sum.cum',
+                'log',
+                False,
+                [None, None],
+                self.halo_profile_radius_limits,
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
-                plot_property_v_distance(
-                    parts,
-                    'baryon',
-                    'mass',
-                    'sum.cum.fraction',
-                    'linear',
-                    False,
-                    [0, 2],
-                    [10, 2000],
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
+            plot_property_v_distance(
+                parts,
+                spec_name,
+                'mass',
+                'density',
+                'log',
+                False,
+                [None, None],
+                self.halo_profile_radius_limits,
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
-            spec_name = 'dark'
-            if spec_name in parts[0]:
-                plot_property_v_distance(
-                    parts,
-                    spec_name,
-                    'mass',
-                    'sum.cum',
-                    'log',
-                    False,
-                    [None, None],
-                    self.halo_profile_radius_limits,
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
+        spec_name = 'gas'
+        if spec_name in parts[0]:
+            plot_property_v_distance(
+                parts,
+                spec_name,
+                'mass',
+                'sum.cum',
+                'log',
+                False,
+                [None, None],
+                self.halo_profile_radius_limits,
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
 
-                plot_property_v_distance(
-                    parts,
-                    spec_name,
-                    'mass',
-                    'density',
-                    'log',
-                    False,
-                    [None, None],
-                    self.halo_profile_radius_limits,
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
-
-            spec_name = 'gas'
-            if spec_name in parts[0]:
-                plot_property_v_distance(
-                    parts,
-                    spec_name,
-                    'mass',
-                    'sum.cum',
-                    'log',
-                    False,
-                    [None, None],
-                    self.halo_profile_radius_limits,
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
-
-                if 'massfraction' in parts[0][spec_name]:
-                    try:
-                        plot_property_v_distance(
-                            parts,
-                            spec_name,
-                            'metallicity.total',
-                            'median',
-                            'linear',
-                            True,
-                            [None, None],
-                            self.halo_profile_radius_limits,
-                            distance_bin_width,
-                            write_plot=True,
-                            plot_directory=self.plot_directory,
-                        )
-
-                        plot_property_distribution(
-                            parts,
-                            spec_name,
-                            'metallicity.total',
-                            [-5, 1.3],
-                            0.1,
-                            None,
-                            'linear',
-                            'probability',
-                            self.halo_profile_radius_limits,
-                            axis_y_limits=[1e-4, None],
-                            write_plot=True,
-                            plot_directory=self.plot_directory,
-                        )
-                    except Exception:
-                        pass
-
-                # if 'velocity' in parts[0][prop]:
-                #    plot_property_v_distance(
-                #        parts, spec, 'host.velocity.rad', 'average', 'linear', True,
-                #        [None, None], self.halo_profile_radius_limits, 0.25,
-                #        write_plot=True, plot_directory=self.plot_directory,
-                #    )
-
-            spec_name = 'star'
-            if spec_name in parts[0]:
-                plot_property_v_distance(
-                    parts,
-                    spec_name,
-                    'mass',
-                    'sum.cum',
-                    'log',
-                    False,
-                    [None, None],
-                    self.halo_profile_radius_limits,
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
-
-                plot_property_v_distance(
-                    parts,
-                    spec_name,
-                    'mass',
-                    'density',
-                    'log',
-                    False,
-                    [None, None],
-                    self.galaxy_profile_radius_limits,
-                    distance_bin_width,
-                    write_plot=True,
-                    plot_directory=self.plot_directory,
-                )
-
-                if 'massfraction' in parts[0][spec_name]:
-                    try:
-                        plot_property_v_distance(
-                            parts,
-                            spec_name,
-                            'metallicity.fe',
-                            'median',
-                            'linear',
-                            True,
-                            [None, None],
-                            self.galaxy_profile_radius_limits,
-                            distance_bin_width,
-                            write_plot=True,
-                            plot_directory=self.plot_directory,
-                        )
-
-                        plot_property_distribution(
-                            parts,
-                            spec_name,
-                            'metallicity.fe',
-                            [-5, 1.3],
-                            0.1,
-                            None,
-                            'linear',
-                            'probability',
-                            self.galaxy_radius_limits,
-                            axis_y_limits=[1e-4, None],
-                            write_plot=True,
-                            plot_directory=self.plot_directory,
-                        )
-                    except Exception:
-                        pass
-
-                    try:
-                        plot_property_v_distance(
-                            parts,
-                            spec_name,
-                            'metallicity.mg - metallicity.fe',
-                            'median',
-                            'linear',
-                            True,
-                            [None, None],
-                            self.galaxy_profile_radius_limits,
-                            distance_bin_width,
-                            write_plot=True,
-                            plot_directory=self.plot_directory,
-                        )
-
-                        plot_property_distribution(
-                            parts,
-                            spec_name,
-                            'metallicity.mg - metallicity.fe',
-                            [-1.7, 0.6],
-                            0.1,
-                            None,
-                            'linear',
-                            'probability',
-                            self.galaxy_radius_limits,
-                            axis_y_limits=[1e-4, None],
-                            write_plot=True,
-                            plot_directory=self.plot_directory,
-                        )
-                    except Exception:
-                        pass
-
-                if 'form.scalefactor' in parts[0][spec_name] and redshift <= 5:
+            if 'massfraction' in parts[0][spec_name]:
+                try:
                     plot_property_v_distance(
                         parts,
                         spec_name,
-                        'age',
-                        'average',
+                        'metallicity.total',
+                        'median',
                         'linear',
                         True,
                         [None, None],
-                        self.galaxy_radius_limits,
+                        self.halo_profile_radius_limits,
                         distance_bin_width,
-                        'linear',
                         write_plot=True,
                         plot_directory=self.plot_directory,
                     )
 
-                    StarFormHistory.plot_star_form_history(
+                    plot_property_distribution(
                         parts,
-                        'mass',
-                        'redshift',
-                        [None, 7],
-                        0.2,
+                        spec_name,
+                        'metallicity.total',
+                        [-5, 1.3],
+                        0.1,
+                        None,
                         'linear',
-                        self.galaxy_radius_limits,
-                        sfh_limits=[None, None],
+                        'probability',
+                        self.halo_profile_radius_limits,
+                        axis_y_limits=[1e-4, None],
                         write_plot=True,
                         plot_directory=self.plot_directory,
                     )
+                except Exception:
+                    pass
 
-                    StarFormHistory.plot_star_form_history(
+            # if 'velocity' in parts[0][prop]:
+            #    plot_property_v_distance(
+            #        parts, spec, 'host.velocity.rad', 'average', 'linear', True,
+            #        [None, None], self.halo_profile_radius_limits, 0.25,
+            #        write_plot=True, plot_directory=self.plot_directory,
+            #    )
+
+        spec_name = 'star'
+        if spec_name in parts[0]:
+            plot_property_v_distance(
+                parts,
+                spec_name,
+                'mass',
+                'sum.cum',
+                'log',
+                False,
+                [None, None],
+                self.halo_profile_radius_limits,
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
+
+            plot_property_v_distance(
+                parts,
+                spec_name,
+                'mass',
+                'density',
+                'log',
+                False,
+                [None, None],
+                self.galaxy_profile_radius_limits,
+                distance_bin_width,
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
+
+            if 'massfraction' in parts[0][spec_name]:
+                try:
+                    plot_property_v_distance(
                         parts,
-                        'form.rate',
-                        'time.lookback',
-                        [None, 13],
-                        0.5,
+                        spec_name,
+                        'metallicity.fe',
+                        'median',
                         'linear',
-                        self.galaxy_radius_limits,
-                        sfh_limits=[None, None],
+                        True,
+                        [None, None],
+                        self.galaxy_profile_radius_limits,
+                        distance_bin_width,
                         write_plot=True,
                         plot_directory=self.plot_directory,
                     )
 
-                    StarFormHistory.plot_star_form_history(
+                    plot_property_distribution(
                         parts,
-                        'form.rate.specific',
-                        'time.lookback',
-                        [None, 13],
-                        0.5,
+                        spec_name,
+                        'metallicity.fe',
+                        [-5, 1.3],
+                        0.1,
+                        None,
                         'linear',
+                        'probability',
                         self.galaxy_radius_limits,
-                        sfh_limits=[None, None],
+                        axis_y_limits=[1e-4, None],
+                        write_plot=True,
+                        plot_directory=self.plot_directory,
+                    )
+                except Exception:
+                    pass
+
+                try:
+                    plot_property_v_distance(
+                        parts,
+                        spec_name,
+                        'metallicity.mg - metallicity.fe',
+                        'median',
+                        'linear',
+                        True,
+                        [None, None],
+                        self.galaxy_profile_radius_limits,
+                        distance_bin_width,
                         write_plot=True,
                         plot_directory=self.plot_directory,
                     )
 
-    def plot_properties_2d(
-        self,
-        parts=None,
-        species=['star', 'gas', 'dark'],
-        simulation_directories=None,
-        redshifts=[6, 5, 4, 3, 2, 1.5, 1, 0.5, 0],
-        property_bin_number=100,
-    ):
+                    plot_property_distribution(
+                        parts,
+                        spec_name,
+                        'metallicity.mg - metallicity.fe',
+                        [-1.7, 0.6],
+                        0.1,
+                        None,
+                        'linear',
+                        'probability',
+                        self.galaxy_radius_limits,
+                        axis_y_limits=[1e-4, None],
+                        write_plot=True,
+                        plot_directory=self.plot_directory,
+                    )
+                except Exception:
+                    pass
+
+            if 'form.scalefactor' in parts[0][spec_name] and parts[0].snapshot['redshift'] <= 5:
+                plot_property_v_distance(
+                    parts,
+                    spec_name,
+                    'age',
+                    'average',
+                    'linear',
+                    True,
+                    [None, None],
+                    self.galaxy_radius_limits,
+                    distance_bin_width,
+                    'linear',
+                    write_plot=True,
+                    plot_directory=self.plot_directory,
+                )
+
+    def plot_histories(self, parts, galaxy_radius_limits=[0, 12]):
         '''
-        Plot property v property for each simulation at each redshift.
+        Plot histories of star formation and mass.
 
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
-        simulation_directories : list : simulation directories and names/labels for figure
-        redshifts : float or list
+        '''
+        if galaxy_radius_limits is None or len(galaxy_radius_limits) == 0:
+            galaxy_radius_limits = self.galaxy_radius_limits
+
+        StarFormHistory = StarFormHistoryClass()
+
+        if 'star' in parts[0]:
+            StarFormHistory.plot_star_form_history(
+                parts,
+                'mass',
+                'redshift',
+                [None, 7],
+                0.1,
+                'linear',
+                galaxy_radius_limits,
+                sfh_limits=[None, None],
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
+
+            StarFormHistory.plot_star_form_history(
+                parts,
+                'mass',
+                'redshift',
+                #[None, 7],
+                [3, 9],
+                0.1,
+                'linear',
+                galaxy_radius_limits,
+                sfh_limits=[None, None],
+                write_plot=True,
+                plot_directory=self.plot_directory + 'z3/',
+            )
+
+            StarFormHistory.plot_star_form_history(
+                parts,
+                'form.rate',
+                'time.lookback',
+                [None, 13],
+                0.4,
+                'linear',
+                galaxy_radius_limits,
+                sfh_limits=[0, None],
+                sfh_scaling='linear',
+                write_plot=True,
+                plot_directory=self.plot_directory,
+            )
+
+            StarFormHistory.plot_star_form_history(
+                parts,
+                'form.rate',
+                'redshift',
+                [3, 9],
+                0.5,
+                'linear',
+                galaxy_radius_limits,
+                sfh_limits=[0, None],
+                sfh_scaling='linear',
+                write_plot=True,
+                plot_directory=self.plot_directory + 'z3/',
+            )
+
+            #StarFormHistory.plot_star_form_history(
+            #    parts,
+            #    'form.rate.specific',
+            #    'time.lookback',
+            #    [None, 13],
+            #    0.4,
+            #    'linear',
+            #    galaxy_radius_limits,
+            #    sfh_limits=[None, None],
+            #    write_plot=True,
+            #    plot_directory=self.plot_directory,
+            #)
+
+    def plot_properties_v_properties(
+        self, parts, property_bin_number=100
+    ):
+        '''
+        Plot property v property for each simulation.
+
+        Parameters
+        ----------
+        parts : list : dictionaries of particles at snapshot
         property_bin_number : int : number of bins along each dimension for histogram
         '''
         plot_directory = self.plot_directory + 'property_2d'
 
-        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
+        for part in parts:
+            species_name = 'star'
+            if species_name in part:
+                if 'massfraction' in parts[0][species_name]:
+                    try:
+                        plot_property_v_property(
+                            part,
+                            species_name,
+                            'metallicity.fe',
+                            [-3, 1],
+                            'linear',
+                            'metallicity.mg - metallicity.fe',
+                            [-0.5, 0.55],
+                            'linear',
+                            property_bin_number,
+                            host_distance_limits=self.galaxy_radius_limits,
+                            draw_statistics=False,
+                            write_plot=True,
+                            plot_directory=plot_directory,
+                            add_simulation_name=True,
+                        )
 
-        for redshift in redshifts:
-            if len(redshifts) > 1:
-                parts = self.Read.read_snapshots_simulations(
-                    species,
-                    'redshift',
-                    redshift,
-                    simulation_directories,
-                    properties=self.properties,
-                )
+                        plot_property_v_property(
+                            part,
+                            species_name,
+                            'age',
+                            [0, 13.5],
+                            'linear',
+                            'metallicity.fe',
+                            [-3, 1],
+                            'linear',
+                            property_bin_number,
+                            host_distance_limits=self.galaxy_radius_limits,
+                            draw_statistics=True,
+                            write_plot=True,
+                            plot_directory=plot_directory,
+                            add_simulation_name=True,
+                        )
 
-            for part in parts:
-                species_name = 'star'
-                if species_name in part:
-                    if 'massfraction' in parts[0][species_name]:
-                        try:
-                            plot_property_v_property(
-                                part,
-                                species_name,
-                                'metallicity.fe',
-                                [-3, 1],
-                                'linear',
-                                'metallicity.mg - metallicity.fe',
-                                [-0.5, 0.55],
-                                'linear',
-                                property_bin_number,
-                                host_distance_limits=self.galaxy_radius_limits,
-                                draw_statistics=False,
-                                write_plot=True,
-                                plot_directory=plot_directory,
-                                add_simulation_name=True,
-                            )
+                        plot_property_v_property(
+                            part,
+                            species_name,
+                            'age',
+                            [0, 13.5],
+                            'linear',
+                            'metallicity.mg - metallicity.fe',
+                            [-0.5, 0.55],
+                            'linear',
+                            property_bin_number,
+                            host_distance_limits=self.galaxy_radius_limits,
+                            draw_statistics=True,
+                            write_plot=True,
+                            plot_directory=plot_directory,
+                            add_simulation_name=True,
+                        )
+                    except Exception:
+                        pass
 
-                            plot_property_v_property(
-                                part,
-                                species_name,
-                                'age',
-                                [0, 13.5],
-                                'linear',
-                                'metallicity.fe',
-                                [-3, 1],
-                                'linear',
-                                property_bin_number,
-                                host_distance_limits=self.galaxy_radius_limits,
-                                draw_statistics=True,
-                                write_plot=True,
-                                plot_directory=plot_directory,
-                                add_simulation_name=True,
-                            )
-
-                            plot_property_v_property(
-                                part,
-                                species_name,
-                                'age',
-                                [0, 13.5],
-                                'linear',
-                                'metallicity.mg - metallicity.fe',
-                                [-0.5, 0.55],
-                                'linear',
-                                property_bin_number,
-                                host_distance_limits=self.galaxy_radius_limits,
-                                draw_statistics=True,
-                                write_plot=True,
-                                plot_directory=plot_directory,
-                                add_simulation_name=True,
-                            )
-                        except Exception:
-                            pass
-
-                species_name = 'gas'
-                # if species_name in part:
-                #    plot_property_v_property(
-                #        part, species_name,
-                #        'number.density', [-4, 4], 'log',
-                #        'temperature', [10, 1e7], 'log',
-                #        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
-                #        draw_statistics=False,
-                #        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,
-                #    )
+            species_name = 'gas'
+            # if species_name in part:
+            #    plot_property_v_property(
+            #        part, species_name,
+            #        'number.density', [-4, 4], 'log',
+            #        'temperature', [10, 1e7], 'log',
+            #        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
+            #        draw_statistics=False,
+            #        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,
+            #    )
 
     def plot_images(
         self,
-        parts=None,
-        species=['star', 'gas'],
-        simulation_directories=None,
-        redshifts=[
-            1.5,
-            1.4,
-            1.3,
-            1.2,
-            1.1,
-            1.0,
-            0.9,
-            0.8,
-            0.7,
-            0.6,
-            0.55,
-            0.5,
-            0.45,
-            0.4,
-            0.35,
-            0.3,
-            0.29,
-            0.28,
-            0.27,
-            0.26,
-            0.25,
-            0.24,
-            0.23,
-            0.22,
-            0.21,
-            0.2,
-            0.19,
-            0.18,
-            0.17,
-            0.16,
-            0.15,
-            0.14,
-            0.13,
-            0.12,
-            0.11,
-            0.1,
-            0.09,
-            0.08,
-            0.07,
-            0.06,
-            0.05,
-            0.04,
-            0.03,
-            0.02,
-            0.01,
-            0,
-        ],
+        parts,
         distance_max=21,
         distance_bin_width=0.05,
         align_principal_axes=True,
     ):
         '''
-        Plot images of simulations at each snapshot.
+        Plot images of each simulation.
 
         Parameters
         ----------
         parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
-        simulation_directories : list : simulation directories and names/labels for figure
-        redshifts : float or list
         distance_max : float : maximum distance from center to plot
         distance_bin_width : float : distance bin width (pixel size)
-        image_limits : list : min and max limits for image dyanmic range
         align_principal_axes : bool : whether to align plot axes with principal axes
         '''
-        properties = ['mass', 'position']
         plot_directory = self.plot_directory + 'image'
 
-        parts, species, redshifts = self.parse_inputs(parts, species, redshifts)
-
-        for redshift in redshifts:
-            if len(redshifts) > 1:
-                parts = self.Read.read_snapshots_simulations(
-                    species, 'redshift', redshift, simulation_directories, properties=properties
+        for part in parts:
+            species_name = 'star'
+            if species_name in part:
+                Image.plot_image(
+                    part,
+                    species_name,
+                    'mass',
+                    'histogram',
+                    [0, 1, 2],
+                    [0, 1, 2],
+                    distance_max,
+                    distance_bin_width,
+                    rotation=align_principal_axes,
+                    image_limits=[10 ** 6, 10 ** 10.5],
+                    background_color='black',
+                    write_plot=True,
+                    plot_directory=plot_directory,
                 )
 
-            for part in parts:
-                species_name = 'star'
-                if species_name in part:
-                    Image.plot_image(
-                        part,
-                        species_name,
-                        'mass',
-                        'histogram',
-                        [0, 1, 2],
-                        [0, 1, 2],
-                        distance_max,
-                        distance_bin_width,
-                        rotation=align_principal_axes,
-                        image_limits=[10 ** 6, 10 ** 10.5],
-                        background_color='black',
-                        write_plot=True,
-                        plot_directory=plot_directory,
-                    )
+            species_name = 'gas'
+            if species_name in part:
+                Image.plot_image(
+                    part,
+                    species_name,
+                    'mass',
+                    'histogram',
+                    [0, 1, 2],
+                    [0, 1, 2],
+                    distance_max,
+                    distance_bin_width,
+                    rotation=align_principal_axes,
+                    image_limits=[10 ** 4, 10 ** 9],
+                    background_color='black',
+                    write_plot=True,
+                    plot_directory=plot_directory,
+                )
 
-                species_name = 'gas'
-                if species_name in part:
-                    Image.plot_image(
-                        part,
-                        species_name,
-                        'mass',
-                        'histogram',
-                        [0, 1, 2],
-                        [0, 1, 2],
-                        distance_max,
-                        distance_bin_width,
-                        rotation=align_principal_axes,
-                        image_limits=[10 ** 4, 10 ** 9],
-                        background_color='black',
-                        write_plot=True,
-                        plot_directory=plot_directory,
-                    )
-
-                species_name = 'dark'
-                if species_name in part:
-                    Image.plot_image(
-                        part,
-                        species_name,
-                        'mass',
-                        'histogram',
-                        [0, 1, 2],
-                        [0, 1, 2],
-                        distance_max,
-                        distance_bin_width,
-                        rotation=align_principal_axes,
-                        image_limits=[10 ** 5.5, 10 ** 9],
-                        background_color='black',
-                        write_plot=True,
-                        plot_directory=plot_directory,
-                    )
+            species_name = 'dark'
+            if species_name in part:
+                Image.plot_image(
+                    part,
+                    species_name,
+                    'mass',
+                    'histogram',
+                    [0, 1, 2],
+                    [0, 1, 2],
+                    distance_max,
+                    distance_bin_width,
+                    rotation=align_principal_axes,
+                    image_limits=[10 ** 5.5, 10 ** 9],
+                    background_color='black',
+                    write_plot=True,
+                    plot_directory=plot_directory,
+                )
 
 
 CompareSimulations = CompareSimulationsClass()
@@ -4749,10 +4639,6 @@ def compare_resolution(
                     properties=['position', 'mass'],
                     assign_host_coordinates=assign_host_coordinates,
                 )
-                if 'res880' in simulation_directory:
-                    part.host_positions = np.array(
-                        [[41820.015, 44151.745, 46272.818]], dtype=np.float32
-                    )
                 if len(redshifts) > 1:
                     part.info['simulation.name'] += ' z={:.1f}'.format(redshift)
 

@@ -1164,7 +1164,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 if np.ndim(dict_in[prop_name]) == 2:
                     dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
                 part.host_positions_all = dict_in[prop_name]
-                part.host_positions = part.host_positions_all[:, snapshot_index]
+                part.host_positions = part.host_positions_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_positions_all = part.host_positions_all
                     part[spec_name].host_positions = part.host_positions
@@ -1173,7 +1173,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 if np.ndim(dict_in[prop_name]) == 2:
                     dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
                 part.host_velocities_all = dict_in[prop_name]
-                part.host_velocities = part.host_velocities_all[:, snapshot_index]
+                part.host_velocities = part.host_velocities_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_velocities_all = part.host_velocities_all
                     part[spec_name].host_velocities = part.host_velocities
@@ -1183,14 +1183,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 if np.ndim(dict_in[prop_name]) == 3:
                     dict_in[prop_name] = np.array([dict_in[prop_name]])  # old file format
                 part.host_rotations_all = dict_in[prop_name]
-                part.host_rotations = part.host_rotations_all[:, snapshot_index]
+                part.host_rotations = part.host_rotations_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_rotations_all = part.host_rotations_all
                     part[spec_name].host_rotations = part.host_rotations
 
-        host_number = len(part.host_positions_all)
+        host_number = part.host_positions_all.shape[1]
         self.say(
-            f'* read position, velocity, and rotation for {host_number} host galaxy[s] from:'
+            f'* read position, velocity, rotation for {host_number} host galaxy[s] from:'
             + '  {}'.format(file_path_name.strip('./') + '.hdf5')
         )
 

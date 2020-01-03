@@ -277,6 +277,7 @@ class ParticleDictionaryClass(dict):
         if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
             if self.MassLoss is None:
                 from . import gizmo_star
+
                 self.MassLoss = gizmo_star.MassLossClass()
 
             # fractional mass loss since formation
@@ -955,7 +956,12 @@ class ReadClass(ut.io.SayClass):
 
         if 'mass' in properties and 'star' in part:
             for part, directory in zip(parts, directories_read):
-                print('{}: star.mass = {:.3e}'.format(directory, part['star']['mass'].sum()))
+                print(
+                    '{}\n* total star.mass = {} Msun\n'.format(
+                        directory,
+                        ut.io.get_string_from_numbers(part['star']['mass'].sum(), 2, True),
+                    )
+                )
 
         return parts
 
@@ -1541,10 +1547,14 @@ class ReadClass(ut.io.SayClass):
         if renormalize_potential:
             potential_max = 0
             for spec_name in part:
-                if part[spec_name]['potential'].max() > potential_max:
+                if (
+                    'potential' in part[spec_name]
+                    and part[spec_name]['potential'].max() > potential_max
+                ):
                     potential_max = part[spec_name]['potential'].max()
             for spec_name in part:
-                part[spec_name]['potential'] -= potential_max
+                if 'potential' in part[spec_name]:
+                    part[spec_name]['potential'] -= potential_max
 
         # sub-sample particles, for smaller memory
         if particle_subsample_factor is not None and particle_subsample_factor > 1:
@@ -1871,13 +1881,16 @@ class ReadClass(ut.io.SayClass):
                     )
 
             except (IOError, ImportError):
-                self.say(
-                    'so, will assign host coordinates via iterative zoom using particle mass'
-                )
+                self.say('so, will assign host coordinates via iterative zoom using particle mass')
                 method = 'mass'
                 self._assign_host_coordinates_from_particles(
-                    part, species_name, part_indicess, method, host_number, exclusion_distance,
-                    verbose
+                    part,
+                    species_name,
+                    part_indicess,
+                    method,
+                    host_number,
+                    exclusion_distance,
+                    verbose,
                 )
         else:
             self.say(
