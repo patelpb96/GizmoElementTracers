@@ -4107,10 +4107,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 string = '* R_major,{}, R_minor,{}  = {:.1f}, {:.1f} kpc'
                 self.say(
                     string.format(
-                        mass_fraction,
-                        mass_fraction,
-                        gal['radius.major'],
-                        gal['radius.minor'],
+                        mass_fraction, mass_fraction, gal['radius.major'], gal['radius.minor']
                     )
                 )
         print()
@@ -4395,7 +4392,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts,
                 'mass',
                 'redshift',
-                #[None, 7],
+                # [None, 7],
                 [3, 9],
                 0.1,
                 'linear',
@@ -4433,22 +4430,20 @@ class CompareSimulationsClass(ut.io.SayClass):
                 plot_directory=self.plot_directory + 'z3/',
             )
 
-            StarFormHistory.plot_star_form_history(
-                parts,
-                'form.rate.specific',
-                'time.lookback',
-                [None, 13],
-                0.4,
-                'linear',
-                galaxy_radius_limits,
-                sfh_limits=[None, None],
-                write_plot=True,
-                plot_directory=self.plot_directory,
-            )
+            # StarFormHistory.plot_star_form_history(
+            #    parts,
+            #    'form.rate.specific',
+            #    'time.lookback',
+            #    [None, 13],
+            #    0.4,
+            #    'linear',
+            #    galaxy_radius_limits,
+            #    sfh_limits=[None, None],
+            #    write_plot=True,
+            #    plot_directory=self.plot_directory,
+            # )
 
-    def plot_properties_v_properties(
-        self, parts, property_bin_number=100
-    ):
+    def plot_properties_v_properties(self, parts, property_bin_number=100):
         '''
         Plot property v property for each simulation.
 
@@ -4529,11 +4524,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             #    )
 
     def plot_images(
-        self,
-        parts,
-        distance_max=21,
-        distance_bin_width=0.05,
-        align_principal_axes=True,
+        self, parts, distance_max=21, distance_bin_width=0.05, align_principal_axes=True
     ):
         '''
         Plot images of each simulation.

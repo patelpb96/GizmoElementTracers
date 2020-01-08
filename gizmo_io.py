@@ -1614,8 +1614,6 @@ class ReadClass(ut.io.SayClass):
         path_file_name[s] : str or list thereof : (relative) path + name of file[s]
         [file_indices : list of ints : indices of snapshot files]
         '''
-        import natsort
-
         directory = ut.io.get_path(directory)
 
         assert (
@@ -1648,6 +1646,8 @@ class ReadClass(ut.io.SayClass):
             if snapshot_block_index > 1:
                 # if using non-default snapshot block, need to ensure file names are
                 # sorted 'naturally' by block number (0, 1, 2, ... instead of 0, 1, 10, ...)
+                # TODO: find another way of doing this, because natsort not a standard library
+                import natsort
                 path_file_names = natsort.natsorted(path_file_names)
 
             if (
