@@ -1644,9 +1644,9 @@ class ReadClass(ut.io.SayClass):
             path_file_names = ut.io.get_file_names(path_file_names + '/' + self.snapshot_name_base)
 
             if snapshot_block_index > 1:
-                # if using non-default snapshot block, need to ensure file names are
-                # sorted 'naturally' by block number (0, 1, 2, ... instead of 0, 1, 10, ...)
-                # TODO: find another way of doing this, because natsort not a standard library
+                # if using non-default snapshot block, sort file names 'naturally' by block number
+                # (0, 1, 2, ... instead of 0, 1, 10, ...)
+                # TODO: find another way to do this, because natsort is not a standard library
                 import natsort
                 path_file_names = natsort.natsorted(path_file_names)
 

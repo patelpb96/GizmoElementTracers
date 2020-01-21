@@ -2425,7 +2425,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         if None in time_limits:
             if time_kind == 'redshift':
                 if time_limits[0] is None:
-                    time_limits[0] = parts[0].snapshot[time_kind]
+                    time_limits[0] = np.floor(parts[0].snapshot[time_kind])
                 if time_limits[1] is None:
                     time_limits[1] = 7
             elif time_kind == 'time':
@@ -2437,7 +2437,8 @@ class StarFormHistoryClass(ut.io.SayClass):
                 if time_limits[0] is None:
                     time_limits[0] = 0
                 elif time_limits[1] is None:
-                    time_limits[1] = 13.6  # [Gyr]
+                    # time_limits[1] = 13.6  # [Gyr]
+                    time_limits[1] = parts[0]['star'].prop('age').max()  # [Gyr]
 
         sfh = {}
 
@@ -4005,7 +4006,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         if species is not None and np.isscalar(species):
             species = [species]
 
-        if redshifts is not None and np.isscalar(redshifts):
+        if redshifts is None:
+            redshifts = parts[0].snapshot['redshift']
+        if np.isscalar(redshifts):
             redshifts = [redshifts]
 
         if parts is not None and redshifts is not None and len(redshifts) > 1:
@@ -4022,7 +4025,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         parts=None,
         species=['star', 'gas', 'dark'],
         simulation_directories=None,
-        redshifts=[0],
+        redshifts=None,
         galaxy_radius_limits=None,
         plot_properties_v_distance=True,
         plot_histories=True,
@@ -4392,8 +4395,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts,
                 'mass',
                 'redshift',
-                # [None, 7],
-                [3, 9],
+                [3, 10],
                 0.1,
                 'linear',
                 galaxy_radius_limits,
@@ -4420,7 +4422,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts,
                 'form.rate',
                 'redshift',
-                [3, 9],
+                [3, 10],
                 0.5,
                 'linear',
                 galaxy_radius_limits,

@@ -535,11 +535,11 @@ if __name__ == '__main__':
 
         snapshot_index_limits = [0, 600]
         if len(sys.argv) > 3:
-            snapshot_index_min = int(sys.argv[3])
-            snapshot_index_max = 600
+            snapshot_index_limits[0] = int(sys.argv[3])
             if len(sys.argv) > 4:
-                snapshot_index_max = int(sys.argv[4])
-            snapshot_indices = np.arange(snapshot_index_min, snapshot_index_max + 1)
+                snapshot_index_limits[1] = int(sys.argv[4])
+
+        snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
         Compress.test_compression(snapshot_indices, directory)
 
