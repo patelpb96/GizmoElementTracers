@@ -255,10 +255,9 @@ def plot_metal_v_distance(
 
 def plot_kernel(
     kernel_kind='cubic',
-    function_kinds=['density', 'mass', 'potential', 'acceleration'],
+    function_kinds=['density', 'mass', 'acceleration', 'potential/newtonian'],
     distance_limits=[0, 1],
     distance_bin_width=0.001,
-    ratio_newtonian=False,
     write_plot=False,
     plot_directory='.',
     figure_index=1,
@@ -272,29 +271,40 @@ def plot_kernel(
 
     kernel_values = np.zeros((len(function_kinds), distances.size))
     for f_i, function_kind in enumerate(function_kinds):
+        if '/newtonian' in function_kind:
+            function_kind = function_kind.replace('/newtonian', '')
+            ratio_newtonian = True
+        else:
+            ratio_newtonian = False
         for d_i, distance in enumerate(distances):
             kernel_values[f_i, d_i] = ut.particle.get_kernel(
                 kernel_kind, function_kind, distance, ratio_newtonian=ratio_newtonian
             )
         if function_kind == 'potential':
             kernel_values[f_i] -= kernel_values[f_i].min()
-        else:
-            kernel_values[f_i] /= kernel_values[f_i].max()
+        kernel_values[f_i] /= kernel_values[f_i].max()
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
 
-    ut.plot.set_axes_scaling_limits(subplot, 'linear', distance_limits, None, 'linear', [0, 1.8])
+    ut.plot.set_axes_scaling_limits(subplot, 'linear', distance_limits, None, 'linear', [0, 1])
 
     subplot.set_ylabel('kernel')
     subplot.set_xlabel('$r/H_{\\rm kernel}$')
 
     for f_i, function_kind in enumerate(function_kinds):
-        subplot.plot(distances, kernel_values[f_i], alpha=0.8, label=function_kind)
+        label = function_kind
+        if label == 'mass':
+            label += ' ($= a / a_{{\\rm newt}}$)'
+        subplot.plot(distances, kernel_values[f_i], alpha=0.8, label=label)
 
     ut.plot.make_legends(subplot, 'best')
 
-    ut.plot.parse_output(write_plot, 'kernel_v_distance', plot_directory)
+    plt.arrow(1 / 2.8, 0, 0, 0.1, alpha=0.5)
+
+    plt.arrow(1 / 2, 0, 0, 0.05, alpha=0.5)
+
+    ut.plot.parse_output(write_plot, f'kernel.{kernel_kind}_v_distance', plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------

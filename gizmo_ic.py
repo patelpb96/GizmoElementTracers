@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 '''
-Generate initial condition points by selecting particles at final time and tracking them back
-to initial time.
+Generate file of positions for zoom-in initial conditions by selecting particles at final time and
+tracking them back to initial time.
 
 @author: Andrew Wetzel
 
@@ -26,15 +26,13 @@ import utilities as ut
 # --------------------------------------------------------------------------------------------------
 class InitialConditionClass(ut.io.SayClass):
     '''
-    Read particles from final and initial snapshots [and halos from catalog at final snapshot.]
+    Read particles from final and initial snapshots [and halos from catalog at final snapshot].
     Generate text file of positions of particles at the initial snapshot that are within the
     selection region at the final snapshot.
     '''
 
     def __init__(self, snapshot_redshifts=[0, 99], simulation_directory='.'):
         '''
-        Read particles at final and initial snapshots and halos at final snapshot.
-
         Parameters
         ----------
         snapshot_redshifts : list : redshifts of initial and final snapshots
@@ -60,13 +58,13 @@ class InitialConditionClass(ut.io.SayClass):
         Select dark-matter particles at the final snapshot, write a file of their positions at
         the initial snapshot.
 
-        If input halo catalog and hal_index, select zoom-in region from halo catalog,
+        If input halo catalog hal and halo index hal_index, select zoom-in volume around that halo,
         typically for a uniform-resolution DM-only simulation.
 
-        Else, assume am working from an existing zoom-in simulation,
-        re-generate region around center.
+        Else, assume am working from an existing zoom-in simulation, re-select spherical volume
+        around center.
 
-        If not supply parts, read them at the fiducial snapshot redshifts.
+        If not supply particle catalogs parts, read them at the fiducial snapshots.
 
         Rule of thumb from Onorbe et al:
             given distance_pure
@@ -422,7 +420,7 @@ InitialCondition = InitialConditionClass()
 
 
 # --------------------------------------------------------------------------------------------------
-# running from command line
+# run from command line
 # --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     if len(sys.argv) <= 1:

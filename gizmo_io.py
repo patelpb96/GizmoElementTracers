@@ -1567,7 +1567,7 @@ class ReadClass(ut.io.SayClass):
                 del (helium_mass_fracs, ys_helium, mus, molecular_weights)
 
         # renormalize so potential max = 0
-        renormalize_potential = True
+        renormalize_potential = False
         if renormalize_potential:
             potential_max = 0
             for spec_name in part:
@@ -1648,6 +1648,7 @@ class ReadClass(ut.io.SayClass):
                 # (0, 1, 2, ... instead of 0, 1, 10, ...)
                 # TODO: find another way to do this, because natsort is not a standard library
                 import natsort
+
                 path_file_names = natsort.natsorted(path_file_names)
 
             if (
