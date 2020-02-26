@@ -27,6 +27,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
 '''
 
 import numpy as np
+from scipy import integrate
 
 from . import gizmo_star
 # import utilities as ut
@@ -35,7 +36,7 @@ from . import gizmo_star
 def construct_yield_table(elements, agebins,
                           yield_object,
                           yf = None ,
-                          yield_args = (), yield_kwargs = {}
+                          yield_args = (), yield_kwargs = {},
                           rate_function = None,
                           rate_args  = (), rate_kwargs = {}):
     """
@@ -96,11 +97,8 @@ def construct_yield_table(elements, agebins,
 
             yield_table[i][j] = integrate.quad( yield_object.yields,
                                 min_t, max_t,
-                                args = (e,))
-
-
-
-    return yield_table 
+                                args = (e,))[0]
+    return yield_table
 
 
 class YieldsObject ():
@@ -120,59 +118,114 @@ class YieldsObject ():
         pass
 
 
+# ------------------------------------------------------------------------------
+# FIRE2 Yield Class object for generating yield tables for age-tracer
+# post-processing. This serves as an example
+# ------------------------------------------------------------------------------
 
-class FIRE2_yields_table(YieldsObject):
-
+class FIRE2_yields(YieldsObject):
+    '''
+    Object desigend for use with the construct_yield_table method. This object
+    Provides the yields for the default FIRE2 chemical evolution model. This
+    model uses some metallicity depended yields, determined by two paramters.
+    '''
     def __init__(self, name = "FIRE2", model_Z = 1.0, Z_scaling=True):
         """
-        Model_Z is solar
+        Initialize object and pre-load some things for convenience.
+
+        Parameters
+        -----------
+        name  : str, optional
+            Optional name for this table. Default : FIRE2
+        model_Z : float, Optional
+            Metallicity (in solar units) for metallicity dependent yield
+            scalings in the FIRE2 model. Default: 1.0 (solar)
+        Z_scaling : bool, optional
+            Apply the FIRE2 metallicity scalings in approximate fashion.
+            Default : True
         """
 
         super().__init__(name)
 
+        # Not required. Specific parameters for this model
         self.model_parameters = {'model_Z' : model_Z,
                                  'Z_scaling' : Z_scaling}
 
-        self.elements = ['helium','carbon','nitrogen','oxygen',
+        # Not required, but useful
+        self.elements = ['metals','helium','carbon','nitrogen','oxygen',
                          'neon','magnesium','silicon','sulphur',
                          'calcium','iron']
 
+
+        # Not required
+        # to use for metallicity dependent corrections on the yields
+        # this just assumes that all yields come from stars with metallicities
+        # and individual abundances scaled to the solar abundance pattern
+        # this isn't accurate in practice but gives better agreement between
+        # post-processed yields and native simulated yields in the FIRE-2 model.
+        star_massfraction = {}
+        for e in self.elements:
+            star_massfraction[e]    = self.model_parameters['model_Z'] *\
+                                      gizmo_star.sun_massfraction[e]
+
+        # pre-load yields since they are constants in time.
+        # in general, this probably cannot be done if they are time-varying
+        # and would have to make separete function calls or something in
+        # the yields method
+
+        #  Yields here is a dictionary with element names as kwargs
+        # and yields (in Msun) as values
+        self.snIa_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ia',
+                                                  star_metallicity=self.model_parameters['model_Z'],
+                                                  star_massfraction=star_massfraction,
+                                                  normalize=False)
+
+        self.snII_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ii',
+                                              star_metallicity=self.model_parameters['model_Z'],
+                                              star_massfraction=star_massfraction,
+                                              normalize=False)
+        #    wind yields do not have quantized rates. These are mass fraction
+        #
+        self.wind_yields = gizmo_star.get_nucleosynthetic_yields('wind',
+                                              star_metallicity=self.model_parameters['model_Z'],
+                                              star_massfraction=star_massfraction,
+                                              normalize=False)
         return
 
     def yields(self, t, element):
         """
-        Returns the total yields for all FIRE processes. t is in Gyr
+
+        Returns the total yields for all FIRE processes. This method is REQUIRED
+        by construct_yield_table.
+
+        Parameters
+        -----------
+        t    : float or np.ndarray
+            Time (in Gyr) to compute instantaneous yield
+        element : str : Must be in self.elements
+            Element name
+
+        Returns
+        -----------
+        y : float or np.ndarray
+            Total yields at a given time for desired element in units of
+            Msun / Gyr per Msun of star formation.
         """
 
+        assert element in self.elements
 
-        snIa_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ia',
-                                                  star_metallicity=self.model_parameters['model_Z'],
-                                                  star_massfraction={},
-                                                  normalize=False)
+        # get SNIa rate at a given time (in units of 1/Myr per Msun of SF)
+        snIarate = gizmo_star.SupernovaIa.get_rate(t*1000.0, 'mannucci')
 
-        snIarate = gizmo_star.SupernovaIa.get_rate(t, 'mannucci')
-
-        # get snII yields. Returns a dictionary with element names as kwargs
-        # and yields (in Msun) as values
-        snII_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ii',
-                                              star_metallicity=self.model_parameters['model_Z'],
-                                              star_massfraction={},
-                                              normalize=False)
-
-        # get snII rate at given time (in units of 1/Myr per Msun)
+        # get snII rate at given time (in units of 1/Myr per Msun of SF)
         snIIrate = gizmo_star.SupernovaII.get_rate(t*1000.0)
 
-        wind_yields = gizmo_star.get_nucleosynthetic_yields('wind',
-                                              star_metallicity=self.model_parameters['model_Z'],
-                                              star_massfraction={},
-                                              normalize=False)
+        # get widnd rate at given time (in units of Msun/Myr per Msun of SF)
+        #   this is the only model in the FIRE default that is Z dependent
+        windrate = gizmo_star.StellarWind.get_rate(t*1000.0, metallicity=self.model_parameters['model_Z'])
 
-        windrate = gizmo_star.get_rate(t, metallicity=self.model_parameters['model_Z'])
+        y =  ( (self.wind_yields[element] * windrate) +\
+               (self.snIa_yields[element] * snIarate) +\
+               (self.snII_yields[element] * snIIrate))  # in Msun / Myr
 
-
-
-        y =  ( (wind_yields[element] * windrate) +\
-               (snIa_yields[element] * snIarate) +\
-               (snII_yields[element] * snIIrate)) * 1.0E6 # in Msun / yr
-
-        return y
+        return y * 1000.0 # Msun / Gyr
