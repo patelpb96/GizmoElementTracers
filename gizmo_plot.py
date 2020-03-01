@@ -367,7 +367,7 @@ class ImageClass(ut.io.SayClass):
         dimensions_select : list : which dimensions to use to select particles
             note : use this to set selection 'depth' of an image
         distances_max : float or array : distance[s] from center to plot and/or cut
-        distance_bin_width : float : length pixel
+        distance_bin_width : float : length of pixel
         distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
         center_position : array-like : position of center
         rotation : bool or array : whether to rotate particles - two options:

@@ -145,7 +145,7 @@ class RuntimeClass(ut.io.SayClass):
         print_next_line = False
 
         for line in file_in:
-            if print_next_line:
+            if print_next_line and 'total' in line:
                 wall_times.append(float(line.split()[1]))
                 print_next_line = False
                 i += 1
