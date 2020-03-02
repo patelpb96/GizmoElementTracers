@@ -285,6 +285,55 @@ class ContaminationClass(ut.io.SayClass):
     Contamination by low-resolution dark matter.
     '''
 
+    def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
+        '''
+        Plot contamination from lower-resolution particles around halo center as a function of
+        distance.
+
+        Parameters
+        ----------
+        redshift : float : redshift of snapshot
+        simulation_directory : str : top-level directory of simulation
+        '''
+        distance_bin_width = 0.01
+        distance_limits_phys = [10, 2000]  # [kpc physical]
+        distance_limits_halo = [0.01, 7]  # [units of R_halo]
+        virial_kind = '200m'
+
+        os.chdir(simulation_directory)
+
+        Read = gizmo_io.ReadClass()
+        part = Read.read_snapshots(
+            ['star', 'dark', 'dark2'],
+            'redshift',
+            redshift,
+            simulation_directory,
+            properties=['position', 'mass'],
+            assign_host_coordinates=True,
+        )
+
+        halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
+
+        self.plot_contamination_v_distance(
+            part,
+            distance_limits_phys,
+            distance_bin_width,
+            halo_radius=halo_prop['radius'],
+            scale_to_halo_radius=False,
+            write_plot=True,
+            plot_directory='plot',
+        )
+
+        self.plot_contamination_v_distance(
+            part,
+            distance_limits_halo,
+            distance_bin_width,
+            halo_radius=halo_prop['radius'],
+            scale_to_halo_radius=True,
+            write_plot=True,
+            plot_directory='plot',
+        )
+
     def plot_contamination_v_distance(
         self,
         part,
@@ -532,98 +581,6 @@ class ContaminationClass(ut.io.SayClass):
             distance_name += '.' + virial_kind
         plot_name = ut.plot.get_file_name('mass.ratio', distance_name, snapshot_dict=part.snapshot)
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
-
-    def plot_contamination_v_distance_halo(
-        self,
-        part,
-        hal,
-        hal_index,
-        distance_max=7,
-        distance_bin_width=0.5,
-        scale_to_halo_radius=True,
-    ):
-        '''
-        Print information on contamination from lower-resolution particles around halo as a function
-        of distance.
-
-        Parameters
-        ----------
-        part : dict : catalog of particles at snapshot
-        hal : dict : catalog of halos at snapshot
-        hal_index: int : index of halo
-        distance_max : float : maximum distance from halo center to check
-        distance_bin_width : float : width of distance bin for printing
-        scale_to_halo_radius : bool : whether to scale distances by virial radius
-        '''
-        distance_scaling = 'linear'
-        distance_limits = [0, distance_max]
-        axis_y_scaling = 'log'
-
-        self.say('halo radius = {:.1f} kpc'.format(hal['radius'][hal_index]))
-
-        halo_radius = hal['radius'][hal_index]
-
-        self.plot_contamination_v_distance(
-            part,
-            distance_limits,
-            distance_bin_width,
-            None,
-            distance_scaling,
-            halo_radius,
-            scale_to_halo_radius,
-            hal['position'][hal_index],
-            axis_y_scaling,
-            write_plot=None,
-        )
-
-    def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
-        '''
-        Plot contamination from lower-resolution particles around halo center as a function of
-        distance.
-
-        Parameters
-        ----------
-        redshift : float : redshift of snapshot
-        simulation_directory : str : top-level directory of simulation
-        '''
-        distance_bin_width = 0.01
-        distance_limits_phys = [10, 2000]  # [kpc physical]
-        distance_limits_halo = [0.01, 7]  # [units of R_halo]
-        virial_kind = '200m'
-
-        os.chdir(simulation_directory)
-
-        Read = gizmo_io.ReadClass()
-        part = Read.read_snapshots(
-            ['dark', 'dark2'],
-            'redshift',
-            redshift,
-            simulation_directory,
-            properties=['position', 'mass', 'potential'],
-            assign_host_coordinates=True,
-        )
-
-        halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
-
-        self.plot_contamination_v_distance(
-            part,
-            distance_limits_phys,
-            distance_bin_width,
-            halo_radius=halo_prop['radius'],
-            scale_to_halo_radius=False,
-            write_plot=True,
-            plot_directory='plot',
-        )
-
-        self.plot_contamination_v_distance(
-            part,
-            distance_limits_halo,
-            distance_bin_width,
-            halo_radius=halo_prop['radius'],
-            scale_to_halo_radius=True,
-            write_plot=True,
-            plot_directory='plot',
-        )
 
 
 Contamination = ContaminationClass()
