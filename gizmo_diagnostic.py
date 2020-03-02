@@ -424,10 +424,10 @@ class ContaminationClass(ut.io.SayClass):
             }
             profile_number[spec_name] = {
                 'sum': np.int64(
-                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])
+                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'].min())
                 ),
                 'sum.cum': np.int64(
-                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'][0])
+                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'].min())
                 ),
             }
 
