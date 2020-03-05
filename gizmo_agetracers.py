@@ -75,8 +75,12 @@ def construct_yield_table(yield_object, agebins,
 
     """
 
-    for e in elements:
-        assert e in yield_object.elements
+    # assume to generate this for all elements
+    if elements is None:
+        elements = yield_object.elements
+    else:
+        for e in elements:
+            assert e in yield_object.elements
 
     yield_table = np.zeros(  (np.size(agebins)-1, np.size(elements)))
 
@@ -166,34 +170,16 @@ class FIRE2_yields(YieldsObject):
         # and individual abundances scaled to the solar abundance pattern
         # this isn't accurate in practice but gives better agreement between
         # post-processed yields and native simulated yields in the FIRE-2 model.
-        star_massfraction = {}
+        self._star_massfraction = {}
         for e in self.elements:
-            star_massfraction[e]    = self.model_parameters['model_Z'] *\
+            self._star_massfraction[e]    = self.model_parameters['model_Z'] *\
                                       gizmo_star.sun_massfraction[e]
 
         # pre-load yields since they are constants in time.
         # in general, this probably cannot be done if they are time-varying
         # and would have to make separete function calls or something in
         # the yields method
-
-        #  Yields here is a dictionary with element names as kwargs
-        # and yields (in Msun) as values
-        self.snIa_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ia',
-                                                  star_metallicity=self.model_parameters['model_Z'],
-                                                  star_massfraction=star_massfraction,
-                                                  normalize=False)
-
-        self.snII_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ii',
-                                              star_metallicity=self.model_parameters['model_Z'],
-                                              star_massfraction=star_massfraction,
-                                              normalize=False)
-        #    wind yields do not have quantized rates. These are mass fraction
-        #
-        self.wind_yields = gizmo_star.get_nucleosynthetic_yields('wind',
-                                              star_metallicity=self.model_parameters['model_Z'],
-                                              star_massfraction=star_massfraction,
-                                              normalize=False)
-
+        self.compute_yields()
 
         #
         # Points (in Gyr) to be careful around during integration. These are
@@ -202,6 +188,33 @@ class FIRE2_yields(YieldsObject):
                                             0.001, 0.05, 0.10, 1.0, 14.0])
 
 
+        return
+
+    def compute_yields(self, model_Z = None):
+
+        if not (model_Z is None):
+            self.model_parameters['model_Z'] = model_Z
+
+        if self.model_parameters['model_Z'] is None:
+            self.model_parameters['model_Z'] = 1.0    # default
+
+        #  Yields here is a dictionary with element names as kwargs
+        # and yields (in Msun) as values
+        self.snIa_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ia',
+                                                  star_metallicity=self.model_parameters['model_Z'],
+                                                  star_massfraction=self._star_massfraction,
+                                                  normalize=False)
+
+        self.snII_yields = gizmo_star.get_nucleosynthetic_yields('supernova.ii',
+                                              star_metallicity=self.model_parameters['model_Z'],
+                                              star_massfraction=self._star_massfraction,
+                                              normalize=False)
+        #    wind yields do not have quantized rates. These are mass fraction
+        #
+        self.wind_yields = gizmo_star.get_nucleosynthetic_yields('wind',
+                                              star_metallicity=self.model_parameters['model_Z'],
+                                              star_massfraction=self._star_massfraction,
+                                              normalize=False)
         return
 
     def yields(self, t, element):
@@ -252,6 +265,7 @@ class FIRE2_yields(YieldsObject):
 # Helper things 
 #
 # ------------------------------------------------------------------------------
+
 
 # a list of all elements up to uranmium
 ElementList = ['hydrogen','helium','lithium','beryllium','boron','carbon','nitrogen',
