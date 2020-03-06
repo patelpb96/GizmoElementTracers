@@ -126,6 +126,132 @@ class YieldsObject ():
 
 
 # ------------------------------------------------------------------------------
+# NuGrid yield class object for generating yield tables for age-tracer
+# postprocessing using the Sygma module
+# ------------------------------------------------------------------------------
+class NuGrid_yields(YieldsObject):
+    '''
+    Object designed for use with the construct_yield_table method. This
+    object proves the yields from the NuGrid collaboration using the
+    Sygma interface. The NuPyCEE code must be installed (and its dependencies)
+    in the python path for this object to work.
+
+    https://nugrid.github.io/NuPyCEE/index.html
+
+    '''
+
+    try:
+        import sygma as _sygma
+    except ImportError:
+        raise ImportError("Cannot load the NuPyCEE module Sygma. "+\
+                          "Make sure this is installed in your python path. "+\
+                          "For more info: https://nugrid.github.io/NuPyCEE/index.html")
+
+    def __init__(self, name = "NuGrid",
+                       **kwargs):
+
+        super().__init__(name)
+
+        #if elements is None
+        #if isinstance(elements,str):
+        #    elements = [elements]
+        #self.elements = elements
+
+        #if not 'metals' in elements:
+        #    self.elements = ['metals'] + self.elements
+
+        self.model_parameters = {}
+        # set some defaults:
+        self.model_parameters = {'dt' : 1.0E5,  # first dt
+                                 'special_timesteps':1000, # number of timesteps (using logspacing alg)
+                                 'tend' : 1.4E10, # end time in years
+                                 'mgal' : 1.0} # galaxy / SSP mass in solar masses
+
+
+        for k in kwargs:
+            self.model_parameters[k] = kwargs[k]
+
+
+        # pre-compute sygma model
+        self.compute_yields()
+
+        self.elements = self._sygma_model.history.elements
+        self.elements = ['metals'] + self.elements
+
+        return
+
+    def compute_yields(self, **kwargs):
+        '''
+        Runs through the Sygma model given model parameters.
+
+        '''
+
+        for k in kwargs:
+            self.model_parameters[k] = kwargs[k]
+
+        if not 'iniZ' in self.model_parameters:
+            self.model_parameters['iniZ'] = 0.02
+            print("Using default iniZ %8.5f"%(self.model_parameters['iniZ']))
+
+        if self.model_parameters['mgal'] != 1.0:
+            print("Galaxy mass is not 1 solar mass. Are you sure?")
+            print("This will throw off scalings")
+
+        self._sygma_model = self._sygma.sygma(**self.model_parameters)
+
+        # get yields. This is the "ISM" mass fraction of all elements. But since
+        # mgal above is 1.0, this is the solar masses of each element in the ISM
+        # as a function of time. The diff of this is dM. Need to skip first
+        # which is the initial values
+        skip_index = 1
+        skip_h_he  = 2
+
+        self._model_yields = np.array(self._sygma_model.history.ism_elem_yield)[skip_index:,:]
+        # construct total metals (2: skips H and He)
+        self._total_metals = np.sum(self._model_yields[:,skip_h_he:], axis=1)
+        self._model_time   = np.array(self._sygma_model.history.age[1:]) / 1.0E9 # in yr -> Gyr
+
+        # in Msun / Gyr
+        #print(np.shape(dt), np.shape(self._model_yields), np.shape(self._model_total_metal_rate))
+        dt = np.diff(self._model_time)
+        self._model_yield_rate = (np.diff(self._model_yields,axis=0).transpose() / dt).transpose()
+        self._model_total_metal_rate = (np.diff(self._total_metals) / dt).transpose()
+
+        return
+
+    def yields(self, t, element):
+        """
+
+        Returns the total yields for all yield channels in NuGrid.
+        This method is REQUIRED by construct_yield_table.
+
+        Parameters
+        -----------
+        t    : float or np.ndarray
+            Time (in Gyr) to compute instantaneous yield rate
+        element : str : Must be in self.elements
+            Element name
+
+        Returns
+        -----------
+        y : float or np.ndarray
+            Total yields at a given time for desired element in units of
+            Msun / Gyr per Msun of star formation.
+        """
+
+        assert element in self.elements
+
+        x = self._model_time[1:] - self._model_time[:-1]
+
+        if element == 'metals':
+            y = self._model_total_metal_rate
+        else:
+            element_index = self._sygma_model.history.elements.index(element)
+            y = self._model_yield_rate[:,element_index]
+
+        return np.interp(t, x, y)
+
+# ------------------------------------------------------------------------------
 # FIRE2 Yield Class object for generating yield tables for age-tracer
 # post-processing. This serves as an example
 # ------------------------------------------------------------------------------
@@ -262,7 +388,8 @@ class FIRE2_yields(YieldsObject):
 
 # ------------------------------------------------------------------------------
 #
-# Helper things 
+# Helper things - this needs some work, and will probably ported
+# to utilities and renamed at some point.
 #
 # ------------------------------------------------------------------------------
 
