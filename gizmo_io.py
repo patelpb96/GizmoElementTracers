@@ -346,16 +346,16 @@ class ParticleDictionaryClass(dict):
                 # compute the yield for given element
                 age_element = property_name.split('.')[-1]
 
-                if not ((age_element in self._postprocess_elements) or (agetracers.ElementSymbolMapper[age_element] in self._postprocess_elements))\
-                   and age_element != 'alpha':
-                    raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}')
+                if age_element != 'alpha':
+                    if not ((age_element in self._postprocess_elements) or (agetracers.ElementSymbolMapper[age_element] in self._postprocess_elements)):
+                        raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}')
 
                 if age_element == 'alpha':
                     return np.mean(
                         [
-                            self.prop('metallicity.agetracer.o', indeces),
-                            self.prop('metallicity.agetracer.mg', indeces),
-                            self.prop('metallicity.agetracer.si', indeces),
+                            self.prop('metallicity.agetracer.o', indices),
+                            self.prop('metallicity.agetracer.mg', indices),
+                            self.prop('metallicity.agetracer.si', indices),
                             self.prop('metallicity.agetracer.ca', indices),
                         ],
                         0,
@@ -366,7 +366,7 @@ class ParticleDictionaryClass(dict):
                 else:
                     age_element_index = self._postprocess_elements.index(agetracers.ElementSymbolMapper[age_element])
 
-                # first and last indeces for age tracer Metallicity fields in output
+                # first and last indices for age tracer Metallicity fields in output
                 start_index = self.ageprop.info['metallicity_start']
                 end_index   = self.ageprop.info['metallicity_end']
                 if indices is None:
