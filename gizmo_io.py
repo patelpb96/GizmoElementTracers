@@ -382,6 +382,8 @@ class ParticleDictionaryClass(dict):
 
                 if hasattr(self,'_initial_abundances'):
                     values = values + self._initial_abundances[age_element]
+                else:
+                    print("no initial abundances")
 
                 if 'metallicity.' in property_name:
                     values = ut.math.get_log(
@@ -646,6 +648,9 @@ class ParticleDictionaryClass(dict):
             self._initial_abundances[e] = initial_abundances[e]
             if e != 'metals':
                 self._initial_abundances[agetracers.ElementSymbolMapper[e]]=initial_abundances[e]
+
+        for k in self.keys():
+            self[k]._initial_abundances = self._initial_abundances
 
         return
 
