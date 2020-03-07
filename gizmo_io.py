@@ -380,10 +380,15 @@ class ParticleDictionaryClass(dict):
                                                                 # so need to be multiplied by particle mass
                                                                 # in code units as a correction factor
 
+                if hasattr(self,'_initial_abundances'):
+                    values = values + self._initial_abundances[age_element]
+
                 if 'metallicity.' in property_name:
                     values = ut.math.get_log(
                                  values / ut.constant.sun_composition[age_element]['massfraction']
                     )
+
+
 
                 return values
 
@@ -610,6 +615,39 @@ class ParticleDictionaryClass(dict):
         # should not get this far without a return
         raise KeyError(f'not sure how to parse property = {property_name}')
 
+
+    def set_initial_abundances(self, initial_abundances):
+        '''
+        For use with post-processing of elemental abundances with age
+        tracer model. Sets the initial abundances to add to the returned age tracer
+        values.
+
+        Parameters
+        ----------
+
+        initial_abundances : dict :
+            Dictionary with keys matching element names and values corresponding
+            to the initial mass fractions for that element. Excluded elements
+            will be given an initial abundance of zero by default.
+        '''
+
+        if self._postprocess_elements is None:
+            print("Yield table (set_yield_table) must be set first")
+            raise RuntimeError
+
+        self._initial_abundances = {}
+
+        for e in self._postprocess_elements:
+            self._initial_abundances[e] = 0.0
+            if e != 'metals':
+                self._initial_abundances[agetracers.ElementSymbolMapper[e]]=0.0
+
+        for e in initial_abundances:
+            self._initial_abundances[e] = initial_abundances[e]
+            if e != 'metals':
+                self._initial_abundances[agetracers.ElementSymbolMapper[e]]=initial_abundances[e]
+
+        return
 
     def set_yield_table(self, yield_table, elements):
         '''
