@@ -397,7 +397,7 @@ class FIRE2_yields(YieldsObject):
 # a list of all elements up to uranmium
 ElementList = ['hydrogen','helium','lithium','beryllium','boron','carbon','nitrogen',
                'oxygen','flourine','neon','sodium','magnesium','alumnimum','silicon',
-               'phosphorus','sulfur','chlorine','argon','potassium','calcium','scandium',
+               'phosphorus','sulphur','chlorine','argon','potassium','calcium','scandium',
                'titatium','vanadium','chromium','manganese','iron','cobalt','nickel','copper',
                'zinc','gallium','germanium','arsenic','selenium','bromine','krypton','rubidium',
                'strontium','yttrium','zirconium','niobium','molybdenum','technetium','ruthenium',
