@@ -41,13 +41,13 @@ class RuntimeClass(ut.io.SayClass):
 
         file_name = ut.io.get_path(simulation_directory) + runtime_file_name
         path_file_names = glob.glob(file_name)
-        file_in = open(path_file_names[0], 'r')
+        file_read = open(path_file_names[0], 'r')
 
         loop_i = 0
         mpi_number = None
         omp_number = None
 
-        for line in file_in:
+        for line in file_read:
             if 'MPI tasks' in line:
                 mpi_number = int(line.split()[2])
             elif 'OpenMP threads' in line:
@@ -136,7 +136,7 @@ class RuntimeClass(ut.io.SayClass):
         path_file_name = (
             ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name
         )
-        file_in = open(path_file_name, 'r')
+        file_read = open(path_file_name, 'r')
 
         wall_times = []
 
@@ -144,7 +144,7 @@ class RuntimeClass(ut.io.SayClass):
         scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
         print_next_line = False
 
-        for line in file_in:
+        for line in file_read:
             if print_next_line and 'total' in line:
                 wall_times.append(float(line.split()[1]))
                 print_next_line = False

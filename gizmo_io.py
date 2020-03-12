@@ -458,7 +458,7 @@ class ParticleDictionaryClass(dict):
                 host_name = 'host3.'
                 host_index = 2
             else:
-                raise ValueError(f'could not identify host name in {property_name}')
+                raise ValueError(f'cannot identify host name in {property_name}')
 
             if 'form.' in property_name:
                 # special case: coordinates wrt primary host *at formation*
@@ -930,14 +930,14 @@ class ReadClass(ut.io.SayClass):
                 )
             except IOError:
                 self.say(
-                    '! could not read snapshot header at {} = {:.3f} in {}'.format(
+                    '! cannot read snapshot header at {} = {:.3f} in {}'.format(
                         snapshot_value_kind, snapshot_value, simulation_directory
                     )
                 )
                 bad_snapshot_value += 1
 
         if bad_snapshot_value:
-            self.say(f'\n! could not read {bad_snapshot_value} snapshots')
+            self.say(f'\n! cannot read {bad_snapshot_value} snapshots')
             return
 
         parts = []
@@ -975,7 +975,7 @@ class ReadClass(ut.io.SayClass):
                 directories_read.append(directory)
 
         if len(parts) == 0:
-            self.say(f'! could not read any snapshots at {snapshot_value_kind} = {snapshot_value}')
+            self.say(f'! cannot read any snapshots at {snapshot_value_kind} = {snapshot_value}')
             return
 
         if 'mass' in properties and 'star' in part:
@@ -1069,12 +1069,12 @@ class ReadClass(ut.io.SayClass):
         self.say('* reading header from:  {}'.format(path_file_name.strip('./')), verbose)
 
         # open snapshot file
-        with h5py.File(path_file_name, 'r') as file_in:
-            header_in = file_in['Header'].attrs  # load header dictionary
+        with h5py.File(path_file_name, 'r') as file_read:
+            header_read = file_read['Header'].attrs  # load header dictionary
 
-            for prop_in_name in header_in:
-                prop_name = header_dict[prop_in_name]
-                header[prop_name] = header_in[prop_in_name]  # transfer to custom header dict
+            for prop_read_name in header_read:
+                prop_name = header_dict[prop_read_name]
+                header[prop_name] = header_read[prop_read_name]  # transfer to custom header dict
 
         # determine whether simulation is cosmological
         if (
@@ -1239,12 +1239,12 @@ class ReadClass(ut.io.SayClass):
                 prop_name = str.lower(prop_name)
                 if 'massfraction' in prop_name or 'metallicity' in prop_name:
                     prop_name = 'massfraction'  # this has several aliases, so ensure default name
-                for prop_in_name in property_dict:
+                for prop_read_name in property_dict:
                     if prop_name in [
-                        str.lower(prop_in_name),
-                        str.lower(property_dict[prop_in_name]),
+                        str.lower(prop_read_name),
+                        str.lower(property_dict[prop_read_name]),
                     ]:
-                        properties_temp.append(prop_in_name)
+                        properties_temp.append(prop_read_name)
             properties = properties_temp
             del properties_temp
 
@@ -1304,7 +1304,7 @@ class ReadClass(ut.io.SayClass):
 
                 # check if snapshot file happens not to have particles of this species
                 if part_numbers_in_file[spec_id] > 0:
-                    part_in = file_in['PartType' + str(spec_id)]
+                    part_read = file_in['PartType' + str(spec_id)]
                 else:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
@@ -1318,7 +1318,7 @@ class ReadClass(ut.io.SayClass):
                             part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
                             if part_numbers_in_file_i[spec_id] > 0:
                                 # found one
-                                part_in = file_in_i['PartType' + str(spec_id)]
+                                part_read = file_in_i['PartType' + str(spec_id)]
                                 break
                     else:
                         # tried all files and still did not find particles of species
@@ -1326,40 +1326,40 @@ class ReadClass(ut.io.SayClass):
 
                 props_print = []
                 ignore_flag = False  # whether ignored any properties in the file
-                for prop_in_name in part_in.keys():
-                    if prop_in_name in properties:
-                        prop_name = property_dict[prop_in_name]
+                for prop_read_name in part_read.keys():
+                    if prop_read_name in properties:
+                        prop_name = property_dict[prop_read_name]
 
                         # determine shape of prop array
-                        if len(part_in[prop_in_name].shape) == 1:
+                        if len(part_read[prop_read_name].shape) == 1:
                             prop_shape = part_number_tot
-                        elif len(part_in[prop_in_name].shape) == 2:
-                            prop_shape = [part_number_tot, part_in[prop_in_name].shape[1]]
+                        elif len(part_read[prop_read_name].shape) == 2:
+                            prop_shape = [part_number_tot, part_read[prop_read_name].shape[1]]
                             if (
-                                prop_in_name == 'Metallicity'
+                                prop_read_name == 'Metallicity'
                                 and element_indices is not None
                                 and str(element_indices) != 'all'
                             ):
                                 prop_shape = [part_number_tot, len(element_indices)]
 
                         # determine data type to store
-                        prop_in_dtype = part_in[prop_in_name].dtype
-                        if convert_float32 and prop_in_dtype == 'float64':
-                            prop_in_dtype = np.float32
+                        prop_read_dtype = part_read[prop_read_name].dtype
+                        if convert_float32 and prop_read_dtype == 'float64':
+                            prop_read_dtype = np.float32
                         # elif prop == 'mass':
-                        #    prop_in_dtype = np.float64  # added by Kareem (and ported by SGK)
+                        #    prop_read_dtype = np.float64  # added by Kareem (and ported by SGK)
 
                         # initialize to -1's
-                        part[spec_name][prop_name] = np.zeros(prop_shape, prop_in_dtype) - 1
+                        part[spec_name][prop_name] = np.zeros(prop_shape, prop_read_dtype) - 1
 
                         if prop_name == 'id':
                             # initialize so calling an un-itialized value leads to error
                             part[spec_name][prop_name] -= part_number_tot
 
-                        if prop_in_name in property_dict:
-                            props_print.append(property_dict[prop_in_name])
+                        if prop_read_name in property_dict:
+                            props_print.append(property_dict[prop_read_name])
                         else:
-                            props_print.append(prop_in_name)
+                            props_print.append(prop_read_name)
                     else:
                         ignore_flag = True
 
@@ -1368,7 +1368,7 @@ class ReadClass(ut.io.SayClass):
                     self.say(f'* reading {spec_name} properties: {props_print}')
 
                 # special case: particle mass is fixed and given in mass array in header
-                if 'Masses' in properties and 'Masses' not in part_in:
+                if 'Masses' in properties and 'Masses' not in part_read:
                     prop_name = property_dict['Masses']
                     part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
@@ -1397,7 +1397,7 @@ class ReadClass(ut.io.SayClass):
                 for spec_i, spec_name in enumerate(self.species_read):
                     spec_id = self.species_dict[spec_name]
                     if part_numbers_in_file[spec_id] > 0:
-                        part_in = file_in['PartType' + str(spec_id)]
+                        part_read = file_in['PartType' + str(spec_id)]
 
                         part_index_lo = part_indices_lo[spec_i]
                         part_index_hi = part_index_lo + part_numbers_in_file[spec_id]
@@ -1409,26 +1409,28 @@ class ReadClass(ut.io.SayClass):
                                 'particle.masses'
                             ][spec_id]
 
-                        for prop_in_name in part_in.keys():
-                            if prop_in_name in properties:
-                                prop_name = property_dict[prop_in_name]
-                                if len(part_in[prop_in_name].shape) == 1:
+                        for prop_read_name in part_read.keys():
+                            if prop_read_name in properties:
+                                prop_name = property_dict[prop_read_name]
+                                if len(part_read[prop_read_name].shape) == 1:
                                     part[spec_name][prop_name][
                                         part_index_lo:part_index_hi
-                                    ] = part_in[prop_in_name]
-                                elif len(part_in[prop_in_name].shape) == 2:
+                                    ] = part_read[prop_read_name]
+                                elif len(part_read[prop_read_name].shape) == 2:
                                     if (
-                                        prop_in_name == 'Metallicity'
+                                        prop_read_name == 'Metallicity'
                                         and element_indices is not None
                                         and str(element_indices) != 'all'
                                     ):
-                                        prop_in_name = part_in[prop_in_name][:, element_indices]
+                                        prop_read_name = part_read[prop_read_name][
+                                            :, element_indices
+                                        ]
                                     else:
-                                        prop_in_name = part_in[prop_in_name]
+                                        prop_read_name = part_read[prop_read_name]
 
                                     part[spec_name][prop_name][
                                         part_index_lo:part_index_hi, :
-                                    ] = prop_in_name
+                                    ] = prop_read_name
 
                         part_indices_lo[spec_i] = part_index_hi  # set indices for next file
 
@@ -1646,7 +1648,7 @@ class ReadClass(ut.io.SayClass):
             if snapshot_block_index > 1:
                 # if using non-default snapshot block, sort file names 'naturally' by block number
                 # (0, 1, 2, ... instead of 0, 1, 10, ...)
-                # TODO: find another way to do this, because natsort is not a standard library
+                # should find another way to do this, because natsort is not a standard library
                 import natsort
 
                 path_file_names = natsort.natsorted(path_file_names)
@@ -1906,7 +1908,7 @@ class ReadClass(ut.io.SayClass):
                     )
 
             except (IOError, ImportError):
-                self.say('could not read file containing host coordinates')
+                self.say('cannot read file containing host coordinates')
                 self.say('instead will assign host coordinates via iterative zoom on particle mass')
                 method = 'mass'
                 self._assign_host_coordinates_from_particles(
@@ -1988,8 +1990,7 @@ class ReadClass(ut.io.SayClass):
             'index',
             part.snapshot['index'],
             simulation_directory,
-            assign_species=False,
-            assign_host=True,
+            species=None,
             host_number=host_number,
         )
 
@@ -2131,7 +2132,7 @@ class ReadClass(ut.io.SayClass):
             for file_i in range(header['NumFilesPerSnapshot']):
                 # open i'th of multiple files for snapshot
                 file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
-                file_in = h5py.File(file_name_i, 'r+')
+                file_read = h5py.File(file_name_i, 'r+')
 
                 self.say('reading particles from: ' + file_name_i.split('/')[-1])
 
@@ -2142,7 +2143,7 @@ class ReadClass(ut.io.SayClass):
                 # read and delete particle properties
                 for _spec_i, spec_name in enumerate(species):
                     spec_id = self.species_dict[spec_name]
-                    spec_in = 'PartType' + str(spec_id)
+                    spec_read = 'PartType' + str(spec_id)
                     self.say(f'adjusting species = {spec_name}')
 
                     if 'delete' in action:
@@ -2153,11 +2154,11 @@ class ReadClass(ut.io.SayClass):
                         part_number[spec_id] = 0
 
                         # delete properties
-                        # for prop_name in file_in[spec_in]:
-                        #    del(file_in[spec_in + '/' + prop_name])
+                        # for prop_name in file_in[spec_read]:
+                        #    del(file_in[spec_read + '/' + prop_name])
                         #    self.say(f'  deleting {prop_name})
 
-                        del file_in[spec_in]
+                        del file_read[spec_read]
 
                     elif 'velocity' in action and value_adjust:
                         dimension_index = 2  # boost velocity along z-axis
@@ -2166,10 +2167,10 @@ class ReadClass(ut.io.SayClass):
                                 dimension_index, value_adjust
                             )
                         )
-                        velocities = file_in[spec_in + '/' + 'Velocities']
+                        velocities = file_in[spec_read + '/' + 'Velocities']
                         scalefactor = 1 / (1 + header['Redshift'])
                         velocities[:, 2] += value_adjust / np.sqrt(scalefactor)
-                        # file_in[spec_in + '/' + 'Velocities'] = velocities
+                        # file_in[spec_read + '/' + 'Velocities'] = velocities
 
                     print()
 

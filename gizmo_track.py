@@ -332,6 +332,7 @@ class ParticlePointerClass(ut.io.SayClass):
         Pointer=None,
         simulation_directory=None,
         track_directory=None,
+        verbose=False,
     ):
         '''
         Read or write, for each star particle at the reference (later, z0) snapshot
@@ -346,6 +347,7 @@ class ParticlePointerClass(ut.io.SayClass):
         Pointer : dict class : particle pointers (if writing)
         simulation_directory : str : directory of simulation
         track_directory : str : directory of files for particle pointers and formation coordinates
+        verbose : bool : whether to print diagnostic information
 
         Returns
         -------
@@ -386,16 +388,24 @@ class ParticlePointerClass(ut.io.SayClass):
 
         else:
             # read from file
-            dict_in = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(
+                simulation_directory + track_directory + file_name, verbose=verbose
+            )
+
+            self.say(
+                '* read particle pointers from:  {}.hdf5'.format(
+                    simulation_directory.strip('./') + track_directory + file_name
+                )
+            )
 
             Pointer = ParticlePointerDictionaryClass()
-            for k in dict_in:
+            for k in dict_read:
                 if 'number' in k or 'snapshot.index' in k:
-                    Pointer[k] = dict_in[k].item()  # convert to float/int
+                    Pointer[k] = dict_read[k].item()  # convert to float/int
                 elif k == 'species':
-                    Pointer[k] = dict_in[k].astype('<U4')  # store as unicode
+                    Pointer[k] = dict_read[k].astype('<U4')  # store as unicode
                 else:
-                    Pointer[k] = dict_in[k]
+                    Pointer[k] = dict_read[k]
 
             if part is None:
                 return Pointer
@@ -459,13 +469,13 @@ class ParticlePointerClass(ut.io.SayClass):
             )
         else:
             # read from file
-            dict_in = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
 
             Pointer = ParticlePointerDictionaryClass()
             particle_index_name = Pointer.pointer_index_name
             z0 = Pointer.z0_name
             z = Pointer.z_name
-            Pointer[particle_index_name] = dict_in[hdf5_dict_name]
+            Pointer[particle_index_name] = dict_read[hdf5_dict_name]
 
             part_z0_number = Pointer[particle_index_name].size
             Pointer['species'] = [species_name]
@@ -1096,44 +1106,44 @@ class ParticleCoordinateClass(ut.io.SayClass):
             ut.io.file_hdf5(simulation_directory + track_directory + file_name, dict_out)
 
         else:
-            dict_in = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
 
             # sanity check
-            bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_in['id'])
+            bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_read['id'])
             if bad_id_number:
                 self.say(f'! {bad_id_number} particles have mismatched id, this is bad!')
 
-            for prop_name in dict_in:
+            for prop_name in dict_read:
                 if prop_name in ['host.positions', 'center.position']:
-                    if np.ndim(dict_in[prop_name]) == 2:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                            (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                    if np.ndim(dict_read[prop_name]) == 2:
+                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                            (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                         )  # update from old file format
-                    part.host_positions_all = dict_in[prop_name]
+                    part.host_positions_all = dict_read[prop_name]
                     for spec_name in part:
                         part[spec_name].host_positions_all = part.host_positions_all
 
                 elif prop_name in ['host.velocities', 'center.velocity']:
-                    if np.ndim(dict_in[prop_name]) == 2:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                            (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                    if np.ndim(dict_read[prop_name]) == 2:
+                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                            (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                         )  # update from old file format
-                    part.host_velocities_all = dict_in[prop_name]
+                    part.host_velocities_all = dict_read[prop_name]
                     for spec_name in part:
                         part[spec_name].host_velocities_all = part.host_velocities_all
 
                 elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
                     # compatible with all naming conventions
-                    if np.ndim(dict_in[prop_name]) == 3:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                    if np.ndim(dict_read[prop_name]) == 3:
+                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                             (
-                                dict_in[prop_name].shape[0],
+                                dict_read[prop_name].shape[0],
                                 1,
-                                dict_in[prop_name].shape[1],
-                                dict_in[prop_name].shape[2],
+                                dict_read[prop_name].shape[1],
+                                dict_read[prop_name].shape[2],
                             )
                         )  # update from old file format
-                    part.host_rotations_all = dict_in[prop_name]
+                    part.host_rotations_all = dict_read[prop_name]
                     for spec_name in part:
                         part[spec_name].host_rotations_all = part.host_rotations_all
 
@@ -1142,7 +1152,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
                 else:
                     # store coordinates at formation
-                    part[self.species_name][prop_name] = dict_in[prop_name]
+                    part[self.species_name][prop_name] = dict_read[prop_name]
 
     def read_host_coordinates(
         self, part, simulation_directory=None, track_directory=None, verbose=True
@@ -1157,6 +1167,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         part : dict : catalog of particles at a snapshot
         simulation_directory : str : directory of simulation
         track_directory : str : directory of files for particle pointers and formation coordinates
+        verbose : bool : whether to print diagnostic information
+
         '''
         file_name = self.file_name_base.format(part.snapshot['index'])
 
@@ -1176,52 +1188,50 @@ class ParticleCoordinateClass(ut.io.SayClass):
             f'* reading host[s] position, velocity, rotation from:'
             + '  {}'.format(file_path_name.strip('./') + '.hdf5')
         )
-        dict_in = ut.io.file_hdf5(file_path_name, verbose=False)
+        dict_read = ut.io.file_hdf5(file_path_name, verbose=False)
 
         snapshot_index = part.snapshot['index']
-        for prop_name in dict_in:
+        for prop_name in dict_read:
             if prop_name in ['host.positions', 'center.position']:
-                if np.ndim(dict_in[prop_name]) == 2:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                        (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                if np.ndim(dict_read[prop_name]) == 2:
+                    dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                        (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                     )  # update from old file format
-                part.host_positions_all = dict_in[prop_name]
+                part.host_positions_all = dict_read[prop_name]
                 part.host_positions = part.host_positions_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_positions_all = part.host_positions_all
                     part[spec_name].host_positions = part.host_positions
 
             elif prop_name in ['host.velocities', 'center.velocity']:
-                if np.ndim(dict_in[prop_name]) == 2:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                        (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                if np.ndim(dict_read[prop_name]) == 2:
+                    dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                        (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                     )  # update from old file format
-                part.host_velocities_all = dict_in[prop_name]
+                part.host_velocities_all = dict_read[prop_name]
                 part.host_velocities = part.host_velocities_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_velocities_all = part.host_velocities_all
                     part[spec_name].host_velocities = part.host_velocities
 
             elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
-                if np.ndim(dict_in[prop_name]) == 3:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                if np.ndim(dict_read[prop_name]) == 3:
+                    dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                         (
-                            dict_in[prop_name].shape[0],
+                            dict_read[prop_name].shape[0],
                             1,
-                            dict_in[prop_name].shape[1],
-                            dict_in[prop_name].shape[2],
+                            dict_read[prop_name].shape[1],
+                            dict_read[prop_name].shape[2],
                         )
                     )  # update from old file format
-                part.host_rotations_all = dict_in[prop_name]
+                part.host_rotations_all = dict_read[prop_name]
                 part.host_rotations = part.host_rotations_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_rotations_all = part.host_rotations_all
                     part[spec_name].host_rotations = part.host_rotations
 
         host_number = part.host_positions_all.shape[1]
-        self.say(
-            f'read position, velocity, rotation for {host_number} host galaxy[s]'
-        )
+        self.say(f'read position, velocity, rotation for {host_number} host galaxy[s]')
 
         if verbose:
             for host_i, host_position in enumerate(part.host_positions):
