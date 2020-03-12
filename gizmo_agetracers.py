@@ -241,7 +241,7 @@ class NuGrid_yields(YieldsObject):
 
         assert element in self.elements
 
-        x = self._model_time[1:] - self._model_time[:-1]
+        x = 0.5 * (self._model_time[1:] + self._model_time[:-1])
 
         if element == 'metals':
             y = self._model_total_metal_rate
