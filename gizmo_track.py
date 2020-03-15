@@ -394,7 +394,7 @@ class ParticlePointerClass(ut.io.SayClass):
 
             self.say(
                 '* read particle pointers from:  {}.hdf5'.format(
-                    simulation_directory.strip('./') + track_directory + file_name
+                    simulation_directory.lstrip('./') + track_directory + file_name
                 )
             )
 
@@ -522,6 +522,8 @@ class ParticlePointerClass(ut.io.SayClass):
 
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
+        else:
+            simulation_directory = ut.io.get_path(simulation_directory)
 
         PointerTo = self.io_pointers(
             snapshot_index=snapshot_index_to, simulation_directory=simulation_directory
@@ -1185,8 +1187,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
         file_path_name = simulation_directory + track_directory + file_name
 
         self.say(
-            f'* reading host[s] position, velocity, rotation from:'
-            + '  {}'.format(file_path_name.strip('./') + '.hdf5')
+            '* reading host[s] position, velocity, rotation from:  {}.hdf5'.format(
+                file_path_name.lstrip('./')
+            )
         )
         dict_read = ut.io.file_hdf5(file_path_name, verbose=False)
 
@@ -1264,7 +1267,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
         host_number = ut.catalog.get_host_number_from_directory(host_number, './', os)
 
         if simulation_directory is None:
-            simulation_directory = ut.io.get_path(self.simulation_directory)
+            simulation_directory = self.simulation_directory
+        else:
+            simulation_directory = ut.io.get_path(simulation_directory)
 
         if part_z0 is None:
             # read particles at z = 0

@@ -1066,7 +1066,7 @@ class ReadClass(ut.io.SayClass):
         )
 
         self._is_first_print = True
-        self.say('* reading header from:  {}'.format(path_file_name.strip('./')), verbose)
+        self.say('* reading header from:  {}'.format(path_file_name.lstrip('./')), verbose)
 
         # open snapshot file
         with h5py.File(path_file_name, 'r') as file_read:
@@ -1377,7 +1377,7 @@ class ReadClass(ut.io.SayClass):
         part_indices_lo = np.zeros(len(self.species_read), dtype=np.int64)
 
         if header['file.number.per.snapshot'] == 1:
-            self.say('* reading particles from:\n    {}'.format(path_file_name.strip('./')))
+            self.say('* reading particles from:\n    {}'.format(path_file_name.lstrip('./')))
         else:
             self.say('* reading particles from:')
 
@@ -1708,7 +1708,7 @@ class ReadClass(ut.io.SayClass):
                 path_file_name = path_file_names[0]
                 self.say(
                     '* reading cosmological parameters from:  {}'.format(
-                        path_file_name.strip('./')
+                        path_file_name.lstrip('./')
                     ),
                     end='\n\n',
                 )
@@ -1729,7 +1729,7 @@ class ReadClass(ut.io.SayClass):
                         elif 'nspec' in line:
                             n_s = get_check_value(line, n_s)
             else:
-                self.say('! cannot find MUSIC config file:  {}'.format(file_name_find.strip('./')))
+                self.say('! cannot find MUSIC config file:  {}'.format(file_name_find.lstrip('./')))
 
         # AGORA box (use as default, if cannot find MUSIC config file)
         if omega_baryon is None or sigma_8 is None or n_s is None:
@@ -2121,7 +2121,7 @@ class ReadClass(ut.io.SayClass):
         )
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
-        self.say('* reading header from:  {}'.format(path_file_name.strip('./')), end='\n\n')
+        self.say('* reading header from:  {}'.format(path_file_name.lstrip('./')), end='\n\n')
 
         # read header ----------
         # open snapshot file and parse header
