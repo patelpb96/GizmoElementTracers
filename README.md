@@ -109,6 +109,24 @@ python setup.py develop
 
 
 ---
+# Using
+
+Once installed, you can call individual modules like this:
+
+```
+import gizmo_analysis
+gizmo_analysis.gizmo_io
+```
+
+or more succinctly like this
+
+```
+import gizmo_analysis as gizmo
+gizmo.io
+```
+
+
+---
 # License
 
 Copyright 2014-2020 by Andrew Wetzel <arwetzel@gmail.com> and Shea Garrison-Kimmel <sheagk@gmail.com>.
