@@ -37,11 +37,11 @@ We develop this package using Python 3.7 and recommend that you use the same ver
 ## gizmo_track.py
 * track star and gas particles across snapshots
 
-## gizmo_tutorial.ipynb
-* jupyter notebook tutorial for using this package
-
 ## snapshot_times.txt
 * example file for storing information about snapshots: scale-factors, redshifts, times, etc
+
+## gizmo_tutorial.ipynb
+* jupyter notebook tutorial for using this package
 
 
 ---
@@ -63,11 +63,35 @@ Unless otherwise noted, all quantities are in (or converted to during read-in) t
 
 This package functions either as a subfolder in your `$PYTHONPATH` or by installing it with `setup.py develop`, which should place an egg.link to the source code in a place that whichever `python` you used to install it knows where to look.
 
+## Instructions for placing in PYTHONPATH:
+
+1. create any directory $DIR
+2. add $DIR to your `$PYTHONPATH`
+3. clone gizmo_analysis into $DIR
+
+In commands, that would be something like:
+```
+#!bash
+
+DIR=$HOME/code
+echo $PYTHONPATH=$DIR:$PYTHONPATH >> ~/.bashrc
+mkdir -p $DIR
+cd $DIR
+git clone git@bitbucket.org:awetzel/gizmo_analysis.git
+```
+
+That is, you should end up with `$DIR/gizmo_analysis/gizmo_*.py`, with `$DIR` in your `$PYTHONPATH`
+
+You then will be able to import gizmo_analysis.<whatever>
+
+To update, cd into $DIR/gizmo_analysis and execute `git pull`.
+
+
 ## Instructions for installing as a package:
 
 1. create any directory $DIR
 2. clone gizmo_analysis into $DIR
-3. copy setup.py from gizmo_analysis into $DIR (moving it will give you hg issues when pulling updates in the future)
+3. copy setup.py from gizmo_analysis into $DIR
 4. run python setup.py develop
 
 In commands, that is:
@@ -75,36 +99,13 @@ In commands, that is:
 ```
 #!bash
 
-DIR=$HOME/code/wetzel/
+DIR=$HOME/code/
 mkdir -p $DIR
 cd $DIR
-hg clone ssh://hg@bitbucket.org/awetzel/gizmo_analysis
+git clone git@bitbucket.org:awetzel/gizmo_analysis.git
 cp gizmo_analysis/setup.py .
 python setup.py develop
 ```
-
-## Instructions for placing in PYTHONPATH:
-
-1.  create any directory $DIR
-2.  add $DIR to your `$PYTHONPATH`
-3.  clone gizmo_analysis into $DIR
-
-In commands, that would be something like:
-```
-#!bash
-
-DIR=$HOME/code/wetzel
-echo $PYTHONPATH=$DIR:$PYTHONPATH >> ~/.bashrc
-mkdir -p $DIR
-cd $DIR
-hg clone ssh://hg@bitbucket.org/awetzel/gizmo_analysis
-```
-
-That is, you should end up with `$DIR/gizmo_analysis/gizmo_xxx.py`, with `$DIR` in your `$PYTHONPATH`
-
-You then will be able to import gizmo_analysis.<whatever>
-
-To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 
 
 ---
@@ -112,7 +113,7 @@ To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 
 Copyright 2014-2020 by Andrew Wetzel <arwetzel@gmail.com> and Shea Garrison-Kimmel <sheagk@gmail.com>.
 
-If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), first used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
+If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), which first was used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
 
 You are free to use, edit, share, and do whatever you want. But please keep us informed and report bugs. Have fun!
 
