@@ -112,7 +112,7 @@ To update the repo, cd into $DIR/gizmo_analysis and run `hg pull && hg update`.
 
 Copyright 2014-2020 by Andrew Wetzel <arwetzel@gmail.com> and Shea Garrison-Kimmel <sheagk@gmail.com>.
 
-If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), which originally was developed and used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
+If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), first used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
 
 You are free to use, edit, share, and do whatever you want. But please keep us informed and report bugs. Have fun!
 
