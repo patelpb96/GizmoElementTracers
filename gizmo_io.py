@@ -153,8 +153,6 @@ import copy
 
 import utilities as ut
 
-from . import gizmo_agetracers as agetracers # for now... will try not to need 
-
 # --------------------------------------------------------------------------------------------------
 # particle dictionary class
 # --------------------------------------------------------------------------------------------------
@@ -347,8 +345,27 @@ class ParticleDictionaryClass(dict):
                 age_element = property_name.split('.')[-1]
 
                 if age_element != 'alpha':
-                    if not ((age_element in self._postprocess_elements) or (agetracers.ElementSymbolMapper[age_element] in self._postprocess_elements)):
-                        raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}')
+
+                    # make sure element name can be found in table
+                    # check for both full element names and symbols in case
+                    # table list only has one or the other and not both
+                    if not (age_element in self._postprocess_elements):
+                        element_found = False
+
+                        if age_element in ut.constant.element_symbol_from_name.keys():
+                            element_found = ut.constant.element_symbol_from_name[age_element] in self._postprocess_elements
+
+                            if element_found:
+                                age_element = ut.constant.element_symbol_from_name[age_element]
+
+                        if age_element in ut.constant.element_name_from_symbol.keys():
+                            element_found = ut.constant.element_name_from_symbol[age_element] in self._postprocess_elements
+
+                            if element_found:
+                                age_element = ut.constant.element_name_from_symbol[age_element]
+
+                        if not element_found:
+                            raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}')
 
                 if age_element == 'alpha':
                     return np.mean(
@@ -361,10 +378,8 @@ class ParticleDictionaryClass(dict):
                         0,
                     )
 
-                if age_element in self._postprocess_elements:
-                    age_element_index = self._postprocess_elements.index(age_element)
-                else:
-                    age_element_index = self._postprocess_elements.index(agetracers.ElementSymbolMapper[age_element])
+                # get index corresponding to the element name in table
+                age_element_index = self._postprocess_elements.index(age_element)
 
                 # first and last indices for age tracer Metallicity fields in output
                 start_index = self.ageprop.info['metallicity_start']
@@ -639,15 +654,18 @@ class ParticleDictionaryClass(dict):
 
         self._initial_abundances = {}
 
+        # set initial values in both element name and
+        # symbol for versatility
         for e in self._postprocess_elements:
             self._initial_abundances[e] = 0.0
             if e != 'metals':
-                self._initial_abundances[agetracers.ElementSymbolMapper[e]]=0.0
+                self._initial_abundances[ut.constant.element_map_name_symbol[e]]=0.0
 
+        # set actual values in both name and symbol
         for e in initial_abundances:
             self._initial_abundances[e] = initial_abundances[e]
             if e != 'metals':
-                self._initial_abundances[agetracers.ElementSymbolMapper[e]]=initial_abundances[e]
+                self._initial_abundances[ut.constant.element_map_name_symbol[e]]=initial_abundances[e]
 
         for k in self.keys():
             self[k]._initial_abundances = self._initial_abundances
@@ -682,7 +700,6 @@ class ParticleDictionaryClass(dict):
 
         self._yield_table          = copy.deepcopy(yield_table)
         self._postprocess_elements = copy.deepcopy(elements)
-             #                        [agetracers.ElementSymbolMapper[e] for e in elements if e in agetracers.ElementSymbolMapper.keys()] # should make this a function
 
         # make sure individual particle types can access this
         # information (shallow copies only)
