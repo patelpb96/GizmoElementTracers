@@ -73,6 +73,15 @@ def construct_yield_table(yield_object, agebins,
         the yields_object. This argument overrides the yield_object
         attribute if provided. Default : None
 
+    Returns
+    -------
+
+    yield_table : np.ndarray
+        2D array containing the weights for each element in each age-tracer
+        time bin with dimensions: N_tracer x N_elements. Each value represents
+        the mass (in Msun) of each element produced during each time bin
+        per solar mass of star formation.
+
     """
 
     # assume to generate this for all elements
