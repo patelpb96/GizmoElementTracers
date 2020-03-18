@@ -333,7 +333,7 @@ class ParticleDictionaryClass(dict):
 
                 return values
 
-            elif 'agetracer.' in property_name:
+            elif 'agetracers.' in property_name or 'agetracer.' in property_name:
 
                 if self.ageprop.info['flag_agetracers'] == 0:
                     raise RuntimeError("Post-process age tracer element field requested but no age tracer model found to exist")
