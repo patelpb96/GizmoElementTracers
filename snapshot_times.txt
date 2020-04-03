@@ -1,5 +1,8 @@
-# 601 snapshots
+# this is an example snapshot_times.txt file
+# copy this file into each Gizmo simulation directory,
+# to be alongside the output/ directory that stores the snapshots
 # times assume cosmology from Planck 2015
+# @author: Andrew Wetzel <arwetzel@gmail.com>
 # i scale-factor redshift time[Gyr] time_width[Myr]
   0 0.0100000 99.00000000  0.01721736   0.00000
   1 0.0322581 30.00000000  0.09975108  82.53377
