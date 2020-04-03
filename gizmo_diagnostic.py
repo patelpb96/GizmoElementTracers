@@ -487,7 +487,7 @@ class ContaminationClass(ut.io.SayClass):
                         break
 
         print()
-        print('contamination summary')
+        print('contamination')
         species = 'dark2'
         if halo_radius and halo_radius > 0:
             dist_i_halo = np.searchsorted(distances_phys, halo_radius)
