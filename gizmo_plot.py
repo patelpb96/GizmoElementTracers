@@ -2526,7 +2526,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
         time_value = None
-        if time_kind == 'redshift' and min(time_limits) > 1.5 * parts[0].snapshot['redshift']:
+        if time_kind == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
             time_value = min(time_limits)
 
         plot_name = ut.plot.get_file_name(
