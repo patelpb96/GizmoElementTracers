@@ -2474,7 +2474,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
             if verbose:
                 self.say(
-                    'star.mass max = {}'.format(
+                    'M_star max = {}'.format(
                         ut.io.get_string_from_numbers(sfh_p['mass'].max(), 2, exponential=True)
                     )
                 )
@@ -2868,8 +2868,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             and len(center_position) > 0
             and distance_limits is not None
             and len(distance_limits) > 0
+            and (min(distance_limits) > 0 or max(distance_limits) < np.inf)
         ):
-
             distances = ut.coordinate.get_distances(
                 part['star']['position'][part_indices],
                 center_position,
@@ -2879,11 +2879,12 @@ class StarFormHistoryClass(ut.io.SayClass):
             )  # [kpc physical]
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
-        # get star particle formation times, sorted from earliest
+        # get formation times of star particles, sorted from earliest
         part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
         form_times = part[species].prop('form.time', part_indices_sort)
-        form_masses = part[species].prop('form.mass', part_indices_sort)
-        current_masses = part[species]['mass'][part_indices_sort]
+        # need to store as 64-bit float to avoid precision error with cumsum below
+        form_masses = part[species].prop('form.mass', part_indices_sort).astype(np.float64)
+        current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
         # get time bins, ensure are ordered from earliest
         time_dict = self._get_time_bin_dictionary(
@@ -2898,6 +2899,8 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         current_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(current_masses))
         current_mass_difs = np.diff(current_mass_cum_bins)
+
+        print(np.cumsum(current_masses))
 
         # convert to midpoints of bins
         current_mass_cum_bins = (
