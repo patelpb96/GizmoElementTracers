@@ -89,11 +89,11 @@ snapshot_indices_keep = [
 def clean_directory(
     simulation_directory='.',
     gizmo_directory='gizmo',
-    output_directory='output',
-    gizmo_out_file_name='gizmo.out',
-    gizmo_err_file_name='gizmo.err',
-    snapshot_scalefactor_file_name='snapshot_scale-factors.txt',
-    restart_file_directory='restartfiles',
+    snapshot_directory='output',
+    gizmo_out_file='gizmo.out',
+    gizmo_err_file='gizmo.err',
+    snapshot_scalefactor_file='snapshot_scale-factors.txt',
+    restart_directory='restartfiles',
 ):
     '''
     Clean Gizmo simulation directory. Run this after a simulation finishes.
@@ -101,30 +101,33 @@ def clean_directory(
     Parameters
     ----------
     '''
+    gizmo_config_file = 'gizmo_config.h'  # file to save used config settings and gizmo version
+
     # move to this directory
     cwd = os.getcwd()
     os.system(f'cd {simulation_directory}')
 
     # clean gizmo source code
-    os.system(f'mv {gizmo_directory}/GIZMO_config.h gizmo_config.h')
-    os.system(f'cd {gizmo_directory}; make clean; cd ..')
-    os.system(f'rm -f {gizmo_err_file_name}')
+    os.system(f'mv {gizmo_directory}/GIZMO_config.h {gizmo_config_file}')  # save used config
+    os.system(f'cd {gizmo_directory}')
+    os.system('make clean')
+    os.system(f'echo "git version" ../{gizmo_config_file}')  # save gizmo git version
+    os.system(f'git log -n 1 >> ../{gizmo_config_file}')
+    os.system('cd ..')
     os.system(f'mv ewald_spc_table_64_dbl.dat spcool_tables TREECOOL -t {gizmo_directory}/')
-    os.system(f'rm -f {snapshot_scalefactor_file_name}')
-
-    # store gizmo version
-    os.system(f'echo "gizmo git version" >> notes.txt')
-    os.system(f'cd {gizmo_directory}; git log -n 1 >> ../notes.txt; cd ..')
+    os.system(f'rm -f {snapshot_scalefactor_file}')
+    os.system(f'rm -f {gizmo_err_file}')
 
     # clean output files
-    os.system(f'head -1000 {gizmo_out_file_name} > {gizmo_out_file_name}.txt')
-    os.system(f'rm -f {gizmo_out_file_name}')
-    os.system(f'cd {output_directory}')
-    os.system(f'rm -rf {restart_file_directory}')
-    os.system(f'rm -rf HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
-    os.system('cd ..')
+    os.system(f'head -1000 {gizmo_out_file} > {gizmo_out_file}.txt')
+    os.system(f'rm -f {gizmo_out_file}')
+    os.system(f'rm -rf {snapshot_directory}/{restart_directory}')
+    os.system(f'rm -f {snapshot_directory}/HIIheating.txt')
+    os.system(f'rm -f {snapshot_directory}/MomWinds.txt')
+    os.system(f'rm -f {snapshot_directory}/sfr.txt')
+    os.system(f'rm -f {snapshot_directory}/SNeIIheating.txt')
 
-    # clean stray files
+    # clean backup files
     os.system('rm -f *~ .#* ._* /#*#')
 
     # move back to original directory
