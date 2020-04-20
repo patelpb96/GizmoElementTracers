@@ -109,7 +109,7 @@ def clean_directory(
     os.system(f'mv {gizmo_directory}/GIZMO_config.h gizmo_config.h')
     os.system(f'cd {gizmo_directory}; make clean; cd ..')
     os.system(f'rm -f {gizmo_err_file_name}')
-    os.system(f'mv -r ewald_spc_table_64_dbl.dat spcool_tables TREECOOL -t {gizmo_directory}/')
+    os.system(f'mv ewald_spc_table_64_dbl.dat spcool_tables TREECOOL -t {gizmo_directory}/')
     os.system(f'rm -f {snapshot_scalefactor_file_name}')
 
     # store gizmo version
