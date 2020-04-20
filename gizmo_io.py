@@ -981,7 +981,7 @@ class ReadClass(ut.io.SayClass):
         if 'mass' in properties and 'star' in part:
             for part, directory in zip(parts, directories_read):
                 print(
-                    '{}\n* total star.mass = {} Msun\n'.format(
+                    '{}\n* M_star simulation = {} Msun\n'.format(
                         directory,
                         ut.io.get_string_from_numbers(part['star']['mass'].sum(), 2, True),
                     )

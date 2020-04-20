@@ -832,7 +832,7 @@ def plot_scaling(
     resolution='res7100',
     time_kind='core',
     axis_x_scaling='log',
-    axis_y_scaling='linear',
+    axis_y_scaling='log',
     write_plot=False,
     plot_directory='.',
 ):
@@ -874,8 +874,9 @@ def plot_scaling(
     #    #           'core.time': 1.95e7, 'wall.time': 2380},
     # }
 
-    # conversion to stampede 2
+    # conversion to stampede2
     weak_baryon = collections.OrderedDict()
+    """
     weak_baryon['res450000'] = {
         'particle.number': 1.10e6 * 2,
         'node.number': 1,
@@ -895,15 +896,50 @@ def plot_scaling(
         'wall.time': 821,
     }
 
+    weak_baryon['res880'] = {
+        'particle.number': 7.e7 * 2,
+        'node.number': 64,
+        'node.time': 52000,
+        'wall.time': 821,
+    }
+    """
+    # m12f to z = 1, Stampede2 equivalent node-hours
+    # weak_baryon['res450000'] = {
+    #    'particle.number': 8.14e7 * 2 / 64,
+    #    'node.number': 1,
+    #    'node.time': 73,
+    #    'wall.time': 73,
+    # }
+    weak_baryon['res57000'] = {
+        'particle.number': 8.14e7 * 2 / 8,
+        'node.number': 2.5,
+        'node.time': 500,
+        'wall.time': 200,
+    }
+    weak_baryon['res7100'] = {
+        'particle.number': 8.14e7 * 2,
+        'node.number': 20,
+        'node.time': 12511,
+        'wall.time': 626,
+    }
+    weak_baryon['res880'] = {
+        'particle.number': 7.70e8 * 2,
+        'node.number': 160,
+        'node.time': 500458,
+        'wall.time': 3128,
+    }
+
     strong_baryon = collections.OrderedDict()
 
     # convert from running to scale-factor = 0.068 to 0.1 via 2x
     strong_baryon['res880'] = {
         'particle.number': 5.64e8 * 2,
         'core.number': np.array([2048, 4096, 8192, 16384]),
-        'node.number': np.array([128, 256, 512, 1024]),
+        #'node.number': np.array([128, 256, 512, 1024]),
+        'node.number': np.array([40, 80, 160, 320]),  # conversion to Stampede2 SKX
         'wall.time': np.array([15.55, 8.64, 4.96, 4.57]) * 2,
-        'core.time': np.array([31850, 35389, 40632, 74875]) * 2,
+        #'core.time': np.array([31850, 35389, 40632, 74875]) * 2,
+        'node.time': np.array([664, 737, 847, 1560]),
     }
 
     # did not have time to run these, so scale down from res880
@@ -951,7 +987,8 @@ def plot_scaling(
         subplot.set_xlabel('number of nodes')
 
         if resolution == 'res880':
-            axis_x_limits = [1e2, 1.9e4]
+            # axis_x_limits = [1e2, 1.9e4]
+            axis_x_limits = [10, 400]
         elif resolution == 'res7100':
             # axis_x_limits = [3e2, 1e4]
             axis_x_limits = [10, 200]
@@ -967,8 +1004,9 @@ def plot_scaling(
         elif time_kind == 'node':
             axis_x_kind = 'node.number'
             if resolution == 'res880':
-                axis_y_limits = [0, 1e4]
-                subplot.set_ylabel('node time to $z = 9$ [hr]')
+                # axis_y_limits = [0, 1e4]
+                axis_y_limits = [0, 2000]
+                subplot.set_ylabel('node-hours to $z = 9$ [hr]')
             elif resolution == 'res7100':
                 axis_y_limits = [0, 8000]
                 subplot.set_ylabel('node-hours to $z = 3$')
@@ -995,7 +1033,8 @@ def plot_scaling(
             subplot.text(
                 0.1,
                 0.1,
-                'strong scaling:\nparticle number = 1.1e9',
+                #'strong scaling:\nparticle number = 1.1e9',
+                'strong scaling:\nparticle number = 1.5e9',
                 color='black',
                 transform=subplot.transAxes,
             )
@@ -1019,11 +1058,11 @@ def plot_scaling(
             baryon_times = np.array([weak_baryon[i]['node.time'] for i in weak_baryon])
         elif time_kind == 'wall':
             # resolutinon_ref = 'res880'
-            resolutinon_ref = 'res7100'
-            ratio_ref = (
-                weak_baryon[resolutinon_ref]['particle.number']
-                / weak_baryon[resolutinon_ref]['node.number']
-            )
+            # resolutinon_ref = 'res7100'
+            # ratio_ref = (
+            #    weak_baryon[resolutinon_ref]['particle.number']
+            #    / weak_baryon[resolutinon_ref]['node.number']
+            # )
             # dm_times = np.array(
             #    [weak_dark[core_num]['wall.time'] * ratio_ref /
             #     (weak_dark[core_num]['particle.number'] / weak_dark[core_num]['core.number'])
@@ -1033,18 +1072,22 @@ def plot_scaling(
         subplot.set_xlabel('number of particles')
 
         # axis_x_limits = [6e6, 1.5e9]
-        axis_x_limits = [1e6, 2e8]
+        # axis_x_limits = [1e6, 2e8]
+        axis_x_limits = [1e7, 2e9]
 
         if time_kind == 'node':
-            axis_y_limits = [10, 2e5]
-            subplot.set_ylabel('node-hours to $z = 0$')
+            # axis_y_limits = [10, 2e5]
+            axis_y_limits = [100, 1e6]
+            subplot.set_ylabel('node-hours to $z = 1$')
         elif time_kind == 'wall':
-            axis_y_limits = [10, 1000]
-            subplot.set_ylabel('wall time to $z = 0$ [hr]')
+            # axis_y_limits = [10, 1000]
+            axis_y_limits = [100, 10000]
+            subplot.set_ylabel('wall time to $z = 1$ [hr]')
             subplot.text(
                 0.05,
                 0.05,
-                'weak scaling:\nparticles / node = {:.1e}'.format(ratio_ref),
+                #'weak scaling:\nparticles / node = {:.1e}'.format(ratio_ref),
+                'weak scaling:\nparticles / node = 9.4e6',
                 color='black',
                 transform=subplot.transAxes,
             )

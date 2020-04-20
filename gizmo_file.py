@@ -84,6 +84,54 @@ snapshot_indices_keep = [
 
 
 # --------------------------------------------------------------------------------------------------
+# clean simulation directory
+# --------------------------------------------------------------------------------------------------
+def clean_directory(
+    simulation_directory='.',
+    gizmo_directory='gizmo',
+    output_directory='output',
+    gizmo_out_file_name='gizmo.out',
+    gizmo_err_file_name='gizmo.err',
+    snapshot_scalefactor_file_name='snapshot_scale-factors.txt',
+    restart_file_directory='restartfiles',
+):
+    '''
+    Clean Gizmo simulation directory. Run this after a simulation finishes.
+
+    Parameters
+    ----------
+    '''
+    # move to this directory
+    cwd = os.getcwd()
+    os.system(f'cd {simulation_directory}')
+
+    # clean gizmo source code
+    os.system(f'mv {gizmo_directory}/GIZMO_config.h gizmo_config.h')
+    os.system(f'cd {gizmo_directory}; make clean; cd ..')
+    os.system(f'rm -f {gizmo_err_file_name}')
+    os.system(f'mv -r ewald_spc_table_64_dbl.dat spcool_tables TREECOOL -t {gizmo_directory}/')
+    os.system(f'rm -f {snapshot_scalefactor_file_name}')
+
+    # store gizmo version
+    os.system(f'echo "gizmo git version" >> notes.txt')
+    os.system(f'cd {gizmo_directory}; git log -n 1 >> ../notes.txt; cd ..')
+
+    # clean output files
+    os.system(f'head -1000 {gizmo_out_file_name} > {gizmo_out_file_name}.txt')
+    os.system(f'rm -f {gizmo_out_file_name}')
+    os.system(f'cd {output_directory}')
+    os.system(f'rm -rf {restart_file_directory}')
+    os.system(f'rm -rf HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
+    os.system('cd ..')
+
+    # clean stray files
+    os.system('rm -f *~ .#* ._* /#*#')
+
+    # move back to original directory
+    os.system(f'cd {cwd}')
+
+
+# --------------------------------------------------------------------------------------------------
 # compress files
 # --------------------------------------------------------------------------------------------------
 class CompressClass(ut.io.SayClass):
@@ -136,8 +184,8 @@ class CompressClass(ut.io.SayClass):
         snapshot_index : int : index of snapshot
         analysis_directory : str : directory of analysis code
         '''
-        executable = '{} {}/manipulate_hdf5/compactify_hdf5.py -L 0'.format(
-            python_executable, analysis_directory
+        executable = (
+            f'{python_executable} {analysis_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
         )
         snapshot_name_base = 'snap*_{:03d}*'
 
@@ -162,8 +210,8 @@ class CompressClass(ut.io.SayClass):
                 else:
                     path_file_name_out = path_file_name
 
-                executable_i = '{} -o {} {}'.format(executable, path_file_name_out, path_file_name)
-                self.say('executing:  {}'.format(executable_i))
+                executable_i = f'{executable} -o {path_file_name_out} {path_file_name}'
+                self.say(f'executing:  {executable_i}')
                 os.system(executable_i)
 
     def test_compression(
@@ -236,14 +284,14 @@ class CompressClass(ut.io.SayClass):
         )
         self.say('* {} are uncompressed'.format(len(compression_none_snapshots)))
         if len(compression_none_snapshots) > 0:
-            self.say('{}'.format(compression_none_snapshots))
+            self.say(f'{compression_none_snapshots}')
         self.say(
             '* {} have wrong compression (level != {})'.format(
                 len(compression_wrong_snapshots), compression_level
             )
         )
         if len(compression_wrong_snapshots) > 0:
-            self.say('{}'.format(compression_wrong_snapshots))
+            self.say(f'{compression_wrong_snapshots}')
 
 
 Compress = CompressClass()
@@ -282,9 +330,8 @@ class GlobusClass(ut.io.SayClass):
         if simulation_path_directory[-1] != '/':
             simulation_path_directory += '/'
 
-        command = 'globus transfer $(globus bookmark show stampede){}'.format(
-            simulation_path_directory[1:]
-        )  # preceeding '/' already in globus bookmark
+        # preceeding '/' already in globus bookmark
+        command = f'globus transfer $(globus bookmark show stampede){simulation_path_directory[1:]}'
 
         path_directories = simulation_path_directory.split('/')
         simulation_directory = path_directories[-2]
@@ -297,16 +344,16 @@ class GlobusClass(ut.io.SayClass):
                 directory_to = simulation_directory.split('_')[0]
             directory_to += '/' + simulation_directory + '/'
 
-            command += ' $(globus bookmark show peloton-scratch){}'.format(directory_to)
+            command += f' $(globus bookmark show peloton-scratch){directory_to}'
 
         # set globus parameters
         command += ' --sync-level=checksum --preserve-mtime --verify-checksum'
-        command += ' --label "{}" --batch < {}'.format(simulation_directory, batch_file_name)
+        command += f' --label "{simulation_directory}" --batch < {batch_file_name}'
 
         # write globus batch file
         self.write_batch_file(simulation_path_directory, snapshot_directory, batch_file_name)
 
-        self.say('* executing:\n{}\n'.format(command))
+        self.say(f'* executing:\n{command}\n')
         os.system(command)
 
     def write_batch_file(
@@ -359,12 +406,12 @@ class GlobusClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices_keep:
             snapshot_name = '{}snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
             if os.path.exists(simulation_directory + snapshot_name):
-                snapshot_string = '{} {} --recursive\n'.format(snapshot_name, snapshot_name)
+                snapshot_string = f'{snapshot_name} {snapshot_name} --recursive\n'
                 transfer_string += snapshot_string
 
             snapshot_name = '{}snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
             if os.path.exists(simulation_directory + snapshot_name):
-                snapshot_string = '{} {}\n'.format(snapshot_name, snapshot_name)
+                snapshot_string = f'{snapshot_name} {snapshot_name}\n'
                 transfer_string += snapshot_string
 
         with open(file_name, 'w') as file_out:
@@ -406,8 +453,8 @@ def rsync_snapshots(
         snapshot_path_names += directory_from + snapshot_name_base.format(snapshot_index) + ' '
 
     command = 'rsync -ahvP --size-only '
-    command += '{}:"{}" {}'.format(machine_name, snapshot_path_names, directory_to)
-    print('\n* executing:\n{}\n'.format(command))
+    command += f'{machine_name}:"{snapshot_path_names}" {directory_to}'
+    print(f'\n* executing:\n{command}\n')
     os.system(command)
 
 
@@ -461,10 +508,10 @@ def rsync_simulation_files(
 
     arguments = ''
     for exclude in excludes:
-        arguments += '--exclude="{}" '.format(exclude)
+        arguments += f'--exclude="{exclude}" '
 
     command += arguments + directory_from + ' ' + directory_to + '.'
-    print('\n* executing:\n{}\n'.format(command))
+    print(f'\n* executing:\n{command}\n')
     os.system(command)
 
 
@@ -502,13 +549,13 @@ def delete_snapshots(
     for snapshot_index in snapshot_indices:
         if snapshot_index not in snapshot_indices_keep:
             snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
-            print('* deleting:  {}'.format(snapshot_name))
-            os.system('rm -rf {}'.format(snapshot_name))
+            print(f'* deleting:  {snapshot_name}')
+            os.system(f'rm -rf {snapshot_name}')
 
             if delete_halos:
                 halo_name = halo_directory + halo_name_base.format(snapshot_index)
-                print('* deleting:  {}'.format(halo_name))
-                os.system('rm -rf {}'.format(halo_name))
+                print(f'* deleting:  {halo_name}')
+                os.system(f'rm -rf {halo_name}')
     print()
 
 
@@ -517,21 +564,28 @@ def delete_snapshots(
 # --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        raise OSError('specify function to run: compress, globus, rsync, delete')
+        raise OSError('specify function to run: clean, compress, globus, rsync, delete')
 
     function_kind = str(sys.argv[1])
 
     assert (
-        'compress' in function_kind
+        'clean' in function_kind
+        or 'compress' in function_kind
         or 'rsync' in function_kind
         or 'globus' in function_kind
         or 'delete' in function_kind
     )
 
-    if 'compress' in function_kind:
-        directory = 'output'
+    if 'clean' in function_kind:
+        simulation_directory = '.'
         if len(sys.argv) > 2:
-            directory = str(sys.argv[2])
+            simulation_directory = str(sys.argv[2])
+        clean_directory(simulation_directory)
+
+    if 'compress' in function_kind:
+        snapshot_directory = 'output'
+        if len(sys.argv) > 2:
+            snapshot_directory = str(sys.argv[2])
 
         snapshot_index_limits = [0, 600]
         if len(sys.argv) > 3:
@@ -541,7 +595,7 @@ if __name__ == '__main__':
 
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-        Compress.test_compression(snapshot_indices, directory)
+        Compress.test_compression(snapshot_indices, snapshot_directory)
 
     elif 'globus' in function_kind:
         directory = '.'
@@ -561,12 +615,12 @@ if __name__ == '__main__':
         rsync_snapshots(machine_name, simulation_directory_from, simulation_directory_to)
 
     elif 'delete' in function_kind:
-        directory = 'output'
+        snapshot_directory = 'output'
         if len(sys.argv) > 3:
-            directory = str(sys.argv[3])
+            snapshot_directory = str(sys.argv[3])
 
         snapshot_index_limits = None
         if len(sys.argv) > 4:
             snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
 
-        delete_snapshots(directory, snapshot_index_limits)
+        delete_snapshots(snapshot_directory, snapshot_index_limits)
