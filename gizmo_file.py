@@ -109,11 +109,11 @@ def clean_directory(
 
     # clean gizmo source code
     os.system(f'mv {gizmo_directory}/GIZMO_config.h {gizmo_config_file}')  # save used config
-    os.system(f'cd {gizmo_directory}')
+    os.chdir(f'{gizmo_directory}')
     os.system('make clean')
-    os.system(f'echo "git version" ../{gizmo_config_file}')  # save gizmo git version
+    os.system(f'echo "\n# git version of gizmo" >> ../{gizmo_config_file}')  # save git version
     os.system(f'git log -n 1 >> ../{gizmo_config_file}')
-    os.system('cd ..')
+    os.chdir('..')
     os.system(f'mv ewald_spc_table_64_dbl.dat spcool_tables TREECOOL -t {gizmo_directory}/')
     os.system(f'rm -f {snapshot_scalefactor_file}')
     os.system(f'rm -f {gizmo_err_file}')
