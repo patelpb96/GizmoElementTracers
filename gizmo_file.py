@@ -139,11 +139,12 @@ def clean_directory(
 # --------------------------------------------------------------------------------------------------
 class CompressClass(ut.io.SayClass):
     '''
-    .
+    Compress snapshot files, losslessly.
     '''
 
     def compress_snapshots(
         self,
+        simulation_directory='.',
         snapshot_directory='output',
         snapshot_directory_out='',
         snapshot_index_limits=[0, 600],
@@ -154,6 +155,7 @@ class CompressClass(ut.io.SayClass):
 
         Parameters
         ----------
+        simulation_directory : str : directory of simulation
         snapshot_directory : str : directory of snapshots
         snapshot_directory_out : str : directory to write compressed snapshots
         snapshot_index_limits : list : min and max snapshot indices to compress
@@ -163,7 +165,7 @@ class CompressClass(ut.io.SayClass):
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
         args_list = [
-            (snapshot_directory, snapshot_directory_out, snapshot_index)
+            (simulation_directory, snapshot_directory, snapshot_directory_out, snapshot_index)
             for snapshot_index in snapshot_indices
         ]
 
@@ -171,6 +173,7 @@ class CompressClass(ut.io.SayClass):
 
     def compress_snapshot(
         self,
+        simulation_directory='.',
         snapshot_directory='output',
         snapshot_directory_out='',
         snapshot_index=600,
@@ -182,6 +185,7 @@ class CompressClass(ut.io.SayClass):
 
         Parameters
         ----------
+        simulation_directory : str : directory of simulation
         snapshot_directory : str : directory of snapshot
         snapshot_directory_out : str : directory to write compressed snapshot
         snapshot_index : int : index of snapshot
@@ -190,14 +194,17 @@ class CompressClass(ut.io.SayClass):
         executable = (
             f'{python_executable} {analysis_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
         )
+
         snapshot_name_base = 'snap*_{:03d}*'
 
-        if snapshot_directory[-1] != '/':
-            snapshot_directory += '/'
+        simulation_directory = ut.io.get_path(simulation_directory)
+        snapshot_directory = ut.io.get_path(snapshot_directory)
         if snapshot_directory_out and snapshot_directory_out[-1] != '/':
             snapshot_directory_out += '/'
 
-        path_file_names = glob.glob(snapshot_directory + snapshot_name_base.format(snapshot_index))
+        path_file_names = glob.glob(
+            simulation_directory + snapshot_directory + snapshot_name_base.format(snapshot_index)
+        )
 
         if len(path_file_names) > 0:
             if 'snapdir' in path_file_names[0]:
