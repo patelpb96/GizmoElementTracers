@@ -188,6 +188,7 @@ class CompressClass(ut.io.SayClass):
         snapshot_directory_out='',
         analysis_directory='~/analysis',
         python_executable='python3',
+        snapshot_index=600
     ):
         '''
         Compress single snapshot (which may be multiple files) in input directory.
