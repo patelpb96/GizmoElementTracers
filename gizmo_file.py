@@ -219,9 +219,9 @@ class CompressClass(ut.io.SayClass):
 
     def test_compression(
         self,
-        snapshot_indices='all',
         simulation_directory='.',
         snapshot_directory='output',
+        snapshot_indices='all',
         compression_level=0,
         verbose=False,
     ):
@@ -522,7 +522,10 @@ def rsync_simulation_files(
 # delete files
 # --------------------------------------------------------------------------------------------------
 def delete_snapshots(
-    snapshot_directory='output', snapshot_index_limits=[1, 599], delete_halos=False
+    simulation_directory='.',
+    snapshot_directory='output',
+    snapshot_index_limits=[1, 599],
+    delete_halos=False,
 ):
     '''
     Delete all snapshots in given directory within snapshot_index_limits,
@@ -530,19 +533,22 @@ def delete_snapshots(
 
     Parameters
     ----------
+    simulation_directory : str : directory of simulation
     snapshot_directory : str : directory of snapshots
     snapshot_index_limits : list : min and max snapshot indices to delete
     delete_halos : bool : whether to delete halo catalog files at same snapshot times
     '''
+    if not simulation_directory:
+        simulation_directory = '.'
+    simulation_directory = ut.io.get_path(simulation_directory)
+
     snapshot_name_base = 'snap*_{:03d}*'
     if not snapshot_directory:
         snapshot_directory = 'output/'
+    snapshot_directory = ut.io.get_path(snapshot_directory)
 
     halo_name_base = 'halos_{:03d}*'
     halo_directory = 'halo/rockstar_dm/catalog/'
-
-    if snapshot_directory[-1] != '/':
-        snapshot_directory += '/'
 
     if snapshot_index_limits is None or len(snapshot_index_limits) == 0:
         snapshot_index_limits = [1, 599]
@@ -551,12 +557,18 @@ def delete_snapshots(
     print()
     for snapshot_index in snapshot_indices:
         if snapshot_index not in snapshot_indices_keep:
-            snapshot_name = snapshot_directory + snapshot_name_base.format(snapshot_index)
+            snapshot_name = (
+                simulation_directory
+                + snapshot_directory
+                + snapshot_name_base.format(snapshot_index)
+            )
             print(f'* deleting:  {snapshot_name}')
             os.system(f'rm -rf {snapshot_name}')
 
             if delete_halos:
-                halo_name = halo_directory + halo_name_base.format(snapshot_index)
+                halo_name = (
+                    simulation_directory + halo_directory + halo_name_base.format(snapshot_index)
+                )
                 print(f'* deleting:  {halo_name}')
                 os.system(f'rm -rf {halo_name}')
     print()
@@ -586,9 +598,9 @@ if __name__ == '__main__':
         clean_directory(simulation_directory)
 
     if 'compress' in function_kind:
-        snapshot_directory = 'output'
+        simulation_directory = '.'
         if len(sys.argv) > 2:
-            snapshot_directory = str(sys.argv[2])
+            simulation_directory = str(sys.argv[2])
 
         snapshot_index_limits = [0, 600]
         if len(sys.argv) > 3:
@@ -598,7 +610,7 @@ if __name__ == '__main__':
 
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-        Compress.test_compression(snapshot_indices, snapshot_directory)
+        Compress.test_compression(simulation_directory, snapshot_indices=snapshot_indices)
 
     elif 'globus' in function_kind:
         directory = '.'
@@ -618,12 +630,12 @@ if __name__ == '__main__':
         rsync_snapshots(machine_name, simulation_directory_from, simulation_directory_to)
 
     elif 'delete' in function_kind:
-        snapshot_directory = 'output'
-        if len(sys.argv) > 3:
-            snapshot_directory = str(sys.argv[3])
+        simulation_directory = '.'
+        if len(sys.argv) > 2:
+            simulation_directory = str(sys.argv[2])
 
         snapshot_index_limits = None
-        if len(sys.argv) > 4:
-            snapshot_index_limits = [int(sys.argv[4]), int(sys.argv[5])]
+        if len(sys.argv) > 3:
+            snapshot_index_limits = [int(sys.argv[3]), int(sys.argv[4])]
 
-        delete_snapshots(snapshot_directory, snapshot_index_limits)
+        delete_snapshots(simulation_directory, snapshot_index_limits=snapshot_index_limits)
