@@ -148,6 +148,8 @@ class CompressClass(ut.io.SayClass):
         snapshot_directory='output',
         snapshot_directory_out='',
         snapshot_index_limits=[0, 600],
+        analysis_directory='~/analysis',
+        python_executable='python3',
         thread_number=1,
     ):
         '''
@@ -159,13 +161,21 @@ class CompressClass(ut.io.SayClass):
         snapshot_directory : str : directory of snapshots
         snapshot_directory_out : str : directory to write compressed snapshots
         snapshot_index_limits : list : min and max snapshot indices to compress
-        syncronize : bool : whether to synchronize parallel tasks,
-            wait for each thread bundle to complete before starting new bundle
+        analysis_directory : str : directory of analysis code
+        python_executable : str : python executable to use to run compression script
+        thread_number : int : number of parallel threads
         '''
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
         args_list = [
-            (simulation_directory, snapshot_directory, snapshot_directory_out, snapshot_index)
+            (
+                simulation_directory,
+                snapshot_directory,
+                snapshot_directory_out,
+                analysis_directory,
+                python_executable,
+                snapshot_index,
+            )
             for snapshot_index in snapshot_indices
         ]
 
@@ -176,7 +186,6 @@ class CompressClass(ut.io.SayClass):
         simulation_directory='.',
         snapshot_directory='output',
         snapshot_directory_out='',
-        snapshot_index=600,
         analysis_directory='~/analysis',
         python_executable='python3',
     ):
@@ -188,8 +197,9 @@ class CompressClass(ut.io.SayClass):
         simulation_directory : str : directory of simulation
         snapshot_directory : str : directory of snapshot
         snapshot_directory_out : str : directory to write compressed snapshot
-        snapshot_index : int : index of snapshot
         analysis_directory : str : directory of analysis code
+        python_executable : str : python executable to use to run compression script
+        snapshot_index : int : index of snapshot
         '''
         executable = (
             f'{python_executable} {analysis_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
