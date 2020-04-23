@@ -327,7 +327,7 @@ Compress = CompressClass()
 # --------------------------------------------------------------------------------------------------
 class GlobusClass(ut.io.SayClass):
     '''
-    .
+    Tranfer files via Globus command-line utility.
     '''
 
     def submit_transfer(
@@ -338,7 +338,7 @@ class GlobusClass(ut.io.SayClass):
         machine_name='peloton',
     ):
         '''
-        Submit globus transfer of simulation files.
+        Submit transfer of simulation files via Globus command-line utility.
         Must initiate from Stampede.
 
         Parameters
@@ -385,7 +385,7 @@ class GlobusClass(ut.io.SayClass):
         self, simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'
     ):
         '''
-        Write batch file that sets files to transfer via globus.
+        Write a batch file that sets files to transfer via globus.
 
         Parameters
         ----------
@@ -455,6 +455,9 @@ class RsyncClass(ut.io.SayClass):
     '''
 
     def __init__(self):
+        '''
+        .
+        '''
         self.rsync_command = 'rsync -ahvP --size-only '
         self.snapshot_name_base = 'snap*_{:03d}*'
 
@@ -493,6 +496,9 @@ class RsyncClass(ut.io.SayClass):
         print(f'\n* executing:\n{command}\n')
         os.system(command)
 
+        # fix file permissions (expecially if transfer from Stampede)
+        os.system('chmod u=rw,go=r $(find . -type f); chmod u=rwX,go=rX $(find . -type d)')
+
     def rsync_simulation_files(
         self,
         machine_from,
@@ -530,6 +536,8 @@ class RsyncClass(ut.io.SayClass):
             'MomWinds.txt',
             'SNeIIheating.txt',
             '*.ics',
+            'submit_music*',
+            'input_powerspec.txt',
             'snapshot_scale-factors.txt',
             'submit_gizmo*.py',
             '*.bin',
@@ -564,8 +572,12 @@ class RsyncClass(ut.io.SayClass):
         print(f'\n* executing:\n{command}\n')
         os.system(command)
 
+        # fix file permissions (expecially if transfer from Stampede)
+        os.system('chmod u=rw,go=r $(find . -type f); chmod u=rwX,go=rX $(find . -type d)')
+
 
 Rsync = RsyncClass()
+
 
 # --------------------------------------------------------------------------------------------------
 # delete files
@@ -669,20 +681,16 @@ if __name__ == '__main__':
 
     elif 'rsync' in function_kind:
         if len(sys.argv) < 5:
-            raise OSError('imports: machine_from simulation_directory_from simulation_directory_to')
+            raise OSError('imports: machine_from directory_from directory_to')
 
         machine_from = str(sys.argv[2])
-        simulation_directory_from = str(sys.argv[3])
-        simulation_directory_to = str(sys.argv[4])
+        directory_from = str(sys.argv[3])
+        directory_to = str(sys.argv[4])
 
         Rsync.rsync_simulation_files(
-            machine_from,
-            simulation_directory_from,
-            simulation_directory_to,
-            include_snapshot600=True,
+            machine_from, directory_from, directory_to, include_snapshot600=True,
         )
-        # Rsync.rsync_snapshot_files(
-        # machine_from, simulation_directory_from, simulation_directory_to)
+        # Rsync.rsync_snapshot_files(machine_from, directory_from, directory_to)
 
     elif 'delete' in function_kind:
         simulation_directory = '.'
