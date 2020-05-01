@@ -426,6 +426,7 @@ def archive_directories(
     rockstar_job_directory='rockstar_jobs',
     rockstar_catalog_directory='catalog',
     rockstar_hdf5_directory='catalog_hdf5',
+    track_directory='track',
     delete_directories=False,
     delete_tarballs=False,
     thread_number=1,
@@ -454,6 +455,7 @@ def archive_directories(
     rockstar_job_directory : str : directory of Rockstar run-time log/job files
     rockstar_catalog_directory : str : directory of Rockstar (text) halo catalog + tree files
     rockstar_hdf5_directory : str : directory of Rockstar post-processed hdf5 catalog + tree files
+    track_directory : str : directory of particle tracking files
     delete_directories : bool :
         whether to delete the (raw) directories after tar-ing them into a single file
     delete_tarballs : bool : whether to delete existing tar-balls
@@ -462,6 +464,7 @@ def archive_directories(
     '''
 
     def tar_halo_directory(directory_name, delete_directories):
+        print('here')
         if os.path.exists(f'{directory_name}'):
             print(f'\n* tar-ing:  {directory_name}/')
             os.system(f'tar -cf {directory_name}.tar {directory_name}')
@@ -513,6 +516,7 @@ def archive_directories(
                     rockstar_job_directory,
                     rockstar_catalog_directory,
                     rockstar_hdf5_directory,
+                    track_directory,
                     delete_directories,
                     delete_tarballs,
                 )
@@ -529,7 +533,21 @@ def archive_directories(
                 os.system(f'tar -cvf {ic_directory}.tar {ic_directory}')
                 if delete_directories:
                     print(f'* deleting:  {ic_directory}/')
-                    os.system('rm -rf {ic_directory}')
+                    os.system(f'rm -rf {ic_directory}')
+            else:
+                print(f'\n! could not find:  {ic_directory}/')
+
+        # tar directory of particle tracking files
+        if delete_tarballs:
+            print(f'\n* deleting:  {track_directory}.tar')
+            os.system(f'rm -f {track_directory}.tar')
+        else:
+            if os.path.exists(f'{track_directory}'):
+                print(f'\n* tar-ing:  {track_directory}/')
+                os.system(f'tar -cf {track_directory}.tar {track_directory}')
+                if delete_directories:
+                    print(f'* deleting:  {track_directory}/')
+                    os.system(f'rm -rf {track_directory}')
             else:
                 print(f'\n! could not find:  {ic_directory}/')
 
