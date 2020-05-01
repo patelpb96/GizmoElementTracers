@@ -9,6 +9,7 @@ Edit Gizmo snapshot files: compress, delete, transfer across machines.
 import os
 import sys
 import glob
+import tarfile
 import numpy as np
 
 import utilities as ut
@@ -88,7 +89,7 @@ snapshot_indices_keep = [
 # --------------------------------------------------------------------------------------------------
 class CompressClass(ut.io.SayClass):
     '''
-    Compress snapshot files, losslessly.
+    Compress snapshot files, losslessly, using Robert Feldmann's compression package.
     '''
 
     def compress_snapshots(
@@ -371,7 +372,8 @@ def clean_directories(
             os.chdir('..')
 
             # tar gizmo directory
-            os.system(f'tar -cf {gizmo_directory}.tar {gizmo_directory}; rm -rf {gizmo_directory}')
+            os.system(f'tar -cf {gizmo_directory}.tar {gizmo_directory}')
+            os.system(f'rm -rf {gizmo_directory}')
         else:
             print(f'! could not find:  {gizmo_directory}/')
 
@@ -415,6 +417,26 @@ def clean_directories(
 
         # move back to original directory
         os.chdir(f'{cwd}')
+
+
+def _tar_directory(directory_name, delete_directories=False, delete_tarballs=False):
+    '''
+    Helper function.
+    '''
+    if delete_tarballs:
+        print(f'\n* deleting:  {directory_name}.tar')
+        os.system(f'rm -f {directory_name}.tar')
+    else:
+        if os.path.exists(f'{directory_name}'):
+            print(f'* tar-ing:  {directory_name}/')
+            # os.system(f'tar -cf {directory_name}.tar {directory_name}')
+            with tarfile.open(f'{directory_name}.tar', 'w') as tar:
+                tar.add(directory_name)
+            if delete_directories:
+                print(f'* deleting:  {directory_name}/')
+                os.system(f'rm -rf {directory_name}')
+        else:
+            print(f'\n! could not find:  {directory_name}/')
 
 
 def archive_directories(
@@ -462,23 +484,6 @@ def archive_directories(
         use this to clean safely the tar-balls that this function creates
     proc_number : int : number of parallel processes to use for tar-ing snapshots
     '''
-
-    def tar_halo_directory(directory_name, delete_directories):
-        print('here')
-        if os.path.exists(f'{directory_name}'):
-            print(f'\n* tar-ing:  {directory_name}/')
-            os.system(f'tar -cf {directory_name}.tar {directory_name}')
-            if delete_directories:
-                print(f'* deleting:  {directory_name}/')
-                os.system(f'rm -rf {directory_name}')
-
-    def tar_snapshot_directory(directory_name, delete_directories):
-        print(f'* tar-ing:  {directory_name}/')
-        os.system(f'tar -cf {directory_name}.tar {directory_name}')
-        if delete_directories:
-            print(f'* deleting:  {directory_name}/')
-            os.system(f'rm -rf {directory_name}')
-
     if np.isscalar(directories):
         directories = [directories]
 
@@ -524,61 +529,34 @@ def archive_directories(
             return
 
         # tar directory of initial conditions
-        if delete_tarballs:
-            print(f'\n* deleting:  {ic_directory}.tar')
-            os.system(f'rm -f {ic_directory}.tar')
-        else:
-            if os.path.exists(f'{ic_directory}'):
-                print(f'\n* tar-ing:  {ic_directory}/')
-                os.system(f'tar -cvf {ic_directory}.tar {ic_directory}')
-                if delete_directories:
-                    print(f'* deleting:  {ic_directory}/')
-                    os.system(f'rm -rf {ic_directory}')
-            else:
-                print(f'\n! could not find:  {ic_directory}/')
+        _tar_directory(ic_directory, delete_directories, delete_tarballs)
 
         # tar directory of particle tracking files
-        if delete_tarballs:
-            print(f'\n* deleting:  {track_directory}.tar')
-            os.system(f'rm -f {track_directory}.tar')
-        else:
-            if os.path.exists(f'{track_directory}'):
-                print(f'\n* tar-ing:  {track_directory}/')
-                os.system(f'tar -cf {track_directory}.tar {track_directory}')
-                if delete_directories:
-                    print(f'* deleting:  {track_directory}/')
-                    os.system(f'rm -rf {track_directory}')
-            else:
-                print(f'\n! could not find:  {ic_directory}/')
+        _tar_directory(track_directory, delete_directories, delete_tarballs)
 
         # tar directories of halo catalogs + trees
         if os.path.exists(f'{halo_directory}/{rockstar_directory}'):
             print(f'\n* moving into:  {halo_directory}/{rockstar_directory}/')
             os.chdir(f'{halo_directory}/{rockstar_directory}')
-            if delete_tarballs:
-                print(f'* deleting:  {rockstar_job_directory}.tar')
-                os.system(f'rm -f {rockstar_job_directory}.tar')
-                print(f'* deleting:  {rockstar_catalog_directory}.tar')
-                os.system(f'rm -f {rockstar_catalog_directory}.tar')
-                print(f'* deleting:  {rockstar_hdf5_directory}.tar')
-                os.system(f'rm -f {rockstar_hdf5_directory}.tar')
-            else:
-                halo_subdirectories = [
-                    rockstar_job_directory,
-                    rockstar_catalog_directory,
-                    rockstar_hdf5_directory,
-                ]
 
-                if proc_number > 1:
-                    # tar halo directories in parallel
-                    with Pool(proc_number) as pool:
-                        for halo_subdirectory in halo_subdirectories:
-                            pool.apply_async(
-                                tar_halo_directory, (halo_subdirectory, delete_directories)
-                            )
-                else:
-                    for halo_subdirectory in halo_subdirectories:
-                        tar_halo_directory(halo_subdirectory, delete_directories)
+            halo_argss = [
+                (rockstar_job_directory, delete_directories, delete_tarballs),
+                (rockstar_hdf5_directory, delete_directories, delete_tarballs),
+                (rockstar_catalog_directory, delete_directories, delete_tarballs),
+            ]
+
+            if proc_number > 1:
+                # tar halo directories in parallel
+                # with Pool(proc_number) as pool:
+                #    pool.starmap(_tar_directory, halo_argss)
+                pool = Pool(proc_number)
+                for halo_args in halo_argss:
+                    pool.apply_async(_tar_directory, halo_args)
+                pool.close()
+                pool.join()
+            else:
+                for halo_args in halo_argss:
+                    _tar_directory(*halo_args)
 
             os.chdir('../..')
         else:
@@ -588,34 +566,28 @@ def archive_directories(
         if os.path.exists(f'{snapshot_directory}'):
             os.chdir(f'{snapshot_directory}')
 
+            snapshot_names = glob.glob('snapdir_*')
             if delete_tarballs:
-                print(f'\n* moving into:  {snapshot_directory}/')
-                print('* deleting snapshot tar-balls')
-                snapshot_names = glob.glob('snapdir_*.tar')
-                snapshot_names.sort()
-                for snapshot_directory_name in snapshot_names:
-                    print(f'* deleting:  {snapshot_directory_name}.tar')
-                    os.system(f'rm -f {snapshot_directory_name}.tar')
-
+                snapshot_names = [s for s in snapshot_names if '.tar' in s]
             else:
-                snapshot_names = glob.glob('snapdir_*')
                 # ensure not tar an existing tar file
                 snapshot_names = [s for s in snapshot_names if '.tar' not in s]
-                snapshot_names.sort()
-                if len(snapshot_names) > 0:
-                    print(f'\n* moving into:  {snapshot_directory}/')
-                    print('* tar-ing snapshot directories')
+            snapshot_names.sort()
+            if len(snapshot_names) > 0:
+                print(f'\n* moving into:  {snapshot_directory}/')
 
-                if proc_number > 1:
-                    # tar snapshot directories in parallel
-                    with Pool(proc_number) as pool:
-                        for snapshot_name in snapshot_names:
-                            pool.apply_async(
-                                tar_snapshot_directory, (snapshot_name, delete_directories)
-                            )
-                else:
-                    for snapshot_name in snapshot_names:
-                        tar_snapshot_directory(snapshot_name, delete_directories)
+            if proc_number > 1:
+                # tar snapshot directories in parallel
+                pool = Pool(proc_number)
+                for snapshot_name in snapshot_names:
+                    pool.apply_async(
+                        _tar_directory, (snapshot_name, delete_directories, delete_tarballs)
+                    )
+                pool.close()
+                pool.join()
+            else:
+                for snapshot_name in snapshot_names:
+                    _tar_directory(snapshot_name, delete_directories, delete_tarballs)
 
             os.chdir('..')
         else:
