@@ -576,7 +576,7 @@ class ParticlePointerClass(ut.io.SayClass):
         match_propery_tolerance=1e-6,
         test_property='form.scalefactor',
         snapshot_indices=[],
-        thread_number=1,
+        proc_number=1,
     ):
         '''
         Assign to each particle a pointer from its index at the reference (later) snapshot
@@ -593,7 +593,7 @@ class ParticlePointerClass(ut.io.SayClass):
         match_propery_tolerance : float : fractional tolerance for matching via match_property
         test_property : str : additional property to use to test matching
         snapshot_indices : array-like : snapshot indices at which to assign pointers
-        thread_number : int : number of threads for parallelization
+        proc_number : int : number of parallel processes to run
         '''
         assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
@@ -685,22 +685,18 @@ class ParticlePointerClass(ut.io.SayClass):
         }
 
         # initiate threads, if asking for > 1
-        if thread_number > 1:
-            import multiprocessing as mp
+        if proc_number > 1:
+            from multiprocessing import Pool
 
-            pool = mp.Pool(thread_number)
-
-        for snapshot_index in snapshot_indices:
-            if thread_number > 1:
-                # causes memory errors if try to pass part_z0, so instead re-read part_z0 per thread
-                pool.apply_async(self._write_pointers_to_snapshot, (None, snapshot_index, count))
-            else:
+            with Pool(proc_number) as pool:
+                for snapshot_index in snapshot_indices:
+                    # memory errors if try to pass part_z0, so instead re-read part_z0 per thread
+                    pool.apply_async(
+                        self._write_pointers_to_snapshot, (None, snapshot_index, count)
+                    )
+        else:
+            for snapshot_index in snapshot_indices:
                 self._write_pointers_to_snapshot(part_z0, snapshot_index, count)
-
-        # close threads
-        if thread_number > 1:
-            pool.close()
-            pool.join()
 
         # print cumulative diagnostics
         print()
@@ -1250,7 +1246,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             # print()
 
     def write_formation_coordinates(
-        self, part_z0=None, host_number=1, thread_number=1, simulation_directory=None
+        self, part_z0=None, host_number=1, proc_number=1, simulation_directory=None
     ):
         '''
         Assign to each particle its coordiates (3-D distance and 3-D velocity) wrt each primary
@@ -1260,7 +1256,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         ----------
         part : dict : catalog of particles at the reference snapshot
         host_number : int : number of host galaxies to assign and compute coordinates relative to
-        thread_number : int : number of threads for parallelization
+        proc_number : int : number of parallel processes to run
         simulation_directory : str : directory of simulation
         '''
         # if 'elvis' is in simulation directory name, force 2 hosts
@@ -1339,26 +1335,20 @@ class ParticleCoordinateClass(ut.io.SayClass):
         count = {'id none': 0, 'id wrong': 0}
 
         # initiate threads, if asking for > 1
-        if thread_number > 1:
-            import multiprocessing as mp
+        if proc_number > 1:
+            from multiprocessing import Pool
 
-            pool = mp.Pool(thread_number)
-
-        for snapshot_index in snapshot_indices:
-            if thread_number > 1:
-                pool.apply(
-                    self._write_formation_coordinates,
-                    (part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count),
-                )
-            else:
+            with Pool(proc_number) as pool:
+                for snapshot_index in snapshot_indices:
+                    pool.apply(
+                        self._write_formation_coordinates,
+                        (part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count),
+                    )
+        else:
+            for snapshot_index in snapshot_indices:
                 self._write_formation_coordinates(
                     part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count
                 )
-
-        # close threads
-        if thread_number > 1:
-            pool.close()
-            pool.join()
 
         # print cumulative diagnostics
         print()

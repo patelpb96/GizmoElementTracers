@@ -99,7 +99,7 @@ class CompressClass(ut.io.SayClass):
         snapshot_index_limits=[0, 600],
         analysis_directory='~/analysis',
         python_executable='python3',
-        thread_number=1,
+        proc_number=1,
     ):
         '''
         Compress all snapshots in input directory.
@@ -112,7 +112,7 @@ class CompressClass(ut.io.SayClass):
         snapshot_index_limits : list : min and max snapshot indices to compress
         analysis_directory : str : directory of analysis code
         python_executable : str : python executable to use to run compression script
-        thread_number : int : number of parallel threads
+        proc_number : int : number of parallel processes to use
         '''
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
@@ -128,7 +128,7 @@ class CompressClass(ut.io.SayClass):
             for snapshot_index in snapshot_indices
         ]
 
-        ut.io.run_in_parallel(self.compress_snapshot, args_list, thread_number=thread_number)
+        ut.io.run_in_parallel(self.compress_snapshot, args_list, proc_number=proc_number)
 
     def compress_snapshot(
         self,
@@ -429,7 +429,7 @@ def archive_directories(
     track_directory='track',
     delete_directories=False,
     delete_tarballs=False,
-    thread_number=1,
+    proc_number=1,
 ):
     '''
     Use tar to combine simulation sub-directories into single tar-ball files.
@@ -460,7 +460,7 @@ def archive_directories(
         whether to delete the (raw) directories after tar-ing them into a single file
     delete_tarballs : bool : whether to delete existing tar-balls
         use this to clean safely the tar-balls that this function creates
-    thread_number : int : number of parallel threads to use for tar-ing snapshots
+    proc_number : int : number of parallel processes to use for tar-ing snapshots
     '''
 
     def tar_halo_directory(directory_name, delete_directories):
@@ -482,8 +482,8 @@ def archive_directories(
     if np.isscalar(directories):
         directories = [directories]
 
-    if thread_number > 1:
-        import multiprocessing as mp
+    if proc_number > 1:
+        from multiprocessing import Pool
 
     # move to this directory
     cwd = os.getcwd()
@@ -569,22 +569,16 @@ def archive_directories(
                     rockstar_hdf5_directory,
                 ]
 
-                if thread_number > 1:
-                    # tar each snapshot directory in parallel
-                    pool = mp.Pool(thread_number)
-
-                for halo_subdirectory in halo_subdirectories:
-                    if thread_number > 1:
-                        pool.apply_async(
-                            tar_halo_directory, (halo_subdirectory, delete_directories)
-                        )
-                    else:
+                if proc_number > 1:
+                    # tar halo directories in parallel
+                    with Pool(proc_number) as pool:
+                        for halo_subdirectory in halo_subdirectories:
+                            pool.apply_async(
+                                tar_halo_directory, (halo_subdirectory, delete_directories)
+                            )
+                else:
+                    for halo_subdirectory in halo_subdirectories:
                         tar_halo_directory(halo_subdirectory, delete_directories)
-
-                # close threads
-                if thread_number > 1:
-                    pool.close()
-                    pool.join()
 
             os.chdir('../..')
         else:
@@ -612,22 +606,16 @@ def archive_directories(
                     print(f'\n* moving into:  {snapshot_directory}/')
                     print('* tar-ing snapshot directories')
 
-                if thread_number > 1:
-                    # tar each snapshot directory in parallel
-                    pool = mp.Pool(thread_number)
-
-                for snapshot_name in snapshot_names:
-                    if thread_number > 1:
-                        pool.apply_async(
-                            tar_snapshot_directory, (snapshot_name, delete_directories)
-                        )
-                    else:
+                if proc_number > 1:
+                    # tar snapshot directories in parallel
+                    with Pool(proc_number) as pool:
+                        for snapshot_name in snapshot_names:
+                            pool.apply_async(
+                                tar_snapshot_directory, (snapshot_name, delete_directories)
+                            )
+                else:
+                    for snapshot_name in snapshot_names:
                         tar_snapshot_directory(snapshot_name, delete_directories)
-
-                # close threads
-                if thread_number > 1:
-                    pool.close()
-                    pool.join()
 
             os.chdir('..')
         else:
