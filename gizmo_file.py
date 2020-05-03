@@ -271,7 +271,7 @@ Compress = CompressClass()
 # --------------------------------------------------------------------------------------------------
 # clean and archive simulation directories and files
 # --------------------------------------------------------------------------------------------------
-def ArchiveClass():
+class ArchiveClass:
     '''
     Clean, archive, and delete simulation directories and files after a simulation has finished.
     '''
