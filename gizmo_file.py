@@ -423,7 +423,7 @@ def _tar_directory(directory_name, delete_directories=False, delete_tarballs=Fal
     '''
     Helper function.
     '''
-    if delete_tarballs:
+    if delete_tarballs and os.path.exists(f'{directory_name}.tar'):
         print(f'\n* deleting:  {directory_name}.tar')
         os.system(f'rm -f {directory_name}.tar')
     else:
@@ -568,7 +568,8 @@ def archive_directories(
 
             snapshot_names = glob.glob('snapdir_*')
             if delete_tarballs:
-                snapshot_names = [s for s in snapshot_names if '.tar' in s]
+                # ensure get only tar files
+                snapshot_names = [s.rstrip('.tar') for s in snapshot_names if '.tar' in s]
             else:
                 # ensure not tar an existing tar file
                 snapshot_names = [s for s in snapshot_names if '.tar' not in s]
