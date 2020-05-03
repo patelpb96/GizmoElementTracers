@@ -271,388 +271,405 @@ Compress = CompressClass()
 # --------------------------------------------------------------------------------------------------
 # clean and archive simulation directories and files
 # --------------------------------------------------------------------------------------------------
-def clean_directories(
-    directories='.',
-    gizmo_directory='gizmo',
-    snapshot_directory='output',
-    restart_directory='restartfiles',
-    gizmo_out_file='gizmo.out',
-    gizmo_err_file='gizmo.err',
-    snapshot_scalefactor_file='snapshot_scale-factors.txt',
-):
+def ArchiveClass():
     '''
-    Clean a simulation directory, a list of simulation directories, or a directory of multiple
-    simulation directories.
-    Run this after a simulation finishes.
-    Remove unnecessary run-time files, and tar directories (into a single tar-ball file) that we
-    generally do not need for post-processing analysis.
-
-    Parameters
-    ----------
-    directories : str or list thereof : directory[s] to run this on
-        can be a single simulation directory, a list of simulation directories,
-        or a directory that contains multiple simulation directories for which this function will
-        run recursively on each one
-    gizmo_directory : str : directory of Gizmo source code
-    snapshot_directory : str : output directory that contains snapshots
-    restart_directory : str : directory within snapshot_directory that contains restart files
-    gizmo_out_file : str : Gizmo 'out' file
-    gizmo_err_file : str : Gizmo error file
-    snapshot_scalefactor_file : str : file that contains snapshot scale-factors (only)
+    Clean, archive, and delete simulation directories and files after a simulation has finished.
     '''
-    gizmo_config_file_used = 'GIZMO_config.h'
-    gizmo_config_file_save = 'gizmo_config.h'  # file to save used config settings and gizmo version
-    gizmo_job_directory = 'gizmo_jobs'
 
-    if np.isscalar(directories):
-        directories = [directories]
+    def clean_directories(
+        self,
+        directories='.',
+        gizmo_directory='gizmo',
+        snapshot_directory='output',
+        restart_directory='restartfiles',
+        gizmo_out_file='gizmo.out',
+        gizmo_err_file='gizmo.err',
+        snapshot_scalefactor_file='snapshot_scale-factors.txt',
+    ):
+        '''
+        Clean a simulation directory, a list of simulation directories, or a directory of multiple
+        simulation directories.
+        Run this after a simulation finishes.
+        Remove unnecessary run-time files, and tar directories (into a single tar-ball file) that we
+        generally do not need for post-processing analysis.
 
-    gizmo_directory = gizmo_directory.rstrip('/')
-    snapshot_directory = snapshot_directory.rstrip('/')
+        Parameters
+        ----------
+        directories : str or list thereof : directory[s] to run this on
+            can be a single simulation directory, a list of simulation directories,
+            or a directory that contains multiple simulation directories for which this function
+            will run recursively on each one
+        gizmo_directory : str : directory of Gizmo source code
+        snapshot_directory : str : output directory that contains snapshots
+        restart_directory : str : directory within snapshot_directory that contains restart files
+        gizmo_out_file : str : Gizmo 'out' file
+        gizmo_err_file : str : Gizmo error file
+        snapshot_scalefactor_file : str : file that contains snapshot scale-factors (only)
+        '''
+        gizmo_config_file_used = 'GIZMO_config.h'
+        gizmo_config_file_save = (
+            'gizmo_config.h'  # file to save used config settings and gizmo version
+        )
+        gizmo_job_directory = 'gizmo_jobs'
 
-    cwd = os.getcwd()  # save current directory
+        if np.isscalar(directories):
+            directories = [directories]
 
-    # move into each directory
-    for directory in directories:
-        directory = directory.rstrip('/')
-        if directory != '.':
-            print(f'\n* moving into:  {directory}/')
-            os.chdir(f'{directory}')
+        gizmo_directory = gizmo_directory.rstrip('/')
+        snapshot_directory = snapshot_directory.rstrip('/')
 
-        # check if this directory has relevant simulation directories,
-        # or if need to run recursively on different simulation directories
-        directory_names = glob.glob('*/')  # get names of all directories
-        directory_names.sort()
-        if len(directory_names) == 0:
-            # this is an empty directory, exit
-            print(f'\n! could not find any directories to clean in {directory}')
-            os.chdir(f'{cwd}')
-            return
-        elif snapshot_directory + '/' not in directory_names:
-            # this is a directory of simulation directories, recursively run on each one, then exit
-            for directory_name in directory_names:
-                clean_directories(
-                    directory_name,
-                    gizmo_directory,
-                    snapshot_directory,
-                    restart_directory,
-                    gizmo_out_file,
-                    gizmo_err_file,
-                    snapshot_scalefactor_file,
-                )
-            os.chdir(f'{cwd}')
-            return
+        cwd = os.getcwd()  # save current directory
 
-        if os.path.exists(f'{gizmo_directory}'):
-            # clean directory of gizmo source code
-            # save config file, move to simulation directory
-            os.chdir(f'{gizmo_directory}')
-            print(f'* cleaning + tar-ing:  {gizmo_directory}/')
-            os.system(f'mv {gizmo_config_file_used} ../{gizmo_config_file_save}')
-            os.system('make clean')
+        # move into each directory
+        for directory in directories:
+            directory = directory.rstrip('/')
+            if directory != '.':
+                print(f'\n* moving into:  {directory}/')
+                os.chdir(f'{directory}')
 
-            if os.path.exists('.git'):
-                version_control = 'git'
-            elif os.path.exists('.hg'):
-                version_control = 'hg'
-            else:
-                version_control = None
-            # append to the gizmo_config_file the version of Gizmo used (if not already there)
-            if version_control == 'git':
-                if os.system(f'grep "# git" ../{gizmo_config_file_save}') > 0:
-                    os.system(f'printf "\n# git version of Gizmo\n" >> ../{gizmo_config_file_save}')
-                    os.system(f'git log -n 1 >> ../{gizmo_config_file_save}')
-                os.system('git gc --aggressive --prune')  # prune old commits
-            elif version_control == 'hg':
-                if os.system(f'grep "# hg" ../{gizmo_config_file_save}') > 0:
-                    os.system(f'printf "\n# hg version of Gizmo\n" >> ../{gizmo_config_file_save}')
-                    os.system(f'hg log -l 1 >> ../{gizmo_config_file_save}')
-
-            os.system('mv ../ewald_spc_table_64_dbl.dat ../spcool_tables ../TREECOOL -t .')
-            os.chdir('..')
-
-            # tar gizmo directory
-            os.system(f'tar -cf {gizmo_directory}.tar {gizmo_directory}')
-            os.system(f'rm -rf {gizmo_directory}')
-        else:
-            print(f'! could not find:  {gizmo_directory}/')
-
-        # clean output files
-        os.system(f'rm -f {gizmo_err_file}')
-        if os.path.exists(f'{gizmo_out_file}'):
-            os.system(f'head -1000 {gizmo_out_file} > {gizmo_out_file}.txt')
-            os.system(f'rm -f {gizmo_out_file}')
-        os.system(f'rm -f {snapshot_scalefactor_file}')
-
-        # tar directory of gizmo_jobs
-        if os.path.exists(f'{gizmo_job_directory}'):
-            print(f'* tar-ing:  {gizmo_job_directory}/')
-            os.system(f'tar -cvf {gizmo_job_directory}.tar {gizmo_job_directory}')
-            os.system(f'rm -rf {gizmo_job_directory}')
-        else:
-            print(f'! could not find:  {gizmo_job_directory}/')
-
-        # clean snapshot directory
-        if os.path.exists(f'{snapshot_directory}'):
-            os.chdir(f'{snapshot_directory}')
-            print(f'* cleaning:  {snapshot_directory}/')
-            os.system(f'rm -rf {restart_directory}')
-            os.system('rm -f HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
-            os.chdir('..')
-        else:
-            print(f'! could not find:  {snapshot_directory}/')
-
-        # clean directory of initial conditions
-        # if os.path.exists(f'{ic_directory}'):
-        #    os.chdir(f'{ic_directory}')
-        #    print(f'* cleaning:  {ic_directory}/')
-        #    os.system('rm -f input_powerspec*.txt')
-        #    os.system('rm -f *.wnoise')
-        #    os.chdir('..')
-        # else:
-        #    print(f'! could not find {ic_directory}/ to clean')
-
-        # clean backup files
-        os.system('rm -f *~ .#* ._* /#*#')
-
-        # move back to original directory
-        os.chdir(f'{cwd}')
-
-
-def _tar_directory(directory_name, delete_directories=False, delete_tarballs=False):
-    '''
-    Helper function.
-    '''
-    if delete_tarballs:
-        if os.path.exists(f'{directory_name}.tar'):
-            print(f'\n* deleting:  {directory_name}.tar')
-            os.system(f'rm -f {directory_name}.tar')
-    else:
-        if os.path.exists(f'{directory_name}'):
-            print(f'* tar-ing:  {directory_name}/')
-            # os.system(f'tar -cf {directory_name}.tar {directory_name}')
-            with tarfile.open(f'{directory_name}.tar', 'w') as tar:
-                tar.add(directory_name)
-            if delete_directories:
-                print(f'* deleting:  {directory_name}/')
-                os.system(f'rm -rf {directory_name}')
-        else:
-            print(f'\n! could not find:  {directory_name}/')
-
-
-def archive_directories(
-    directories='.',
-    snapshot_directory='output',
-    ic_directory='initial_condition',
-    halo_directory='halo',
-    rockstar_directory='rockstar_dm',
-    rockstar_job_directory='rockstar_jobs',
-    rockstar_catalog_directory='catalog',
-    rockstar_hdf5_directory='catalog_hdf5',
-    track_directory='track',
-    delete_directories=False,
-    delete_tarballs=False,
-    proc_number=1,
-):
-    '''
-    Use tar to combine simulation sub-directories into single tar-ball files.
-    Run this on a single simulation directory, a list of simulation directories,
-    or a directory of multiple simulation directories.
-    Run this after you run clean_directory(), to reduce the file count for archival/tape storage.
-    By default, this stores the original sub-directories after tar-ring them, but you can delete
-    the directories (if you are running this on the archival/tape server directly) by inputing
-    delete_directories=True.
-    To delete the tar-balls that this function creates (if you are running on live scratch space),
-    simply input delete_tarballs=True.
-
-    Parameters
-    ----------
-    directories : str or list thereof : directory[s] to run this on
-        can be a single simulation directory, a list of simulation directories,
-        or a directory that contains multiple simulation directories for which this function will
-        run recursively on each one
-    snapshot_directory : str : output directory that contains snapshots
-    ic_directory : str : directory that contains initial condition files from MUSIC
-    halo_directory : str : directory of (all) halo files/directories
-    rockstar_directory : str : directory of (all) Rockstar files/directories
-    rockstar_job_directory : str : directory of Rockstar run-time log/job files
-    rockstar_catalog_directory : str : directory of Rockstar (text) halo catalog + tree files
-    rockstar_hdf5_directory : str : directory of Rockstar post-processed hdf5 catalog + tree files
-    track_directory : str : directory of particle tracking files
-    delete_directories : bool :
-        whether to delete the (raw) directories after tar-ing them into a single file
-    delete_tarballs : bool : whether to delete existing tar-balls
-        use this to clean safely the tar-balls that this function creates
-    proc_number : int : number of parallel processes to use for tar-ing snapshots
-    '''
-    if np.isscalar(directories):
-        directories = [directories]
-
-    if proc_number > 1:
-        from multiprocessing import Pool
-
-    # move to this directory
-    cwd = os.getcwd()
-
-    # move into each directory
-    for directory in directories:
-        directory = directory.rstrip('/')
-        if directory != '.':
-            print(f'\n\n* moving into:  {directory}/')
-            os.chdir(f'{directory}')
-
-        # check if this directory has relevant simulation directories,
-        # or if need to run recursively on different simulation directories
-        directory_names = glob.glob('*/')  # get names of all directories
-        directory_names.sort()
-        if len(directory_names) == 0:
-            # this is an empty directory, exit
-            print(f'\n! could not find any directories to tar in {directory}')
-            os.chdir(f'{cwd}')
-            return
-        elif snapshot_directory + '/' not in directory_names:
-            # this is a directory of simulation directories, recursively run on each one, then exit
-            for directory_name in directory_names:
-                archive_directories(
-                    directory_name,
-                    snapshot_directory,
-                    ic_directory,
-                    halo_directory,
-                    rockstar_directory,
-                    rockstar_job_directory,
-                    rockstar_catalog_directory,
-                    rockstar_hdf5_directory,
-                    track_directory,
-                    delete_directories,
-                    delete_tarballs,
-                )
-            os.chdir(f'{cwd}')
-            return
-
-        # tar directory of initial conditions
-        _tar_directory(ic_directory, delete_directories, delete_tarballs)
-
-        # tar directory of particle tracking files
-        _tar_directory(track_directory, delete_directories, delete_tarballs)
-
-        # tar directories of halo catalogs + trees
-        if os.path.exists(f'{halo_directory}/{rockstar_directory}'):
-            print(f'\n* moving into:  {halo_directory}/{rockstar_directory}/')
-            os.chdir(f'{halo_directory}/{rockstar_directory}')
-
-            halo_argss = [
-                (rockstar_job_directory, delete_directories, delete_tarballs),
-                (rockstar_hdf5_directory, delete_directories, delete_tarballs),
-                (rockstar_catalog_directory, delete_directories, delete_tarballs),
-            ]
-
-            if proc_number > 1:
-                # tar halo directories in parallel
-                # with Pool(proc_number) as pool:
-                #    pool.starmap(_tar_directory, halo_argss)
-                pool = Pool(proc_number)
-                for halo_args in halo_argss:
-                    pool.apply_async(_tar_directory, halo_args)
-                pool.close()
-                pool.join()
-            else:
-                for halo_args in halo_argss:
-                    _tar_directory(*halo_args)
-
-            os.chdir('../..')
-        else:
-            print(f'\n! could not find:  {halo_directory}/{rockstar_directory}/')
-
-        # tar each snapshot directory
-        if os.path.exists(f'{snapshot_directory}'):
-            os.chdir(f'{snapshot_directory}')
-
-            snapshot_names = glob.glob('snapdir_*')
-            if delete_tarballs:
-                # ensure get only tar files
-                snapshot_names = [s.rstrip('.tar') for s in snapshot_names if '.tar' in s]
-            else:
-                # ensure not tar an existing tar file
-                snapshot_names = [s for s in snapshot_names if '.tar' not in s]
-            snapshot_names.sort()
-            if len(snapshot_names) > 0:
-                print(f'\n* moving into:  {snapshot_directory}/')
-
-            if proc_number > 1:
-                # tar snapshot directories in parallel
-                pool = Pool(proc_number)
-                for snapshot_name in snapshot_names:
-                    pool.apply_async(
-                        _tar_directory, (snapshot_name, delete_directories, delete_tarballs)
+            # check if this directory has relevant simulation directories,
+            # or if need to run recursively on different simulation directories
+            directory_names = glob.glob('*/')  # get names of all directories
+            directory_names.sort()
+            if len(directory_names) == 0:
+                # this is an empty directory, exit
+                print(f'\n! could not find any directories to clean in {directory}')
+                os.chdir(f'{cwd}')
+                return
+            elif snapshot_directory + '/' not in directory_names:
+                # this is a directory of simulation directories, recursively run on each one
+                for directory_name in directory_names:
+                    self.clean_directories(
+                        directory_name,
+                        gizmo_directory,
+                        snapshot_directory,
+                        restart_directory,
+                        gizmo_out_file,
+                        gizmo_err_file,
+                        snapshot_scalefactor_file,
                     )
-                pool.close()
-                pool.join()
+                os.chdir(f'{cwd}')
+                return
+
+            if os.path.exists(f'{gizmo_directory}'):
+                # clean directory of gizmo source code
+                # save config file, move to simulation directory
+                os.chdir(f'{gizmo_directory}')
+                print(f'* cleaning + tar-ing:  {gizmo_directory}/')
+                os.system(f'mv {gizmo_config_file_used} ../{gizmo_config_file_save}')
+                os.system('make clean')
+
+                if os.path.exists('.git'):
+                    version_control = 'git'
+                elif os.path.exists('.hg'):
+                    version_control = 'hg'
+                else:
+                    version_control = None
+                # append to the gizmo_config_file the version of Gizmo used (if not already there)
+                if version_control == 'git':
+                    if os.system(f'grep "# git" ../{gizmo_config_file_save}') > 0:
+                        os.system(
+                            f'printf "\n# git version of Gizmo\n" >> ../{gizmo_config_file_save}'
+                        )
+                        os.system(f'git log -n 1 >> ../{gizmo_config_file_save}')
+                    os.system('git gc --aggressive --prune')  # prune old commits
+                elif version_control == 'hg':
+                    if os.system(f'grep "# hg" ../{gizmo_config_file_save}') > 0:
+                        os.system(
+                            f'printf "\n# hg version of Gizmo\n" >> ../{gizmo_config_file_save}'
+                        )
+                        os.system(f'hg log -l 1 >> ../{gizmo_config_file_save}')
+
+                os.system('mv ../ewald_spc_table_64_dbl.dat ../spcool_tables ../TREECOOL -t .')
+                os.chdir('..')
+
+                # tar gizmo directory
+                os.system(f'tar -cf {gizmo_directory}.tar {gizmo_directory}')
+                os.system(f'rm -rf {gizmo_directory}')
             else:
-                for snapshot_name in snapshot_names:
-                    _tar_directory(snapshot_name, delete_directories, delete_tarballs)
+                print(f'! could not find:  {gizmo_directory}/')
 
-            os.chdir('..')
+            # clean output files
+            os.system(f'rm -f {gizmo_err_file}')
+            if os.path.exists(f'{gizmo_out_file}'):
+                os.system(f'head -1000 {gizmo_out_file} > {gizmo_out_file}.txt')
+                os.system(f'rm -f {gizmo_out_file}')
+            os.system(f'rm -f {snapshot_scalefactor_file}')
+
+            # tar directory of gizmo_jobs
+            if os.path.exists(f'{gizmo_job_directory}'):
+                print(f'* tar-ing:  {gizmo_job_directory}/')
+                os.system(f'tar -cvf {gizmo_job_directory}.tar {gizmo_job_directory}')
+                os.system(f'rm -rf {gizmo_job_directory}')
+            else:
+                print(f'! could not find:  {gizmo_job_directory}/')
+
+            # clean snapshot directory
+            if os.path.exists(f'{snapshot_directory}'):
+                os.chdir(f'{snapshot_directory}')
+                print(f'* cleaning:  {snapshot_directory}/')
+                os.system(f'rm -rf {restart_directory}')
+                os.system('rm -f HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
+                os.chdir('..')
+            else:
+                print(f'! could not find:  {snapshot_directory}/')
+
+            # clean directory of initial conditions
+            # if os.path.exists(f'{ic_directory}'):
+            #    os.chdir(f'{ic_directory}')
+            #    print(f'* cleaning:  {ic_directory}/')
+            #    os.system('rm -f input_powerspec*.txt')
+            #    os.system('rm -f *.wnoise')
+            #    os.chdir('..')
+            # else:
+            #    print(f'! could not find {ic_directory}/ to clean')
+
+            # clean backup files
+            os.system('rm -f *~ .#* ._* /#*#')
+
+            # move back to original directory
+            os.chdir(f'{cwd}')
+
+    def tar_directories(
+        self,
+        directories='.',
+        snapshot_directory='output',
+        ic_directory='initial_condition',
+        halo_directory='halo',
+        rockstar_directory='rockstar_dm',
+        rockstar_job_directory='rockstar_jobs',
+        rockstar_catalog_directory='catalog',
+        rockstar_hdf5_directory='catalog_hdf5',
+        track_directory='track',
+        delete_directories=False,
+        delete_tarballs=False,
+        proc_number=1,
+    ):
+        '''
+        Use tar to combine simulation sub-directories into single tar-ball files.
+        Run this on a single simulation directory, a list of simulation directories,
+        or a directory of multiple simulation directories.
+        Run this after runing clean_directory(), to reduce the file count for archival/tape storage.
+        By default, this stores the original sub-directories after tar-ring them, but you can delete
+        the directories (if you are running this on the archival/tape server directly) by inputing
+        delete_directories=True.
+        To delete the tar-balls that this function creates (if you are on live scratch space),
+        simply input delete_tarballs=True.
+
+        Parameters
+        ----------
+        directories : str or list thereof : directory[s] to run this on
+            can be a single simulation directory, a list of simulation directories,
+            or a directory that contains multiple simulation directories for which this function
+            will run recursively on each one
+        snapshot_directory : str : output directory that contains snapshots
+        ic_directory : str : directory that contains initial condition files from MUSIC
+        halo_directory : str : directory of (all) halo files/directories
+        rockstar_directory : str : directory of (all) Rockstar files/directories
+        rockstar_job_directory : str : directory of Rockstar run-time log/job files
+        rockstar_catalog_directory : str : directory of Rockstar (text) halo catalog + tree files
+        rockstar_hdf5_directory : str : directory of post-processed catalog + tree hdf5 files
+        track_directory : str : directory of particle tracking files
+        delete_directories : bool :
+            whether to delete the (raw) directories after tar-ing them into a single file
+        delete_tarballs : bool : whether to delete existing tar-balls
+            use this to clean safely the tar-balls that this function creates
+        proc_number : int : number of parallel processes to use for tar-ing snapshots
+        '''
+        if np.isscalar(directories):
+            directories = [directories]
+
+        if proc_number > 1:
+            from multiprocessing import Pool
+
+        # move to this directory
+        cwd = os.getcwd()
+
+        # move into each directory
+        for directory in directories:
+            directory = directory.rstrip('/')
+            if directory != '.':
+                print(f'\n\n* moving into:  {directory}/')
+                os.chdir(f'{directory}')
+
+            # check if this directory has relevant simulation directories,
+            # or if need to run recursively on different simulation directories
+            directory_names = glob.glob('*/')  # get names of all directories
+            directory_names.sort()
+            if len(directory_names) == 0:
+                # this is an empty directory, exit
+                print(f'\n! could not find any directories to tar in {directory}')
+                os.chdir(f'{cwd}')
+                return
+            elif snapshot_directory + '/' not in directory_names:
+                # this is a directory of simulation directories, recursively run on each one
+                for directory_name in directory_names:
+                    self.tar_directories(
+                        directory_name,
+                        snapshot_directory,
+                        ic_directory,
+                        halo_directory,
+                        rockstar_directory,
+                        rockstar_job_directory,
+                        rockstar_catalog_directory,
+                        rockstar_hdf5_directory,
+                        track_directory,
+                        delete_directories,
+                        delete_tarballs,
+                    )
+                os.chdir(f'{cwd}')
+                return
+
+            # tar directory of initial conditions
+            self._tar_directory(ic_directory, delete_directories, delete_tarballs)
+
+            # tar directory of particle tracking files
+            self._tar_directory(track_directory, delete_directories, delete_tarballs)
+
+            # tar directories of halo catalogs + trees
+            if os.path.exists(f'{halo_directory}/{rockstar_directory}'):
+                print(f'\n* moving into:  {halo_directory}/{rockstar_directory}/')
+                os.chdir(f'{halo_directory}/{rockstar_directory}')
+
+                halo_argss = [
+                    (rockstar_job_directory, delete_directories, delete_tarballs),
+                    (rockstar_hdf5_directory, delete_directories, delete_tarballs),
+                    (rockstar_catalog_directory, delete_directories, delete_tarballs),
+                ]
+
+                if proc_number > 1:
+                    # tar halo directories in parallel
+                    # with Pool(proc_number) as pool:
+                    #    pool.starmap(self._tar_directory, halo_argss)
+                    pool = Pool(proc_number)
+                    for halo_args in halo_argss:
+                        pool.apply_async(self._tar_directory, halo_args)
+                    pool.close()
+                    pool.join()
+                else:
+                    for halo_args in halo_argss:
+                        self._tar_directory(*halo_args)
+
+                os.chdir('../..')
+            else:
+                print(f'\n! could not find:  {halo_directory}/{rockstar_directory}/')
+
+            # tar each snapshot directory
+            if os.path.exists(f'{snapshot_directory}'):
+                os.chdir(f'{snapshot_directory}')
+
+                snapshot_names = glob.glob('snapdir_*')
+                if delete_tarballs:
+                    # ensure get only tar files
+                    snapshot_names = [s.rstrip('.tar') for s in snapshot_names if '.tar' in s]
+                else:
+                    # ensure not tar an existing tar file
+                    snapshot_names = [s for s in snapshot_names if '.tar' not in s]
+                snapshot_names.sort()
+                if len(snapshot_names) > 0:
+                    print(f'\n* moving into:  {snapshot_directory}/')
+
+                if proc_number > 1:
+                    # tar snapshot directories in parallel
+                    pool = Pool(proc_number)
+                    for snapshot_name in snapshot_names:
+                        pool.apply_async(
+                            self._tar_directory,
+                            (snapshot_name, delete_directories, delete_tarballs),
+                        )
+                    pool.close()
+                    pool.join()
+                else:
+                    for snapshot_name in snapshot_names:
+                        self._tar_directory(snapshot_name, delete_directories, delete_tarballs)
+
+                os.chdir('..')
+            else:
+                print(f'\n! could not find:  {snapshot_directory}/')
+
+            # clean backup files
+            os.system('rm -f *~ .#* ._* /#*#')
+
+            # move back to original directory
+            os.chdir(f'{cwd}')
+
+    def _tar_directory(self, directory_name, delete_directories=False, delete_tarballs=False):
+        '''
+        Helper function.
+        '''
+        if delete_tarballs:
+            if os.path.exists(f'{directory_name}.tar'):
+                print(f'\n* deleting:  {directory_name}.tar')
+                os.system(f'rm -f {directory_name}.tar')
         else:
-            print(f'\n! could not find:  {snapshot_directory}/')
+            if os.path.exists(f'{directory_name}'):
+                print(f'* tar-ing:  {directory_name}/')
+                # os.system(f'tar -cf {directory_name}.tar {directory_name}')
+                with tarfile.open(f'{directory_name}.tar', 'w') as tar:
+                    tar.add(directory_name)
+                if delete_directories:
+                    print(f'* deleting:  {directory_name}/')
+                    os.system(f'rm -rf {directory_name}')
+            else:
+                print(f'\n! could not find:  {directory_name}/')
 
-        # clean backup files
-        os.system('rm -f *~ .#* ._* /#*#')
+    def delete_snapshots(
+        self,
+        simulation_directory='.',
+        snapshot_directory='output',
+        snapshot_index_limits=[1, 599],
+        delete_halos=False,
+    ):
+        '''
+        Delete all snapshots in simulation_directory/snapshot_directory/ that are within
+        snapshot_index_limits, except for those in snapshot_indices_keep list.
 
-        # move back to original directory
-        os.chdir(f'{cwd}')
+        Parameters
+        ----------
+        simulation_directory : str : directory of simulation
+        snapshot_directory : str : directory of snapshot files
+        snapshot_index_limits : list : min and max snapshot indices to delete
+        delete_halos : bool : whether to delete halo catalog files at the same snapshots
+        '''
+        if not simulation_directory:
+            simulation_directory = '.'
+        simulation_directory = ut.io.get_path(simulation_directory)
 
+        snapshot_name_base = 'snap*_{:03d}*'
+        if not snapshot_directory:
+            snapshot_directory = 'output/'
+        snapshot_directory = ut.io.get_path(snapshot_directory)
 
-def delete_snapshots(
-    simulation_directory='.',
-    snapshot_directory='output',
-    snapshot_index_limits=[1, 599],
-    delete_halos=False,
-):
-    '''
-    Delete all snapshots in simulation_directory/snapshot_directory/ that are within
-    snapshot_index_limits, except for those in snapshot_indices_keep list.
+        halo_name_base = 'halos_{:03d}*'
+        halo_directory = 'halo/rockstar_dm/catalog/'
 
-    Parameters
-    ----------
-    simulation_directory : str : directory of simulation
-    snapshot_directory : str : directory of snapshot files
-    snapshot_index_limits : list : min and max snapshot indices to delete
-    delete_halos : bool : whether to delete halo catalog files at the same snapshots
-    '''
-    if not simulation_directory:
-        simulation_directory = '.'
-    simulation_directory = ut.io.get_path(simulation_directory)
+        if snapshot_index_limits is None or len(snapshot_index_limits) == 0:
+            snapshot_index_limits = [1, 599]
+        snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
-    snapshot_name_base = 'snap*_{:03d}*'
-    if not snapshot_directory:
-        snapshot_directory = 'output/'
-    snapshot_directory = ut.io.get_path(snapshot_directory)
-
-    halo_name_base = 'halos_{:03d}*'
-    halo_directory = 'halo/rockstar_dm/catalog/'
-
-    if snapshot_index_limits is None or len(snapshot_index_limits) == 0:
-        snapshot_index_limits = [1, 599]
-    snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
-
-    print()
-    for snapshot_index in snapshot_indices:
-        if snapshot_index not in snapshot_indices_keep:
-            snapshot_name = (
-                simulation_directory
-                + snapshot_directory
-                + snapshot_name_base.format(snapshot_index)
-            )
-            print(f'* deleting:  {snapshot_name}')
-            os.system(f'rm -rf {snapshot_name}')
-
-            if delete_halos:
-                halo_name = (
-                    simulation_directory + halo_directory + halo_name_base.format(snapshot_index)
+        print()
+        for snapshot_index in snapshot_indices:
+            if snapshot_index not in snapshot_indices_keep:
+                snapshot_name = (
+                    simulation_directory
+                    + snapshot_directory
+                    + snapshot_name_base.format(snapshot_index)
                 )
-                print(f'* deleting:  {halo_name}')
-                os.system(f'rm -rf {halo_name}')
-    print()
+                print(f'* deleting:  {snapshot_name}')
+                os.system(f'rm -rf {snapshot_name}')
+
+                if delete_halos:
+                    halo_name = (
+                        simulation_directory
+                        + halo_directory
+                        + halo_name_base.format(snapshot_index)
+                    )
+                    print(f'* deleting:  {halo_name}')
+                    os.system(f'rm -rf {halo_name}')
+        print()
+
+
+Archive = ArchiveClass()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -950,16 +967,16 @@ if __name__ == '__main__':
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
-        clean_directories(directory)
+        Archive.clean_directories(directory)
 
         if 'archive' in function_kind:
-            archive_directories(directory)
+            Archive.tar_directories(directory)
 
     elif 'archive' in function_kind:
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
-        archive_directories(directory)
+        Archive.tar_directories(directory)
 
     elif 'delete' in function_kind:
         simulation_directory = '.'
@@ -970,7 +987,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 3:
             snapshot_index_limits = [int(sys.argv[3]), int(sys.argv[4])]
 
-        delete_snapshots(simulation_directory, snapshot_index_limits=snapshot_index_limits)
+        Archive.delete_snapshots(simulation_directory, snapshot_index_limits=snapshot_index_limits)
 
     elif 'globus' in function_kind:
         directory = '.'
