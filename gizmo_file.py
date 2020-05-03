@@ -423,9 +423,10 @@ def _tar_directory(directory_name, delete_directories=False, delete_tarballs=Fal
     '''
     Helper function.
     '''
-    if delete_tarballs and os.path.exists(f'{directory_name}.tar'):
-        print(f'\n* deleting:  {directory_name}.tar')
-        os.system(f'rm -f {directory_name}.tar')
+    if delete_tarballs:
+        if os.path.exists(f'{directory_name}.tar'):
+            print(f'\n* deleting:  {directory_name}.tar')
+            os.system(f'rm -f {directory_name}.tar')
     else:
         if os.path.exists(f'{directory_name}'):
             print(f'* tar-ing:  {directory_name}/')
