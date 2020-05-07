@@ -271,7 +271,7 @@ Compress = CompressClass()
 # --------------------------------------------------------------------------------------------------
 # clean and archive simulation directories and files
 # --------------------------------------------------------------------------------------------------
-class ArchiveClass:
+class ArchiveClass(ut.io.SayClass):
     '''
     Clean, archive, and delete simulation directories and files after a simulation has finished.
     '''
@@ -324,7 +324,7 @@ class ArchiveClass:
         for directory in directories:
             directory = directory.rstrip('/')
             if directory != '.':
-                print(f'\n* moving into:  {directory}/')
+                self.say(f'* moving into:  {directory}/')
                 os.chdir(f'{directory}')
 
             # check if this directory has relevant simulation directories,
@@ -333,7 +333,7 @@ class ArchiveClass:
             directory_names.sort()
             if len(directory_names) == 0:
                 # this is an empty directory, exit
-                print(f'\n! could not find any directories to clean in {directory}')
+                self.say(f'! could not find any directories to clean in {directory}/')
                 os.chdir(f'{cwd}')
                 return
             elif snapshot_directory + '/' not in directory_names:
@@ -355,7 +355,7 @@ class ArchiveClass:
                 # clean directory of gizmo source code
                 # save config file, move to simulation directory
                 os.chdir(f'{gizmo_directory}')
-                print(f'* cleaning + tar-ing:  {gizmo_directory}/')
+                self.say(f'* cleaning + tar-ing:  {gizmo_directory}/')
                 os.system(f'mv {gizmo_config_file_used} ../{gizmo_config_file_save}')
                 os.system('make clean')
 
@@ -387,7 +387,7 @@ class ArchiveClass:
                 os.system(f'tar -cf {gizmo_directory}.tar {gizmo_directory}')
                 os.system(f'rm -rf {gizmo_directory}')
             else:
-                print(f'! could not find:  {gizmo_directory}/')
+                self.say(f'! could not find:  {gizmo_directory}/')
 
             # clean output files
             os.system(f'rm -f {gizmo_err_file}')
@@ -398,31 +398,31 @@ class ArchiveClass:
 
             # tar directory of gizmo_jobs
             if os.path.exists(f'{gizmo_job_directory}'):
-                print(f'* tar-ing:  {gizmo_job_directory}/')
+                self.say(f'* tar-ing:  {gizmo_job_directory}/')
                 os.system(f'tar -cvf {gizmo_job_directory}.tar {gizmo_job_directory}')
                 os.system(f'rm -rf {gizmo_job_directory}')
             else:
-                print(f'! could not find:  {gizmo_job_directory}/')
+                self.say(f'! could not find:  {gizmo_job_directory}/')
 
             # clean snapshot directory
             if os.path.exists(f'{snapshot_directory}'):
                 os.chdir(f'{snapshot_directory}')
-                print(f'* cleaning:  {snapshot_directory}/')
+                self.say(f'* cleaning:  {snapshot_directory}/')
                 os.system(f'rm -rf {restart_directory}')
                 os.system('rm -f HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
                 os.chdir('..')
             else:
-                print(f'! could not find:  {snapshot_directory}/')
+                self.say(f'! could not find:  {snapshot_directory}/')
 
             # clean directory of initial conditions
             # if os.path.exists(f'{ic_directory}'):
             #    os.chdir(f'{ic_directory}')
-            #    print(f'* cleaning:  {ic_directory}/')
+            #    self.say(f'* cleaning:  {ic_directory}/')
             #    os.system('rm -f input_powerspec*.txt')
             #    os.system('rm -f *.wnoise')
             #    os.chdir('..')
             # else:
-            #    print(f'! could not find {ic_directory}/ to clean')
+            #    self.say(f'! could not find {ic_directory}/ to clean')
 
             # clean backup files
             os.system('rm -f *~ .#* ._* /#*#')
@@ -474,7 +474,7 @@ class ArchiveClass:
             whether to delete the (raw) directories after tar-ing them into a single file
         delete_tarballs : bool : whether to delete existing tar-balls
             use this to clean safely the tar-balls that this function creates
-        proc_number : int : number of parallel processes to use for tar-ing snapshots
+        proc_number : int : number of parallel processes for tar-ing halo directories + snapshots
         '''
         if np.isscalar(directories):
             directories = [directories]
@@ -489,7 +489,7 @@ class ArchiveClass:
         for directory in directories:
             directory = directory.rstrip('/')
             if directory != '.':
-                print(f'\n\n* moving into:  {directory}/')
+                self.say(f'\n\n* moving into:  {directory}/')
                 os.chdir(f'{directory}')
 
             # check if this directory has relevant simulation directories,
@@ -498,7 +498,7 @@ class ArchiveClass:
             directory_names.sort()
             if len(directory_names) == 0:
                 # this is an empty directory, exit
-                print(f'\n! could not find any directories to tar in {directory}')
+                self.say(f'\n! could not find any directories to tar in {directory}/')
                 os.chdir(f'{cwd}')
                 return
             elif snapshot_directory + '/' not in directory_names:
@@ -528,7 +528,7 @@ class ArchiveClass:
 
             # tar directories of halo catalogs + trees
             if os.path.exists(f'{halo_directory}/{rockstar_directory}'):
-                print(f'\n* moving into:  {halo_directory}/{rockstar_directory}/')
+                self.say(f'\n* moving into:  {halo_directory}/{rockstar_directory}/')
                 os.chdir(f'{halo_directory}/{rockstar_directory}')
 
                 halo_argss = [
@@ -552,7 +552,7 @@ class ArchiveClass:
 
                 os.chdir('../..')
             else:
-                print(f'\n! could not find:  {halo_directory}/{rockstar_directory}/')
+                self.say(f'\n! could not find:  {halo_directory}/{rockstar_directory}/')
 
             # tar each snapshot directory
             if os.path.exists(f'{snapshot_directory}'):
@@ -567,7 +567,7 @@ class ArchiveClass:
                     snapshot_names = [s for s in snapshot_names if '.tar' not in s]
                 snapshot_names.sort()
                 if len(snapshot_names) > 0:
-                    print(f'\n* moving into:  {snapshot_directory}/')
+                    self.say(f'\n* moving into:  {snapshot_directory}/')
 
                 if proc_number > 1:
                     # tar snapshot directories in parallel
@@ -585,7 +585,7 @@ class ArchiveClass:
 
                 os.chdir('..')
             else:
-                print(f'\n! could not find:  {snapshot_directory}/')
+                self.say(f'\n! could not find:  {snapshot_directory}/')
 
             # clean backup files
             os.system('rm -f *~ .#* ._* /#*#')
@@ -599,19 +599,19 @@ class ArchiveClass:
         '''
         if delete_tarballs:
             if os.path.exists(f'{directory_name}.tar'):
-                print(f'\n* deleting:  {directory_name}.tar')
+                self.say(f'\n* deleting:  {directory_name}.tar')
                 os.system(f'rm -f {directory_name}.tar')
         else:
             if os.path.exists(f'{directory_name}'):
-                print(f'* tar-ing:  {directory_name}/')
+                self.say(f'* tar-ing:  {directory_name}/')
                 # os.system(f'tar -cf {directory_name}.tar {directory_name}')
                 with tarfile.open(f'{directory_name}.tar', 'w') as tar:
                     tar.add(directory_name)
                 if delete_directories:
-                    print(f'* deleting:  {directory_name}/')
+                    self.say(f'* deleting:  {directory_name}/')
                     os.system(f'rm -rf {directory_name}')
             else:
-                print(f'\n! could not find:  {directory_name}/')
+                self.say(f'\n! could not find:  {directory_name}/')
 
     def delete_snapshots(
         self,
@@ -655,7 +655,7 @@ class ArchiveClass:
                     + snapshot_directory
                     + snapshot_name_base.format(snapshot_index)
                 )
-                print(f'* deleting:  {snapshot_name}')
+                self.say(f'* deleting:  {snapshot_name}')
                 os.system(f'rm -rf {snapshot_name}')
 
                 if delete_halos:
@@ -664,9 +664,8 @@ class ArchiveClass:
                         + halo_directory
                         + halo_name_base.format(snapshot_index)
                     )
-                    print(f'* deleting:  {halo_name}')
+                    self.say(f'* deleting:  {halo_name}')
                     os.system(f'rm -rf {halo_name}')
-        print()
 
 
 Archive = ArchiveClass()
@@ -844,7 +843,7 @@ class RsyncClass(ut.io.SayClass):
             )
 
         command = self.rsync_command + f'{machine_from}:"{snapshot_path_names}" {directory_to}'
-        print(f'\n* executing:\n{command}\n')
+        self.say(f'\n* executing:\n{command}\n')
         os.system(command)
 
         # fix file permissions (especially relevant if transfer from Stampede)
@@ -920,7 +919,7 @@ class RsyncClass(ut.io.SayClass):
             arguments += f'--exclude="{exclude_name}" '
 
         command = self.rsync_command + arguments + directory_from + ' ' + directory_to + '.'
-        print(f'\n* executing:\n{command}\n')
+        self.say(f'\n* executing:\n{command}\n')
         os.system(command)
 
         # fix file permissions (especially relevant if transfer from Stampede)

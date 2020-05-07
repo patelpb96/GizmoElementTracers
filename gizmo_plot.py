@@ -253,58 +253,66 @@ def plot_metal_v_distance(
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
-def plot_kernel(
-    kernel_kind='cubic',
-    function_kinds=['density', 'mass', 'acceleration', 'potential/newtonian'],
-    distance_limits=[0, 1],
-    distance_bin_width=0.001,
-    write_plot=False,
-    plot_directory='.',
-    figure_index=1,
-):
+def test_metal_variation(parts, species=['star', 'gas'], element_reference='o', log_ratio=True):
     '''
     .
     '''
-    distances = np.arange(
-        distance_bin_width, max(distance_limits) + distance_bin_width, distance_bin_width
-    )
+    Say = ut.io.SayClass(test_metal_variation)
 
-    kernel_values = np.zeros((len(function_kinds), distances.size))
-    for f_i, function_kind in enumerate(function_kinds):
-        if '/newtonian' in function_kind:
-            function_kind = function_kind.replace('/newtonian', '')
-            ratio_newtonian = True
-        else:
-            ratio_newtonian = False
-        for d_i, distance in enumerate(distances):
-            kernel_values[f_i, d_i] = ut.particle.get_kernel(
-                kernel_kind, function_kind, distance, ratio_newtonian=ratio_newtonian
+    element_names = ['he', 'c', 'n', 'o', 'ne', 'mg', 'si', 's', 'ca', 'fe']
+    element_names = [
+        element_name for element_name in element_names if element_name != element_reference
+    ]
+    if np.isscalar(species):
+        species = [species]
+    if species[0] in parts:
+        parts = [parts]
+
+    Statistic = ut.statistic.StatisticClass()
+
+    for element_name in element_names:
+        Say.say(
+            '\ndex scatter in [{}/{}]'.format(
+                element_name.capitalize(), element_reference.capitalize()
             )
-        if function_kind == 'potential':
-            kernel_values[f_i] -= kernel_values[f_i].min()
-        kernel_values[f_i] /= kernel_values[f_i].max()
+        )
+        for spec_name in species:
+            for part_i, part in enumerate(parts):
+                element_ratios_p = part[spec_name].prop(f'massfraction.{element_name}') / part[
+                    spec_name
+                ].prop(f'massfraction.{element_reference}')
+                if part_i == 0:
+                    element_ratios = element_ratios_p
+                else:
+                    element_ratios = np.concatenate((element_ratios, element_ratios_p))
 
-    # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index)
+            element_ratios /= np.median(element_ratios)
+            if log_ratio:
+                element_ratios = np.log10(element_ratios)
 
-    ut.plot.set_axes_scaling_limits(subplot, 'linear', distance_limits, None, 'linear', [0, 1])
-
-    subplot.set_ylabel('kernel')
-    subplot.set_xlabel('$r/H_{\\rm kernel}$')
-
-    for f_i, function_kind in enumerate(function_kinds):
-        label = function_kind
-        if label == 'mass':
-            label += ' ($= a / a_{{\\rm newt}}$)'
-        subplot.plot(distances, kernel_values[f_i], alpha=0.8, label=label)
-
-    ut.plot.make_legends(subplot, 'best')
-
-    plt.arrow(1 / 2.8, 0, 0, 0.1, alpha=0.5)
-
-    plt.arrow(1 / 2, 0, 0, 0.05, alpha=0.5)
-
-    ut.plot.parse_output(write_plot, f'kernel.{kernel_kind}_v_distance', plot_directory)
+            stat = Statistic.get_statistic_dict(element_ratios)
+            Say.say(
+                '* {:4}: 2-sigma {:.2f}, 3-sigma {:.2f}'.format(
+                    spec_name,
+                    0.5 * (stat['percent.98'] - stat['percent.2']),
+                    0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
+                )
+            )
+            # Say.say(f'* {spec_name}')
+            # Say.say(
+            #    '  95%: {:.2f} {:.2f} | {:.2f}'.format(
+            #        stat['percent.2'],
+            #        stat['percent.98'],
+            #        0.5 * (stat['percent.98'] - stat['percent.2']),
+            #    )
+            # )
+            # Say.say(
+            #    '99.7%: {:.2f} {:.2f} | {:.2f}'.format(
+            #        stat['percent.0.1'],
+            #        stat['percent.99.9'],
+            #        0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
+            #    )
+            # )
 
 
 # --------------------------------------------------------------------------------------------------
@@ -3698,7 +3706,7 @@ def plot_galaxy_property_v_time(
 
 
 # --------------------------------------------------------------------------------------------------
-# disk mass and radius over time, for shea
+# disk mass and radius over time
 # --------------------------------------------------------------------------------------------------
 def get_galaxy_mass_profiles_v_redshift(
     directory='.',
