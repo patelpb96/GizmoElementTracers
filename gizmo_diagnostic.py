@@ -41,13 +41,13 @@ class RuntimeClass(ut.io.SayClass):
 
         file_name = ut.io.get_path(simulation_directory) + runtime_file_name
         path_file_names = glob.glob(file_name)
-        file_in = open(path_file_names[0], 'r')
+        file_read = open(path_file_names[0], 'r')
 
         loop_i = 0
         mpi_number = None
         omp_number = None
 
-        for line in file_in:
+        for line in file_read:
             if 'MPI tasks' in line:
                 mpi_number = int(line.split()[2])
             elif 'OpenMP threads' in line:
@@ -136,7 +136,7 @@ class RuntimeClass(ut.io.SayClass):
         path_file_name = (
             ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name
         )
-        file_in = open(path_file_name, 'r')
+        file_read = open(path_file_name, 'r')
 
         wall_times = []
 
@@ -144,8 +144,8 @@ class RuntimeClass(ut.io.SayClass):
         scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
         print_next_line = False
 
-        for line in file_in:
-            if print_next_line:
+        for line in file_read:
+            if print_next_line and 'total' in line:
                 wall_times.append(float(line.split()[1]))
                 print_next_line = False
                 i += 1
@@ -285,6 +285,55 @@ class ContaminationClass(ut.io.SayClass):
     Contamination by low-resolution dark matter.
     '''
 
+    def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
+        '''
+        Plot contamination from lower-resolution particles around halo center as a function of
+        distance.
+
+        Parameters
+        ----------
+        redshift : float : redshift of snapshot
+        simulation_directory : str : top-level directory of simulation
+        '''
+        distance_bin_width = 0.01
+        distance_limits_phys = [10, 2000]  # [kpc physical]
+        distance_limits_halo = [0.01, 7]  # [units of R_halo]
+        virial_kind = '200m'
+
+        os.chdir(simulation_directory)
+
+        Read = gizmo_io.ReadClass()
+        part = Read.read_snapshots(
+            ['star', 'dark', 'dark2'],
+            'redshift',
+            redshift,
+            simulation_directory,
+            properties=['position', 'mass'],
+            assign_host_coordinates=True,
+        )
+
+        halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
+
+        self.plot_contamination_v_distance(
+            part,
+            distance_limits_phys,
+            distance_bin_width,
+            halo_radius=halo_prop['radius'],
+            scale_to_halo_radius=False,
+            write_plot=True,
+            plot_directory='plot',
+        )
+
+        self.plot_contamination_v_distance(
+            part,
+            distance_limits_halo,
+            distance_bin_width,
+            halo_radius=halo_prop['radius'],
+            scale_to_halo_radius=True,
+            write_plot=True,
+            plot_directory='plot',
+        )
+
     def plot_contamination_v_distance(
         self,
         part,
@@ -375,10 +424,10 @@ class ContaminationClass(ut.io.SayClass):
             }
             profile_number[spec_name] = {
                 'sum': np.int64(
-                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'][0])
+                    np.round(profile_mass[spec_name]['sum'] / part[spec_name]['mass'].min())
                 ),
                 'sum.cum': np.int64(
-                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'][0])
+                    np.round(profile_mass[spec_name]['sum.cum'] / part[spec_name]['mass'].min())
                 ),
             }
 
@@ -438,7 +487,7 @@ class ContaminationClass(ut.io.SayClass):
                         break
 
         print()
-        print('contamination summary')
+        print('contamination')
         species = 'dark2'
         if halo_radius and halo_radius > 0:
             dist_i_halo = np.searchsorted(distances_phys, halo_radius)
@@ -532,98 +581,6 @@ class ContaminationClass(ut.io.SayClass):
             distance_name += '.' + virial_kind
         plot_name = ut.plot.get_file_name('mass.ratio', distance_name, snapshot_dict=part.snapshot)
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
-
-    def plot_contamination_v_distance_halo(
-        self,
-        part,
-        hal,
-        hal_index,
-        distance_max=7,
-        distance_bin_width=0.5,
-        scale_to_halo_radius=True,
-    ):
-        '''
-        Print information on contamination from lower-resolution particles around halo as a function
-        of distance.
-
-        Parameters
-        ----------
-        part : dict : catalog of particles at snapshot
-        hal : dict : catalog of halos at snapshot
-        hal_index: int : index of halo
-        distance_max : float : maximum distance from halo center to check
-        distance_bin_width : float : width of distance bin for printing
-        scale_to_halo_radius : bool : whether to scale distances by virial radius
-        '''
-        distance_scaling = 'linear'
-        distance_limits = [0, distance_max]
-        axis_y_scaling = 'log'
-
-        self.say('halo radius = {:.1f} kpc'.format(hal['radius'][hal_index]))
-
-        halo_radius = hal['radius'][hal_index]
-
-        self.plot_contamination_v_distance(
-            part,
-            distance_limits,
-            distance_bin_width,
-            None,
-            distance_scaling,
-            halo_radius,
-            scale_to_halo_radius,
-            hal['position'][hal_index],
-            axis_y_scaling,
-            write_plot=None,
-        )
-
-    def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
-        '''
-        Plot contamination from lower-resolution particles around halo center as a function of
-        distance.
-
-        Parameters
-        ----------
-        redshift : float : redshift of snapshot
-        simulation_directory : str : top-level directory of simulation
-        '''
-        distance_bin_width = 0.01
-        distance_limits_phys = [10, 2000]  # [kpc physical]
-        distance_limits_halo = [0.01, 7]  # [units of R_halo]
-        virial_kind = '200m'
-
-        os.chdir(simulation_directory)
-
-        Read = gizmo_io.ReadClass()
-        part = Read.read_snapshots(
-            ['dark', 'dark2'],
-            'redshift',
-            redshift,
-            simulation_directory,
-            properties=['position', 'mass', 'potential'],
-            assign_host_coordinates=True,
-        )
-
-        halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
-
-        self.plot_contamination_v_distance(
-            part,
-            distance_limits_phys,
-            distance_bin_width,
-            halo_radius=halo_prop['radius'],
-            scale_to_halo_radius=False,
-            write_plot=True,
-            plot_directory='plot',
-        )
-
-        self.plot_contamination_v_distance(
-            part,
-            distance_limits_halo,
-            distance_bin_width,
-            halo_radius=halo_prop['radius'],
-            scale_to_halo_radius=True,
-            write_plot=True,
-            plot_directory='plot',
-        )
 
 
 Contamination = ContaminationClass()
@@ -875,7 +832,7 @@ def plot_scaling(
     resolution='res7100',
     time_kind='core',
     axis_x_scaling='log',
-    axis_y_scaling='linear',
+    axis_y_scaling='log',
     write_plot=False,
     plot_directory='.',
 ):
@@ -917,8 +874,9 @@ def plot_scaling(
     #    #           'core.time': 1.95e7, 'wall.time': 2380},
     # }
 
-    # conversion to stampede 2
+    # conversion to stampede2
     weak_baryon = collections.OrderedDict()
+    """
     weak_baryon['res450000'] = {
         'particle.number': 1.10e6 * 2,
         'node.number': 1,
@@ -938,15 +896,50 @@ def plot_scaling(
         'wall.time': 821,
     }
 
+    weak_baryon['res880'] = {
+        'particle.number': 7.e7 * 2,
+        'node.number': 64,
+        'node.time': 52000,
+        'wall.time': 821,
+    }
+    """
+    # m12f to z = 1, Stampede2 equivalent node-hours
+    # weak_baryon['res450000'] = {
+    #    'particle.number': 8.14e7 * 2 / 64,
+    #    'node.number': 1,
+    #    'node.time': 73,
+    #    'wall.time': 73,
+    # }
+    weak_baryon['res57000'] = {
+        'particle.number': 8.14e7 * 2 / 8,
+        'node.number': 2.5,
+        'node.time': 500,
+        'wall.time': 200,
+    }
+    weak_baryon['res7100'] = {
+        'particle.number': 8.14e7 * 2,
+        'node.number': 20,
+        'node.time': 12511,
+        'wall.time': 626,
+    }
+    weak_baryon['res880'] = {
+        'particle.number': 7.70e8 * 2,
+        'node.number': 160,
+        'node.time': 500458,
+        'wall.time': 3128,
+    }
+
     strong_baryon = collections.OrderedDict()
 
     # convert from running to scale-factor = 0.068 to 0.1 via 2x
     strong_baryon['res880'] = {
         'particle.number': 5.64e8 * 2,
         'core.number': np.array([2048, 4096, 8192, 16384]),
-        'node.number': np.array([128, 256, 512, 1024]),
+        #'node.number': np.array([128, 256, 512, 1024]),
+        'node.number': np.array([40, 80, 160, 320]),  # conversion to Stampede2 SKX
         'wall.time': np.array([15.55, 8.64, 4.96, 4.57]) * 2,
-        'core.time': np.array([31850, 35389, 40632, 74875]) * 2,
+        #'core.time': np.array([31850, 35389, 40632, 74875]) * 2,
+        'node.time': np.array([664, 737, 847, 1560]),
     }
 
     # did not have time to run these, so scale down from res880
@@ -994,7 +987,8 @@ def plot_scaling(
         subplot.set_xlabel('number of nodes')
 
         if resolution == 'res880':
-            axis_x_limits = [1e2, 1.9e4]
+            # axis_x_limits = [1e2, 1.9e4]
+            axis_x_limits = [10, 400]
         elif resolution == 'res7100':
             # axis_x_limits = [3e2, 1e4]
             axis_x_limits = [10, 200]
@@ -1010,8 +1004,9 @@ def plot_scaling(
         elif time_kind == 'node':
             axis_x_kind = 'node.number'
             if resolution == 'res880':
-                axis_y_limits = [0, 1e4]
-                subplot.set_ylabel('node time to $z = 9$ [hr]')
+                # axis_y_limits = [0, 1e4]
+                axis_y_limits = [0, 2000]
+                subplot.set_ylabel('node-hours to $z = 9$ [hr]')
             elif resolution == 'res7100':
                 axis_y_limits = [0, 8000]
                 subplot.set_ylabel('node-hours to $z = 3$')
@@ -1038,7 +1033,8 @@ def plot_scaling(
             subplot.text(
                 0.1,
                 0.1,
-                'strong scaling:\nparticle number = 1.1e9',
+                #'strong scaling:\nparticle number = 1.1e9',
+                'strong scaling:\nparticle number = 1.5e9',
                 color='black',
                 transform=subplot.transAxes,
             )
@@ -1062,11 +1058,11 @@ def plot_scaling(
             baryon_times = np.array([weak_baryon[i]['node.time'] for i in weak_baryon])
         elif time_kind == 'wall':
             # resolutinon_ref = 'res880'
-            resolutinon_ref = 'res7100'
-            ratio_ref = (
-                weak_baryon[resolutinon_ref]['particle.number']
-                / weak_baryon[resolutinon_ref]['node.number']
-            )
+            # resolutinon_ref = 'res7100'
+            # ratio_ref = (
+            #    weak_baryon[resolutinon_ref]['particle.number']
+            #    / weak_baryon[resolutinon_ref]['node.number']
+            # )
             # dm_times = np.array(
             #    [weak_dark[core_num]['wall.time'] * ratio_ref /
             #     (weak_dark[core_num]['particle.number'] / weak_dark[core_num]['core.number'])
@@ -1076,18 +1072,22 @@ def plot_scaling(
         subplot.set_xlabel('number of particles')
 
         # axis_x_limits = [6e6, 1.5e9]
-        axis_x_limits = [1e6, 2e8]
+        # axis_x_limits = [1e6, 2e8]
+        axis_x_limits = [1e7, 2e9]
 
         if time_kind == 'node':
-            axis_y_limits = [10, 2e5]
-            subplot.set_ylabel('node-hours to $z = 0$')
+            # axis_y_limits = [10, 2e5]
+            axis_y_limits = [100, 1e6]
+            subplot.set_ylabel('node-hours to $z = 1$')
         elif time_kind == 'wall':
-            axis_y_limits = [10, 1000]
-            subplot.set_ylabel('wall time to $z = 0$ [hr]')
+            # axis_y_limits = [10, 1000]
+            axis_y_limits = [100, 10000]
+            subplot.set_ylabel('wall time to $z = 1$ [hr]')
             subplot.text(
                 0.05,
                 0.05,
-                'weak scaling:\nparticles / node = {:.1e}'.format(ratio_ref),
+                #'weak scaling:\nparticles / node = {:.1e}'.format(ratio_ref),
+                'weak scaling:\nparticles / node = 9.4e6',
                 color='black',
                 transform=subplot.transAxes,
             )

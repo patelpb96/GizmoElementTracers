@@ -253,48 +253,66 @@ def plot_metal_v_distance(
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
-def plot_kernel(
-    kernel_kind='cubic',
-    function_kinds=['density', 'mass', 'potential', 'acceleration'],
-    distance_limits=[0, 1],
-    distance_bin_width=0.001,
-    ratio_newtonian=False,
-    write_plot=False,
-    plot_directory='.',
-    figure_index=1,
-):
+def test_metal_variation(parts, species=['star', 'gas'], element_reference='o', log_ratio=True):
     '''
     .
     '''
-    distances = np.arange(
-        distance_bin_width, max(distance_limits) + distance_bin_width, distance_bin_width
-    )
+    Say = ut.io.SayClass(test_metal_variation)
 
-    kernel_values = np.zeros((len(function_kinds), distances.size))
-    for f_i, function_kind in enumerate(function_kinds):
-        for d_i, distance in enumerate(distances):
-            kernel_values[f_i, d_i] = ut.particle.get_kernel(
-                kernel_kind, function_kind, distance, ratio_newtonian=ratio_newtonian
+    element_names = ['he', 'c', 'n', 'o', 'ne', 'mg', 'si', 's', 'ca', 'fe']
+    element_names = [
+        element_name for element_name in element_names if element_name != element_reference
+    ]
+    if np.isscalar(species):
+        species = [species]
+    if species[0] in parts:
+        parts = [parts]
+
+    Statistic = ut.statistic.StatisticClass()
+
+    for element_name in element_names:
+        Say.say(
+            '\ndex scatter in [{}/{}]'.format(
+                element_name.capitalize(), element_reference.capitalize()
             )
-        if function_kind == 'potential':
-            kernel_values[f_i] -= kernel_values[f_i].min()
-        else:
-            kernel_values[f_i] /= kernel_values[f_i].max()
+        )
+        for spec_name in species:
+            for part_i, part in enumerate(parts):
+                element_ratios_p = part[spec_name].prop(f'massfraction.{element_name}') / part[
+                    spec_name
+                ].prop(f'massfraction.{element_reference}')
+                if part_i == 0:
+                    element_ratios = element_ratios_p
+                else:
+                    element_ratios = np.concatenate((element_ratios, element_ratios_p))
 
-    # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index)
+            element_ratios /= np.median(element_ratios)
+            if log_ratio:
+                element_ratios = np.log10(element_ratios)
 
-    ut.plot.set_axes_scaling_limits(subplot, 'linear', distance_limits, None, 'linear', [0, 1.8])
-
-    subplot.set_ylabel('kernel')
-    subplot.set_xlabel('$r/H_{\\rm kernel}$')
-
-    for f_i, function_kind in enumerate(function_kinds):
-        subplot.plot(distances, kernel_values[f_i], alpha=0.8, label=function_kind)
-
-    ut.plot.make_legends(subplot, 'best')
-
-    ut.plot.parse_output(write_plot, 'kernel_v_distance', plot_directory)
+            stat = Statistic.get_statistic_dict(element_ratios)
+            Say.say(
+                '* {:4}: 2-sigma {:.2f}, 3-sigma {:.2f}'.format(
+                    spec_name,
+                    0.5 * (stat['percent.98'] - stat['percent.2']),
+                    0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
+                )
+            )
+            # Say.say(f'* {spec_name}')
+            # Say.say(
+            #    '  95%: {:.2f} {:.2f} | {:.2f}'.format(
+            #        stat['percent.2'],
+            #        stat['percent.98'],
+            #        0.5 * (stat['percent.98'] - stat['percent.2']),
+            #    )
+            # )
+            # Say.say(
+            #    '99.7%: {:.2f} {:.2f} | {:.2f}'.format(
+            #        stat['percent.0.1'],
+            #        stat['percent.99.9'],
+            #        0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
+            #    )
+            # )
 
 
 # --------------------------------------------------------------------------------------------------
@@ -357,7 +375,7 @@ class ImageClass(ut.io.SayClass):
         dimensions_select : list : which dimensions to use to select particles
             note : use this to set selection 'depth' of an image
         distances_max : float or array : distance[s] from center to plot and/or cut
-        distance_bin_width : float : length pixel
+        distance_bin_width : float : length of pixel
         distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
         center_position : array-like : position of center
         rotation : bool or array : whether to rotate particles - two options:
@@ -2377,7 +2395,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_limits=[0, 13],
         time_width=0.2,
         time_scaling='linear',
-        distance_limits=[0, 10],
+        distance_limits=[0, 15],
         center_positions=None,
         host_index=0,
         property_select={},
@@ -2464,7 +2482,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
             if verbose:
                 self.say(
-                    'star.mass max = {}'.format(
+                    'M_star max = {}'.format(
                         ut.io.get_string_from_numbers(sfh_p['mass'].max(), 2, exponential=True)
                     )
                 )
@@ -2515,9 +2533,14 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
+        time_value = None
+        if time_kind == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
+            time_value = min(time_limits)
+
         plot_name = ut.plot.get_file_name(
-            sfh_kind + '.history', time_kind, 'star', snapshot_dict=part.snapshot
+            sfh_kind + '.history', time_kind, 'star', 'redshift', parts[0].snapshot, time_value,
         )
+
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
     def plot_star_form_history_galaxies(
@@ -2853,8 +2876,8 @@ class StarFormHistoryClass(ut.io.SayClass):
             and len(center_position) > 0
             and distance_limits is not None
             and len(distance_limits) > 0
+            and (min(distance_limits) > 0 or max(distance_limits) < np.inf)
         ):
-
             distances = ut.coordinate.get_distances(
                 part['star']['position'][part_indices],
                 center_position,
@@ -2864,11 +2887,12 @@ class StarFormHistoryClass(ut.io.SayClass):
             )  # [kpc physical]
             part_indices = part_indices[ut.array.get_indices(distances, distance_limits)]
 
-        # get star particle formation times, sorted from earliest
+        # get formation times of star particles, sorted from earliest
         part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
         form_times = part[species].prop('form.time', part_indices_sort)
-        form_masses = part[species].prop('form.mass', part_indices_sort)
-        current_masses = part[species]['mass'][part_indices_sort]
+        # need to store as 64-bit float to avoid precision error with cumsum below
+        form_masses = part[species].prop('form.mass', part_indices_sort).astype(np.float64)
+        current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
         # get time bins, ensure are ordered from earliest
         time_dict = self._get_time_bin_dictionary(
@@ -2883,6 +2907,8 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         current_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(current_masses))
         current_mass_difs = np.diff(current_mass_cum_bins)
+
+        print(np.cumsum(current_masses))
 
         # convert to midpoints of bins
         current_mass_cum_bins = (
@@ -3680,7 +3706,7 @@ def plot_galaxy_property_v_time(
 
 
 # --------------------------------------------------------------------------------------------------
-# disk mass and radius over time, for shea
+# disk mass and radius over time
 # --------------------------------------------------------------------------------------------------
 def get_galaxy_mass_profiles_v_redshift(
     directory='.',
@@ -3910,8 +3936,8 @@ def print_galaxy_mass_v_redshift(gal):
     print('# redshift scale-factor time[Gyr] ', end='')
     print('star_position(x,y,z)[kpc comov] ', end='')
     print('star_velocity(x,y,z)[km/s] dark_velocity(x,y,z)[km/s] ', end='')
-    print('R_50[kpc] M_star_50[M_sun] M_gas_50[M_sun] M_dark_50[M_sun] ', end='')
-    print('R_90[kpc] M_star_90[M_sun] M_gas_90[M_sun] M_dark_90[M_sun]', end='\n')
+    print('R_50[kpc] M_star_50[Msun] M_gas_50[Msun] M_dark_50[Msun] ', end='')
+    print('R_90[kpc] M_star_90[Msun] M_gas_90[Msun] M_dark_90[Msun]', end='\n')
 
     for z_i in range(gal['redshift'].size):
         print(
@@ -3974,7 +4000,7 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def __init__(
         self,
-        galaxy_radius_limits=[0, 12],
+        galaxy_radius_limits=[0, 15],
         galaxy_profile_radius_limits=[0.1, 30],
         halo_profile_radius_limits=[0.5, 300],
         plot_directory='plot',
@@ -4028,8 +4054,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         redshifts=None,
         galaxy_radius_limits=None,
         plot_properties_v_distance=True,
-        plot_histories=True,
+        plot_abundances=True,
         plot_properties_v_properties=True,
+        plot_histories=True,
         plot_images=True,
     ):
         '''
@@ -4057,11 +4084,11 @@ class CompareSimulationsClass(ut.io.SayClass):
             if 'star' in species:
                 self.print_masses_sizes(parts, ['star'])
             if plot_properties_v_distance:
-                self.plot_properties_v_distance(parts)
+                self.plot_properties_v_distance(parts, plot_abundances=plot_abundances)
+            if plot_abundances and plot_properties_v_properties:
+                self.plot_properties_v_properties(parts)
             if plot_histories:
                 self.plot_histories(parts, galaxy_radius_limits)
-            if plot_properties_v_properties:
-                self.plot_properties_v_properties(parts)
             if plot_images:
                 self.plot_images(parts)
 
@@ -4087,18 +4114,49 @@ class CompareSimulationsClass(ut.io.SayClass):
                 )
                 gals.append(gal)
 
-            self.say('\n# species = {}'.format(spec_name))
+            self.say(f'\n# species = {spec_name}')
 
             for part_i, part in enumerate(parts):
                 gal = gals[part_i]
                 self.say('\n{}'.format(part.info['simulation.name']))
+
                 self.say(
-                    '* total M_{} = {} Msun, log = {:.2f}'.format(
+                    '* M_{},sim = {} Msun, log = {:.2f}'.format(
                         spec_name,
                         ut.io.get_string_from_numbers(part[spec_name]['mass'].sum(), 2, True),
                         np.log10(part[spec_name]['mass'].sum()),
                     )
                 )
+
+                pindices = ut.array.get_indices(
+                    part[spec_name].prop('host.distance.total'), [0, distance_max]
+                )
+                self.say(
+                    '* M_{}(< {:.0f} kpc) = {} Msun, log = {:.2f}'.format(
+                        spec_name,
+                        distance_max,
+                        ut.io.get_string_from_numbers(
+                            part[spec_name]['mass'][pindices].sum(), 2, True
+                        ),
+                        np.log10(part[spec_name]['mass'][pindices].sum()),
+                    )
+                )
+
+                distance_min = 50
+                pindices = ut.array.get_indices(
+                    part[spec_name].prop('host.distance.total'), [distance_min, Inf]
+                )
+                self.say(
+                    '* M_{}(> {:.0f} kpc) = {} Msun, log = {:.2f}'.format(
+                        spec_name,
+                        distance_min,
+                        ut.io.get_string_from_numbers(
+                            part[spec_name]['mass'][pindices].sum(), 2, True
+                        ),
+                        np.log10(part[spec_name]['mass'][pindices].sum()),
+                    )
+                )
+
                 self.say(
                     '* M_{},{} = {} Msun, log = {:.2f}'.format(
                         spec_name,
@@ -4107,15 +4165,14 @@ class CompareSimulationsClass(ut.io.SayClass):
                         np.log10(gal['mass']),
                     )
                 )
-                string = '* R_major,{}, R_minor,{}  = {:.1f}, {:.1f} kpc'
                 self.say(
-                    string.format(
-                        mass_fraction, mass_fraction, gal['radius.major'], gal['radius.minor']
+                    '* R_{},{} major, minor = {:.1f}, {:.1f} kpc'.format(
+                        spec_name, mass_fraction, gal['radius.major'], gal['radius.minor']
                     )
                 )
         print()
 
-    def plot_properties_v_distance(self, parts, distance_bin_width=0.1):
+    def plot_properties_v_distance(self, parts, distance_bin_width=0.1, plot_abundances=True):
         '''
         Plot profiles of various properties, comparing all simulations at each redshift.
 
@@ -4123,6 +4180,7 @@ class CompareSimulationsClass(ut.io.SayClass):
         ----------
         parts : list : dictionaries of particles at snapshot
         distance_bin_width : float : width of distance bin
+        plot_abundances : bool : whether to plot elemental abundances
         '''
         if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
             plot_property_v_distance(
@@ -4213,7 +4271,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 plot_directory=self.plot_directory,
             )
 
-            if 'massfraction' in parts[0][spec_name]:
+            if 'massfraction' in parts[0][spec_name] and plot_abundances:
                 try:
                     plot_property_v_distance(
                         parts,
@@ -4283,7 +4341,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 plot_directory=self.plot_directory,
             )
 
-            if 'massfraction' in parts[0][spec_name]:
+            if 'massfraction' in parts[0][spec_name] and plot_abundances:
                 try:
                     plot_property_v_distance(
                         parts,
@@ -4358,13 +4416,13 @@ class CompareSimulationsClass(ut.io.SayClass):
                     True,
                     [None, None],
                     self.galaxy_radius_limits,
-                    distance_bin_width,
+                    distance_bin_width * 2,
                     'linear',
                     write_plot=True,
                     plot_directory=self.plot_directory,
                 )
 
-    def plot_histories(self, parts, galaxy_radius_limits=[0, 12]):
+    def plot_histories(self, parts, galaxy_radius_limits=[0, 15], plot_directory=None):
         '''
         Plot histories of star formation and mass.
 
@@ -4375,6 +4433,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         if galaxy_radius_limits is None or len(galaxy_radius_limits) == 0:
             galaxy_radius_limits = self.galaxy_radius_limits
 
+        if plot_directory is None or len(plot_directory) == 0:
+            plot_directory = self.plot_directory
+
         StarFormHistory = StarFormHistoryClass()
 
         if 'star' in parts[0]:
@@ -4382,13 +4443,13 @@ class CompareSimulationsClass(ut.io.SayClass):
                 parts,
                 'mass',
                 'redshift',
-                [None, 7],
+                [None, 6],
                 0.1,
                 'linear',
                 galaxy_radius_limits,
                 sfh_limits=[None, None],
                 write_plot=True,
-                plot_directory=self.plot_directory,
+                plot_directory=plot_directory,
             )
 
             StarFormHistory.plot_star_form_history(
@@ -4401,7 +4462,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 galaxy_radius_limits,
                 sfh_limits=[None, None],
                 write_plot=True,
-                plot_directory=self.plot_directory + 'z3/',
+                plot_directory=plot_directory,
             )
 
             StarFormHistory.plot_star_form_history(
@@ -4409,28 +4470,28 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'form.rate',
                 'time.lookback',
                 [None, 13],
-                0.4,
-                'linear',
-                galaxy_radius_limits,
-                sfh_limits=[0, None],
-                sfh_scaling='linear',
-                write_plot=True,
-                plot_directory=self.plot_directory,
-            )
-
-            StarFormHistory.plot_star_form_history(
-                parts,
-                'form.rate',
-                'redshift',
-                [3, 10],
                 0.5,
                 'linear',
                 galaxy_radius_limits,
                 sfh_limits=[0, None],
                 sfh_scaling='linear',
                 write_plot=True,
-                plot_directory=self.plot_directory + 'z3/',
+                plot_directory=plot_directory,
             )
+
+            # StarFormHistory.plot_star_form_history(
+            #    parts,
+            #    'form.rate',
+            #    'redshift',
+            #    [3, 10],
+            #    0.5,
+            #    'linear',
+            #    galaxy_radius_limits,
+            #    sfh_limits=[0, None],
+            #    sfh_scaling='linear',
+            #    write_plot=True,
+            #    plot_directory=plot_directory,
+            # )
 
             # StarFormHistory.plot_star_form_history(
             #    parts,
@@ -4442,7 +4503,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             #    galaxy_radius_limits,
             #    sfh_limits=[None, None],
             #    write_plot=True,
-            #    plot_directory=self.plot_directory,
+            #    plot_directory=plot_directory,
             # )
 
     def plot_properties_v_properties(self, parts, property_bin_number=100):

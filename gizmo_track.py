@@ -332,6 +332,7 @@ class ParticlePointerClass(ut.io.SayClass):
         Pointer=None,
         simulation_directory=None,
         track_directory=None,
+        verbose=False,
     ):
         '''
         Read or write, for each star particle at the reference (later, z0) snapshot
@@ -346,6 +347,7 @@ class ParticlePointerClass(ut.io.SayClass):
         Pointer : dict class : particle pointers (if writing)
         simulation_directory : str : directory of simulation
         track_directory : str : directory of files for particle pointers and formation coordinates
+        verbose : bool : whether to print diagnostic information
 
         Returns
         -------
@@ -386,16 +388,24 @@ class ParticlePointerClass(ut.io.SayClass):
 
         else:
             # read from file
-            dict_in = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(
+                simulation_directory + track_directory + file_name, verbose=verbose
+            )
+
+            self.say(
+                '* read particle pointers from:  {}.hdf5'.format(
+                    simulation_directory.lstrip('./') + track_directory + file_name
+                )
+            )
 
             Pointer = ParticlePointerDictionaryClass()
-            for k in dict_in:
+            for k in dict_read:
                 if 'number' in k or 'snapshot.index' in k:
-                    Pointer[k] = dict_in[k].item()  # convert to float/int
+                    Pointer[k] = dict_read[k].item()  # convert to float/int
                 elif k == 'species':
-                    Pointer[k] = dict_in[k].astype('<U4')  # store as unicode
+                    Pointer[k] = dict_read[k].astype('<U4')  # store as unicode
                 else:
-                    Pointer[k] = dict_in[k]
+                    Pointer[k] = dict_read[k]
 
             if part is None:
                 return Pointer
@@ -459,13 +469,13 @@ class ParticlePointerClass(ut.io.SayClass):
             )
         else:
             # read from file
-            dict_in = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
 
             Pointer = ParticlePointerDictionaryClass()
             particle_index_name = Pointer.pointer_index_name
             z0 = Pointer.z0_name
             z = Pointer.z_name
-            Pointer[particle_index_name] = dict_in[hdf5_dict_name]
+            Pointer[particle_index_name] = dict_read[hdf5_dict_name]
 
             part_z0_number = Pointer[particle_index_name].size
             Pointer['species'] = [species_name]
@@ -512,6 +522,8 @@ class ParticlePointerClass(ut.io.SayClass):
 
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
+        else:
+            simulation_directory = ut.io.get_path(simulation_directory)
 
         PointerTo = self.io_pointers(
             snapshot_index=snapshot_index_to, simulation_directory=simulation_directory
@@ -564,7 +576,7 @@ class ParticlePointerClass(ut.io.SayClass):
         match_propery_tolerance=1e-6,
         test_property='form.scalefactor',
         snapshot_indices=[],
-        thread_number=1,
+        proc_number=1,
     ):
         '''
         Assign to each particle a pointer from its index at the reference (later) snapshot
@@ -581,7 +593,7 @@ class ParticlePointerClass(ut.io.SayClass):
         match_propery_tolerance : float : fractional tolerance for matching via match_property
         test_property : str : additional property to use to test matching
         snapshot_indices : array-like : snapshot indices at which to assign pointers
-        thread_number : int : number of threads for parallelization
+        proc_number : int : number of parallel processes to run
         '''
         assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
@@ -673,22 +685,18 @@ class ParticlePointerClass(ut.io.SayClass):
         }
 
         # initiate threads, if asking for > 1
-        if thread_number > 1:
-            import multiprocessing as mp
+        if proc_number > 1:
+            from multiprocessing import Pool
 
-            pool = mp.Pool(thread_number)
-
-        for snapshot_index in snapshot_indices:
-            if thread_number > 1:
-                # causes memory errors if try to pass part_z0, so instead re-read part_z0 per thread
-                pool.apply_async(self._write_pointers_to_snapshot, (None, snapshot_index, count))
-            else:
+            with Pool(proc_number) as pool:
+                for snapshot_index in snapshot_indices:
+                    # memory errors if try to pass part_z0, so instead re-read part_z0 per thread
+                    pool.apply_async(
+                        self._write_pointers_to_snapshot, (None, snapshot_index, count)
+                    )
+        else:
+            for snapshot_index in snapshot_indices:
                 self._write_pointers_to_snapshot(part_z0, snapshot_index, count)
-
-        # close threads
-        if thread_number > 1:
-            pool.close()
-            pool.join()
 
         # print cumulative diagnostics
         print()
@@ -1096,44 +1104,44 @@ class ParticleCoordinateClass(ut.io.SayClass):
             ut.io.file_hdf5(simulation_directory + track_directory + file_name, dict_out)
 
         else:
-            dict_in = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
 
             # sanity check
-            bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_in['id'])
+            bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_read['id'])
             if bad_id_number:
                 self.say(f'! {bad_id_number} particles have mismatched id, this is bad!')
 
-            for prop_name in dict_in:
+            for prop_name in dict_read:
                 if prop_name in ['host.positions', 'center.position']:
-                    if np.ndim(dict_in[prop_name]) == 2:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                            (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                    if np.ndim(dict_read[prop_name]) == 2:
+                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                            (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                         )  # update from old file format
-                    part.host_positions_all = dict_in[prop_name]
+                    part.host_positions_all = dict_read[prop_name]
                     for spec_name in part:
                         part[spec_name].host_positions_all = part.host_positions_all
 
                 elif prop_name in ['host.velocities', 'center.velocity']:
-                    if np.ndim(dict_in[prop_name]) == 2:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                            (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                    if np.ndim(dict_read[prop_name]) == 2:
+                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                            (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                         )  # update from old file format
-                    part.host_velocities_all = dict_in[prop_name]
+                    part.host_velocities_all = dict_read[prop_name]
                     for spec_name in part:
                         part[spec_name].host_velocities_all = part.host_velocities_all
 
                 elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
                     # compatible with all naming conventions
-                    if np.ndim(dict_in[prop_name]) == 3:
-                        dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                    if np.ndim(dict_read[prop_name]) == 3:
+                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                             (
-                                dict_in[prop_name].shape[0],
+                                dict_read[prop_name].shape[0],
                                 1,
-                                dict_in[prop_name].shape[1],
-                                dict_in[prop_name].shape[2],
+                                dict_read[prop_name].shape[1],
+                                dict_read[prop_name].shape[2],
                             )
                         )  # update from old file format
-                    part.host_rotations_all = dict_in[prop_name]
+                    part.host_rotations_all = dict_read[prop_name]
                     for spec_name in part:
                         part[spec_name].host_rotations_all = part.host_rotations_all
 
@@ -1142,7 +1150,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
                 else:
                     # store coordinates at formation
-                    part[self.species_name][prop_name] = dict_in[prop_name]
+                    part[self.species_name][prop_name] = dict_read[prop_name]
 
     def read_host_coordinates(
         self, part, simulation_directory=None, track_directory=None, verbose=True
@@ -1157,6 +1165,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         part : dict : catalog of particles at a snapshot
         simulation_directory : str : directory of simulation
         track_directory : str : directory of files for particle pointers and formation coordinates
+        verbose : bool : whether to print diagnostic information
+
         '''
         file_name = self.file_name_base.format(part.snapshot['index'])
 
@@ -1173,55 +1183,54 @@ class ParticleCoordinateClass(ut.io.SayClass):
         file_path_name = simulation_directory + track_directory + file_name
 
         self.say(
-            f'* reading host[s] position, velocity, rotation from:'
-            + '  {}'.format(file_path_name.strip('./') + '.hdf5')
+            '* reading host[s] position, velocity, rotation from:  {}.hdf5'.format(
+                file_path_name.lstrip('./')
+            )
         )
-        dict_in = ut.io.file_hdf5(file_path_name, verbose=False)
+        dict_read = ut.io.file_hdf5(file_path_name, verbose=False)
 
         snapshot_index = part.snapshot['index']
-        for prop_name in dict_in:
+        for prop_name in dict_read:
             if prop_name in ['host.positions', 'center.position']:
-                if np.ndim(dict_in[prop_name]) == 2:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                        (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                if np.ndim(dict_read[prop_name]) == 2:
+                    dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                        (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                     )  # update from old file format
-                part.host_positions_all = dict_in[prop_name]
+                part.host_positions_all = dict_read[prop_name]
                 part.host_positions = part.host_positions_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_positions_all = part.host_positions_all
                     part[spec_name].host_positions = part.host_positions
 
             elif prop_name in ['host.velocities', 'center.velocity']:
-                if np.ndim(dict_in[prop_name]) == 2:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
-                        (dict_in[prop_name].shape[0], 1, dict_in[prop_name].shape[1])
+                if np.ndim(dict_read[prop_name]) == 2:
+                    dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
+                        (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                     )  # update from old file format
-                part.host_velocities_all = dict_in[prop_name]
+                part.host_velocities_all = dict_read[prop_name]
                 part.host_velocities = part.host_velocities_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_velocities_all = part.host_velocities_all
                     part[spec_name].host_velocities = part.host_velocities
 
             elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
-                if np.ndim(dict_in[prop_name]) == 3:
-                    dict_in[prop_name] = np.array([dict_in[prop_name]]).reshape(
+                if np.ndim(dict_read[prop_name]) == 3:
+                    dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                         (
-                            dict_in[prop_name].shape[0],
+                            dict_read[prop_name].shape[0],
                             1,
-                            dict_in[prop_name].shape[1],
-                            dict_in[prop_name].shape[2],
+                            dict_read[prop_name].shape[1],
+                            dict_read[prop_name].shape[2],
                         )
                     )  # update from old file format
-                part.host_rotations_all = dict_in[prop_name]
+                part.host_rotations_all = dict_read[prop_name]
                 part.host_rotations = part.host_rotations_all[snapshot_index]
                 for spec_name in part:
                     part[spec_name].host_rotations_all = part.host_rotations_all
                     part[spec_name].host_rotations = part.host_rotations
 
         host_number = part.host_positions_all.shape[1]
-        self.say(
-            f'read position, velocity, rotation for {host_number} host galaxy[s]'
-        )
+        self.say(f'read position, velocity, rotation for {host_number} host galaxy[s]')
 
         if verbose:
             for host_i, host_position in enumerate(part.host_positions):
@@ -1237,7 +1246,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             # print()
 
     def write_formation_coordinates(
-        self, part_z0=None, host_number=1, thread_number=1, simulation_directory=None
+        self, part_z0=None, host_number=1, proc_number=1, simulation_directory=None
     ):
         '''
         Assign to each particle its coordiates (3-D distance and 3-D velocity) wrt each primary
@@ -1247,14 +1256,16 @@ class ParticleCoordinateClass(ut.io.SayClass):
         ----------
         part : dict : catalog of particles at the reference snapshot
         host_number : int : number of host galaxies to assign and compute coordinates relative to
-        thread_number : int : number of threads for parallelization
+        proc_number : int : number of parallel processes to run
         simulation_directory : str : directory of simulation
         '''
         # if 'elvis' is in simulation directory name, force 2 hosts
         host_number = ut.catalog.get_host_number_from_directory(host_number, './', os)
 
         if simulation_directory is None:
-            simulation_directory = ut.io.get_path(self.simulation_directory)
+            simulation_directory = self.simulation_directory
+        else:
+            simulation_directory = ut.io.get_path(simulation_directory)
 
         if part_z0 is None:
             # read particles at z = 0
@@ -1324,26 +1335,20 @@ class ParticleCoordinateClass(ut.io.SayClass):
         count = {'id none': 0, 'id wrong': 0}
 
         # initiate threads, if asking for > 1
-        if thread_number > 1:
-            import multiprocessing as mp
+        if proc_number > 1:
+            from multiprocessing import Pool
 
-            pool = mp.Pool(thread_number)
-
-        for snapshot_index in snapshot_indices:
-            if thread_number > 1:
-                pool.apply(
-                    self._write_formation_coordinates,
-                    (part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count),
-                )
-            else:
+            with Pool(proc_number) as pool:
+                for snapshot_index in snapshot_indices:
+                    pool.apply(
+                        self._write_formation_coordinates,
+                        (part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count),
+                    )
+        else:
+            for snapshot_index in snapshot_indices:
                 self._write_formation_coordinates(
                     part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count
                 )
-
-        # close threads
-        if thread_number > 1:
-            pool.close()
-            pool.join()
 
         # print cumulative diagnostics
         print()
