@@ -310,7 +310,6 @@ class ArchiveClass(ut.io.SayClass):
         gizmo_config_file_save = (
             'gizmo_config.h'  # file to save used config settings and gizmo version
         )
-        gizmo_job_directory = 'gizmo_jobs'
 
         if np.isscalar(directories):
             directories = [directories]
@@ -396,14 +395,6 @@ class ArchiveClass(ut.io.SayClass):
                 os.system(f'rm -f {gizmo_out_file}')
             os.system(f'rm -f {snapshot_scalefactor_file}')
 
-            # tar directory of gizmo_jobs
-            if os.path.exists(f'{gizmo_job_directory}'):
-                self.say(f'* tar-ing:  {gizmo_job_directory}/')
-                os.system(f'tar -cvf {gizmo_job_directory}.tar {gizmo_job_directory}')
-                os.system(f'rm -rf {gizmo_job_directory}')
-            else:
-                self.say(f'! could not find:  {gizmo_job_directory}/')
-
             # clean snapshot directory
             if os.path.exists(f'{snapshot_directory}'):
                 os.chdir(f'{snapshot_directory}')
@@ -413,16 +404,6 @@ class ArchiveClass(ut.io.SayClass):
                 os.chdir('..')
             else:
                 self.say(f'! could not find:  {snapshot_directory}/')
-
-            # clean directory of initial conditions
-            # if os.path.exists(f'{ic_directory}'):
-            #    os.chdir(f'{ic_directory}')
-            #    self.say(f'* cleaning:  {ic_directory}/')
-            #    os.system('rm -f input_powerspec*.txt')
-            #    os.system('rm -f *.wnoise')
-            #    os.chdir('..')
-            # else:
-            #    self.say(f'! could not find {ic_directory}/ to clean')
 
             # clean backup files
             os.system('rm -f *~ .#* ._* /#*#')
@@ -434,13 +415,14 @@ class ArchiveClass(ut.io.SayClass):
         self,
         directories='.',
         snapshot_directory='output',
+        job_directory='gizmo_jobs',
         ic_directory='initial_condition',
+        particle_track_directory='track',
         halo_directory='halo',
         rockstar_directory='rockstar_dm',
         rockstar_job_directory='rockstar_jobs',
         rockstar_catalog_directory='catalog',
         rockstar_hdf5_directory='catalog_hdf5',
-        track_directory='track',
         delete_directories=False,
         delete_tarballs=False,
         proc_number=1,
@@ -462,14 +444,15 @@ class ArchiveClass(ut.io.SayClass):
             can be a single simulation directory, a list of simulation directories,
             or a directory that contains multiple simulation directories for which this function
             will run recursively on each one
-        snapshot_directory : str : output directory that contains snapshots
+        snapshot_directory : str : output directory that contains snapshot files
+        job_directory : str : directory that contains slurm/pbs job files
         ic_directory : str : directory that contains initial condition files from MUSIC
+        particle_track_directory : str : directory of particle tracking files
         halo_directory : str : directory of (all) halo files/directories
         rockstar_directory : str : directory of (all) Rockstar files/directories
         rockstar_job_directory : str : directory of Rockstar run-time log/job files
         rockstar_catalog_directory : str : directory of Rockstar (text) halo catalog + tree files
         rockstar_hdf5_directory : str : directory of post-processed catalog + tree hdf5 files
-        track_directory : str : directory of particle tracking files
         delete_directories : bool :
             whether to delete the (raw) directories after tar-ing them into a single file
         delete_tarballs : bool : whether to delete existing tar-balls
@@ -507,24 +490,28 @@ class ArchiveClass(ut.io.SayClass):
                     self.tar_directories(
                         directory_name,
                         snapshot_directory,
+                        job_directory,
                         ic_directory,
+                        particle_track_directory,
                         halo_directory,
                         rockstar_directory,
                         rockstar_job_directory,
                         rockstar_catalog_directory,
                         rockstar_hdf5_directory,
-                        track_directory,
                         delete_directories,
                         delete_tarballs,
                     )
                 os.chdir(f'{cwd}')
                 return
 
+            # tar directory of slurm/pbs batch job files
+            self._tar_directory(job_directory, delete_directories, delete_tarballs)
+
             # tar directory of initial conditions
             self._tar_directory(ic_directory, delete_directories, delete_tarballs)
 
             # tar directory of particle tracking files
-            self._tar_directory(track_directory, delete_directories, delete_tarballs)
+            self._tar_directory(particle_track_directory, delete_directories, delete_tarballs)
 
             # tar directories of halo catalogs + trees
             if os.path.exists(f'{halo_directory}/{rockstar_directory}'):
