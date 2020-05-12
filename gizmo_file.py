@@ -136,7 +136,7 @@ class CompressClass(ut.io.SayClass):
         simulation_directory='.',
         snapshot_directory='output',
         snapshot_directory_out='',
-        analysis_directory='~/analysis',
+        code_directory='~/analysis',
         python_executable='python3',
         snapshot_index=600,
     ):
@@ -146,15 +146,13 @@ class CompressClass(ut.io.SayClass):
         Parameters
         ----------
         simulation_directory : str : directory of simulation
-        snapshot_directory : str : directory of snapshot
-        snapshot_directory_out : str : directory to write compressed snapshot
-        analysis_directory : str : directory of analysis code
+        snapshot_directory : str : directory of snapshot files
+        snapshot_directory_out : str : directory to write compressed snapshot files
+        code_directory : str : directory of code that contains the manipulate_hdf5/ package
         python_executable : str : python executable to use to run compression script
         snapshot_index : int : index of snapshot
         '''
-        executable = (
-            f'{python_executable} {analysis_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
-        )
+        executable = f'{python_executable} {code_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
 
         snapshot_name_base = 'snap*_{:03d}*'
 
