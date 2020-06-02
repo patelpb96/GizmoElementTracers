@@ -2413,7 +2413,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         Parameters
         ----------
         parts : dict or list : catalog[s] of particles
-        sfh_kind : str : star form kind to plot:
+        sfh_kind : str : star formation kind to plot:
             'form.rate', 'form.rate.specific', 'mass', 'mass.normalized'
         time_kind : str : time kind to use: 'time', 'time.lookback' (wrt z = 0), 'redshift'
         time_limits : list : min and max limits of time_kind to get

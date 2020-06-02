@@ -589,9 +589,9 @@ class ArchiveClass(ut.io.SayClass):
         else:
             if os.path.exists(f'{directory_name}'):
                 self.say(f'* tar-ing:  {directory_name}/')
-                # os.system(f'tar -cf {directory_name}.tar {directory_name}')
-                with tarfile.open(f'{directory_name}.tar', 'w') as tar:
-                    tar.add(directory_name)
+                os.system(f'tar -cf {directory_name}.tar {directory_name}')
+                # with tarfile.open(f'{directory_name}.tar', 'w') as tar:
+                #    tar.add(directory_name)
                 if delete_directories:
                     self.say(f'* deleting:  {directory_name}/')
                     os.system(f'rm -rf {directory_name}')

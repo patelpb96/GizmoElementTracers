@@ -1192,12 +1192,20 @@ class ReadClass(ut.io.SayClass):
             # stored in snapshot file as maximum distance to neighbor (radius of compact support)
             # but here convert to Plummer-equivalent length (for consistency with force softening)
             'SmoothingLength': 'smooth.length',
-            #'ArtificialViscosity': 'artificial.viscosity',
             # average free-electron number per proton, averaged over mass of gas particle
             'ElectronAbundance': 'electron.fraction',
             # fraction of hydrogen that is neutral (not ionized)
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
             'StarFormationRate': 'sfr',  # [M_sun / yr]
+            'MagneticField': 'magnetic.field',  # 3-D magnetic field [Gauss]
+            # divergence of magnetic field (for testing)
+            #'DivergenceOfMagneticField': 'magnetic.field.div',
+            #'DivBcleaningFunctionGradPhi': 'magnetic.field.clean.func.grad.phi', # 3-D
+            #'DivBcleaningFunctionPhi': 'magnetic.field.clean.func.phi', # 1-D
+            # N_frequencies-D array, total radiation energy in each frequency bin [code units]
+            'PhotonEnergy': 'photon.energy',
+            'CosmicRayEnergy': 'cosmic.ray.energy',  # energy of cosmic rays
+            #'SoundSpeed': 'sound.speed',
             # star/gas particles ----------
             # id.generation and id.child initialized to 0 for all gas particles
             # each time a gas particle splits into two:
@@ -1275,8 +1283,8 @@ class ReadClass(ut.io.SayClass):
         self.say(f'* reading species: {self.species_read}')
 
         # open snapshot file
-        with h5py.File(path_file_name, 'r') as file_in:
-            part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
+        with h5py.File(path_file_name, 'r') as file_read:
+            part_numbers_in_file = file_read['Header'].attrs['NumPart_ThisFile']
 
             # initialize arrays to store each prop for each species
             for spec_name in self.species_read:
@@ -1304,7 +1312,7 @@ class ReadClass(ut.io.SayClass):
 
                 # check if snapshot file happens not to have particles of this species
                 if part_numbers_in_file[spec_id] > 0:
-                    part_read = file_in['PartType' + str(spec_id)]
+                    part_read = file_read['PartType' + str(spec_id)]
                 else:
                     # this scenario should occur only for multi-file snapshot
                     if header['file.number.per.snapshot'] == 1:
@@ -1314,11 +1322,11 @@ class ReadClass(ut.io.SayClass):
                     for file_i in range(1, header['file.number.per.snapshot']):
                         file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
                         # try each snapshot file
-                        with h5py.File(file_name_i, 'r') as file_in_i:
-                            part_numbers_in_file_i = file_in_i['Header'].attrs['NumPart_ThisFile']
+                        with h5py.File(file_name_i, 'r') as file_read_i:
+                            part_numbers_in_file_i = file_read_i['Header'].attrs['NumPart_ThisFile']
                             if part_numbers_in_file_i[spec_id] > 0:
                                 # found one
-                                part_read = file_in_i['PartType' + str(spec_id)]
+                                part_read = file_read_i['PartType' + str(spec_id)]
                                 break
                     else:
                         # tried all files and still did not find particles of species
@@ -1524,6 +1532,14 @@ class ReadClass(ut.io.SayClass):
             if 'bh.mass' in part[spec_name]:
                 # convert to [M_sun]
                 part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
+
+            if 'cosmic.ray.energy' in part[spec_name]:
+                # convert to [erg]
+                part[spec_name]['cosmic.ray.energy'] /= header['hubble']
+
+            if 'photon.energy' in part[spec_name]:
+                # convert to [erg]
+                part[spec_name]['photon.energy'] /= header['hubble']
 
             if 'potential' in part[spec_name]:
                 # convert to [km^2 / s^2 physical]

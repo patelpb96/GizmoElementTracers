@@ -408,7 +408,7 @@ class SupernovaIaClass:
                 # Maoz & Graur 2017
                 rate = 2.6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1], my compromise fit
                 # fit to volumetric, Hubble-time-integrated Ia N/M = 1.3 +/- 0.1 per 1000 Msun
-                # rate = 2.1e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1]
+                # rate = 2.1e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1]
                 # fit to field galaxies, Hubble-time-integrated Ia N/M = 1.6 +/- 0.1 per 1000 Msun
                 # rate = 2.6e-7 * (ages / 1e3) ** -1.13  # [Myr ^ -1]
                 # fit to galaxy clusters, Hubble-time-integrated Ia N/M = 5.4 +/- 0.1 per 1000 Msun

@@ -1191,6 +1191,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         snapshot_index = part.snapshot['index']
         for prop_name in dict_read:
+            print(prop_name)
             if prop_name in ['host.positions', 'center.position']:
                 if np.ndim(dict_read[prop_name]) == 2:
                     dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
@@ -1229,8 +1230,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     part[spec_name].host_rotations_all = part.host_rotations_all
                     part[spec_name].host_rotations = part.host_rotations
 
-        host_number = part.host_positions_all.shape[1]
-        self.say(f'read position, velocity, rotation for {host_number} host galaxy[s]')
+        if 'host_positions_all' in part.__dict__:
+            host_number = part.host_positions_all.shape[1]
+            self.say(f'read position, velocity, rotation for {host_number} host galaxy[s]')
 
         if verbose:
             for host_i, host_position in enumerate(part.host_positions):
@@ -1363,6 +1365,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         '''
         Assign to each particle its coordinates (position and velocity) wrt the primary host.
         Write to file.
+
+        TODO: add + store host axis ratios
 
         Parameters
         ----------
