@@ -386,6 +386,23 @@ class ParticleDictionaryClass(dict):
                 / self.prop('density', indices, dict_only=True)
             ) ** (1 / 3)
 
+        if 'volume' in property_name:
+            # gaussian standard-deviation volume [kpc]
+            return self.prop('mass', indices, dict_only=True) / self.prop(
+                'density', indices, dict_only=True
+            )
+
+        if 'magnetic' in property_name and (
+            'energy' in property_name or 'pressure' in property_name
+        ):
+            # magnetic field energy density = pressure = B^2 / (8 pi)
+            values = self.prop('magnetic.field', indices, dict_only=True)
+            values = np.sum(values ** 2, 1) / (8 * np.pi)
+            if 'energy' in property_name and 'density' not in property_name:
+                # get total energy [erg]
+                values *= self.prop('volume', indices)
+            return values
+
         # internal energy of the gas
         # undo the conversion from internal energy -> temperature
         if 'internal.energy' in property_name:
@@ -539,7 +556,7 @@ class ParticleDictionaryClass(dict):
             return values
 
         if '.total' in property_name:
-            # compute total (scalar) quantity (for velocity, acceleration)
+            # compute total (scalar) value from 3-D (for velocity, acceleration, magnetic field)
             prop_name = property_name.replace('.total', '')
             try:
                 values = self.prop(prop_name, indices)
@@ -1202,9 +1219,9 @@ class ReadClass(ut.io.SayClass):
             #'DivergenceOfMagneticField': 'magnetic.field.div',
             #'DivBcleaningFunctionGradPhi': 'magnetic.field.clean.func.grad.phi', # 3-D
             #'DivBcleaningFunctionPhi': 'magnetic.field.clean.func.phi', # 1-D
-            # N_frequencies-D array, total radiation energy in each frequency bin [code units]
+            # N_frequencies-D array, total energy of radiation in each frequency bin [erg]
             'PhotonEnergy': 'photon.energy',
-            'CosmicRayEnergy': 'cosmic.ray.energy',  # energy of cosmic rays
+            'CosmicRayEnergy': 'cosmic.ray.energy',  # energy of cosmic rays [erg]
             #'SoundSpeed': 'sound.speed',
             # star/gas particles ----------
             # id.generation and id.child initialized to 0 for all gas particles
@@ -1522,7 +1539,7 @@ class ReadClass(ut.io.SayClass):
 
             if 'acceleration' in part[spec_name]:
                 # convert to [km / s^2 physical]
-                # consistent with v^2 / r at z = 0.5, TO DO check at z = 0
+                # consistent with v^2 / r at z = 0.5
                 part[spec_name]['acceleration'] *= header['hubble']
 
             if 'mass' in part[spec_name]:

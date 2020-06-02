@@ -9,7 +9,6 @@ Edit Gizmo snapshot files: compress, delete, transfer across machines.
 import os
 import sys
 import glob
-import tarfile
 import numpy as np
 
 import utilities as ut
