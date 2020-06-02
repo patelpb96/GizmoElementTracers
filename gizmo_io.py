@@ -395,13 +395,24 @@ class ParticleDictionaryClass(dict):
         if 'magnetic' in property_name and (
             'energy' in property_name or 'pressure' in property_name
         ):
-            # magnetic field energy density = pressure = B^2 / (8 pi)
+            # magnetic field: energy density = pressure = B^2 / (8 pi) [erg / cm^3]
             values = self.prop('magnetic.field', indices, dict_only=True)
             values = np.sum(values ** 2, 1) / (8 * np.pi)
             if 'energy' in property_name and 'density' not in property_name:
-                # get total energy [erg]
-                values *= self.prop('volume', indices)
+                # total energy in magnetic field [erg]
+                values *= self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
             return values
+
+        if 'cosmic.ray.energy.density' in property_name:
+            # energy density in cosmic rays [erg / cm^3]
+            return self.prop('cosmic.ray.energy', indices, dict_only=True) / (
+                self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
+            )
+
+        # if 'photon.energy.density' in property_name:
+        #    return self.prop('cosmic.ray.energy', indices, dict_only=True) / (
+        #        self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
+        #    )
 
         # internal energy of the gas
         # undo the conversion from internal energy -> temperature
