@@ -379,18 +379,19 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        if 'kernel.length' in property_name:
-            # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
-            return 1000 * (
-                self.prop('mass', indices, dict_only=True)
-                / self.prop('density', indices, dict_only=True)
-            ) ** (1 / 3)
 
         if 'volume' in property_name:
             # gaussian standard-deviation volume [kpc]
             return self.prop('mass', indices, dict_only=True) / self.prop(
                 'density', indices, dict_only=True
             )
+
+        if 'kernel.length' in property_name:
+            # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
+            return 1000 * (
+                self.prop('mass', indices, dict_only=True)
+                / self.prop('density', indices, dict_only=True)
+            ) ** (1 / 3)
 
         if 'magnetic' in property_name and (
             'energy' in property_name or 'pressure' in property_name
@@ -400,7 +401,7 @@ class ParticleDictionaryClass(dict):
             values = np.sum(values ** 2, 1) / (8 * np.pi)
             if 'energy' in property_name and 'density' not in property_name:
                 # total energy in magnetic field [erg]
-                values *= self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
+                values = values * self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
             return values
 
         if 'cosmic.ray.energy.density' in property_name:
