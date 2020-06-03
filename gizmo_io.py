@@ -12,6 +12,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     distance, radius [kpc physical]
     velocity [km / s]
     time [Gyr]
+    magnetic field [Gauss]
     elemental abundance [mass fraction]
 
 
@@ -79,11 +80,11 @@ Star particles also have:
 Gas particles also have:
     'temperature' : [K]
     'density' : [M_sun / kpc^3]
-    'smooth.length' : smoothing/kernel length, stored as Plummer-equivalent
-        (for consistency with force softening) [kpc physical]
+    'size' : kernel (smoothing) length [kpc physical]
     'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
     'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
     'sfr' : instantaneous star formation rate [M_sun / yr]
+    'magnetic.field' : 3-D vector of magnetic vield [Gauss]
 
 
 Derived properties
@@ -370,7 +371,7 @@ class ParticleDictionaryClass(dict):
                 * ut.constant.kpc_per_cm ** 3
             )
 
-            if '.hydrogen' in property_name:
+            if 'hydrogen' in property_name:
                 # number density of hydrogen, using actual hydrogen mass of each particle [cm ^ -3]
                 values = values * self.prop('massfraction.hydrogen', indices)
             else:
@@ -379,19 +380,43 @@ class ParticleDictionaryClass(dict):
 
             return values
 
+        if 'size' in property_name:
+            # default size := inter-particle spacing = mass / density [kpc]
+            f = (np.pi / 3) ** (1 / 3) / 2  # 0.5077, converts from default size to full extent
+
+            if 'size' in self:
+                values = self.prop('size', indices, dict_only=True)
+            else:
+                values = (
+                    self.prop('mass', indices, dict_only=True)
+                    / self.prop('density', indices, dict_only=True)
+                ) ** (1 / 3)
+
+            if 'plummer' in property_name:
+                # convert to plummer equivalent
+                values = values / f / 2.8
+            elif 'max' in property_name:
+                # convert to maximum extent of kernel (radius of compact support)
+                values = values / f
+
+            if '.pc' in property_name:
+                # convert to [pc]
+                values = values * 1000
+
+            return values
 
         if 'volume' in property_name:
-            # gaussian standard-deviation volume [kpc]
-            return self.prop('mass', indices, dict_only=True) / self.prop(
-                'density', indices, dict_only=True
-            )
+            # volume := mass / density [kpc^3]
+            if 'size' in self:
+                return self.prop('size', indices, dict_only=True) ** 3
+            else:
+                return self.prop('mass', indices, dict_only=True) / self.prop(
+                    'density', indices, dict_only=True
+                )
 
-        if 'kernel.length' in property_name:
-            # gaussian standard-deviation length (for cubic kernel) = inter-particle spacing [pc]
-            return 1000 * (
-                self.prop('mass', indices, dict_only=True)
-                / self.prop('density', indices, dict_only=True)
-            ) ** (1 / 3)
+            if '.pc' in property_name:
+                # convert to [pc^3]
+                values = values * 1e9
 
         if 'magnetic' in property_name and (
             'energy' in property_name or 'pressure' in property_name
@@ -399,19 +424,21 @@ class ParticleDictionaryClass(dict):
             # magnetic field: energy density = pressure = B^2 / (8 pi) [erg / cm^3]
             values = self.prop('magnetic.field', indices, dict_only=True)
             values = np.sum(values ** 2, 1) / (8 * np.pi)
+
             if 'energy' in property_name and 'density' not in property_name:
                 # total energy in magnetic field [erg]
                 values = values * self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
+
             return values
 
-        if 'cosmic.ray.energy.density' in property_name:
+        if 'cosmicray.energy.density' in property_name:
             # energy density in cosmic rays [erg / cm^3]
-            return self.prop('cosmic.ray.energy', indices, dict_only=True) / (
+            return self.prop('cosmicray.energy', indices, dict_only=True) / (
                 self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
             )
 
         # if 'photon.energy.density' in property_name:
-        #    return self.prop('cosmic.ray.energy', indices, dict_only=True) / (
+        #    return self.prop('cosmicray.energy', indices, dict_only=True) / (
         #        self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
         #    )
 
@@ -1212,15 +1239,14 @@ class ReadClass(ut.io.SayClass):
             'Velocities': 'velocity',
             'Masses': 'mass',
             'Potential': 'potential',
-            'Acceleration': 'acceleration',  # from grav for DM and stars, from grav + hydro for gas
+            # grav acceleration for dark matter and stars, grav + hydro acceleration for gas
+            'Acceleration': 'accelerdation',
             # particles with adaptive smoothing
-            #'AGS-Softening': 'smooth.length',  # for gas, this is same as SmoothingLength
+            #'AGS-Softening': 'kernel.length',  # for gas, this is same as SmoothingLength
             # gas particles ----------
             'InternalEnergy': 'temperature',
             'Density': 'density',
-            # stored in snapshot file as maximum distance to neighbor (radius of compact support)
-            # but here convert to Plummer-equivalent length (for consistency with force softening)
-            'SmoothingLength': 'smooth.length',
+            'SmoothingLength': 'size',  # size of kernel (smoothing) length
             # average free-electron number per proton, averaged over mass of gas particle
             'ElectronAbundance': 'electron.fraction',
             # fraction of hydrogen that is neutral (not ionized)
@@ -1233,7 +1259,7 @@ class ReadClass(ut.io.SayClass):
             #'DivBcleaningFunctionPhi': 'magnetic.field.clean.func.phi', # 1-D
             # N_frequencies-D array, total energy of radiation in each frequency bin [erg]
             'PhotonEnergy': 'photon.energy',
-            'CosmicRayEnergy': 'cosmic.ray.energy',  # energy of cosmic rays [erg]
+            'CosmicRayEnergy': 'cosmicray.energy',  # energy of cosmic rays [erg]
             #'SoundSpeed': 'sound.speed',
             # star/gas particles ----------
             # id.generation and id.child initialized to 0 for all gas particles
@@ -1253,11 +1279,11 @@ class ReadClass(ut.io.SayClass):
             # for cosmological runs, = scale-factor; for non-cosmological runs, = time [Gyr/h]
             'StellarFormationTime': 'form.scalefactor',
             # black hole particles ----------
-            'BH_Mass': 'bh.mass',
-            'BH_Mdot': 'accretion.rate',
-            'BH_Mass_AlphaDisk': 'disk.mass',
-            'BH_AccretionLength': 'accretion.length',
-            'BH_NProgs': 'prog.number',
+            'BH_Mass': 'blackhole.mass',
+            'BH_Mdot': 'blackhole.accretion.rate',
+            'BH_Mass_AlphaDisk': 'blackhole.disk.mass',
+            'BH_AccretionLength': 'blackhole.accretion.length',
+            'BH_NProgs': 'blackhole.prog.number',
         }
 
         # dictionary class to store properties for particle species
@@ -1558,13 +1584,13 @@ class ReadClass(ut.io.SayClass):
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
-            if 'bh.mass' in part[spec_name]:
+            if 'blackhole.mass' in part[spec_name]:
                 # convert to [M_sun]
-                part[spec_name]['bh.mass'] *= 1e10 / header['hubble']
+                part[spec_name]['blackhole.mass'] *= 1e10 / header['hubble']
 
-            if 'cosmic.ray.energy' in part[spec_name]:
+            if 'cosmicray.energy' in part[spec_name]:
                 # convert to [erg]
-                part[spec_name]['cosmic.ray.energy'] /= header['hubble']
+                part[spec_name]['cosmicray.energy'] /= header['hubble']
 
             if 'photon.energy' in part[spec_name]:
                 # convert to [erg]
@@ -1585,12 +1611,15 @@ class ReadClass(ut.io.SayClass):
                     1e10 / header['hubble'] / (header['scalefactor'] / header['hubble']) ** 3
                 )
 
-            if 'smooth.length' in part[spec_name]:
-                # convert to [pc physical]
-                part[spec_name]['smooth.length'] *= 1000 * header['scalefactor'] / header['hubble']
-                # convert to Plummer softening - 2.8 is valid for cubic spline
-                # alternately, to convert to Gaussian scale length, divide by 2
-                part[spec_name]['smooth.length'] /= 2.8
+            if 'size' in part[spec_name]:
+                # convert to [kpc physical]
+                part[spec_name]['size'] *= header['scalefactor'] / header['hubble']
+                # to convert to mean interparticle spacing = volume^(1/3): *= (pi/3)^(1/3) / 2 ~ 1/2
+                part[spec_name]['size'] *= (np.pi / 3) ** (1 / 3) / 2
+                # to convert to 1-sigma length of a Gaussian: *= 0.50118 ~ 1/2 (for cubic spline)
+                # part[spec_name]['size'] *= 0.50118
+                # to convert to plummer softening: *= 1/2.8 (for cubic spline)
+                # part[spec_name]['size'] /= 2.8
 
             if 'form.scalefactor' in part[spec_name]:
                 if header['cosmological']:
@@ -1815,7 +1844,7 @@ class ReadClass(ut.io.SayClass):
             'potential': [-1e9, 1e9],  # [km^2 / s^2]
             'temperature': [3, 1e9],  # [K]
             'density': [0, 1e14],  # [M_sun/kpc^3]
-            'smooth.length': [0, 1e9],  # [kpc physical]
+            'size': [0, 1e9],  # [kpc]
             'hydrogen.neutral.fraction': [0, 1],
             'sfr': [0, 1000],  # [M_sun/yr]
             'massfraction': [0, 1],

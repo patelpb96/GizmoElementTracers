@@ -66,7 +66,7 @@ def print_properties_statistics(part, species='all'):
         'velocity',
         'mass',
         'number.density',
-        'smooth.length',
+        'size',
         'temperature',
         'hydrogen.neutral.fraction',
         'sfr',

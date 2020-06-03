@@ -638,7 +638,7 @@ def print_properties_snapshots(
     simulation_directory='.',
     snapshot_directory='output/',
     track_directory='track/',
-    species_property_dict={'gas': ['smooth.length', 'number.density']},
+    species_property_dict={'gas': ['size', 'number.density']},
 ):
     '''
     For each input property, get its extremum at each snapshot.
@@ -655,7 +655,7 @@ def print_properties_snapshots(
     element_indices = [0, 1]
 
     property_statistic = {
-        'smooth.length': {'function.name': 'min', 'function': np.min},
+        'size': {'function.name': 'min', 'function': np.min},
         'density': {'function.name': 'max', 'function': np.max},
         'number.density': {'function.name': 'max', 'function': np.max},
     }
