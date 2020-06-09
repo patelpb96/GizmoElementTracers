@@ -309,7 +309,7 @@ class ContaminationClass(ut.io.SayClass):
             redshift,
             simulation_directory,
             properties=['position', 'mass'],
-            assign_host_coordinates=True,
+            assign_hosts=True,
         )
 
         halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
@@ -626,7 +626,7 @@ def print_properties_statistics(
         '',
         None,
         None,
-        assign_host_coordinates=False,
+        assign_hosts=False,
         separate_dark_lowres=False,
         sort_dark_by_id=False,
     )
@@ -702,7 +702,7 @@ def print_properties_snapshots(
                 '',
                 properties_read,
                 element_indices,
-                assign_host_coordinates=False,
+                assign_hosts=False,
                 sort_dark_by_id=False,
             )
 

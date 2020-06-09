@@ -443,9 +443,7 @@ class ImageClass(ut.io.SayClass):
                 # rotate image
                 if rotation is True:
                     # rotate according to principal axes
-                    rotation_tensor = ut.particle.parse_property(
-                        part, 'rotation_tensor', None, host_index
-                    )
+                    rotation_tensor = ut.particle.parse_property(part, 'rotation', None, host_index)
                 elif len(rotation) > 0:
                     # use input rotation vectors
                     rotation_tensor = np.asarray(rotation)
@@ -1757,8 +1755,8 @@ def plot_disk_orientation(
             host_index=host_index,
             verbose=False,
         )
-        axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation.tensor'])
-        # axis_rotation_ref = np.dot(orientation_axis, part['star'].host_rotations[0])
+        axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation'])
+        # axis_rotation_ref = np.dot(orientation_axis, part['star'].host['rotation'][0])
 
         for spec_i, spec_name in enumerate(species_names):
             Say.say('  {}'.format(spec_name))
@@ -1791,7 +1789,7 @@ def plot_disk_orientation(
                 )
 
                 # get orientation of axis of interest
-                axis_rotation = np.dot(orientation_axis, principal_axes['rotation.tensor'])
+                axis_rotation = np.dot(orientation_axis, principal_axes['rotation'])
                 angle = np.arccos(np.dot(axis_rotation, axis_rotation_ref))
                 if angle is np.nan:
                     angle = 0  # sanity check, for exact alignment
@@ -2971,7 +2969,7 @@ def plot_gas_neutral_fraction_v_redshift(
             snapshot_indices,
             simulation_directory,
             properties=['mass', 'density', 'hydrogen.neutral.fraction'],
-            assign_host_coordinates=False,
+            assign_hosts=False,
         )
     else:
         snapshot_indices = np.array([part.snapshot['index'] for part in parts], np.int32)
@@ -3585,7 +3583,7 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
             gal[k].append(part.snapshot[k])
 
         # get position and velocity
-        gal['star.position'].append(part.host_positions[0])
+        gal['star.position'].append(part.host['position'][0])
 
         for spec_name in species:
             for mass_percent in mass_percents:
@@ -3748,8 +3746,8 @@ def get_galaxy_mass_profiles_v_redshift(
         'star.velocity': [],  # center-of-mass velocity of stars within R_50 [km / s]
         'dark.position': [],  # position of DM center [kpc comoving]
         'dark.velocity': [],  # center-of-mass velocity of DM within 0.5 * R_200m [km / s]
-        'rotation.tensor': [],  # rotation tensor of disk
-        'axis.ratio': [],  # axis ratios of disk
+        'rotation': [],  # rotation tensor of disk
+        'axis.ratios': [],  # axis ratios of disk
         'profile.3d.distance': [],  # distance bins in 3-D [kpc physical]
         'profile.3d.density': [],  # density, in 3-D [M_sun / kpc ^ 3]
         'profile.major.distance': [],  # distance bins along major (R) axis [kpc physical]
@@ -3784,8 +3782,8 @@ def get_galaxy_mass_profiles_v_redshift(
             gal[k].append(part.snapshot[k])
 
         # get position and velocity
-        gal['star.position'].append(part.host_positions[0])
-        gal['star.velocity'].append(part.host_velocities[0])
+        gal['star.position'].append(part.host['position'][0])
+        gal['star.velocity'].append(part.host['velocity'][0])
 
         gal['dark.position'].append(
             ut.particle.get_center_positions(part, 'dark', weight_property='potential')
@@ -3803,7 +3801,7 @@ def get_galaxy_mass_profiles_v_redshift(
             part, profile_species_name, gal_90['radius']
         )
 
-        gal['rotation.tensor'].append(principal_axes['rotation.tensor'])
+        gal['rotation'].append(principal_axes['rotation'])
         gal['axis.ratios'].append(principal_axes['axis.ratios'])
 
         for mass_percent in profile_mass_percents:
@@ -3826,7 +3824,7 @@ def get_galaxy_mass_profiles_v_redshift(
                 mass_percent,
                 'minor',
                 star_distance_max,
-                rotation_tensor=principal_axes['rotation.tensor'],
+                rotation_tensor=principal_axes['rotation'],
                 other_axis_distance_limits=[0, gal_90['radius']],
             )
             gal['radius.minor.' + mass_percent_name].append(gal_minor['radius'])
@@ -3839,7 +3837,7 @@ def get_galaxy_mass_profiles_v_redshift(
                 mass_percent,
                 'major',
                 star_distance_max,
-                rotation_tensor=principal_axes['rotation.tensor'],
+                rotation_tensor=principal_axes['rotation'],
                 other_axis_distance_limits=[0, gal_minor['radius']],
             )
             gal['radius.major.' + mass_percent_name].append(gal_major['radius'])
@@ -3874,7 +3872,7 @@ def get_galaxy_mass_profiles_v_redshift(
             0.1,
             'log',
             2,
-            rotation=principal_axes['rotation.tensor'],
+            rotation=principal_axes['rotation'],
             other_axis_distance_limits=[0, 1],
             get_values=True,
         )
@@ -3893,7 +3891,7 @@ def get_galaxy_mass_profiles_v_redshift(
             0.1,
             'log',
             1,
-            rotation=principal_axes['rotation.tensor'],
+            rotation=principal_axes['rotation'],
             other_axis_distance_limits=[0, 0.05],
             get_values=True,
         )
@@ -3912,7 +3910,7 @@ def get_galaxy_mass_profiles_v_redshift(
             0.1,
             'log',
             1,
-            rotation=principal_axes['rotation.tensor'],
+            rotation=principal_axes['rotation'],
             other_axis_distance_limits=[1, 10],
             get_values=True,
         )
@@ -4680,9 +4678,9 @@ def compare_resolution(
         parts = []
         for simulation_directory, simulation_name in simulation_names:
             for redshift in redshifts:
-                assign_host_coordinates = True
+                assign_hosts = True
                 if 'res880' in simulation_directory:
-                    assign_host_coordinates = False
+                    assign_hosts = False
                 Read = gizmo_io.ReadClass()
                 part = Read.read_snapshots(
                     'dark',
@@ -4691,7 +4689,7 @@ def compare_resolution(
                     simulation_directory,
                     simulation_name=simulation_name,
                     properties=['position', 'mass'],
-                    assign_host_coordinates=assign_host_coordinates,
+                    assign_hosts=assign_hosts,
                 )
                 if len(redshifts) > 1:
                     part.info['simulation.name'] += ' z={:.1f}'.format(redshift)
