@@ -108,9 +108,9 @@ Some useful examples:
         3-D distance aligned with the galaxy principal (major, intermed, minor) axes [kpc physial]
     part[species_name].prop('host.distance.principal.cylindrical') :
         same, but in cylindrical coordinates [kpc physical]:
-            along the major axes (R, positive definite)
-            vertical height wrt the disk (Z, signed)
-            azimuthal angle (phi, 0 to 2 * pi)
+            along the major axes R (positive definite)
+            azimuthal angle phi (0 to 2 * pi)
+            vertical height wrt the disk Z (signed)
 
     part[species_name].prop('host.velocity') :
         3-D velocity wrt primary galaxy center along simulation's (arbitrary) x,y,z axes [km / s]
@@ -119,9 +119,9 @@ Some useful examples:
         3-D velocity aligned with the galaxy principal (major, intermed, minor) axes [km / s]
     part[species_name].prop('host.distance.principal.cylindrical') :
         same, but in cylindrical coordinates [km / s]:
-            along the major axes (v_R, signed)
-            along the vertical wrt the disk (v_Z, signed)
-            along the azimuth (phi, signed)
+            along the major axes v_R (signed)
+            along the azimuth v_phi )signed)
+            along the vertical wrt the disk v_Z (signed)
 
     part['star'].prop('form.time') : time of the Universe when star particle formed [Gyr]
     part['star'].prop('age') :
@@ -581,9 +581,7 @@ class ParticleDictionaryClass(dict):
                     elif 'principal' in property_name:
                         distance_vectors = self.prop(host_name + 'distance.principal', indices)
                     else:
-                        distance_vectors = self.prop(
-                            host_name + 'distance', indices, dict_only=True
-                        )
+                        distance_vectors = self.prop(host_name + 'distance', indices)
                     values = ut.coordinate.get_velocities_in_coordinate_system(
                         values, distance_vectors, 'cartesian', coordinate_system
                     )

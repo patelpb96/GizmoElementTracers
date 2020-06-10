@@ -1040,10 +1040,10 @@ def plot_velocity_v_age(
 
     distances = part[species_name].prop('host.distance.principal.cylindridal', part_indices)
     part_indices = ut.array.get_indices(distances[:, 0], [7, 9], part_indices)
-    part_indices = ut.array.get_indices(distances[:, 1], [-1, 1], part_indices)
+    part_indices = ut.array.get_indices(distances[:, 2], [-1, 1], part_indices)
 
     y_prop_values = part[species_name].prop('host.velocity.principal.cylindrical', part_indices)[
-        :, 1
+        :, 2
     ]
 
     Bin = ut.binning.BinClass(x_property_limits, x_property_bin_width, scaling=x_property_scaling)
@@ -1617,7 +1617,7 @@ def plot_property_v_distance(
 def print_densities(
     parts,
     species_names=['star', 'dark', 'gas'],
-    distance_limitss=[[8.0, 8.4], [-1.1, 1.1], [0, 2 * np.pi]],
+    distance_limitss=[[8.0, 8.4], [0, 2 * np.pi], [-1.1, 1.1]],
     coordinate_system='cylindrical',
     center_positions=None,
     center_velocities=None,
@@ -1660,7 +1660,13 @@ def print_densities(
 
         for spec_name in species_names:
             distances = ut.particle.get_distances_wrt_center(
-                part, spec_name, None, center_positions[part_i], rotation, host_index, 'cylindrical'
+                part,
+                spec_name,
+                None,
+                center_positions[part_i],
+                rotation,
+                host_index,
+                coordinate_system,
             )
 
             pis = None
