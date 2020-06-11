@@ -371,9 +371,7 @@ class ContaminationClass(ut.io.SayClass):
         '''
         virial_kind = '200m'
 
-        center_position = ut.particle.parse_property(
-            part, 'center_position', center_position, host_index
-        )
+        center_position = ut.particle.parse_property(part, 'position', center_position, host_index)
 
         if scale_to_halo_radius:
             assert halo_radius and halo_radius > 0

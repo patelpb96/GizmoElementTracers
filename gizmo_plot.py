@@ -148,9 +148,7 @@ def plot_metal_v_distance(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(
-        parts, 'center_position', center_positions, host_index
-    )
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
 
     distance_limits_use = np.array(distance_limits)
     if halo_radius and scale_to_halo_radius:
@@ -430,9 +428,7 @@ class ImageClass(ut.io.SayClass):
         if weight_name:
             weights = part[species_name].prop(weight_name, part_indices)
 
-        center_position = ut.particle.parse_property(
-            part, 'center_position', center_position, host_index
-        )
+        center_position = ut.particle.parse_property(part, 'position', center_position, host_index)
 
         if center_position is not None and len(center_position) > 0:
             # re-orient to input center
@@ -921,13 +917,11 @@ def plot_property_distribution(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(
-        parts, 'center_position', center_positions, host_index
-    )
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
     if 'velocity' in property_name:
         center_velocities = ut.particle.parse_property(
-            parts, 'center_velocity', center_velocities, host_index
+            parts, 'velocity', center_velocities, host_index
         )
 
     Stat = ut.statistic.StatisticClass()
@@ -1031,9 +1025,7 @@ def plot_velocity_v_age(
     '''
     .
     '''
-    center_position = ut.particle.parse_property(
-        part, 'center_position', center_position, host_index
-    )
+    center_position = ut.particle.parse_property(part, 'position', center_position, host_index)
 
     if part_indices is None or len(part_indices) == 0:
         part_indices = ut.array.get_arange(part[species_name].prop(x_property_name))
@@ -1166,9 +1158,7 @@ def plot_property_v_property(
     '''
     Say = ut.io.SayClass(plot_property_v_property)
 
-    center_position = ut.particle.parse_property(
-        part, 'center_position', center_position, host_index
-    )
+    center_position = ut.particle.parse_property(part, 'position', center_position, host_index)
 
     if part_indices is None or len(part_indices) == 0:
         part_indices = ut.array.get_arange(part[species_name].prop(x_property_name))
@@ -1383,12 +1373,10 @@ def plot_property_v_distance(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(
-        parts, 'center_position', center_positions, host_index
-    )
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
     if 'velocity' in property_name:
         center_velocities = ut.particle.parse_property(
-            parts, 'center_velocity', center_velocities, host_index
+            parts, 'velocity', center_velocities, host_index
         )
     else:
         center_velocities = [center_velocities for _ in center_positions]
@@ -1647,12 +1635,8 @@ def print_densities(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(
-        parts, 'center_position', center_positions, host_index
-    )
-    center_velocities = ut.particle.parse_property(
-        parts, 'center_velocity', center_velocities, host_index
-    )
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
+    center_velocities = ut.particle.parse_property(parts, 'velocity', center_velocities, host_index)
 
     for part_i, part in enumerate(parts):
         densities_2d = []
@@ -1738,9 +1722,7 @@ def plot_disk_orientation(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(
-        parts, 'center_position', center_positions, host_index
-    )
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
 
     PropertyBin = ut.binning.BinClass(
         property_limits, property_bin_width, scaling=property_scaling, include_max=True
@@ -1902,13 +1884,11 @@ def plot_velocity_distribution_of_halo(
     if isinstance(parts, dict):
         parts = [parts]
 
-    center_positions = ut.particle.parse_property(
-        parts, 'center_position', center_positions, host_index
-    )
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
     if 'velocity' in property_name:
         center_velocities = ut.particle.parse_property(
-            parts, 'center_velocity', center_velocities, host_index
+            parts, 'velocity', center_velocities, host_index
         )
 
     Stat = ut.statistic.StatisticClass()
@@ -2439,7 +2419,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             parts = [parts]
 
         center_positions = ut.particle.parse_property(
-            parts, 'center_position', center_positions, host_index
+            parts, 'position', center_positions, host_index
         )
         part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
@@ -2871,9 +2851,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 part['star'], property_select, part_indices
             )
 
-        center_position = ut.particle.parse_property(
-            part, 'center_position', center_position, host_index
-        )
+        center_position = ut.particle.parse_property(part, 'position', center_position, host_index)
 
         if (
             center_position is not None
