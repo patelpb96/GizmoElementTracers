@@ -874,6 +874,7 @@ def plot_property_distribution(
     property_bin_number=100,
     property_scaling='log',
     property_statistic='probability',
+    weight_property_name='',
     distance_limits=[],
     center_positions=None,
     center_velocities=None,
@@ -900,6 +901,7 @@ def plot_property_distribution(
     property_scaling : str : scaling of property: 'log', 'linear'
     property_statistic : str : statistic to plot:
         'probability', 'probability.cum', 'histogram', 'histogram.cum'
+    weight_property_name : str : property to weight each particle by
     distance_limits : list : min and max limits for distance from galaxy
     center_positions : array or list of arrays : position[s] of galaxy center[s]
     center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
@@ -961,10 +963,20 @@ def plot_property_distribution(
         else:
             prop_values = part[species_name].prop(property_name, part_indices)
 
+        if weight_property_name:
+            weights = part[species_name].prop(weight_property_name, part_indices)
+        else:
+            weights = None
+
         Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
 
         Stat.append_to_dictionary(
-            prop_values, property_limits, property_bin_width, property_bin_number, property_scaling
+            prop_values,
+            property_limits,
+            property_bin_width,
+            property_bin_number,
+            property_scaling,
+            weights,
         )
 
         Stat.print_statistics(-1)
