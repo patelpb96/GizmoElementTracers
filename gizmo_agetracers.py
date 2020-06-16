@@ -138,6 +138,14 @@ class YieldsObject ():
 # NuGrid yield class object for generating yield tables for age-tracer
 # postprocessing using the Sygma module
 # ------------------------------------------------------------------------------
+
+try:
+    import sygma as _sygma
+    NuPyCEE_loaded = True
+except:
+    NuPyCEE_loaded = False
+
+
 class NuGrid_yields(YieldsObject):
     '''
     Object designed for use with the construct_yield_table method. This
@@ -149,15 +157,18 @@ class NuGrid_yields(YieldsObject):
 
     '''
 
-    try:
-        import sygma as _sygma
-    except ImportError:
-        raise ImportError("Cannot load the NuPyCEE module Sygma. "+\
-                          "Make sure this is installed in your python path. "+\
-                          "For more info: https://nugrid.github.io/NuPyCEE/index.html")
-
     def __init__(self, name = "NuGrid",
                        **kwargs):
+
+        if not NuPyCEE_loaded:
+            print("Cannot load the NuPyCEE module Sygma. "+\
+                  "This is necessary to use the NuGrid yields."+\
+                  "Make sure this is installed in your python path. "+\
+                  "For more info: https://nugrid.github.io/NuPyCEE/index.html")
+
+            raise RuntimeError
+
+
 
         super().__init__(name)
 
