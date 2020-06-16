@@ -1937,18 +1937,20 @@ class ReadClass(ut.io.SayClass):
         track_directory : str :
             directory of files for particle pointers, formation coordinates, and host coordinates
         '''
+        if not species_name:
+            if 'star' in part:
+                species_name = 'star'
+            else:
+                species_name = 'dark'
+
+        assert species_name in ['star', 'dark', 'gas', 'dark2', 'blackhole']
+
         if (
-            species_name in part
-            and 'position' in part[species_name]
-            and len(part[species_name]['position']) > 0
+            species_name not in part
+            or 'position' not in part[species_name]
+            or len(part[species_name]['position']) == 0
         ):
-            pass
-        elif 'star' in part and 'position' in part['star'] and len(part['star']['position']) > 0:
-            species_name = 'star'
-        elif 'dark' in part and 'position' in part['dark'] and len(part['dark']['position']) > 0:
-            species_name = 'dark'
-        else:
-            self.say('! catalog does not contain star or dark particles, so cannot assign hosts')
+            self.say('! did not read star or dark particles, so cannot assign host[s]')
             return
 
         assert method in [True, 'track', 'halo', 'mass', 'potential']
