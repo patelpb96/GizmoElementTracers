@@ -957,6 +957,45 @@ class ReadClass(ut.io.SayClass):
             for spec_name in part:
                 part[spec_name].Snapshot = part.Snapshot
 
+            # check for and store information about r-process enerichment:
+            num_rprocess = 0
+            rprocess_start = None
+            if part.info['has.metals'] > 11:
+                # if > 11 we may have r-process (assuming the hard-coded default 11 elements for FIRE)
+                if (part.ageprop.info['flag_agetracers'] > 0):
+                    # if 11 then we don't have any rproc
+                    if part.ageprop.info['metallicity_start'] == 11:
+                        rprocess_start = -1
+                        num_rprocess   = 0
+                    else:
+                        rprocess_start = 11
+                        num_rprocess   = part.ageprop.info['metallicity_start'] - 11
+                else:
+                    rprocess_start = 11
+                    num_rprocess = part.info['has.metals'] - 11
+
+            if num_rprocess < 0:
+                raise RuntimeError("Getting negative number of r-process fields. Need to check things")
+
+            part.info['has.rprocess']   = num_rprocess
+            part.info['rprocess_start'] = rprocess_start
+
+            # now do a bit of a hack to get the rprocess fields accessed the same way as the elements
+            if (part.info['has.rprocess'] > 0):
+                # generate new keys in the elementdict for these
+                # labelled unexciting names. using both rprocessN and rN just
+                # to keep this exactly the same style as the elements
+                for n in np.arange(0, part.info['has.rprocess'],1):
+                    part.element_dict['rprocess%i'%(n)] = part.element_dict['r%i'%(n)] = part.info['rprocess_start'] + n
+                part.element_pointer = np.arange(len(part.element_dict)//2)
+
+                # make sure this info progates (should probably do this at the part level, not here)
+                if len(list(part.keys())) > 0:
+                    for k in part.keys():
+                        for n in np.arange(0, part.info['has.rprocess'],1):
+                          part[k].element_dict['rprocess%i'%(n)] = part[k].element_dict['r%i'%(n)] = part[k].info['rprocess_start'] + n
+                    part[k].element_pointer = np.arange(len(part[k].element_dict)//2)
+
             # store list of  each host's position, velocity, principal axes rotation tensor
             # store as lists to accommodate possibility of multiple hosts
             # these already were initialized for the overlal particle class, but useful to
@@ -1374,7 +1413,7 @@ class ReadClass(ut.io.SayClass):
             # mass fraction of individual elements ----------
             # 0 = all metals (everything not H, He)
             # 1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
-            # 
+            #
             'Metallicity': 'massfraction',
             # star particles ----------
             # 'time' when star particle formed
