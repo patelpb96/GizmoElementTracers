@@ -1938,21 +1938,11 @@ class ReadClass(ut.io.SayClass):
             directory of files for particle pointers, formation coordinates, and host coordinates
         '''
         if not species_name:
-            if 'star' in part:
-                species_name = 'star'
-            else:
-                species_name = 'dark'
+            species_name = 'star'
+        if species_name == 'star' and species_name not in part:
+            species_name = 'dark'
 
         assert species_name in ['star', 'dark', 'gas', 'dark2', 'blackhole']
-
-        if (
-            species_name not in part
-            or 'position' not in part[species_name]
-            or len(part[species_name]['position']) == 0
-        ):
-            self.say('! did not read star or dark particles, so cannot assign host[s]')
-            return
-
         assert method in [True, 'track', 'halo', 'mass', 'potential']
 
         if method is True:
@@ -1970,7 +1960,7 @@ class ReadClass(ut.io.SayClass):
         elif method in ['track', 'halo']:
             try:
                 if method == 'track':
-                    # read coordinates of all hosts across all snapshots
+                    # read coordinates of each host across all snapshots
                     self.gizmo_track.ParticleCoordinate.read_hosts(
                         part, simulation_directory, track_directory, verbose
                     )
@@ -1988,8 +1978,8 @@ class ReadClass(ut.io.SayClass):
                     )
 
             except (IOError, ImportError):
-                self.say('cannot read file containing host coordinates')
-                self.say('instead will assign host coordinates via iterative zoom on particle mass')
+                self.say('cannot read file containing hosts coordinates')
+                self.say('instead will assign hosts via iterative zoom on particle mass')
                 method = 'mass'
                 self._assign_hosts_coordinates_from_particles(
                     part,
@@ -2002,7 +1992,7 @@ class ReadClass(ut.io.SayClass):
                 )
         else:
             self.say(
-                f'! not recognize coordinate method = {method}, not assigning host coordinates'
+                f'! not recognize coordinate method = {method}, not assigning hosts coordinates'
             )
 
         print()
@@ -2020,6 +2010,14 @@ class ReadClass(ut.io.SayClass):
         '''
         Utility function for assign_hosts_coordinates().
         '''
+        if (
+            species_name not in part
+            or 'position' not in part[species_name]
+            or len(part[species_name]['position']) == 0
+        ):
+            self.say('! did not read star or dark particles, so cannot assign host[s]')
+            return
+
         # max radius around each host position to includer particles to compute center velocity
         if species_name == 'dark':
             velocity_radius_max = 30
