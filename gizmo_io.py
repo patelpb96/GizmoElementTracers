@@ -1102,6 +1102,7 @@ class ReadClass(ut.io.SayClass):
             'Flag_Feedback': 'has.feedback',
             'Flag_DoublePrecision': 'has.double.precision',
             'Flag_IC_Info': 'has.ic.info',
+            'Flag_AgeTracers': 'has.age.tracer',
             # level of compression of snapshot file
             'CompactLevel': 'compression.level',
             'Compactify_Version': 'compression.version',
