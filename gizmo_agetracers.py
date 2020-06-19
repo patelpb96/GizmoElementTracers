@@ -217,7 +217,7 @@ class NuGrid_yields(YieldsObject):
             print("Galaxy mass is not 1 solar mass. Are you sure?")
             print("This will throw off scalings")
 
-        self._sygma_model = self._sygma.sygma(**self.model_parameters)
+        self._sygma_model = _sygma.sygma(**self.model_parameters)
 
         # get yields. This is the "ISM" mass fraction of all elements. But since
         # mgal above is 1.0, this is the solar masses of each element in the ISM
