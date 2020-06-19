@@ -401,7 +401,7 @@ class InitialConditionClass(ut.io.SayClass):
                 snapshot_redshift,
                 self.simulation_directory,
                 properties=properties,
-                assign_host_coordinates=False,
+                assign_hosts=False,
                 sort_dark_by_id=sort_dark_by_id,
             )
 
