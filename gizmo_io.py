@@ -699,7 +699,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_values : int or float or list thereof :
             index[s] or redshift[s] or scale-factor[s] of snapshot[s]
         simulation_directory : str : directory of simulation
-        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        snapshot_directory: str : directory of snapshot files within simulation_directory
         track_directory : str :
             directory of files for particle pointers, formation coordinates, and host coordinates
         simulation_name : str : name to store for future identification
@@ -931,9 +931,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind : str :
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_value : int or float : index or redshift or scale-factor of snapshot
-        simulation_directories : list or list of lists :
-            list of simulation directories, or list of pairs of directory + simulation name
-        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        simulation_directories : list or dict :
+            list of simulation directories, or dict of simulation_directories: simulation_names
+        snapshot_directory: str : directory of snapshot files within simulation_directory
         track_directory : str :
             directory of files for particle pointers, formation coordinates, and host coordinates
         properties : str or list : name[s] of properties to read
@@ -962,25 +962,32 @@ class ReadClass(ut.io.SayClass):
         parts : list of dictionaries
         '''
         # parse list of directories
-        if np.ndim(simulation_directories) == 0:
-            raise ValueError(
-                f'input simulation_directories = {simulation_directories} but need to input list'
-            )
-        elif np.ndim(simulation_directories) == 1:
-            # assign null names
-            simulation_directories = list(
-                zip(simulation_directories, ['' for _ in simulation_directories])
-            )
-        elif np.ndim(simulation_directories) == 2:
+        if isinstance(simulation_directories, dict):
             pass
-        elif np.ndim(simulation_directories) >= 3:
+        elif isinstance(simulation_directories, list) or isinstance(simulation_directories, tuple):
+            if np.ndim(simulation_directories) not in [1, 2]:
+                raise ValueError(
+                    f'not sure how to parse simulation_directories = {simulation_directories}'
+                )
+            elif np.ndim(simulation_directories) == 1:
+                # assign null names
+                simulation_directories = {
+                    simulation_directory: '' for simulation_directory in simulation_directories
+                }
+            elif np.ndim(simulation_directories) == 2:
+                simulation_directories = {
+                    simulation_directory[0]: simulation_directory[1]
+                    for simulation_directory in simulation_directories
+                }
+        else:
             raise ValueError(
                 f'not sure how to parse simulation_directories = {simulation_directories}'
             )
 
         # first pass, read only header, to check that can read all simulations
         bad_snapshot_value = 0
-        for simulation_directory, simulation_name in simulation_directories:
+        for simulation_directory in simulation_directories:
+            simulation_name = simulation_directories[simulation_directory]
             try:
                 _ = self.read_header(
                     snapshot_value_kind,
@@ -1002,14 +1009,15 @@ class ReadClass(ut.io.SayClass):
             return
 
         parts = []
-        directories_read = []
-        for directory, simulation_name in simulation_directories:
+        simulation_directories_read = []
+        for simulation_directory in simulation_directories:
+            simulation_name = simulation_directories[simulation_directory]
             try:
                 part = self.read_snapshots(
                     species,
                     snapshot_value_kind,
                     snapshot_value,
-                    directory,
+                    simulation_directory,
                     snapshot_directory,
                     track_directory,
                     simulation_name,
@@ -1024,7 +1032,8 @@ class ReadClass(ut.io.SayClass):
                 )
             except IOError:
                 self.say(
-                    f'! cannot read snapshot {snapshot_value_kind}={snapshot_value} in {directory}'
+                    f'! cannot read snapshot {snapshot_value_kind}={snapshot_value} in'
+                    + ' {simulation_directory}'
                 )
                 part = None
 
@@ -1033,17 +1042,17 @@ class ReadClass(ut.io.SayClass):
                     self.assign_orbits(part, 'gas')
 
                 parts.append(part)
-                directories_read.append(directory)
+                simulation_directories_read.append(simulation_directory)
 
         if len(parts) == 0:
             self.say(f'! cannot read any snapshots at {snapshot_value_kind} = {snapshot_value}')
             return
 
         if 'mass' in properties and 'star' in part:
-            for part, directory in zip(parts, directories_read):
+            for part, simulationdirectory in zip(parts, simulation_directories_read):
                 print(
                     '{}\n* M_star simulation = {} Msun\n'.format(
-                        directory,
+                        simulationdirectory,
                         ut.io.get_string_from_numbers(part['star']['mass'].sum(), 2, True),
                     )
                 )
@@ -1067,7 +1076,7 @@ class ReadClass(ut.io.SayClass):
         ----------
         snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
-        simulation_directory : root directory of simulation
+        simulation_directory : str : directory of simulation
         snapshot_directory: str : directory of snapshot files within simulation_directory
         simulation_name : str : name to store for future identification
         snapshot_block_index : int : index of file block (if multiple files per snapshot)
@@ -1223,7 +1232,7 @@ class ReadClass(ut.io.SayClass):
         ----------
         snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
-        simulation_directory : root directory of simulation
+        simulation_directory : str : directory of simulation
         snapshot_directory: str : directory of snapshot files within simulation_directory
         properties : str or list : name[s] of particle properties to read - options:
             'all' = all species in file
@@ -2184,7 +2193,7 @@ class ReadClass(ut.io.SayClass):
         value_adjust : float : value by which to adjust property (if not deleting)
         snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
-        simulation_directory : root directory of simulation
+        simulation_directory : str : directory of simulation
         snapshot_directory : str : directory of snapshot files within simulation_directory
         '''
         if np.isscalar(species):

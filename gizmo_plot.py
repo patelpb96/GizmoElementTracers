@@ -968,7 +968,7 @@ def plot_property_distribution(
         else:
             weights = None
 
-        Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
+        Say.say(f'keeping {prop_values.size} {species_name} particles')
 
         Stat.append_to_dictionary(
             prop_values,
@@ -997,7 +997,7 @@ def plot_property_distribution(
     axis_x_label = ut.plot.Label.get_label(property_name, species_name=species_name, get_words=True)
     subplot.set_xlabel(axis_x_label)
     axis_y_label = ut.plot.Label.get_label(
-        property_name, property_statistic, species_name, get_units=False
+        property_name, property_statistic, species_name, property_scaling, get_units=False
     )
     subplot.set_ylabel(axis_y_label)
 
