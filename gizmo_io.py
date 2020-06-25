@@ -2099,7 +2099,7 @@ class ReadClass(ut.io.SayClass):
                 print(') [km / s]')
 
     def assign_hosts_rotation(
-        self, part, species_name='star', distance_max=10, mass_percent=100, age_percent=25
+        self, part, species_name='star', distance_max=10, mass_percent=90, age_percent=25
     ):
         '''
         Assign rotation tensors and axis ratios of principal axes (defined via the moment of

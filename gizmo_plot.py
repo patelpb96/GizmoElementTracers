@@ -355,7 +355,7 @@ class ImageClass(ut.io.SayClass):
         hal_position_kind='position',
         hal_radius_kind='radius',
         write_plot=False,
-        plot_directory='',
+        plot_directory='.',
         figure_index=1,
     ):
         '''
@@ -1696,14 +1696,14 @@ def print_densities(
         Say.say('  density_3d = {:.5f} Msun / pc^3'.format(np.sum(densities_3d)))
 
 
-def plot_disk_orientation(
+def plot_disk_orientation_v_property(
     parts,
-    species_names=['star', 'star.young', 'gas'],
-    property_vary='distance',
-    property_limits=[4, 20],
+    species_names=['star', 'star.25', 'star.young'],
+    property_name='distance',
+    property_limits=[1, 15],
     property_bin_width=1,
     property_scaling='linear',
-    distance_ref=8.2,
+    reference_distance_max=8.2,
     center_positions=None,
     host_index=0,
     write_plot=False,
@@ -1711,25 +1711,29 @@ def plot_disk_orientation(
     figure_index=1,
 ):
     '''
+    Plot orientation angle of the disk versus property_name.
+
+    Parameters
+    ----------
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
     species_names : str or list : name[s] of particle species to compute
         options: 'star', 'gas', 'dark'
-    vary_property : str : which property to vary (along x-axis): 'distance', 'age'
+    property_name : str : which property to vary (along x-axis): 'distance', 'age'
     property_limits : list : min and max property for binning
     property_bin_width : float : width of property bin
     property_scaling : str : 'log', 'linear'
-    distance_ref : float : reference distance to compute principal axes
+    reference_distance_max : float : reference distance to compute principal axes
     center_positions : array or list of arrays : position of center for each particle catalog
     host_index : int : index of host galaxy/halo to get stored position of (if not input it)
     write_plot : bool : whether to write figure to file
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
-    orientation_axis = [0, 0, 1]  # which principal axis to measure orientation angle of
+    axis_index = 2  # which principal axis to measure orientation angle of
     gas_temperature_limits = [0, 5e4]  # [K]
     young_star_age_limits = [0, 1]  # [Gyr]
 
-    Say = ut.io.SayClass(plot_disk_orientation)
+    Say = ut.io.SayClass(plot_disk_orientation_v_property)
 
     if isinstance(parts, dict):
         parts = [parts]
@@ -1745,18 +1749,17 @@ def plot_disk_orientation(
     for part_i, part in enumerate(parts):
         Say.say('{}'.format(part.info['simulation.name']))
 
-        # compute reference principal axes using all stars out to distance_ref
+        # compute reference principal axes using all stars out to reference_distance
         principal_axes = ut.particle.get_principal_axes(
             part,
             'star',
-            distance_ref,
+            reference_distance_max,
             age_limits=[0, 1],
             center_positions=center_positions[part_i],
             host_index=host_index,
             verbose=False,
         )
-        axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation'])
-        # axis_rotation_ref = np.dot(orientation_axis, part['star'].host['rotation'][0])
+        reference_rotation = principal_axes['rotation'][axis_index]
 
         for spec_i, spec_name in enumerate(species_names):
             Say.say('  {}'.format(spec_name))
@@ -1768,15 +1771,19 @@ def plot_disk_orientation(
             elif 'star' in spec_name and 'young' in spec_name:
                 part_indices = ut.array.get_indices(part['star'].prop('age'), young_star_age_limits)
                 spec_name = 'star'
+            elif 'star' in spec_name and '.25' in spec_name:
+                star_age_limits = [0, np.percentile(part['star'].prop('age'), 25)]
+                part_indices = ut.array.get_indices(part['star'].prop('age'), star_age_limits)
+                spec_name = 'star'
             else:
                 part_indices = None
 
             for prop_i, property_max in enumerate(PropertyBin.mins):
-                if property_vary == 'distance':
+                if property_name == 'distance':
                     distance_max = property_max
-                elif property_vary == 'age':
+                elif property_name == 'age':
                     part_indices = ut.array.get_indices(part['star'].prop('age'), [0, property_max])
-                    distance_max = distance_ref
+                    distance_max = reference_distance_max
 
                 principal_axes = ut.particle.get_principal_axes(
                     part,
@@ -1789,18 +1796,28 @@ def plot_disk_orientation(
                 )
 
                 # get orientation of axis of interest
-                axis_rotation = np.dot(orientation_axis, principal_axes['rotation'])
-                angle = np.arccos(np.dot(axis_rotation, axis_rotation_ref))
+                axis_rotation = principal_axes['rotation'][axis_index]
+                angle = np.arccos(np.dot(axis_rotation, reference_rotation))
                 if angle is np.nan:
                     angle = 0  # sanity check, for exact alignment
-                angle = min(angle, np.pi - angle)  # deal with possible flip
                 angle *= 180 / np.pi  # [degree]
+                if angle > 90:
+                    Say.say(
+                        '!   {:4.1f} kpc: {:.1f} deg (raw), min/maj = {:.2f}'.format(
+                            property_max, angle, principal_axes['axis.ratios'][0]
+                        )
+                    )
+                    angle = min(angle, 180 - angle)  # deal with possible flip
 
                 angles[part_i, spec_i, prop_i] = angle
 
-                if property_vary == 'distance':
-                    Say.say('  {:4.1f} kpc: {:.1f} deg'.format(property_max, angle))
-                elif property_vary == 'age':
+                if property_name == 'distance':
+                    Say.say(
+                        '  {:4.1f} kpc: {:.1f} deg, min/maj = {:.2f}'.format(
+                            property_max, angle, principal_axes['axis.ratios'][0]
+                        )
+                    )
+                elif property_name == 'age':
                     Say.say('  {:4.1f} Gyr: {:.1f} deg'.format(property_max, angle))
 
     # plot ----------
@@ -1810,7 +1827,7 @@ def plot_disk_orientation(
         subplot, property_scaling, property_limits, None, 'linear', [0, None], angles
     )
 
-    if property_vary == 'distance':
+    if property_name == 'distance':
         subplot.set_xlabel('maximum radius $\\left[ {{\\rm kpc}} \\right]$')
     else:
         subplot.set_xlabel('star maximum age $\\left[ {{\\rm Gyr}} \\right]$')
@@ -1839,8 +1856,102 @@ def plot_disk_orientation(
     property_y = 'disk.orientation'
     if len(parts) == 1:
         property_y = parts[0].info['simulation.name'] + '_' + property_y
-    plot_name = ut.plot.get_file_name(property_y, property_vary, snapshot_dict=part.snapshot)
+    plot_name = ut.plot.get_file_name(property_y, property_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
+
+
+def plot_disk_orientation_v_time(
+    parts,
+    time_kind='time.lookback',
+    time_limits=[0, 13],
+    time_scaling='linear',
+    refrence_snapshot_index=600,
+    host_index=0,
+    write_plot=False,
+    plot_directory='.',
+    figure_index=1,
+):
+    '''
+    Plot orientation angle of the disk versus time_kind, wrt
+    Requires that you have read pre-compiled host rotation tensors in star_form_coordinates_*.hdf5.
+
+    Parameters
+    ----------
+    parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
+    time_kind : str : time kind to use:
+        'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
+    time_limits : list : min and max limits of time_kind to impose
+    time_width : float : width of time_kind bin
+    time_scaling : str : scaling of time_kind: 'log', 'linear'
+    host_index : int : index of host galaxy/halo to get stored position of (if not input it)
+    write_plot : bool : whether to write figure to file
+    plot_directory : str : directory to write figure file
+    figure_index : int : index of figure for matplotlib
+    '''
+    axis_indices = [0, 1, 2]
+
+    Say = ut.io.SayClass(plot_disk_orientation_v_time)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    angles = np.zeros((len(parts), len(axis_indices), parts[0].hostz['rotation'].shape[0])) * np.nan
+
+    for part_i, part in enumerate(parts):
+        rotation_tensors = part.hostz['rotation'][:, host_index]
+        reference_rotation_tensor = rotation_tensors[refrence_snapshot_index]
+        for axis_i in axis_indices:
+            angles[part_i, axis_i] = np.dot(
+                rotation_tensors[:, axis_i], reference_rotation_tensor[axis_i]
+            )
+
+    masks = np.isfinite(angles)
+    angles[masks] = np.arccos(angles[masks]) * 180 / np.pi  # [degree]
+    # masks = angles > 90
+    # angles[masks] = 180 - angles[masks]
+
+    return angles
+
+    """
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot, property_scaling, property_limits, None, 'linear', [0, None], angles
+    )
+
+    if property_name == 'distance':
+        subplot.set_xlabel('maximum radius $\\left[ {{\\rm kpc}} \\right]$')
+    else:
+        subplot.set_xlabel('star maximum age $\\left[ {{\\rm Gyr}} \\right]$')
+    subplot.set_ylabel('disk offset angle $\\left[ {{\\rm deg}} \\right]$')
+
+    if len(parts) > len(species_names):
+        colors = ut.plot.get_colors(len(parts))
+    else:
+        colors = ut.plot.get_colors(len(species_names))
+
+    for part_i, part in enumerate(parts):
+        for spec_i, spec_name in enumerate(species_names):
+            if len(parts) > len(species_names):
+                label = part.info['simulation.name']
+                color = colors[part_i]
+            else:
+                label = spec_name
+                color = colors[spec_i]
+
+            subplot.plot(
+                PropertyBin.mins, angles[part_i, spec_i], color=color, alpha=0.8, label=label
+            )
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    property_y = 'disk.orientation'
+    if len(parts) == 1:
+        property_y = parts[0].info['simulation.name'] + '_' + property_y
+    plot_name = ut.plot.get_file_name(property_y, property_name, snapshot_dict=part.snapshot)
+    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    """
 
 
 def plot_velocity_distribution_of_halo(
@@ -2411,8 +2522,9 @@ class StarFormHistoryClass(ut.io.SayClass):
         parts : dict or list : catalog[s] of particles
         sfh_kind : str : star formation kind to plot:
             'form.rate', 'form.rate.specific', 'mass', 'mass.normalized'
-        time_kind : str : time kind to use: 'time', 'time.lookback' (wrt z = 0), 'redshift'
-        time_limits : list : min and max limits of time_kind to get
+        time_kind : str : time kind to use:
+            'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
+        time_limits : list : min and max limits of time_kind to impose
         time_width : float : width of time_kind bin
         time_scaling : str : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of distance to select star particles
@@ -2754,72 +2866,6 @@ class StarFormHistoryClass(ut.io.SayClass):
             plot_name += '_lg'
         ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
-    def _get_time_bin_dictionary(
-        self,
-        time_kind='redshift',
-        time_limits=[0, 10],
-        time_width=0.01,
-        time_scaling='linear',
-        Cosmology=None,
-    ):
-        '''
-        Get dictionary of time bin information.
-
-        Parameters
-        ----------
-        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
-        time_limits : list : min and max limits of time_kind to impose
-        time_width : float : width of time_kind bin (in units set by time_scaling)
-        time_scaling : str : scaling of time_kind: 'log', 'linear'
-        Cosmology : class : cosmology class, to convert between time metrics
-
-        Returns
-        -------
-        time_dict : dict
-        '''
-        assert time_kind in ['time', 'time.lookback', 'redshift', 'scalefactor']
-
-        time_limits = np.array(time_limits)
-
-        if 'log' in time_scaling:
-            if time_kind == 'redshift':
-                time_limits += 1  # convert to z + 1 so log is well-defined
-            times = 10 ** np.arange(
-                np.log10(time_limits.min()), np.log10(time_limits.max()) + time_width, time_width
-            )
-            if time_kind == 'redshift':
-                times -= 1
-        else:
-            times = np.arange(time_limits.min(), time_limits.max() + time_width, time_width)
-
-        # if input limits is reversed, get reversed array
-        if time_limits[1] < time_limits[0]:
-            times = times[::-1]
-
-        time_dict = {}
-
-        if 'time' in time_kind:
-            if 'lookback' in time_kind:
-                time_dict['time.lookback'] = times
-                time_dict['time'] = Cosmology.get_time(0) - times
-            else:
-                time_dict['time'] = times
-                time_dict['time.lookback'] = Cosmology.get_time(0) - times
-            time_dict['redshift'] = Cosmology.convert_time('redshift', 'time', time_dict['time'])
-            time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
-
-        else:
-            if 'redshift' in time_kind:
-                time_dict['redshift'] = times
-                time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
-            elif 'scalefactor' in time_kind:
-                time_dict['scalefactor'] = times
-                time_dict['redshift'] = 1 / time_dict['scalefactor'] - 1
-            time_dict['time'] = Cosmology.get_time(time_dict['redshift'])
-            time_dict['time.lookback'] = Cosmology.get_time(0) - time_dict['time']
-
-        return time_dict
-
     def _get_star_form_history(
         self,
         part,
@@ -2839,7 +2885,8 @@ class StarFormHistoryClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
+        time_kind : str : time metric to use:
+            'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
         time_limits : list : min and max limits of time_kind to impose
         time_width : float : width of time_kind bin (in units set by time_scaling)
         time_scaling : str : scaling of time_kind: 'log', 'linear'
@@ -2889,7 +2936,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
         # get time bins, ensure are ordered from earliest
-        time_dict = self._get_time_bin_dictionary(
+        time_dict = part.Cosmology.get_time_bins(
             time_kind, time_limits, time_width, time_scaling, part.Cosmology
         )
         time_bins = np.sort(time_dict['time'])
