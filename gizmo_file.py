@@ -12,6 +12,7 @@ import glob
 import numpy as np
 
 import utilities as ut
+from . import gizmo_default
 
 # default subset of snapshots (65 snapshots)
 snapshot_indices_keep = [
@@ -93,10 +94,10 @@ class CompressClass(ut.io.SayClass):
 
     def compress_snapshots(
         self,
-        simulation_directory='.',
-        snapshot_directory='output',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_directory_out='',
-        snapshot_index_limits=[0, 600],
+        snapshot_index_limits=[0, gizmo_default.snapshot_index],
         analysis_directory='~/analysis',
         python_executable='python3',
         proc_number=1,
@@ -132,12 +133,12 @@ class CompressClass(ut.io.SayClass):
 
     def compress_snapshot(
         self,
-        simulation_directory='.',
-        snapshot_directory='output',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_directory_out='',
         code_directory='~/analysis',
         python_executable='python3',
-        snapshot_index=600,
+        snapshot_index=gizmo_default.snapshot_index,
     ):
         '''
         Compress single snapshot (which may be multiple files) in input directory.
@@ -184,8 +185,8 @@ class CompressClass(ut.io.SayClass):
 
     def test_compression(
         self,
-        simulation_directory='.',
-        snapshot_directory='output',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_indices='all',
         compression_level=0,
         verbose=False,
@@ -229,9 +230,10 @@ class CompressClass(ut.io.SayClass):
         for snapshot_index in snapshot_indices:
             for snapshot_block_index in range(snapshot_block_number):
                 header = Read.read_header(
+                    simulation_directory,
+                    snapshot_directory,
                     'index',
                     snapshot_index,
-                    simulation_directory,
                     snapshot_block_index=snapshot_block_index,
                     verbose=verbose,
                 )
@@ -276,12 +278,12 @@ class ArchiveClass(ut.io.SayClass):
     def clean_directories(
         self,
         directories='.',
-        gizmo_directory='gizmo',
-        snapshot_directory='output',
-        restart_directory='restartfiles',
-        gizmo_out_file='gizmo.out',
-        gizmo_err_file='gizmo.err',
-        snapshot_scalefactor_file='snapshot_scale-factors.txt',
+        gizmo_directory=gizmo_default.gizmo_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
+        restart_directory=gizmo_default.restart_directory,
+        gizmo_out_file=gizmo_default.gizmo_out_file_name,
+        gizmo_err_file=gizmo_default.gizmo_err_file_name,
+        snapshot_scalefactor_file=gizmo_default.snapshot_scalefactor_file_name,
     ):
         '''
         Clean a simulation directory, a list of simulation directories, or a directory of multiple
@@ -298,7 +300,7 @@ class ArchiveClass(ut.io.SayClass):
             will run recursively on each one
         gizmo_directory : str : directory of Gizmo source code
         snapshot_directory : str : output directory that contains snapshots
-        restart_directory : str : directory within snapshot_directory that contains restart files
+        restart_directory : str : directory within snapshot_directory that stores restart files
         gizmo_out_file : str : Gizmo 'out' file
         gizmo_err_file : str : Gizmo error file
         snapshot_scalefactor_file : str : file that contains snapshot scale-factors (only)
@@ -313,6 +315,7 @@ class ArchiveClass(ut.io.SayClass):
 
         gizmo_directory = gizmo_directory.rstrip('/')
         snapshot_directory = snapshot_directory.rstrip('/')
+        gizmo_out_file = gizmo_out_file.rstrip('*')
 
         cwd = os.getcwd()  # save current directory
 
@@ -411,10 +414,10 @@ class ArchiveClass(ut.io.SayClass):
     def tar_directories(
         self,
         directories='.',
-        snapshot_directory='output',
-        job_directory='gizmo_jobs',
-        ic_directory='initial_condition',
-        particle_track_directory='track',
+        snapshot_directory=gizmo_default.snapshot_directory,
+        job_directory=gizmo_default.gizmo_job_directory,
+        ic_directory=gizmo_default.ic_directory,
+        particle_track_directory=gizmo_default.track_directory,
         halo_directory='halo',
         rockstar_directory='rockstar_dm',
         rockstar_job_directory='rockstar_jobs',
@@ -599,8 +602,8 @@ class ArchiveClass(ut.io.SayClass):
 
     def delete_snapshots(
         self,
-        simulation_directory='.',
-        snapshot_directory='output',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_index_limits=[1, 599],
         delete_halos=False,
     ):
@@ -615,17 +618,13 @@ class ArchiveClass(ut.io.SayClass):
         snapshot_index_limits : list : min and max snapshot indices to delete
         delete_halos : bool : whether to delete halo catalog files at the same snapshots
         '''
-        if not simulation_directory:
-            simulation_directory = '.'
-        simulation_directory = ut.io.get_path(simulation_directory)
-
         snapshot_name_base = 'snap*_{:03d}*'
-        if not snapshot_directory:
-            snapshot_directory = 'output/'
-        snapshot_directory = ut.io.get_path(snapshot_directory)
 
         halo_name_base = 'halos_{:03d}*'
         halo_directory = 'halo/rockstar_dm/catalog/'
+
+        simulation_directory = ut.io.get_path(simulation_directory)
+        snapshot_directory = ut.io.get_path(snapshot_directory)
 
         if snapshot_index_limits is None or len(snapshot_index_limits) == 0:
             snapshot_index_limits = [1, 599]
@@ -665,8 +664,8 @@ class GlobusClass(ut.io.SayClass):
 
     def submit_transfer(
         self,
-        simulation_path_directory='.',
-        snapshot_directory='output',
+        simulation_path_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         batch_file_name='globus_batch.txt',
         machine_name='peloton',
     ):
@@ -715,7 +714,10 @@ class GlobusClass(ut.io.SayClass):
         os.system(command)
 
     def write_batch_file(
-        self, simulation_directory='.', snapshot_directory='output', file_name='globus_batch.txt'
+        self,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
+        file_name='globus_batch.txt',
     ):
         '''
         Write a batch file that sets files to transfer via globus.
@@ -753,7 +755,7 @@ class GlobusClass(ut.io.SayClass):
                 transfer_string += command
 
         # initial condition files
-        transfer_items = glob.glob(simulation_directory + 'initial_condition*/*')
+        transfer_items = glob.glob(simulation_directory + gizmo_default.ic_directory + '*')
         transfer_items.sort()
         for transfer_item in transfer_items:
             if '.ics' not in transfer_item:
@@ -814,8 +816,12 @@ class RsyncClass(ut.io.SayClass):
         directory_to : str : local directory to put snapshots
         snapshot_indices : int or list : index[s] of snapshots to transfer
         '''
-        directory_from = ut.io.get_path(simulation_directory_from) + 'output/'
-        directory_to = ut.io.get_path(simulation_directory_to) + 'output/.'
+        directory_from = (
+            ut.io.get_path(simulation_directory_from) + gizmo_default.snapshot_directory
+        )
+        directory_to = (
+            ut.io.get_path(simulation_directory_to) + gizmo_default.snapshot_directory + '.'
+        )
 
         if np.isscalar(snapshot_indices):
             snapshot_indices = [snapshot_indices]
@@ -853,7 +859,7 @@ class RsyncClass(ut.io.SayClass):
         '''
         include_names = []
         if include_snapshot600:
-            include_names.append('output/snap*_600*')
+            include_names.append(gizmo_default.snapshot_directory + 'snap*_600*')
 
         exclude_names = [
             #'output/',
@@ -936,7 +942,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             simulation_directory = str(sys.argv[2])
 
-        snapshot_index_limits = [0, 600]
+        snapshot_index_limits = [0, gizmo_default.snapshot_index]
         if len(sys.argv) > 3:
             snapshot_index_limits[0] = int(sys.argv[3])
             if len(sys.argv) > 4:

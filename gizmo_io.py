@@ -152,6 +152,7 @@ import h5py
 import numpy as np
 
 import utilities as ut
+from . import gizmo_default
 
 
 # --------------------------------------------------------------------------------------------------
@@ -619,7 +620,7 @@ class ReadClass(ut.io.SayClass):
     Read Gizmo snapshot[s].
     '''
 
-    def __init__(self, snapshot_name_base='snap*[!txt]', verbose=True):
+    def __init__(self, snapshot_name_base=gizmo_default.snapshot_name_base, verbose=True):
         '''
         Set properties for snapshot files.
 
@@ -660,10 +661,10 @@ class ReadClass(ut.io.SayClass):
         self,
         species='all',
         snapshot_value_kind='index',
-        snapshot_values=600,
-        simulation_directory='.',
-        snapshot_directory='output/',
-        track_directory='track/',
+        snapshot_values=gizmo_default.snapshot_index,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
+        track_directory=gizmo_default.track_directory,
         simulation_name='',
         properties='all',
         element_indices=None,
@@ -776,7 +777,7 @@ class ReadClass(ut.io.SayClass):
 
             # read header from snapshot file
             header = self.read_header(
-                'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name
+                simulation_directory, snapshot_directory, 'index', snapshot_index, simulation_name
             )
 
             if not header['cosmological']:
@@ -784,10 +785,10 @@ class ReadClass(ut.io.SayClass):
 
             # read particles from snapshot file[s]
             part = self.read_particles(
-                'index',
-                snapshot_index,
                 simulation_directory,
                 snapshot_directory,
+                'index',
+                snapshot_index,
                 properties,
                 element_indices,
                 convert_float32,
@@ -908,10 +909,10 @@ class ReadClass(ut.io.SayClass):
         self,
         species='all',
         snapshot_value_kind='index',
-        snapshot_value=600,
+        snapshot_value=gizmo_default.snapshot_index,
         simulation_directories=[],
-        snapshot_directory='output/',
-        track_directory='track/',
+        snapshot_directory=gizmo_default.snapshot_directory,
+        track_directory=gizmo_default.track_directory,
         properties='all',
         element_indices=[0, 1, 6, 10],
         assign_hosts=True,
@@ -990,10 +991,10 @@ class ReadClass(ut.io.SayClass):
             simulation_name = simulation_directories[simulation_directory]
             try:
                 _ = self.read_header(
-                    snapshot_value_kind,
-                    snapshot_value,
                     simulation_directory,
                     snapshot_directory,
+                    snapshot_value_kind,
+                    snapshot_value,
                     simulation_name,
                 )
             except IOError:
@@ -1061,10 +1062,10 @@ class ReadClass(ut.io.SayClass):
 
     def read_header(
         self,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_value_kind='index',
-        snapshot_value=600,
-        simulation_directory='.',
-        snapshot_directory='output/',
+        snapshot_value=gizmo_default.snapshot_index,
         simulation_name='',
         snapshot_block_index=0,
         verbose=True,
@@ -1216,10 +1217,10 @@ class ReadClass(ut.io.SayClass):
 
     def read_particles(
         self,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_value_kind='index',
-        snapshot_value=600,
-        simulation_directory='.',
-        snapshot_directory='output/',
+        snapshot_value=gizmo_default.snapshot_index,
         properties='all',
         element_indices=None,
         convert_float32=False,
@@ -1230,10 +1231,10 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
-        snapshot_value : int or float : index (number) of snapshot file
         simulation_directory : str : directory of simulation
         snapshot_directory: str : directory of snapshot files within simulation_directory
+        snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
+        snapshot_value : int or float : index (number) of snapshot file
         properties : str or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_dict
@@ -1344,7 +1345,7 @@ class ReadClass(ut.io.SayClass):
 
         if not header:
             header = self.read_header(
-                'index', snapshot_index, simulation_directory, snapshot_directory
+                simulation_directory, snapshot_directory, 'index', snapshot_index,
             )
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
@@ -1755,7 +1756,7 @@ class ReadClass(ut.io.SayClass):
 
     def get_cosmology(
         self,
-        directory='.',
+        simulation_directory=gizmo_default.simulation_directory,
         omega_lambda=None,
         omega_matter=None,
         omega_baryon=None,
@@ -1770,7 +1771,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directory : str : directory of simulation (where directory of initial conditions is)
+        simulation_directory : str : directory of simulation
 
         Returns
         -------
@@ -1788,9 +1789,11 @@ class ReadClass(ut.io.SayClass):
                     print(f'! read {line}, but previously assigned = {value_test}')
             return value
 
-        if directory:
+        if simulation_directory:
             # find MUSIC file, assuming named *.conf
-            file_name_find = ut.io.get_path(directory) + '*/*.conf'
+            file_name_find = (
+                ut.io.get_path(simulation_directory) + '*/' + gizmo_default.music_config_file_name
+            )
             path_file_names = ut.io.get_file_names(file_name_find, verbose=False)
             if len(path_file_names) > 0:
                 path_file_name = path_file_names[0]
@@ -1912,8 +1915,8 @@ class ReadClass(ut.io.SayClass):
         method=True,
         host_number=1,
         exclusion_distance=300,
-        simulation_directory='.',
-        track_directory='track/',
+        simulation_directory=gizmo_default.simulation_directory,
+        track_directory=gizmo_default.track_directory,
         verbose=True,
     ):
         '''
@@ -2066,7 +2069,11 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name].host[host_prop_name] = part.host[host_prop_name]
 
     def _assign_hosts_coordinates_from_halos(
-        self, part, host_number, simulation_directory='.', verbose=True
+        self,
+        part,
+        host_number,
+        simulation_directory=gizmo_default.simulation_directory,
+        verbose=True,
     ):
         '''
         Utility function for assign_hosts_coordinates().
@@ -2174,8 +2181,8 @@ class ReadClass(ut.io.SayClass):
         value_adjust=None,
         snapshot_value_kind='redshift',
         snapshot_value=0,
-        simulation_directory='.',
-        snapshot_directory='output/',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
     ):
         '''
         Read snapshot file[s].

@@ -19,12 +19,10 @@ import collections
 import numpy as np
 
 import utilities as ut
+from . import gizmo_default
 from . import gizmo_io
 
-# default directory to store particle tracking files
-TRACK_DIRECTORY = 'track/'
-# default directory of snapshot files (within simulation directory)
-SNAPSHOT_DIRECTORY = 'output/'
+
 # dictionary key of particle id in catalog
 ID_NAME = 'id'
 
@@ -295,10 +293,10 @@ class ParticlePointerClass(ut.io.SayClass):
     def __init__(
         self,
         species_names=['star', 'gas'],
-        simulation_directory='.',
-        track_directory=TRACK_DIRECTORY,
-        snapshot_directory=SNAPSHOT_DIRECTORY,
-        reference_snapshot_index=600,
+        simulation_directory=gizmo_default.simulation_directory,
+        track_directory=gizmo_default.track_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
+        reference_snapshot_index=gizmo_default.snapshot_index,
     ):
         '''
         Parameters
@@ -482,7 +480,7 @@ class ParticlePointerClass(ut.io.SayClass):
             Pointer[z0 + 'particle.number'] = part_z0_number
             Pointer[z0 + species_name + '.number'] = part_z0_number
             Pointer[z0 + species_name + '.index.limits'] = [0, part_z0_number]
-            Pointer[z0 + 'snapshot.index'] = 600
+            Pointer[z0 + 'snapshot.index'] = gizmo_default.snapshot_index
 
             part_z_number = np.sum(Pointer[particle_index_name] >= 0)
             Pointer[z + 'particle.number'] = part_z_number
@@ -1024,10 +1022,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
     def __init__(
         self,
         species_name='star',
-        simulation_directory='.',
-        track_directory=TRACK_DIRECTORY,
-        snapshot_directory=SNAPSHOT_DIRECTORY,
-        reference_snapshot_index=600,
+        simulation_directory=gizmo_default.simulation_directory,
+        track_directory=gizmo_default.track_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
+        reference_snapshot_index=gizmo_default.snapshot_index,
         host_distance_limits=[0, 50],
     ):
         '''

@@ -20,6 +20,7 @@ from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 
 import utilities as ut
+from . import gizmo_default
 from . import gizmo_io
 
 
@@ -79,12 +80,12 @@ def print_properties_statistics(part, species='all'):
 
     Say.say('printing minimum, median, maximum')
     for spec_name in species_print:
-        Say.say('\n* {}'.format(spec_name))
+        Say.say(f'\n* {spec_name}')
         for prop_name in species_property_dict[spec_name]:
             try:
                 prop_values = part[spec_name].prop(prop_name)
             except KeyError:
-                Say.say('{} not in catalog'.format(prop_name))
+                Say.say(f'{prop_name} not in catalog')
                 continue
 
             # Statistic.stat = Statistic.get_statistic_dict(prop_values)
@@ -198,7 +199,7 @@ def plot_metal_v_distance(
         metal_values,
     )
 
-    metal_mass_label = 'M_{{\\rm Z,{}}}'.format(species_name)
+    metal_mass_label = f'M_{{\\rm Z,{species_name}}}'
     radius_label = '(r)'
     if '.cum' in metal_name:
         radius_label = '(< r)'
@@ -208,12 +209,12 @@ def plot_metal_v_distance(
         )
     elif 'mass' in metal_name:
         # axis_y_label = '${}(< r) \, / \, M_{{\\rm Z,tot}}$'.format(metal_mass_label)
-        axis_y_label = '${}{} \, [M_\odot]$'.format(metal_mass_label, radius_label)
+        axis_y_label = f'${metal_mass_label}{radius_label} \, [M_\odot]$'
     # axis_y_label = '$Z \, / \, Z_\odot$'
     subplot.set_ylabel(axis_y_label)
 
     if scale_to_halo_radius:
-        axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
+        axis_x_label = f'$d \, / \, R_{{\\rm {virial_kind}}}$'
     else:
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
     subplot.set_xlabel(axis_x_label)
@@ -269,11 +270,7 @@ def test_metal_variation(parts, species=['star', 'gas'], element_reference='o', 
     Statistic = ut.statistic.StatisticClass()
 
     for element_name in element_names:
-        Say.say(
-            '\ndex scatter in [{}/{}]'.format(
-                element_name.capitalize(), element_reference.capitalize()
-            )
-        )
+        Say.say(f'\ndex scatter in [{element_name.capitalize()}/{element_reference.capitalize()}]')
         for spec_name in species:
             for part_i, part in enumerate(parts):
                 element_ratios_p = part[spec_name].prop(f'massfraction.{element_name}') / part[
@@ -448,9 +445,9 @@ class ImageClass(ut.io.SayClass):
                         or rotation_tensor.shape[0] != positions.shape[1]
                         or rotation_tensor.shape[1] != positions.shape[1]
                     ):
-                        raise ValueError('wrong shape for rotation = {}'.format(rotation))
+                        raise ValueError(f'wrong shape for rotation = {rotation}')
                 else:
-                    raise ValueError('cannot parse rotation = {}'.format(rotation))
+                    raise ValueError(f'cannot parse rotation = {rotation}')
 
                 positions = ut.coordinate.get_coordinates_rotated(positions, rotation_tensor)
 
@@ -537,12 +534,8 @@ class ImageClass(ut.io.SayClass):
             subplot.set_xlim(position_limits[dimensions_plot[0]])
             subplot.set_ylim(position_limits[dimensions_plot[1]])
 
-            subplot.set_xlabel(
-                '{} $\\left[ {{\\rm kpc}} \\right]$'.format(dimen_label[dimensions_plot[0]])
-            )
-            subplot.set_ylabel(
-                '{} $\\left[ {{\\rm kpc}} \\right]$'.format(dimen_label[dimensions_plot[1]])
-            )
+            subplot.set_xlabel(f'{dimen_label[dimensions_plot[0]]} $\\left[ {{\\rm kpc}} \\right]$')
+            subplot.set_ylabel(f'{dimen_label[dimensions_plot[1]]} $\\left[ {{\\rm kpc}} \\right]$')
 
             if 'histogram' in image_kind:
                 hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
@@ -1219,7 +1212,7 @@ def plot_property_v_property(
     if weight_by_mass:
         masses = masses[part_indices]
 
-    Say.say('keeping {} particles'.format(x_prop_values.size))
+    Say.say(f'keeping {x_prop_values.size} particles')
 
     if draw_statistics:
         stat_bin_number = int(np.round(property_bin_number / 10))
@@ -1762,7 +1755,7 @@ def plot_disk_orientation_v_property(
         reference_rotation = principal_axes['rotation'][axis_index]
 
         for spec_i, spec_name in enumerate(species_names):
-            Say.say('  {}'.format(spec_name))
+            Say.say(f'  {spec_name}')
 
             if spec_name == 'gas':
                 part_indices = ut.array.get_indices(
@@ -1865,7 +1858,8 @@ def plot_disk_orientation_v_time(
     time_kind='time.lookback',
     time_limits=[0, 13],
     time_scaling='linear',
-    refrence_snapshot_index=600,
+    refrence_snapshot_index=gizmo_default.snapshot_index,
+    axis_indices=[0, 1, 2],
     host_index=0,
     write_plot=False,
     plot_directory='.',
@@ -1883,14 +1877,14 @@ def plot_disk_orientation_v_time(
     time_limits : list : min and max limits of time_kind to impose
     time_width : float : width of time_kind bin
     time_scaling : str : scaling of time_kind: 'log', 'linear'
+    refrence_snapshot_index : int : index of reference snapshot, that defines angle zero point
+    axis_indices : list : which principal axes to plot the orientation angles of
     host_index : int : index of host galaxy/halo to get stored position of (if not input it)
     write_plot : bool : whether to write figure to file
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
-    axis_indices = [0, 1, 2]
-
-    Say = ut.io.SayClass(plot_disk_orientation_v_time)
+    # Say = ut.io.SayClass(plot_disk_orientation_v_time)
 
     if isinstance(parts, dict):
         parts = [parts]
@@ -1900,58 +1894,54 @@ def plot_disk_orientation_v_time(
     for part_i, part in enumerate(parts):
         rotation_tensors = part.hostz['rotation'][:, host_index]
         reference_rotation_tensor = rotation_tensors[refrence_snapshot_index]
-        for axis_i in axis_indices:
-            angles[part_i, axis_i] = np.dot(
+        for axis_ii, axis_i in enumerate(axis_indices):
+            angles[part_i, axis_ii] = np.dot(
                 rotation_tensors[:, axis_i], reference_rotation_tensor[axis_i]
             )
 
     masks = np.isfinite(angles)
     angles[masks] = np.arccos(angles[masks]) * 180 / np.pi  # [degree]
-    # masks = angles > 90
-    # angles[masks] = 180 - angles[masks]
+    masks = angles > 90
+    angles[masks] = 180 - angles[masks]
 
-    return angles
+    if time_kind in ['time.lookback', 'age']:
+        times = parts[0].Snapshot['time'][-1] - parts[0].Snapshot['time']
+    else:
+        times = parts[0].Snapshot[time_kind]
 
-    """
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
 
     _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
-        subplot, property_scaling, property_limits, None, 'linear', [0, None], angles
+        subplot, time_scaling, time_limits, times, 'linear', [0, 90], angles
     )
 
-    if property_name == 'distance':
-        subplot.set_xlabel('maximum radius $\\left[ {{\\rm kpc}} \\right]$')
-    else:
-        subplot.set_xlabel('star maximum age $\\left[ {{\\rm Gyr}} \\right]$')
+    subplot.set_xlabel(time_kind)
     subplot.set_ylabel('disk offset angle $\\left[ {{\\rm deg}} \\right]$')
 
-    if len(parts) > len(species_names):
+    if len(parts) > len(axis_indices):
         colors = ut.plot.get_colors(len(parts))
     else:
-        colors = ut.plot.get_colors(len(species_names))
+        colors = ut.plot.get_colors(len(axis_indices))
 
     for part_i, part in enumerate(parts):
-        for spec_i, spec_name in enumerate(species_names):
-            if len(parts) > len(species_names):
+        for axis_ii, axis_i in enumerate(axis_indices):
+            if len(parts) > len(axis_indices):
                 label = part.info['simulation.name']
                 color = colors[part_i]
             else:
-                label = spec_name
-                color = colors[spec_i]
+                label = f'principal axis {axis_i}'
+                color = colors[axis_ii]
 
-            subplot.plot(
-                PropertyBin.mins, angles[part_i, spec_i], color=color, alpha=0.8, label=label
-            )
+            subplot.plot(times, angles[part_i, axis_ii], color=color, alpha=0.8, label=label)
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
-    property_y = 'disk.orientation'
+    plot_name = f'disk.orientation_v_{time_kind}'
     if len(parts) == 1:
-        property_y = parts[0].info['simulation.name'] + '_' + property_y
-    plot_name = ut.plot.get_file_name(property_y, property_name, snapshot_dict=part.snapshot)
+        property_y = parts[0].info['simulation.name'] + '_' + plot_name
+    plot_name = ut.plot.get_file_name(property_y, plot_name, snapshot_dict=part.snapshot)
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
-    """
 
 
 def plot_velocity_distribution_of_halo(
@@ -2051,7 +2041,7 @@ def plot_velocity_distribution_of_halo(
         else:
             prop_values = part[species_name].prop(property_name, part_indices)
 
-        Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
+        Say.say(f'keeping {prop_values.size} {species_name} particles')
 
         Stat.append_to_dictionary(
             prop_values, property_limits, property_bin_width, property_bin_number, property_scaling
@@ -2116,7 +2106,7 @@ def assign_vel_circ_at_radius(
     his = ut.array.get_indices(hal.prop('mass.bound/mass'), [0.1, Inf])
     his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
     his = ut.array.get_indices(hal[sort_property_name], [sort_property_value_min, Inf], his)
-    Say.say('{} halos within limits'.format(his.size))
+    Say.say(f'{his.size} halos within limits')
 
     his = his[np.argsort(hal[sort_property_name][his])]
     his = his[::-1][:halo_number_max]
@@ -2715,7 +2705,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
             hal_indices = hal_indices[np.argsort(hal.prop(mass_kind, hal_indices))]
 
-            print('halo number = {}'.format(hal_indices.size))
+            print(f'halo number = {hal_indices.size}')
 
             sfh = {}
 
@@ -2828,7 +2818,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 linewidth = 2.5 + 0.1 * hal_ii
                 # linewidth = 3.0
                 mass = ut.io.get_string_from_numbers(sfh['mass'][hal_ii][-1], 1, exponential=True)
-                label = '${}\,{{\\rm M}}_\odot$'.format(mass)
+                label = f'${mass}\,{{\\rm M}}_\odot$'
                 subplot.plot(
                     sfh[time_kind][hal_ii],
                     sfh[sfh_kind][hal_ii],
@@ -2989,7 +2979,7 @@ StarFormHistory = StarFormHistoryClass()
 def plot_gas_neutral_fraction_v_redshift(
     parts=None,
     redshift_limits=[6, 8.4],
-    simulation_directory='.',
+    simulation_directory=gizmo_default.simulation_directory,
     write_plot=False,
     plot_directory='.',
     figure_index=1,
@@ -3573,7 +3563,9 @@ def plot_density_profiles_halos(
 # --------------------------------------------------------------------------------------------------
 # galaxy mass and radius at snapshots
 # --------------------------------------------------------------------------------------------------
-def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], species=['star']):
+def write_galaxy_properties_v_time(
+    simulation_directory=gizmo_default.simulation_directory, redshifts=[], species=['star']
+):
     '''
     Read snapshots and store dictionary of host galaxy properties (such as mass and radius)
     at snapshots.
@@ -3602,14 +3594,14 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     gal = {'index': [], 'redshift': [], 'scalefactor': [], 'time': [], 'time.lookback': []}
 
     for spec_name in species:
-        gal['{}.position'.format(spec_name)] = []
+        gal[f'{spec_name}.position'] = []
         for mass_percent in mass_percents:
             gal['{}.radius.{:.0f}'.format(spec_name, mass_percent)] = []
             gal['{}.mass.{:.0f}'.format(spec_name, mass_percent)] = []
 
     if redshifts == 'all' or redshifts is None or redshifts == []:
         Snapshot = ut.simulation.SnapshotClass()
-        Snapshot.read_snapshots('snapshot_times.txt', simulation_directory)
+        Snapshot.read_snapshots(gizmo_default.snapshot_time_file_name, simulation_directory)
         redshifts = Snapshot['redshift']
     else:
         if np.isscalar(redshifts):
@@ -3742,7 +3734,7 @@ def plot_galaxy_property_v_time(
 
     ut.plot.make_legends(subplot)
 
-    plot_name = 'galaxy_{}_v_{}'.format(property_name, time_kind)
+    plot_name = f'galaxy_{property_name}_v_{time_kind}'
     ut.plot.parse_output(write_plot, plot_name, plot_directory)
 
 
