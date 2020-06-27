@@ -1331,6 +1331,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         # initialize and store position, velocity, principal axes rotation tensor + axis ratios
         # of each primary host galaxy at each snapshot
+        part_z0[self.species_name].hostz = {}
+
         part_z0[self.species_name].hostz['position'] = (
             np.zeros([part_z0.Snapshot['index'].size, host_number, 3], self.coordinate_dtype)
             + np.nan

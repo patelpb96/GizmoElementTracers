@@ -1860,6 +1860,7 @@ def plot_disk_orientation_v_time(
     time_scaling='linear',
     refrence_snapshot_index=gizmo_default.snapshot_index,
     axis_indices=[0, 1, 2],
+    angle_limits=[0, 90],
     host_index=0,
     write_plot=False,
     plot_directory='.',
@@ -1872,7 +1873,7 @@ def plot_disk_orientation_v_time(
     Parameters
     ----------
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
-    time_kind : str : time kind to use:
+    time_kind : str : time kind to use:s
         'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
     time_limits : list : min and max limits of time_kind to impose
     time_width : float : width of time_kind bin
@@ -1913,7 +1914,7 @@ def plot_disk_orientation_v_time(
     _fig, subplot = ut.plot.make_figure(figure_index)
 
     _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
-        subplot, time_scaling, time_limits, times, 'linear', [0, 90], angles
+        subplot, time_scaling, time_limits, times, 'linear', angle_limits, angles
     )
 
     subplot.set_xlabel(time_kind)
