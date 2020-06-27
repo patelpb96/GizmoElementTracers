@@ -1092,6 +1092,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         if write:
             track_directory = ut.io.get_path(track_directory, create_path=True)
             dict_out = collections.OrderedDict()
+            dict_out['species'] = self.species_name
+            dict_out['snapshot.index'] = part.snapshot['index']
             dict_out['id'] = part[self.species_name][self.id_name]
             for prop_name in part[self.species_name]:
                 if 'form.host' in prop_name:
@@ -1133,7 +1135,21 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 }
 
             for prop_name in dict_read:
+                if prop_name == 'species':
+                    self.say(f'reading formation coordinates of {dict_read[prop_name]} particles')
+                    continue
+
+                if prop_name == 'snapshot.index':
+                    self.say(f'reading particles at snapshot {dict_read[prop_name]}')
+                    continue
+
                 if prop_name == 'id':
+                    mismatch_ids = part[self.species_name][self.id_name] != dict_read[prop_name]
+                    if np.sum(mismatch_ids) > 0:
+                        self.say(
+                            f'! {np.sum(mismatch_ids)} ids are mis-matched between'
+                            + ' formation particles read in and input particle dictionary'
+                        )
                     continue
 
                 elif 'form.' in prop_name:
