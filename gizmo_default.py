@@ -33,7 +33,7 @@ snapshot_time_file_name = 'snapshot_times.txt'
 # directory within snapshot_directory that stores restart files
 restart_directory = 'restartfiles/'
 
-# name (base) of Gizmo restart files
+# name (base) of files for Gizmo restart
 restart_file_name = 'restart.*'
 
 
@@ -41,13 +41,13 @@ restart_file_name = 'restart.*'
 # directory of Gizmo source code
 gizmo_directory = 'gizmo/'
 
-# name (base) of main run-time file that Gizmo outputs
+# name (base) of file that Gizmo write main run-time information
 gizmo_out_file_name = 'gizmo.out*'
 
-# name of error file that Gizmo outputs
+# name of file that Gizmo write errors to
 gizmo_err_file_name = 'gizmo.err'
 
-# name file that stores Gizmo CPU wall-times
+# name of file that stores Gizmo CPU wall-times
 gizmo_cpu_file_name = 'cpu.txt'
 
 # directory where keep slurm/pbs job files
@@ -55,9 +55,12 @@ gizmo_job_directory = 'gizmo_jobs/'
 
 
 # particle tracking ----------
-# directory of particle tracking files,
-# including stored host coordinates and rotation tensors across all snapshots
+# directory of particle tracking files, including stored hosts coordinates across all snapshots
 track_directory = 'track/'
+
+# file that contains hostst coordinates, rotation tensors, and axis ratios across all snapshots
+# and also stores star particle formation coordinates
+hosts_coordinates_file_name = 'hosts_coordinates.hdf5'
 
 
 # initial condition ----------

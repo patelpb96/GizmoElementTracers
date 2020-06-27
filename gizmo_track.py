@@ -373,6 +373,8 @@ class ParticlePointerClass(ut.io.SayClass):
         else:
             track_directory = ut.io.get_path(track_directory)
 
+        path_file_name = simulation_directory + track_directory + file_name
+
         if Pointer is not None:
             # write to file
             track_directory = ut.io.get_path(track_directory, create_path=True)
@@ -382,13 +384,11 @@ class ParticlePointerClass(ut.io.SayClass):
                 if prop_name == 'species':
                     # hdf5 writer does not support unicode
                     Pointer[prop_name] = Pointer[prop_name].astype('|S4')
-            ut.io.file_hdf5(simulation_directory + track_directory + file_name, Pointer)
+            ut.io.file_hdf5(path_file_name, Pointer)
 
         else:
             # read from file
-            dict_read = ut.io.file_hdf5(
-                simulation_directory + track_directory + file_name, verbose=verbose
-            )
+            dict_read = ut.io.file_hdf5(path_file_name, verbose=verbose)
 
             self.say(
                 '* read particle pointers from:  {}.hdf5'.format(
@@ -1059,8 +1059,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
         # names of distances and velocities to write/read
         self.form_host_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-        self.file_name_base = f'{species_name}_form_coordinates' + '_{:03d}'
-
     def io_formation_coordinates(
         self, part, simulation_directory=None, track_directory=None, write=False
     ):
@@ -1077,8 +1075,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
         track_directory : str : directory of files for particle pointers and formation coordinates
         write : bool : whether to write to file (instead of read)
         '''
-        file_name = self.file_name_base.format(part.snapshot['index'])
-
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
         else:
@@ -1088,6 +1084,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
             track_directory = self.track_directory
         else:
             track_directory = ut.io.get_path(track_directory)
+
+        path_file_name = (
+            simulation_directory + track_directory + gizmo_default.hosts_coordinates_file_name
+        )
 
         if write:
             track_directory = ut.io.get_path(track_directory, create_path=True)
@@ -1099,10 +1099,18 @@ class ParticleCoordinateClass(ut.io.SayClass):
             for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
                 dict_out['host.' + prop_name] = part[self.species_name].hostz[prop_name]
 
-            ut.io.file_hdf5(simulation_directory + track_directory + file_name, dict_out)
+            ut.io.file_hdf5(path_file_name, dict_out)
 
         else:
-            dict_read = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            # read in
+            # backwards compatibility with old file name
+            try:
+                dict_read = ut.io.file_hdf5(path_file_name)
+            except OSError:
+                path_file_name = path_file_name.replace(
+                    gizmo_default.hosts_coordinates_file_name, 'star_form_coordinates_600.hdf5'
+                )
+                dict_read = ut.io.file_hdf5(path_file_name)
 
             # sanity check
             bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_read['id'])
@@ -1186,8 +1194,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
         verbose : bool : whether to print diagnostic information
 
         '''
-        file_name = self.file_name_base.format(part.snapshot['index'])
-
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
         else:
@@ -1198,14 +1204,24 @@ class ParticleCoordinateClass(ut.io.SayClass):
         else:
             track_directory = ut.io.get_path(track_directory)
 
-        file_path_name = simulation_directory + track_directory + file_name
+        path_file_name = (
+            simulation_directory + track_directory + gizmo_default.hosts_coordinates_file_name
+        )
 
         self.say(
             '* reading hosts position, velocity, rotation, axis ratios from:  {}.hdf5'.format(
-                file_path_name.lstrip('./')
+                path_file_name.lstrip('./')
             )
         )
-        dict_read = ut.io.file_hdf5(file_path_name, verbose=False)
+
+        # backwards compatibility with old file name
+        try:
+            dict_read = ut.io.file_hdf5(path_file_name, verbose=False)
+        except OSError:
+            path_file_name = path_file_name.replace(
+                gizmo_default.hosts_coordinates_file_name, 'star_form_coordinates_600.hdf5'
+            )
+            dict_read = ut.io.file_hdf5(path_file_name, verbose=False)
 
         snapshot_index = part.snapshot['index']
 
@@ -1498,9 +1514,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
             # store host galaxy properties
             for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
-                part_z0[self.species_name].hostz[prop_name][snapshot_index] = part_z.host[
-                    prop_name
-                ]
+                part_z0[self.species_name].hostz[prop_name][snapshot_index] = part_z.host[prop_name]
 
             for host_i in range(host_number):
                 # compute coordinates wrt primary host
