@@ -265,7 +265,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
                     self[z + 'snapshot.index'], self[z + 'particle.number']
                 )
             )
-            self.say('but {}->{} pointer index max = {}'.format(z_ref, z, pointers_valid.max()))
+            self.say(f'but {z_ref}->{z} pointer index max = {pointers_valid.max()}')
             self.say(
                 'thus, {}->{} pointers do not point to all particles at snapshot {}'.format(
                     z_ref, z, self[z + 'snapshot.index']
@@ -360,7 +360,7 @@ class ParticlePointerClass(ut.io.SayClass):
 
         file_name = ''
         for spec_name in self.species_names:
-            file_name += '{}_'.format(spec_name)
+            file_name += f'{spec_name}_'
         file_name += 'pointers_{:03d}'.format(snapshot_index)
 
         if simulation_directory is None:
@@ -622,7 +622,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 )
             )
             match_property = 'massfraction.metals'
-            self.say('instead, using: {}'.format(match_property))
+            self.say(f'instead, using: {match_property}')
             if match_property not in properties_read:
                 properties_read.append(match_property)
                 part_z0 = self.GizmoRead.read_snapshots(
@@ -657,7 +657,7 @@ class ParticlePointerClass(ut.io.SayClass):
         species_names_print = self.species_names[0]
         if len(self.species_names) > 1:
             for spec_name in self.species_names[1:]:
-                species_names_print += ' + {}'.format(spec_name)
+                species_names_print += f' + {spec_name}'
         self.say(
             '* {} {} particles have redundant id at (reference) snapshot {}'.format(
                 pindices_mult.size, species_names_print, self.reference_snapshot_index
@@ -668,7 +668,7 @@ class ParticlePointerClass(ut.io.SayClass):
         ut.particle.assign_id_to_index(
             part_z0, self.species_names, self.id_name, store_as_dict=True, verbose=False
         )
-        self.say('assigned id->index pointers at snapshot {}'.format(self.reference_snapshot_index))
+        self.say(f'assigned id->index pointers at snapshot {self.reference_snapshot_index}')
 
         self.match_property = match_property
         self.match_propery_tolerance = match_propery_tolerance
@@ -760,7 +760,7 @@ class ParticlePointerClass(ut.io.SayClass):
         species_names_print = self.species_names[0]
         if len(self.species_names) > 1:
             for spec_name in self.species_names[1:]:
-                species_names_print += ' + {}'.format(spec_name)
+                species_names_print += f' + {spec_name}'
 
         spec_count = 0
         species_names_z = []  # species that are in catalog at this snapshot
@@ -769,7 +769,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 spec_count += 1
                 species_names_z.append(spec_name)
             else:
-                self.say('! no {} particles at snapshot {}'.format(spec_name, snapshot_index))
+                self.say(f'! no {spec_name} particles at snapshot {snapshot_index}')
         if not spec_count:
             return
 
@@ -1432,11 +1432,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     self.species_name, self.species_name, return_array=True
                 )
             except IOError:
-                self.say('! can not read pointers to snapshot {}'.format(snapshot_index))
+                self.say(f'! can not read pointers to snapshot {snapshot_index}')
                 return
 
         part_z0_indices = part_z0_indices[part_pointers >= 0]
-        self.say('\n# {} to assign at snapshot {}'.format(part_z0_indices.size, snapshot_index))
+        self.say(f'\n# {part_z0_indices.size} to assign at snapshot {snapshot_index}')
 
         count = {'id none': 0, 'id wrong': 0}
 
@@ -1498,7 +1498,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
             # store host galaxy properties
             for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
-                part_z0[self.species_name].hostz['position'][snapshot_index] = part_z.host[
+                part_z0[self.species_name].hostz[prop_name][snapshot_index] = part_z.host[
                     prop_name
                 ]
 
