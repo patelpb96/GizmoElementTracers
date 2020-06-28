@@ -1224,11 +1224,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
             simulation_directory + track_directory + gizmo_default.hosts_coordinates_file_name
         )
 
-        self.say(
-            '* reading hosts position, velocity, rotation, axis ratios from:  {}.hdf5'.format(
-                path_file_name.lstrip('./')
-            )
-        )
+        # self.say(
+        #    '* reading hosts position, velocity, rotation, axis ratios from:  {}'.format(
+        #        path_file_name.lstrip('./')
+        #    )
+        # )
 
         # backwards compatibility with old file name
         try:
@@ -1257,20 +1257,23 @@ class ParticleCoordinateClass(ut.io.SayClass):
             }
 
         for prop_name in dict_read:
-            if 'form.' in prop_name or prop_name == 'id':
+            if 'form.' in prop_name or prop_name in ['id', 'snapshot.index', 'species']:
                 continue
+
             elif 'host.position' in prop_name or 'center.position' in prop_name:
                 if np.ndim(dict_read[prop_name]) == 2:
                     dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                         (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                     )  # update from old file format
                 prop_name_store = 'position'
+
             elif 'host.velocit' in prop_name or 'center.velocit' in prop_name:
                 if np.ndim(dict_read[prop_name]) == 2:
                     dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                         (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
                     )  # update from old file format
                 prop_name_store = 'velocity'
+
             elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
                 if np.ndim(dict_read[prop_name]) == 3:
                     dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
@@ -1282,8 +1285,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
                         )
                     )  # update from old file format
                 prop_name_store = 'rotation'
+
             elif 'host.axis.ratios' in prop_name:
                 prop_name_store = 'axis.ratios'
+
             else:
                 self.say(f'! not sure how to parse {prop_name}')
                 continue
@@ -1296,7 +1301,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         if 'hostz' in part.__dict__:
             host_number = part.hostz['position'].shape[1]
-            self.say(f'read position, velocity, rotation, axis ratios for {host_number} host[s]')
+            self.say(
+                f'read position, velocity, rotation, axis ratios for {host_number} host[s]'
+                + f' in:  {path_file_name}'
+            )
 
         if verbose:
             for host_i, host_position in enumerate(part.host['position']):
