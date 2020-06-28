@@ -1303,7 +1303,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             host_number = part.hostz['position'].shape[1]
             self.say(
                 f'read position, velocity, rotation, axis ratios for {host_number} host[s]'
-                + f' in:  {path_file_name}'
+                + ' in:  {}'.format(path_file_name.lstrip('./'))
             )
 
         if verbose:
@@ -1316,6 +1316,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 self.say(f'host{host_i + 1} velocity = (', end='')
                 ut.io.print_array(host_velocity, '{:.1f}', end='')
                 print(') [km / s]')
+
+            for host_i, host_axis_ratios in enumerate(part.host['axis.ratios']):
+                self.say(f'host{host_i + 1} axis ratios = (', end='')
+                ut.io.print_array(host_axis_ratios, '{:.2f}', end='')
+                print(')')
 
             # print()
 
