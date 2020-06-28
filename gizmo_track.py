@@ -1297,8 +1297,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         if 'hostz' in part.__dict__:
             host_number = part.hostz['position'].shape[1]
             self.say(
-                f'read position, velocity, rotation, axis ratios for {host_number} host[s]'
-                + ' in:  {}'.format(path_file_name.lstrip('./'))
+                f'read {host_number} host[s] (position, velocity, rotation, axis ratios)'
+                + ' from:  {}'.format(path_file_name.lstrip('./'))
             )
 
         if verbose:
