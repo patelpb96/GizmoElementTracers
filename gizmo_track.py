@@ -459,15 +459,15 @@ class ParticlePointerClass(ut.io.SayClass):
         else:
             track_directory = ut.io.get_path(track_directory)
 
+        path_file_name = simulation_directory + track_directory + file_name
+
         if part_pointers is not None:
             # write to file
             track_directory = ut.io.get_path(track_directory, create_path=True)
-            ut.io.file_hdf5(
-                simulation_directory + track_directory + file_name, {hdf5_dict_name: part_pointers}
-            )
+            ut.io.file_hdf5(path_file_name, {hdf5_dict_name: part_pointers})
         else:
             # read from file
-            dict_read = ut.io.file_hdf5(simulation_directory + track_directory + file_name)
+            dict_read = ut.io.file_hdf5(path_file_name)
 
             Pointer = ParticlePointerDictionaryClass()
             particle_index_name = Pointer.pointer_index_name
@@ -1092,12 +1092,13 @@ class ParticleCoordinateClass(ut.io.SayClass):
         if write:
             track_directory = ut.io.get_path(track_directory, create_path=True)
             dict_out = collections.OrderedDict()
-            dict_out['species'] = self.species_name
-            dict_out['snapshot.index'] = part.snapshot['index']
-            dict_out['id'] = part[self.species_name][self.id_name]
+            dict_out['snapshot.index'] = np.array(part.snapshot['index'])
+            dict_out[self.species_name + '.id'] = part[self.species_name][self.id_name]
             for prop_name in part[self.species_name]:
                 if 'form.host' in prop_name:
-                    dict_out[prop_name] = part[self.species_name][prop_name]
+                    dict_out[self.species_name + '.' + prop_name] = part[self.species_name][
+                        prop_name
+                    ]
             for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
                 dict_out['host.' + prop_name] = part[self.species_name].hostz[prop_name]
 
@@ -1135,26 +1136,23 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 }
 
             for prop_name in dict_read:
-                if prop_name == 'species':
-                    self.say(f'reading formation coordinates of {dict_read[prop_name]} particles')
-                    continue
-
                 if prop_name == 'snapshot.index':
                     self.say(f'reading particles at snapshot {dict_read[prop_name]}')
                     continue
 
-                if prop_name == 'id':
+                if '.id' in prop_name or prop_name == 'id':
                     mismatch_ids = part[self.species_name][self.id_name] != dict_read[prop_name]
                     if np.sum(mismatch_ids) > 0:
                         self.say(
-                            f'! {np.sum(mismatch_ids)} ids are mis-matched between'
-                            + ' formation particles read in and input particle dictionary'
+                            f'! {np.sum(mismatch_ids)} {prop_name}s are mis-matched between'
+                            + ' particles read in and input particle dictionary'
                         )
                     continue
 
                 elif 'form.' in prop_name:
                     # store coordinates at formation
-                    part[self.species_name][prop_name] = dict_read[prop_name]
+                    prop_name_store = prop_name.lstrip(self.species_name + '.')
+                    part[self.species_name][prop_name_store] = dict_read[prop_name]
                     continue
 
                 elif 'host.position' in prop_name or 'center.position' in prop_name:
@@ -1257,10 +1255,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             }
 
         for prop_name in dict_read:
-            if 'form.' in prop_name or prop_name in ['id', 'snapshot.index', 'species']:
-                continue
-
-            elif 'host.position' in prop_name or 'center.position' in prop_name:
+            if 'host.position' in prop_name or 'center.position' in prop_name:
                 if np.ndim(dict_read[prop_name]) == 2:
                     dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
                         (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
@@ -1290,7 +1285,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 prop_name_store = 'axis.ratios'
 
             else:
-                self.say(f'! not sure how to parse {prop_name}')
+                prop_name_store = None
                 continue
 
             part.hostz[prop_name_store] = dict_read[prop_name]

@@ -60,7 +60,7 @@ track_directory = 'track/'
 
 # file that contains hostst coordinates, rotation tensors, and axis ratios across all snapshots
 # and also stores star particle formation coordinates
-hosts_coordinates_file_name = 'hosts_coordinates.hdf5'
+hosts_coordinates_file_name = 'host_coordinates.hdf5'
 
 
 # initial condition ----------
