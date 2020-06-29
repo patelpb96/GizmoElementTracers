@@ -1115,11 +1115,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 )
                 dict_read = ut.io.file_hdf5(path_file_name)
 
-            # sanity check
-            bad_id_number = np.sum(part[self.species_name][self.id_name] != dict_read['id'])
-            if bad_id_number:
-                self.say(f'! {bad_id_number} particles have mismatched id, this is bad!')
-
             # initialize dictionaries to store host properties across
             part.hostz = {
                 'position': [],
@@ -1141,11 +1136,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     continue
 
                 if '.id' in prop_name or prop_name == 'id':
-                    mismatch_ids = part[self.species_name][self.id_name] != dict_read[prop_name]
-                    if np.sum(mismatch_ids) > 0:
+                    mismatch_id_number = np.sum(
+                        part[self.species_name][self.id_name] != dict_read[prop_name]
+                    )
+                    if mismatch_id_number > 0:
                         self.say(
-                            f'! {np.sum(mismatch_ids)} {prop_name}s are mis-matched between'
-                            + ' particles read in and input particle dictionary'
+                            f'! {mismatch_id_number} {prop_name}s are mis-matched between'
+                            + ' particles read in and input particle dictionary\n'
+                            + '  you may be assigning formation coordinates to the wrong snapshot'
                         )
                     continue
 
@@ -1506,6 +1504,12 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 host_number,
                 exclusion_distance=None,
             )
+
+            if np.isnan(part_z.host['position']).max() or np.isnan(part_z.host['velocity']).max():
+                self.say(
+                    f'! cannot compute host at snapshot {snapshot_index}, not assigning coordinates'
+                )
+                return
 
             part_z_indices = part_pointers[part_z0_indices]
 
