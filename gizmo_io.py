@@ -717,13 +717,13 @@ class ParticleDictionaryClass(dict):
         # symbol for versatility
         for e in self._postprocess_elements:
             self._initial_abundances[e] = 0.0
-            if e != 'metals':
+            if e != 'metals' and (not ('rprocess' in e)):
                 self._initial_abundances[ut.constant.element_map_name_symbol[e]]=0.0
 
         # set actual values in both name and symbol
         for e in initial_abundances:
             self._initial_abundances[e] = initial_abundances[e]
-            if e != 'metals':
+            if e != 'metals' and (not ('rprocess' in e)):
                 self._initial_abundances[ut.constant.element_map_name_symbol[e]]=initial_abundances[e]
 
         for k in self.keys():
