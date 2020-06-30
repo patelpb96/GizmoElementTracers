@@ -369,7 +369,8 @@ class ParticleDictionaryClass(dict):
                                 age_element = ut.constant.element_name_from_symbol[age_element]
 
                         if not element_found:
-                            raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}')
+                            raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}'+\
+                                            'the current yield table has the following elements available: ', self._postprocess_elements)
 
                 if age_element == 'alpha':
                     return np.mean(
@@ -394,7 +395,7 @@ class ParticleDictionaryClass(dict):
                     values = self['massfraction'][indices, start_index:end_index+1]
 
 
-                values =   np.sum( values * self._yield_table[:,age_element_index], axis=1)/1.0E10  #*\
+                values =   np.sum( values * self._yield_table[:,age_element_index], axis=1)  #*\
 #                        (  self.prop('mass', indices, dict_only=True)) # in code, tracers are stored as mass fractions
                                                                 # so need to be multiplied by particle mass
                                                                 # in code units as a correction factor
@@ -968,6 +969,12 @@ class ReadClass(ut.io.SayClass):
             for spec_name in part:
                 part[spec_name].Cosmology = part.Cosmology
 
+            # assign auxilliary information to particle dictionary class
+            # store header dictionary
+            part.info = header
+            for spec_name in part:
+                part[spec_name].info = part.info
+
             # adjust properties for each species
             self.adjust_particle_properties(
                 part, header, particle_subsample_factor, separate_dark_lowres, sort_dark_by_id
@@ -976,12 +983,6 @@ class ReadClass(ut.io.SayClass):
             # check sanity of particle properties read in
             if check_properties:
                 self.check_properties(part)
-
-            # assign auxilliary information to particle dictionary class
-            # store header dictionary
-            part.info = header
-            for spec_name in part:
-                part[spec_name].info = part.info
 
             # store information about snapshot time
             if header['cosmological']:
@@ -1776,6 +1777,7 @@ class ReadClass(ut.io.SayClass):
 
         # apply unit conversions
         for spec_name in part:
+
             if 'position' in part[spec_name]:
                 # convert to [kpc comoving]
                 part[spec_name]['position'] /= header['hubble']
@@ -1792,6 +1794,14 @@ class ReadClass(ut.io.SayClass):
             if 'mass' in part[spec_name]:
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
+
+            if part[spec_name].info['has.age.tracer'] > 0:
+                # normalize age-tracer species appropriately
+                # since these don't actually represent a mass fraction
+                # this is just the inverse of the mass conversion above
+                age_start = part.ageprop.info['metallicity_start']
+                age_end   = part.ageprop.info['metallicity_end']
+                part[spec_name]['massfraction'][:,age_start:age_end] *= (header['hubble'] / 1.0E10)
 
             if 'blackhole.mass' in part[spec_name]:
                 # convert to [M_sun]
