@@ -720,8 +720,8 @@ class ReadClass(ut.io.SayClass):
                 'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
                     during particle tracking using only stars that are in each host at z = 0
                 'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
-                'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
-                    weighting each particle by that property
+                'mass' or 'potential' or 'massfraction.metals': assign coordinates during read in
+                    via iterative zoom-in, weighting each particle by that property
             if True (default), will try a few methods in the following order of preference:
                 if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
                 if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
@@ -1956,7 +1956,15 @@ class ReadClass(ut.io.SayClass):
             species_name = 'dark'
 
         assert species_name in ['star', 'dark', 'gas', 'dark2', 'blackhole']
-        assert method in [True, 'track', 'halo', 'mass', 'potential']
+        assert method in [
+            True,
+            'track',
+            'halo',
+            'mass',
+            'potential',
+            'massfraction.metals',
+            'metallicity.total',
+        ]
 
         if method is True:
             if species_name == 'star':
@@ -1966,10 +1974,11 @@ class ReadClass(ut.io.SayClass):
             else:
                 method = 'mass'
 
-        if method in ['mass', 'potential']:
+        if method in ['mass', 'potential', 'massfraction.metals', 'metallicity.total']:
             self._assign_hosts_coordinates_from_particles(
                 part, species_name, part_indicess, method, host_number, exclusion_distance, verbose
             )
+
         elif method in ['track', 'halo']:
             try:
                 if method == 'track':
@@ -2028,7 +2037,7 @@ class ReadClass(ut.io.SayClass):
             or 'position' not in part[species_name]
             or len(part[species_name]['position']) == 0
         ):
-            self.say('! did not read star or dark particles, so cannot assign host[s]')
+            self.say('! did not read star or dark particles, so cannot assign any hosts')
             return
 
         # max radius around each host position to includer particles to compute center velocity

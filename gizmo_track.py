@@ -1294,8 +1294,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         if 'hostz' in part.__dict__:
             host_number = part.hostz['position'].shape[1]
+            host_string = 'host'
+            if host_number > 1:
+                host_string += 's'
             self.say(
-                f'read {host_number} host[s] (position, velocity, rotation, axis ratios)'
+                f'read {host_number} {host_string} (position, velocity, rotation, axis ratios)'
                 + ' from:  {}'.format(path_file_name.lstrip('./'))
             )
 
@@ -1474,7 +1477,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 return
 
         part_z0_indices = part_z0_indices[part_pointers >= 0]
-        self.say(f'\n# {part_z0_indices.size} to assign at snapshot {snapshot_index}')
+        self.say(
+            f'\n# assigning formation coordinates to {part_z0_indices.size} {self.species_name}'
+            + f' particles at snapshot {snapshot_index}'
+        )
 
         count = {'id none': 0, 'id wrong': 0}
 
