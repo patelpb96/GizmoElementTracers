@@ -7,7 +7,7 @@ the FIRE-3 set of simulations.
 
 In addition to metallicity fields tracked natively in FIRE-3 (see gizmo_star.py),
 the FIRE-3 simulations follow metal enrichment using stellar age bins. Stars
-at a given age deposit into their corresponding age bin. MORE
+at a given age deposit into their corresponding age bin.
 
 This post-processing requires one to compute the weightings for each age-bin for
 each element. This consists of a table which contains the total amount of mass
