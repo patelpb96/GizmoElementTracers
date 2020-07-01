@@ -1795,13 +1795,29 @@ class ReadClass(ut.io.SayClass):
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
-            if part[spec_name].info['has.age.tracer'] > 0:
-                # normalize age-tracer species appropriately
-                # since these don't actually represent a mass fraction
-                # this is just the inverse of the mass conversion above
-                age_start = part.ageprop.info['metallicity_start']
-                age_end   = part.ageprop.info['metallicity_end']
-                part[spec_name]['massfraction'][:,age_start:age_end] *= (header['hubble'] / 1.0E10)
+            if 'has.age.tracer' in part[spec_name].info.keys():
+                if part[spec_name].info['has.age.tracer'] > 0:
+                    # normalize age-tracer species appropriately
+                    # since these don't actually represent a mass fraction
+                    # this is just the inverse of the mass conversion above
+                    age_start = part.ageprop.info['metallicity_start']
+                    age_end   = part.ageprop.info['metallicity_end']
+                    part[spec_name]['massfraction'][:,age_start:age_end] *= (header['hubble'] / 1.0E10)
+            else:
+                # the old version of the agetracers (pre-merge with main Gizmo repo) was missing
+                # a factor of h, which cancelled out with a missing h I had in converting these units
+                #
+                # if we are here, the 'has.age.tracer' flag does not exist so we are using a
+                # pre-merge dataset.
+                # assume we are in the OLD version and normalize without the hubble constant
+                #
+                # but check to see if there are tracers in the first place
+                if part.ageprop.info['flag_agetracers'] > 0:
+                    if part.ageprop.info['metallicity_start'] > 0 and part.ageprop.info['metallicity_end'] > part.ageprop.info['metallicity_start']:
+                        age_start = part.ageprop.info['metallicity_start']
+                        age_end   = part.ageprop.info['metallicity_end']
+                        part[spec_name]['massfraction'][:,age_start:age_end] *= (1.0 / 1.0E10)
+
 
             if 'blackhole.mass' in part[spec_name]:
                 # convert to [M_sun]
