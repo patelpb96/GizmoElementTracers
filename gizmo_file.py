@@ -844,7 +844,7 @@ class RsyncClass(ut.io.SayClass):
         machine_from,
         directory_from='/scratch/projects/xsede/GalaxiesOnFIRE',
         directory_to='.',
-        include_snapshot600=False,
+        snapshot_index=None,
     ):
         '''
         Use rsync to copy (non-snapshot) files from remote machine to local directory.
@@ -856,10 +856,15 @@ class RsyncClass(ut.io.SayClass):
             'pfe', 'stampede', 'frontera', 'peloton'
         directory_from : str : directory to copy from
         directory_to : str : directory to copy files to
+        snapshot_index : int : which snapshot to include
         '''
         include_names = []
-        if include_snapshot600:
-            include_names.append(gizmo_default.snapshot_directory + 'snap*_600*')
+        if snapshot_index:
+            include_names.append(
+                ut.io.get_path(directory_from)
+                + gizmo_default.snapshot_directory
+                + self.snapshot_name_base.format(snapshot_index)
+            )
 
         exclude_names = [
             #'output/',
@@ -993,6 +998,6 @@ if __name__ == '__main__':
         directory_to = str(sys.argv[4])
 
         Rsync.rsync_simulation_files(
-            machine_from, directory_from, directory_to, include_snapshot600=True,
+            machine_from, directory_from, directory_to, snapshot_index=600,
         )
-        # Rsync.rsync_snapshot_files(machine_from, directory_from, directory_to)
+        Rsync.rsync_snapshot_files(machine_from, directory_from, directory_to)

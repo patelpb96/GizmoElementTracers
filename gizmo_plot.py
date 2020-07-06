@@ -1794,13 +1794,13 @@ def plot_disk_orientation_v_property(
                 if angle is np.nan:
                     angle = 0  # sanity check, for exact alignment
                 angle *= 180 / np.pi  # [degree]
-                if angle > 90:
-                    Say.say(
-                        '!   {:4.1f} kpc: {:.1f} deg (raw), min/maj = {:.2f}'.format(
-                            property_max, angle, principal_axes['axis.ratios'][0]
-                        )
-                    )
-                    angle = min(angle, 180 - angle)  # deal with possible flip
+                # if angle > 90:
+                #    Say.say(
+                #        '!   {:4.1f} kpc: {:.1f} deg (raw), min/maj = {:.2f}'.format(
+                #            property_max, angle, principal_axes['axis.ratios'][0]
+                #        )
+                #    )
+                #    angle = min(angle, 180 - angle)  # deal with possible flip
 
                 angles[part_i, spec_i, prop_i] = angle
 
@@ -1902,8 +1902,6 @@ def plot_disk_orientation_v_time(
 
     masks = np.isfinite(angles)
     angles[masks] = np.arccos(angles[masks]) * 180 / np.pi  # [degree]
-    masks = angles > 90
-    angles[masks] = 180 - angles[masks]
 
     if time_kind in ['time.lookback', 'age']:
         times = parts[0].Snapshot['time'][-1] - parts[0].Snapshot['time']

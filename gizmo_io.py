@@ -883,7 +883,7 @@ class ReadClass(ut.io.SayClass):
                 ParticleCoordinate = self.gizmo_track.ParticleCoordinateClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
-                ParticleCoordinate.io_formation_coordinates(part)
+                ParticleCoordinate.io_hosts_and_formation_coordinates(part)
 
             if assign_pointers:
                 # assign star and gas particle pointers from z = 0 to this snapshot
@@ -1390,7 +1390,7 @@ class ReadClass(ut.io.SayClass):
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
-                        file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
+                        file_name_i = path_file_name.replace('.0.', f'.{file_i}.')
                         # try each snapshot file
                         with h5py.File(file_name_i, 'r') as file_read_i:
                             part_numbers_in_file_i = file_read_i['Header'].attrs['NumPart_ThisFile']
@@ -1462,7 +1462,7 @@ class ReadClass(ut.io.SayClass):
         # loop over all file blocks at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
-            file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
+            file_name_i = path_file_name.replace('.0.', f'.{file_i}.')
 
             # open snapshot file
             with h5py.File(file_name_i, 'r') as file_in:
@@ -1544,9 +1544,7 @@ class ReadClass(ut.io.SayClass):
             dark_lowres_masses = np.unique(part[species_name]['mass'])
             if dark_lowres_masses.size > 9:
                 self.say(
-                    '! warning: {} different masses of low-resolution dark matter'.format(
-                        dark_lowres_masses.size
-                    )
+                    f'! warning: {dark_lowres_masses.size} different masses of low-res dark matter'
                 )
 
             if separate_dark_lowres and dark_lowres_masses.size > 1:
@@ -1557,7 +1555,7 @@ class ReadClass(ut.io.SayClass):
 
                 for dark_i, dark_mass in enumerate(dark_lowres_masses):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
-                    spec_name = 'dark{}'.format(dark_i + 2)
+                    spec_name = f'dark{dark_i + 2}'
 
                     part[spec_name] = ParticleDictionaryClass()
 
@@ -1913,6 +1911,7 @@ class ReadClass(ut.io.SayClass):
         species_name='',
         part_indicess=None,
         method=True,
+        velocity_distance_max=8,
         host_number=1,
         exclusion_distance=300,
         simulation_directory=gizmo_default.simulation_directory,
@@ -1941,6 +1940,7 @@ class ReadClass(ut.io.SayClass):
             if True (default), will try a few methods in the following order of preference:
                 if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
                 if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
+        velocity_distance_max : float : maximum distance to keep particles to compute velocity
         host_number : int : number of hosts to assign
         exclusion_distance : float :
             radius around previous hosts' center position[s] to exclude particles in
@@ -1976,7 +1976,14 @@ class ReadClass(ut.io.SayClass):
 
         if method in ['mass', 'potential', 'massfraction.metals', 'metallicity.total']:
             self._assign_hosts_coordinates_from_particles(
-                part, species_name, part_indicess, method, host_number, exclusion_distance, verbose
+                part,
+                species_name,
+                part_indicess,
+                method,
+                velocity_distance_max,
+                host_number,
+                exclusion_distance,
+                verbose,
             )
 
         elif method in ['track', 'halo']:
@@ -2008,6 +2015,7 @@ class ReadClass(ut.io.SayClass):
                     species_name,
                     part_indicess,
                     method,
+                    velocity_distance_max,
                     host_number,
                     exclusion_distance,
                     verbose,
@@ -2024,9 +2032,10 @@ class ReadClass(ut.io.SayClass):
         part,
         species_name,
         part_indicess,
-        method,
-        host_number,
-        exclusion_distance,
+        method='mass',
+        velocity_distance_max=8,
+        host_number=1,
+        exclusion_distance=300,
         verbose=True,
     ):
         '''
@@ -2041,10 +2050,11 @@ class ReadClass(ut.io.SayClass):
             return
 
         # max radius around each host position to includer particles to compute center velocity
-        if species_name == 'dark':
-            velocity_radius_max = 30
-        else:
-            velocity_radius_max = 10
+        if velocity_distance_max is None or velocity_distance_max <= 0:
+            if species_name == 'dark':
+                velocity_distance_max = 30
+            else:
+                velocity_distance_max = 8
 
         if 'position' in part[species_name]:
             # assign to particle dictionary
@@ -2066,7 +2076,7 @@ class ReadClass(ut.io.SayClass):
                 species_name,
                 part_indicess,
                 method,
-                velocity_radius_max,
+                velocity_distance_max,
                 part.host['position'],
                 return_array=False,
                 verbose=verbose,
@@ -2235,7 +2245,7 @@ class ReadClass(ut.io.SayClass):
             # read and delete input species ----------
             for file_i in range(header['NumFilesPerSnapshot']):
                 # open i'th of multiple files for snapshot
-                file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
+                file_name_i = path_file_name.replace('.0.', f'.{file_i}.')
                 file_read = h5py.File(file_name_i, 'r+')
 
                 self.say('reading particles from: ' + file_name_i.split('/')[-1])
