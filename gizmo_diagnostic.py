@@ -330,7 +330,7 @@ class ContaminationClass(ut.io.SayClass):
             distance_bin_width,
             halo_radius=halo_prop['radius'],
             scale_to_halo_radius=False,
-            write_plot=True,
+            plot_file_name=True,
             plot_directory='plot',
         )
 
@@ -340,7 +340,7 @@ class ContaminationClass(ut.io.SayClass):
             distance_bin_width,
             halo_radius=halo_prop['radius'],
             scale_to_halo_radius=True,
-            write_plot=True,
+            plot_file_name=True,
             plot_directory='plot',
         )
 
@@ -356,7 +356,7 @@ class ContaminationClass(ut.io.SayClass):
         host_index=0,
         axis_y_limits=[0.0001, 1],
         axis_y_scaling='log',
-        write_plot=False,
+        plot_file_name=None,
         plot_directory='.',
         figure_index=1,
     ):
@@ -365,19 +365,32 @@ class ContaminationClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at snapshot
-        distance_limits : list : min and max limits for distance from galaxy
-        distance_bin_width : float : width of each distance bin (in units of distance_scaling)
-        distance_scaling : str : 'log', 'linear'
-        halo_radius : float : radius of halo [kpc physical]
-        scale_to_halo_radius : bool : whether to scale distance to halo_radius
-        center_position : array : position of galaxy/halo center
-        host_index : int : index of host halo to get position of (if not input center_position)
-        axis_y_limits : list : min and max limits for y-axis
-        axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
-        write_plot : bool : whether to write figure to file
-        plot_directory : str : directory to write figure file
-        figure_index : int : index of figure for matplotlib
+        part : dict
+            catalog of particles at snapshot
+        distance_limits : list
+            min and max limits for distance from galaxy
+        distance_bin_width : float
+            width of each distance bin (in units of distance_scaling)
+        distance_scaling : str
+            'log', 'linear'
+        halo_radius : float
+            radius of halo [kpc physical]
+        scale_to_halo_radius : bool
+            whether to scale distance to halo_radius
+        center_position : array
+            position of galaxy/halo center
+        host_index : int
+            index of host halo to get position of (if not input center_position)
+        axis_y_limits : list
+            min and max limits for y-axis
+        axis_y_scaling : str
+            scaling of y-axis: 'log', 'linear'
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory in which to write figure file
+        figure_index : int
+            index of figure for matplotlib
         '''
         virial_kind = '200m'
 
@@ -547,7 +560,7 @@ class ContaminationClass(ut.io.SayClass):
                 )
         print()
 
-        if write_plot is None:
+        if plot_file_name is None or len(plot_file_name) == 0:
             return
 
         # plot ----------
@@ -584,11 +597,14 @@ class ContaminationClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, 'best')
 
-        distance_name = 'dist'
-        if halo_radius and scale_to_halo_radius:
-            distance_name += '.' + virial_kind
-        plot_name = ut.plot.get_file_name('mass.ratio', distance_name, snapshot_dict=part.snapshot)
-        ut.plot.parse_output(write_plot, plot_name, plot_directory)
+        if plot_file_name is True or plot_file_name == '':
+            distance_name = 'dist'
+            if halo_radius and scale_to_halo_radius:
+                distance_name += '.' + virial_kind
+            plot_file_name = ut.plot.get_file_name(
+                'mass.ratio', distance_name, snapshot_dict=part.snapshot
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 Contamination = ContaminationClass()
@@ -840,7 +856,7 @@ def plot_scaling(
     time_kind='core',
     axis_x_scaling='log',
     axis_y_scaling='log',
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
 ):
     '''
@@ -854,8 +870,10 @@ def plot_scaling(
     time_kind : str : 'node', 'core', 'wall', 'speedup', 'efficiency'
     axis_x_scaling : str : scaling along x-axis: 'log', 'linear'
     axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
-    write_plot : bool : whether to write plot to file
-    plot_directory : str : directory to write plot file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory to write figure file
     '''
     # weak_dark = {
     #    'res57000': {'particle.number': 8.82e6, 'core.number': 64,
@@ -1110,8 +1128,9 @@ def plot_scaling(
         #             alpha=0.7)
         subplot.plot(baryon_particle_numbers, baryon_times, '*-', linewidth=2.0, color='blue')
 
-    plot_name = 'scaling'
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = 'scaling'
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------

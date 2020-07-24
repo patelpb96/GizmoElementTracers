@@ -84,7 +84,7 @@ Gas particles also have:
     'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
     'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
     'sfr' : instantaneous star formation rate [M_sun / yr]
-    'magnetic.field' : 3-D vector of magnetic vield [Gauss]
+    'magnetic.field' : 3-D vector of magnetic field [Gauss]
 
 
 Derived properties

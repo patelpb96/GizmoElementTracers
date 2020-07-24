@@ -1071,10 +1071,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at a snapshot
-        simulation_directory : str : directory of simulation
-        track_directory : str : directory of files for particle pointers and formation coordinates
-        write : bool : whether to write to file (instead of read)
+        part : dict
+            catalog of particles at a snapshot
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers and formation coordinates
+        write : bool
+            whether to write to file (instead of read)
         '''
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
