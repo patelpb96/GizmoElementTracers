@@ -4742,15 +4742,17 @@ class CompareSimulationsClass(ut.io.SayClass):
 CompareSimulations = CompareSimulationsClass()
 
 
-def compare_star_formation_models(parts, density_limits=[1, 1e6], density_bin_width=0.2):
+def compare_star_formation_models(
+    parts, density_limits=[1, 1e6], density_bin_width=0.2, distance_limits=[0, 12]):
     '''
     .
     '''
-    # density of star-forming gas
+    # get star-forming gas
     part_indicess = []
     for part in parts:
         part_indicess.append(ut.array.get_indices(part['gas']['sfr'], [1e-10, 1e10]))
 
+    # plot density of star-forming gas
     plot_file_name = 'gas.sf.density_distribution_z.{:.1f}'.format(parts[0].snapshot['redshift'])
     plot_property_distribution(
         parts,
@@ -4765,6 +4767,7 @@ def compare_star_formation_models(parts, density_limits=[1, 1e6], density_bin_wi
         plot_file_name=plot_file_name,
     )
 
+    # plot density of star-forming gas weighted by SFR
     plot_file_name = 'gas.sf.density*sfr_distribution_z.{:.1f}'.format(
         parts[0].snapshot['redshift']
     )
@@ -4781,6 +4784,7 @@ def compare_star_formation_models(parts, density_limits=[1, 1e6], density_bin_wi
         plot_file_name=plot_file_name,
     )
 
+    # plot density of all gas
     plot_file_name = 'gas.density_distribution_z.{:.1f}'.format(parts[0].snapshot['redshift'])
     plot_property_distribution(
         parts,
@@ -4789,9 +4793,7 @@ def compare_star_formation_models(parts, density_limits=[1, 1e6], density_bin_wi
         density_limits,
         density_bin_width,
         None,
-        weight_property_name='sfr',
-        part_indicess=part_indicess,
-        distance_limits=None,
+        distance_limits=distance_limits,
         plot_file_name=plot_file_name,
     )
 
