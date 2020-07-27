@@ -4752,11 +4752,12 @@ def compare_star_formation_models(
     '''
     .
     '''
-    # get star-forming gas
+    # get indices of star-forming gas
     part_indicess = []
     for part in parts:
         part_indicess.append(ut.array.get_indices(part['gas']['sfr'], [1e-10, 1e10]))
 
+    # distribution of gas densities ----------
     # plot density of star-forming gas
     plot_file_name = 'gas.sf.density_distribution_z.{:.1f}'.format(parts[0].snapshot['redshift'])
     plot_property_distribution(
@@ -4802,6 +4803,7 @@ def compare_star_formation_models(
         plot_file_name=plot_file_name,
     )
 
+    # image ----------
     distance_max = max(distance_limits)
 
     # plot image of all gas
@@ -4815,11 +4817,11 @@ def compare_star_formation_models(
             distances_max=distance_max,
             distance_bin_width=distance_bin_width,
             rotation=True,
-            image_limits=[3e6, 1e9],
+            image_limits=[2e6, 1e9],
             plot_file_name=part.info['simulation.name'] + '_gas',
         )
 
-        # plot image of SFing gas
+        # plot image of dense gas
         Image.plot_image(
             part,
             'gas',
@@ -4829,9 +4831,9 @@ def compare_star_formation_models(
             distances_max=distance_max,
             distance_bin_width=distance_bin_width,
             rotation=True,
-            part_indices=part_indicess[part_i],
-            image_limits=[3e6, 1e9],
-            plot_file_name=part.info['simulation.name'] + '_gas.sf',
+            property_select={'number.density': [10, np.Inf]},
+            image_limits=[2e6, 1e9],
+            plot_file_name=part.info['simulation.name'] + '_gas.10cm3',
         )
 
         # plot image of young stars
@@ -4845,7 +4847,7 @@ def compare_star_formation_models(
             distance_bin_width=distance_bin_width,
             rotation=True,
             property_select={'age': [0, 0.1]},
-            image_limits=[3e6, 3e8],
+            image_limits=[2e6, 3e8],
             plot_file_name=part.info['simulation.name'] + '_star.100Myr',
         )
 
