@@ -4743,7 +4743,12 @@ CompareSimulations = CompareSimulationsClass()
 
 
 def compare_star_formation_models(
-    parts, density_limits=[1, 1e6], density_bin_width=0.2, distance_limits=[0, 12]):
+    parts,
+    density_limits=[1, 1e6],
+    density_bin_width=0.2,
+    distance_limits=[0, 12],
+    distance_bin_width=0.05,
+):
     '''
     .
     '''
@@ -4796,6 +4801,55 @@ def compare_star_formation_models(
         distance_limits=distance_limits,
         plot_file_name=plot_file_name,
     )
+
+    distance_max = max(distance_limits)
+
+    # plot image of all gas
+    for part in parts:
+        Image.plot_image(
+            part,
+            'gas',
+            'mass',
+            'histogram',
+            [0, 1],
+            distances_max=distance_max,
+            distance_bin_width=distance_bin_width,
+            rotation=True,
+            image_limits=[3e6, 1e9],
+            plot_file_name=part.info['simulation.name'] + '_gas',
+        )
+
+    # plot image of dense gas
+    for part in parts:
+        Image.plot_image(
+            part,
+            'gas',
+            'mass',
+            'histogram',
+            [0, 1],
+            distances_max=distance_max,
+            distance_bin_width=distance_bin_width,
+            rotation=True,
+            property_select={'number.density': [10, np.Inf]},
+            image_limits=[3e6, 1e9],
+            plot_file_name=part.info['simulation.name'] + '_gas.10cm3',
+        )
+
+    # plot image of all gas
+    for part in parts:
+        Image.plot_image(
+            part,
+            'star',
+            'mass',
+            'histogram',
+            [0, 1],
+            distances_max=distance_max,
+            distance_bin_width=distance_bin_width,
+            rotation=True,
+            property_select={'age': [0, 0.1]},
+            image_limits=[3e6, 3e8],
+            plot_file_name=part.info['simulation.name'] + 'star.100Myr',
+        )
 
 
 def compare_resolution(
