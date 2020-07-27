@@ -4805,7 +4805,7 @@ def compare_star_formation_models(
     distance_max = max(distance_limits)
 
     # plot image of all gas
-    for part in parts:
+    for part_i, part in enumerate(parts):
         Image.plot_image(
             part,
             'gas',
@@ -4819,8 +4819,7 @@ def compare_star_formation_models(
             plot_file_name=part.info['simulation.name'] + '_gas',
         )
 
-    # plot image of dense gas
-    for part in parts:
+        # plot image of SFing gas
         Image.plot_image(
             part,
             'gas',
@@ -4830,13 +4829,12 @@ def compare_star_formation_models(
             distances_max=distance_max,
             distance_bin_width=distance_bin_width,
             rotation=True,
-            property_select={'number.density': [10, np.Inf]},
+            part_indices=part_indicess[part_i],
             image_limits=[3e6, 1e9],
-            plot_file_name=part.info['simulation.name'] + '_gas.10cm3',
+            plot_file_name=part.info['simulation.name'] + '_gas.sf',
         )
 
-    # plot image of all gas
-    for part in parts:
+        # plot image of young stars
         Image.plot_image(
             part,
             'star',
@@ -4848,7 +4846,7 @@ def compare_star_formation_models(
             rotation=True,
             property_select={'age': [0, 0.1]},
             image_limits=[3e6, 3e8],
-            plot_file_name=part.info['simulation.name'] + 'star.100Myr',
+            plot_file_name=part.info['simulation.name'] + '_star.100Myr',
         )
 
 
