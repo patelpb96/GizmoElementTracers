@@ -184,7 +184,7 @@ def plot_nucleosynthetic_yields(
     normalize=False,
     axis_y_scaling='linear',
     axis_y_limits=[1e-3, None],
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -193,16 +193,25 @@ def plot_nucleosynthetic_yields(
 
     Parameters
     ----------
-    event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
-    star_metallicity : float : total metallicity of star, fraction wrt to solar
-    star_massfraction : dict : dictionary of elemental mass fractions in star
+    event_kind : str
+        stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+    star_metallicity : float
+        total metallicity of star, fraction wrt to solar
+    star_massfraction : dict
+        dictionary of elemental mass fractions in star
         need to input this to get higher-order correction of yields
-    normalize : bool : whether to normalize yields to be mass fractions (instead of masses)
-    axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
-    axis_y_limits : list : min and max limits of y-axis
-    write_plot : bool : whether to write figure to file
-    plot_directory : str : directory to write figure file
-    figure_index : int : index of figure for matplotlib
+    normalize : bool
+        whether to normalize yields to be mass fractions (instead of masses)
+    axis_y_scaling : str
+        scaling along y-axis: 'log', 'linear'
+    axis_y_limits : list
+        min and max limits of y-axis
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory to write figure file
+    figure_index : int
+        index of figure for matplotlib
     '''
     title_dict = {
         'wind': 'Stellar Wind',
@@ -255,8 +264,9 @@ def plot_nucleosynthetic_yields(
             subplots[si], '$\\left[ Z / Z_\odot={:.3f} \\right]$'.format(star_metallicity)
         )
 
-    plot_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -808,7 +818,7 @@ def plot_supernova_v_age(
     y_axis_kind='rate',
     y_axis_limits=[None, None],
     y_axis_scaling='log',
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -824,9 +834,12 @@ def plot_supernova_v_age(
     y_axis_limits : str : 'rate' or 'number'
     y_axis_limits : list : min and max limits to impose on y-axis
     y_axis_scaling : str : 'log' or 'linear'
-    write_plot : bool : whether to write plot to file
-    plot_directory : str : where to write plot file
-    figure_index : int : index for matplotlib window
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        where to write figure file
+    figure_index : int
+        index for matplotlib window
     '''
     assert y_axis_kind in ['rate', 'number']
 
@@ -870,11 +883,12 @@ def plot_supernova_v_age(
 
     ut.plot.make_legends(subplot, 'best')
 
-    if y_axis_kind == 'rate':
-        plot_name = 'supernova.rate_v_time'
-    elif y_axis_kind == 'number':
-        plot_name = 'supernova.number.cum_v_time'
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        if y_axis_kind == 'rate':
+            plot_file_name = 'supernova.rate_v_time'
+        elif y_axis_kind == 'number':
+            plot_file_name = 'supernova.number.cum_v_time'
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_mass_loss_v_age(
@@ -887,7 +901,7 @@ def plot_mass_loss_v_age(
     element_name='',
     metallicity=1,
     metal_mass_fraction=None,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -905,9 +919,12 @@ def plot_mass_loss_v_age(
     element_name : str : name of element to get yield of (if None, compute total mass loss)
     metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
     metal_mass_fraction : float : mass fration of all metals (everything not H, He)
-    write_plot : bool : whether to write plot to file
-    plot_directory : str : where to write plot file
-    figure_index : int : index for matplotlib window
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory in which to write figure file
+    figure_index : int
+        index for matplotlib window
     '''
     ia_kind = 'mannucci'
 
@@ -961,5 +978,6 @@ def plot_mass_loss_v_age(
 
     ut.plot.make_legends(subplot, 'best')
 
-    plot_name = 'star.mass.loss.' + mass_loss_kind + '_v_time'
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = f'star.mass.loss.{mass_loss_kind}_v_time'
+    ut.plot.parse_output(plot_file_name, plot_directory)

@@ -19,6 +19,7 @@ import numpy as np
 from scipy import spatial
 
 import utilities as ut
+from . import gizmo_default
 
 
 # --------------------------------------------------------------------------------------------------
@@ -31,7 +32,9 @@ class InitialConditionClass(ut.io.SayClass):
     selection region at the final snapshot.
     '''
 
-    def __init__(self, snapshot_redshifts=[0, 99], simulation_directory='.'):
+    def __init__(
+        self, snapshot_redshifts=[0, 99], simulation_directory=gizmo_default.simulation_directory
+    ):
         '''
         Parameters
         ----------

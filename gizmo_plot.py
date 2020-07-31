@@ -20,6 +20,7 @@ from matplotlib.ticker import AutoMinorLocator
 from matplotlib import colors
 
 import utilities as ut
+from . import gizmo_default
 from . import gizmo_io
 
 
@@ -79,12 +80,12 @@ def print_properties_statistics(part, species='all'):
 
     Say.say('printing minimum, median, maximum')
     for spec_name in species_print:
-        Say.say('\n* {}'.format(spec_name))
+        Say.say(f'\n* {spec_name}')
         for prop_name in species_property_dict[spec_name]:
             try:
                 prop_values = part[spec_name].prop(prop_name)
             except KeyError:
-                Say.say('{} not in catalog'.format(prop_name))
+                Say.say(f'{prop_name} not in catalog')
                 continue
 
             # Statistic.stat = Statistic.get_statistic_dict(prop_values)
@@ -119,7 +120,7 @@ def plot_metal_v_distance(
     scale_to_halo_radius=False,
     center_positions=None,
     host_index=0,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -139,7 +140,8 @@ def plot_metal_v_distance(
     scale_to_halo_radius : bool : whether to scale distance to halo_radius
     center_positions : array : position[s] of galaxy center[s] [kpc comoving]
     host_index : int : index of host halo to get position of (if not input center_positions)
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -198,7 +200,7 @@ def plot_metal_v_distance(
         metal_values,
     )
 
-    metal_mass_label = 'M_{{\\rm Z,{}}}'.format(species_name)
+    metal_mass_label = f'M_{{\\rm Z,{species_name}}}'
     radius_label = '(r)'
     if '.cum' in metal_name:
         radius_label = '(< r)'
@@ -208,12 +210,12 @@ def plot_metal_v_distance(
         )
     elif 'mass' in metal_name:
         # axis_y_label = '${}(< r) \, / \, M_{{\\rm Z,tot}}$'.format(metal_mass_label)
-        axis_y_label = '${}{} \, [M_\odot]$'.format(metal_mass_label, radius_label)
+        axis_y_label = f'${metal_mass_label}{radius_label} \, [M_\odot]$'
     # axis_y_label = '$Z \, / \, Z_\odot$'
     subplot.set_ylabel(axis_y_label)
 
     if scale_to_halo_radius:
-        axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
+        axis_x_label = f'$d \, / \, R_{{\\rm {virial_kind}}}$'
     else:
         axis_x_label = 'distance $[\\mathrm{kpc}]$'
     subplot.set_xlabel(axis_x_label)
@@ -242,13 +244,14 @@ def plot_metal_v_distance(
 
     ut.plot.make_legends(subplot, 'best')
 
-    distance_name = 'dist'
-    if halo_radius and scale_to_halo_radius:
-        distance_name += '.' + virial_kind
-    plot_name = ut.plot.get_file_name(
-        'mass.ratio', distance_name, species_name, snapshot_dict=part.snapshot
-    )
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        distance_name = 'dist'
+        if halo_radius and scale_to_halo_radius:
+            distance_name += '.' + virial_kind
+        plot_file_name = ut.plot.get_file_name(
+            'mass.ratio', distance_name, species_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def test_metal_variation(parts, species=['star', 'gas'], element_reference='o', log_ratio=True):
@@ -269,11 +272,7 @@ def test_metal_variation(parts, species=['star', 'gas'], element_reference='o', 
     Statistic = ut.statistic.StatisticClass()
 
     for element_name in element_names:
-        Say.say(
-            '\ndex scatter in [{}/{}]'.format(
-                element_name.capitalize(), element_reference.capitalize()
-            )
-        )
+        Say.say(f'\ndex scatter in [{element_name.capitalize()}/{element_reference.capitalize()}]')
         for spec_name in species:
             for part_i, part in enumerate(parts):
                 element_ratios_p = part[spec_name].prop(f'massfraction.{element_name}') / part[
@@ -328,7 +327,7 @@ class ImageClass(ut.io.SayClass):
         self.histogram_valuess = None
         self.histogram_xs = None
         self.histogram_ys = None
-        self.plot_name = None
+        self.plot_file_name = None
 
     def plot_image(
         self,
@@ -354,8 +353,8 @@ class ImageClass(ut.io.SayClass):
         hal_indices=None,
         hal_position_kind='position',
         hal_radius_kind='radius',
-        write_plot=False,
-        plot_directory='',
+        plot_file_name=False,
+        plot_directory='.',
         figure_index=1,
     ):
         '''
@@ -390,7 +389,8 @@ class ImageClass(ut.io.SayClass):
         hal_indices : array : indices of halos to plot
         hal_position_kind : str : name of position to use for center of halo
         hal_radius_kind : str : name of radius to use for size of halo
-        write_plot : bool : whether to write figure to file
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
         plot_directory : str : path + directory where to write file
             if ends in '.pdf', override default file naming convention and use input name
         add_simulation_name : bool : whether to add name of simulation to figure name
@@ -448,9 +448,9 @@ class ImageClass(ut.io.SayClass):
                         or rotation_tensor.shape[0] != positions.shape[1]
                         or rotation_tensor.shape[1] != positions.shape[1]
                     ):
-                        raise ValueError('wrong shape for rotation = {}'.format(rotation))
+                        raise ValueError(f'wrong shape for rotation = {rotation}')
                 else:
-                    raise ValueError('cannot parse rotation = {}'.format(rotation))
+                    raise ValueError(f'cannot parse rotation = {rotation}')
 
                 positions = ut.coordinate.get_coordinates_rotated(positions, rotation_tensor)
 
@@ -537,12 +537,8 @@ class ImageClass(ut.io.SayClass):
             subplot.set_xlim(position_limits[dimensions_plot[0]])
             subplot.set_ylim(position_limits[dimensions_plot[1]])
 
-            subplot.set_xlabel(
-                '{} $\\left[ {{\\rm kpc}} \\right]$'.format(dimen_label[dimensions_plot[0]])
-            )
-            subplot.set_ylabel(
-                '{} $\\left[ {{\\rm kpc}} \\right]$'.format(dimen_label[dimensions_plot[1]])
-            )
+            subplot.set_xlabel(f'{dimen_label[dimensions_plot[0]]} $\\left[ {{\\rm kpc}} \\right]$')
+            subplot.set_ylabel(f'{dimen_label[dimensions_plot[1]]} $\\left[ {{\\rm kpc}} \\right]$')
 
             if 'histogram' in image_kind:
                 hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
@@ -725,9 +721,9 @@ class ImageClass(ut.io.SayClass):
         # get name and directory to write plot file
         if '.pdf' in plot_directory:
             # use input file name, write in current directory
-            plot_name = plot_directory
+            plot_file_name = plot_directory
             plot_directory = '.'
-        else:
+        elif plot_file_name is True or plot_file_name == '':
             # generate default file name
             prefix = part.info['simulation.name']
 
@@ -736,21 +732,20 @@ class ImageClass(ut.io.SayClass):
                 prop += '.' + dimen_label[dimen_i]
             prop += '_d.{:.0f}'.format(np.max(distances_max[dimensions_plot]))
 
-            plot_name = ut.plot.get_file_name(
+            plot_file_name = ut.plot.get_file_name(
                 weight_name, prop, species_name, 'redshift', part.snapshot, prefix=prefix
             )
 
             if 'histogram' in image_kind:
-                plot_name += '_i.{:.1f}-{:.1f}'.format(
+                plot_file_name += '_i.{:.1f}-{:.1f}'.format(
                     np.log10(image_limits_use[0]), np.log10(image_limits_use[1])
                 )
-
-        ut.plot.parse_output(write_plot, plot_name, plot_directory)
+        ut.plot.parse_output(plot_file_name, plot_directory)
 
         self.histogram_valuess = hist_valuess
         self.histogram_xs = hist_xs
         self.histogram_ys = hist_ys
-        self.plot_name = plot_name
+        self.plot_file_name = plot_file_name
 
     def get_histogram(
         self,
@@ -831,7 +826,7 @@ class ImageClass(ut.io.SayClass):
         '''
         Write 2-D histogram values of image to file.
         '''
-        file_name = self.plot_name + '.txt'
+        file_name = self.plot_file_name + '.txt'
 
         with open(file_name, 'w') as file_out:
             Write = ut.io.WriteClass(file_out, print_stdout=False)
@@ -883,7 +878,7 @@ def plot_property_distribution(
     part_indicess=None,
     axis_y_limits=[],
     axis_y_scaling='log',
-    write_plot=False,
+    plot_file_name=None,
     plot_directory='.',
     figure_index=1,
 ):
@@ -892,27 +887,46 @@ def plot_property_distribution(
 
     Parameters
     ----------
-    part : dict : catalog of particles at snapshot
-    species_name : str : name of particle species
-    property_name : str : property name
-    property_limits : list : min and max limits of property
-    property_bin_width : float : width of property bin (use this or property_bin_number)
-    property_bin_number : int : number of bins within limits (use this or property_bin_width)
-    property_scaling : str : scaling of property: 'log', 'linear'
-    property_statistic : str : statistic to plot:
-        'probability', 'probability.cum', 'histogram', 'histogram.cum'
-    weight_property_name : str : property to weight each particle by
-    distance_limits : list : min and max limits for distance from galaxy
-    center_positions : array or list of arrays : position[s] of galaxy center[s]
-    center_velocities : array or list of arrays : velocity[s] of galaxy center[s]
-    host_index : int : index of host halo to get position and velocity of (if not input)
-    property_select : dict : (other) properties to select on: names as keys and limits as values
-    part_indicess : array or list of arrays : indices of particles from which to select
-    axis_y_limits : list : min and max limits for y-axis
-    axis_y_scaling : str : 'log', 'linear'
-    write_plot : bool : whether to write figure to file
-    plot_directory : str : directory to write figure file
-    figure_index : int : index of figure for matplotlib
+    part : dict
+        catalog of particles at snapshot
+    species_name : str
+        name of particle species
+    property_name : str
+        property name
+    property_limits : list
+        min and max limits of property
+    property_bin_width : float
+        width of property bin (use this or property_bin_number)
+    property_bin_number : int
+        number of bins within limits (use this or property_bin_width)
+    property_scaling : str
+        scaling of property: 'log', 'linear'
+    property_statistic : str :
+        statistic to plot: 'probability', 'probability.cum', 'histogram', 'histogram.cum'
+    weight_property_name : str
+        property to weight each particle by
+    distance_limits : list
+        min and max limits for distance from galaxy
+    center_positions : array or list of arrays
+        position[s] of galaxy center[s]
+    center_velocities : array or list of arrays
+        velocity[s] of galaxy center[s]
+    host_index : int
+        index of host halo to get position and velocity of (if not input)
+    property_select : dict
+        (other) properties to select on: names as keys and limits as values
+    part_indicess : array or list of arrays
+        indices of particles from which to select
+    axis_y_limits : list
+        min and max limits for y-axis
+    axis_y_scaling : str
+        'log', 'linear'
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory to write plot file
+    figure_index : int
+        index of figure for matplotlib
     '''
     Say = ut.io.SayClass(plot_property_distribution)
 
@@ -968,7 +982,7 @@ def plot_property_distribution(
         else:
             weights = None
 
-        Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
+        Say.say(f'keeping {prop_values.size} {species_name} particles')
 
         Stat.append_to_dictionary(
             prop_values,
@@ -997,7 +1011,7 @@ def plot_property_distribution(
     axis_x_label = ut.plot.Label.get_label(property_name, species_name=species_name, get_words=True)
     subplot.set_xlabel(axis_x_label)
     axis_y_label = ut.plot.Label.get_label(
-        property_name, property_statistic, species_name, get_units=False
+        property_name, property_statistic, species_name, property_scaling, get_units=False
     )
     subplot.set_ylabel(axis_y_label)
 
@@ -1012,10 +1026,11 @@ def plot_property_distribution(
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
-    plot_name = ut.plot.get_file_name(
-        property_name, 'distribution', species_name, snapshot_dict=part.snapshot
-    )
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = ut.plot.get_file_name(
+            property_name, 'distribution', species_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_velocity_v_age(
@@ -1030,7 +1045,7 @@ def plot_velocity_v_age(
     center_position=None,
     host_index=0,
     part_indices=None,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -1116,7 +1131,9 @@ def plot_velocity_v_age(
 
     ut.plot.make_legends(subplot)
 
-    ut.plot.parse_output(write_plot, 'test', plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = 'test'
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_property_v_property(
@@ -1137,7 +1154,7 @@ def plot_property_v_property(
     property_select={},
     part_indices=None,
     draw_statistics=False,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     add_simulation_name=False,
     figure_index=1,
@@ -1163,7 +1180,8 @@ def plot_property_v_property(
     property_select : dict : (other) properties to select on: names as keys and limits as values
     part_indices : array : indices of particles from which to select
     draw_statistics : bool : whether to draw statistics (such as median) on figure
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     add_simulation_name : bool : whether to add name of simulation to figure name
     figure_index : int : index of figure for matplotlib
@@ -1219,7 +1237,7 @@ def plot_property_v_property(
     if weight_by_mass:
         masses = masses[part_indices]
 
-    Say.say('keeping {} particles'.format(x_prop_values.size))
+    Say.say(f'keeping {x_prop_values.size} particles')
 
     if draw_statistics:
         stat_bin_number = int(np.round(property_bin_number / 10))
@@ -1300,21 +1318,21 @@ def plot_property_v_property(
         label = ut.plot.Label.get_label('radius', property_limits=host_distance_limits)
         ut.plot.make_label_legend(subplot, label, 'best')
 
-    if add_simulation_name:
-        prefix = part.info['simulation.name']
-    else:
-        prefix = ''
+    if plot_file_name is True or plot_file_name == '':
+        if add_simulation_name:
+            prefix = part.info['simulation.name']
+        else:
+            prefix = ''
 
-    plot_name = ut.plot.get_file_name(
-        y_property_name,
-        x_property_name,
-        species_name,
-        snapshot_dict=part.snapshot,
-        host_distance_limits=host_distance_limits,
-        prefix=prefix,
-    )
-
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+        plot_file_name = ut.plot.get_file_name(
+            y_property_name,
+            x_property_name,
+            species_name,
+            snapshot_dict=part.snapshot,
+            host_distance_limits=host_distance_limits,
+            prefix=prefix,
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_property_v_distance(
@@ -1342,7 +1360,7 @@ def plot_property_v_distance(
     fit_distance_limits=[],
     print_values=False,
     get_values=False,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -1378,7 +1396,8 @@ def plot_property_v_distance(
     fit_distance_limits : list : min and max distance for fit
     print_values : bool : whether to print values plotted
     get_values : bool : whether to return values plotted
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -1597,16 +1616,17 @@ def plot_property_v_distance(
     elif dimension_number == 1:
         distance_name = 'height'
 
-    plot_name = ut.plot.get_file_name(
-        property_name + '.' + property_statistic,
-        distance_name,
-        species_name,
-        snapshot_dict=parts[0].snapshot,
-    )
-    plot_name = plot_name.replace('.sum', '')
-    plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
-    plot_name = plot_name.replace('mass.density', 'density')
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = ut.plot.get_file_name(
+            property_name + '.' + property_statistic,
+            distance_name,
+            species_name,
+            snapshot_dict=parts[0].snapshot,
+        )
+        plot_file_name = plot_file_name.replace('.sum', '')
+        plot_file_name = plot_file_name.replace('mass.vel.circ', 'vel.circ')
+        plot_file_name = plot_file_name.replace('mass.density', 'density')
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
     if get_values:
         if len(parts) == 1:
@@ -1696,40 +1716,45 @@ def print_densities(
         Say.say('  density_3d = {:.5f} Msun / pc^3'.format(np.sum(densities_3d)))
 
 
-def plot_disk_orientation(
+def plot_disk_orientation_v_property(
     parts,
-    species_names=['star', 'star.young', 'gas'],
-    property_vary='distance',
-    property_limits=[4, 20],
+    species_names=['star', 'star.25', 'star.young'],
+    property_name='distance',
+    property_limits=[1, 15],
     property_bin_width=1,
     property_scaling='linear',
-    distance_ref=8.2,
+    reference_distance_max=8.2,
     center_positions=None,
     host_index=0,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
     '''
+    Plot orientation angle of the disk versus property_name.
+
+    Parameters
+    ----------
     parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
     species_names : str or list : name[s] of particle species to compute
         options: 'star', 'gas', 'dark'
-    vary_property : str : which property to vary (along x-axis): 'distance', 'age'
+    property_name : str : which property to vary (along x-axis): 'distance', 'age'
     property_limits : list : min and max property for binning
     property_bin_width : float : width of property bin
     property_scaling : str : 'log', 'linear'
-    distance_ref : float : reference distance to compute principal axes
+    reference_distance_max : float : reference distance to compute principal axes
     center_positions : array or list of arrays : position of center for each particle catalog
     host_index : int : index of host galaxy/halo to get stored position of (if not input it)
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
-    orientation_axis = [0, 0, 1]  # which principal axis to measure orientation angle of
+    axis_index = 2  # which principal axis to measure orientation angle of
     gas_temperature_limits = [0, 5e4]  # [K]
     young_star_age_limits = [0, 1]  # [Gyr]
 
-    Say = ut.io.SayClass(plot_disk_orientation)
+    Say = ut.io.SayClass(plot_disk_orientation_v_property)
 
     if isinstance(parts, dict):
         parts = [parts]
@@ -1745,21 +1770,20 @@ def plot_disk_orientation(
     for part_i, part in enumerate(parts):
         Say.say('{}'.format(part.info['simulation.name']))
 
-        # compute reference principal axes using all stars out to distance_ref
+        # compute reference principal axes using all stars out to reference_distance
         principal_axes = ut.particle.get_principal_axes(
             part,
             'star',
-            distance_ref,
+            reference_distance_max,
             age_limits=[0, 1],
             center_positions=center_positions[part_i],
             host_index=host_index,
             verbose=False,
         )
-        axis_rotation_ref = np.dot(orientation_axis, principal_axes['rotation'])
-        # axis_rotation_ref = np.dot(orientation_axis, part['star'].host['rotation'][0])
+        reference_rotation = principal_axes['rotation'][axis_index]
 
         for spec_i, spec_name in enumerate(species_names):
-            Say.say('  {}'.format(spec_name))
+            Say.say(f'  {spec_name}')
 
             if spec_name == 'gas':
                 part_indices = ut.array.get_indices(
@@ -1768,15 +1792,19 @@ def plot_disk_orientation(
             elif 'star' in spec_name and 'young' in spec_name:
                 part_indices = ut.array.get_indices(part['star'].prop('age'), young_star_age_limits)
                 spec_name = 'star'
+            elif 'star' in spec_name and '.25' in spec_name:
+                star_age_limits = [0, np.percentile(part['star'].prop('age'), 25)]
+                part_indices = ut.array.get_indices(part['star'].prop('age'), star_age_limits)
+                spec_name = 'star'
             else:
                 part_indices = None
 
             for prop_i, property_max in enumerate(PropertyBin.mins):
-                if property_vary == 'distance':
+                if property_name == 'distance':
                     distance_max = property_max
-                elif property_vary == 'age':
+                elif property_name == 'age':
                     part_indices = ut.array.get_indices(part['star'].prop('age'), [0, property_max])
-                    distance_max = distance_ref
+                    distance_max = reference_distance_max
 
                 principal_axes = ut.particle.get_principal_axes(
                     part,
@@ -1789,18 +1817,28 @@ def plot_disk_orientation(
                 )
 
                 # get orientation of axis of interest
-                axis_rotation = np.dot(orientation_axis, principal_axes['rotation'])
-                angle = np.arccos(np.dot(axis_rotation, axis_rotation_ref))
+                axis_rotation = principal_axes['rotation'][axis_index]
+                angle = np.arccos(np.dot(axis_rotation, reference_rotation))
                 if angle is np.nan:
                     angle = 0  # sanity check, for exact alignment
-                angle = min(angle, np.pi - angle)  # deal with possible flip
                 angle *= 180 / np.pi  # [degree]
+                # if angle > 90:
+                #    Say.say(
+                #        '!   {:4.1f} kpc: {:.1f} deg (raw), min/maj = {:.2f}'.format(
+                #            property_max, angle, principal_axes['axis.ratios'][0]
+                #        )
+                #    )
+                #    angle = min(angle, 180 - angle)  # deal with possible flip
 
                 angles[part_i, spec_i, prop_i] = angle
 
-                if property_vary == 'distance':
-                    Say.say('  {:4.1f} kpc: {:.1f} deg'.format(property_max, angle))
-                elif property_vary == 'age':
+                if property_name == 'distance':
+                    Say.say(
+                        '  {:4.1f} kpc: {:.1f} deg, min/maj = {:.2f}'.format(
+                            property_max, angle, principal_axes['axis.ratios'][0]
+                        )
+                    )
+                elif property_name == 'age':
                     Say.say('  {:4.1f} Gyr: {:.1f} deg'.format(property_max, angle))
 
     # plot ----------
@@ -1810,7 +1848,7 @@ def plot_disk_orientation(
         subplot, property_scaling, property_limits, None, 'linear', [0, None], angles
     )
 
-    if property_vary == 'distance':
+    if property_name == 'distance':
         subplot.set_xlabel('maximum radius $\\left[ {{\\rm kpc}} \\right]$')
     else:
         subplot.set_xlabel('star maximum age $\\left[ {{\\rm Gyr}} \\right]$')
@@ -1836,11 +1874,108 @@ def plot_disk_orientation(
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
-    property_y = 'disk.orientation'
-    if len(parts) == 1:
-        property_y = parts[0].info['simulation.name'] + '_' + property_y
-    plot_name = ut.plot.get_file_name(property_y, property_vary, snapshot_dict=part.snapshot)
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        property_y = 'disk.orientation'
+        if len(parts) == 1:
+            property_y = parts[0].info['simulation.name'] + '_' + property_y
+        plot_file_name = ut.plot.get_file_name(
+            property_y, property_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
+
+
+def plot_disk_orientation_v_time(
+    parts,
+    time_kind='time.lookback',
+    time_limits=[0, 13],
+    time_scaling='linear',
+    refrence_snapshot_index=gizmo_default.snapshot_index,
+    axis_indices=[0, 1, 2],
+    angle_limits=[0, 90],
+    host_index=0,
+    plot_file_name=False,
+    plot_directory='.',
+    figure_index=1,
+):
+    '''
+    Plot orientation angle of the disk versus time_kind, wrt
+    Requires that you have read pre-compiled host rotation tensors in star_form_coordinates_*.hdf5.
+
+    Parameters
+    ----------
+    parts : dict or list : catalog[s] of particles (can be different simulations or snapshots)
+    time_kind : str : time kind to use:s
+        'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
+    time_limits : list : min and max limits of time_kind to impose
+    time_width : float : width of time_kind bin
+    time_scaling : str : scaling of time_kind: 'log', 'linear'
+    refrence_snapshot_index : int : index of reference snapshot, that defines angle zero point
+    axis_indices : list : which principal axes to plot the orientation angles of
+    host_index : int : index of host galaxy/halo to get stored position of (if not input it)
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str : directory to write figure file
+    figure_index : int : index of figure for matplotlib
+    '''
+    # Say = ut.io.SayClass(plot_disk_orientation_v_time)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    angles = np.zeros((len(parts), len(axis_indices), parts[0].hostz['rotation'].shape[0])) * np.nan
+
+    for part_i, part in enumerate(parts):
+        rotation_tensors = part.hostz['rotation'][:, host_index]
+        reference_rotation_tensor = rotation_tensors[refrence_snapshot_index]
+        for axis_ii, axis_i in enumerate(axis_indices):
+            angles[part_i, axis_ii] = np.dot(
+                rotation_tensors[:, axis_i], reference_rotation_tensor[axis_i]
+            )
+
+    masks = np.isfinite(angles)
+    angles[masks] = np.arccos(angles[masks]) * 180 / np.pi  # [degree]
+
+    if time_kind in ['time.lookback', 'age']:
+        times = parts[0].Snapshot['time'][-1] - parts[0].Snapshot['time']
+    else:
+        times = parts[0].Snapshot[time_kind]
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot, time_scaling, time_limits, times, 'linear', angle_limits, angles
+    )
+
+    subplot.set_xlabel(time_kind)
+    subplot.set_ylabel('disk offset angle $\\left[ {{\\rm deg}} \\right]$')
+
+    if len(parts) > len(axis_indices):
+        colors = ut.plot.get_colors(len(parts))
+    else:
+        colors = ut.plot.get_colors(len(axis_indices))
+
+    for part_i, part in enumerate(parts):
+        for axis_ii, axis_i in enumerate(axis_indices):
+            if len(parts) > len(axis_indices):
+                label = part.info['simulation.name']
+                color = colors[part_i]
+            else:
+                label = f'principal axis {axis_i}'
+                color = colors[axis_ii]
+
+            subplot.plot(times, angles[part_i, axis_ii], color=color, alpha=0.8, label=label)
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = f'disk.orientation_v_{time_kind}'
+        if len(parts) == 1:
+            property_y = parts[0].info['simulation.name'] + '_' + plot_file_name
+        plot_file_name = ut.plot.get_file_name(
+            property_y, plot_file_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_velocity_distribution_of_halo(
@@ -1860,7 +1995,7 @@ def plot_velocity_distribution_of_halo(
     part_indicess=None,
     axis_y_limits=[],
     axis_y_scaling='linear',
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -1887,7 +2022,8 @@ def plot_velocity_distribution_of_halo(
     part_indicess : array or list of arrays : indices of particles from which to select
     axis_y_limits : list : min and max limits for y-axis
     axis_y_scaling : str : 'log', 'linear'
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -1940,7 +2076,7 @@ def plot_velocity_distribution_of_halo(
         else:
             prop_values = part[species_name].prop(property_name, part_indices)
 
-        Say.say('keeping {} {} particles'.format(prop_values.size, species_name))
+        Say.say(f'keeping {prop_values.size} {species_name} particles')
 
         Stat.append_to_dictionary(
             prop_values, property_limits, property_bin_width, property_bin_number, property_scaling
@@ -1979,10 +2115,11 @@ def plot_velocity_distribution_of_halo(
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
-    plot_name = ut.plot.get_file_name(
-        property_name, 'distribution', species_name, snapshot_dict=part.snapshot
-    )
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = ut.plot.get_file_name(
+            property_name, 'distribution', species_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -2005,7 +2142,7 @@ def assign_vel_circ_at_radius(
     his = ut.array.get_indices(hal.prop('mass.bound/mass'), [0.1, Inf])
     his = ut.array.get_indices(hal['host.distance'], host_distance_limits, his)
     his = ut.array.get_indices(hal[sort_property_name], [sort_property_value_min, Inf], his)
-    Say.say('{} halos within limits'.format(his.size))
+    Say.say(f'{his.size} halos within limits')
 
     his = his[np.argsort(hal[sort_property_name][his])]
     his = his[::-1][:halo_number_max]
@@ -2041,7 +2178,7 @@ def plot_vel_circ_v_radius_halos(
     radius_limits=[0.1, 3],
     radius_bin_width=0.1,
     radius_scaling='log',
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -2114,7 +2251,7 @@ def plot_vel_circ_v_radius_halos(
         radius_scaling,
         3,
         None,
-        write_plot,
+        plot_file_name,
         plot_directory,
         figure_index,
     )
@@ -2125,7 +2262,7 @@ def plot_vel_circ_v_radius_halos(
     #    gal, gal_indices,
     #    'star', 'velocity.total', 'std.cum', vel_circ_scaling, True, vel_circ_limits,
     #    radius_limits, radius_bin_width, radius_scaling, 3, False,
-    #    write_plot, plot_directory, figure_index)
+    #    plot_file_name, plot_directory, figure_index)
 
     return pros
 
@@ -2149,7 +2286,7 @@ def plot_property_v_distance_halos(
     distance_scaling='log',
     dimension_number=3,
     distance_reference=None,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -2173,7 +2310,8 @@ def plot_property_v_distance_halos(
     distance_scaling : str : 'log', 'linear'
     dimension_number : int : number of spatial dimensions for profile
     distance_reference : float : reference distance at which to draw vertical line
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -2361,16 +2499,20 @@ def plot_property_v_distance_halos(
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
-    snapshot_dict = None
-    if parts is not None:
-        snapshot_dict = parts[0].snapshot
-    plot_name = ut.plot.get_file_name(
-        property_name + '.' + property_statistic, 'dist', species_name, snapshot_dict=snapshot_dict
-    )
-    plot_name = plot_name.replace('.sum', '')
-    plot_name = plot_name.replace('mass.vel.circ', 'vel.circ')
-    plot_name = plot_name.replace('mass.density', 'density')
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        snapshot_dict = None
+        if parts is not None:
+            snapshot_dict = parts[0].snapshot
+        plot_file_name = ut.plot.get_file_name(
+            property_name + '.' + property_statistic,
+            'dist',
+            species_name,
+            snapshot_dict=snapshot_dict,
+        )
+        plot_file_name = plot_file_name.replace('.sum', '')
+        plot_file_name = plot_file_name.replace('mass.vel.circ', 'vel.circ')
+        plot_file_name = plot_file_name.replace('mass.density', 'density')
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
     return pros
 
@@ -2399,7 +2541,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         sfh_limits=[],
         sfh_scaling='log',
         verbose=False,
-        write_plot=False,
+        plot_file_name=False,
         plot_directory='.',
         figure_index=1,
     ):
@@ -2411,8 +2553,9 @@ class StarFormHistoryClass(ut.io.SayClass):
         parts : dict or list : catalog[s] of particles
         sfh_kind : str : star formation kind to plot:
             'form.rate', 'form.rate.specific', 'mass', 'mass.normalized'
-        time_kind : str : time kind to use: 'time', 'time.lookback' (wrt z = 0), 'redshift'
-        time_limits : list : min and max limits of time_kind to get
+        time_kind : str : time kind to use:
+            'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
+        time_limits : list : min and max limits of time_kind to impose
         time_width : float : width of time_kind bin
         time_scaling : str : scaling of time_kind: 'log', 'linear'
         distance_limits : list : min and max limits of distance to select star particles
@@ -2423,7 +2566,8 @@ class StarFormHistoryClass(ut.io.SayClass):
         part_indicess : array : part_indices of particles from which to select
         sfh_limits : list : min and max limits for y-axis
         sfh_scaling : str : scaling of y-axis: 'log', 'linear'
-        write_plot : bool : whether to write figure to file
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
         plot_directory : str : directory to write figure file
         figure_index : int : index of figure for matplotlib
         '''
@@ -2529,15 +2673,14 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
-        time_value = None
-        if time_kind == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
-            time_value = min(time_limits)
-
-        plot_name = ut.plot.get_file_name(
-            sfh_kind + '.history', time_kind, 'star', 'redshift', parts[0].snapshot, time_value,
-        )
-
-        ut.plot.parse_output(write_plot, plot_name, plot_directory)
+        if plot_file_name is True or plot_file_name == '':
+            time_value = None
+            if time_kind == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
+                time_value = min(time_limits)
+            plot_file_name = ut.plot.get_file_name(
+                sfh_kind + '.history', time_kind, 'star', 'redshift', parts[0].snapshot, time_value,
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
 
     def plot_star_form_history_galaxies(
         self,
@@ -2555,7 +2698,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_limits=[13.7, 0],
         time_width=0.2,
         time_scaling='linear',
-        write_plot=False,
+        plot_file_name=False,
         plot_directory='.',
         figure_index=1,
     ):
@@ -2579,7 +2722,8 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_limits : list : min and max limits of time_kind to plot
         time_width : float : width of time_kind bin
         time_scaling : str : scaling of time_kind: 'log', 'linear'
-        write_plot : bool : whether to write figure to file
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
         plot_directory : str : directory to write figure file
         figure_index : int : index of figure for matplotlib
         '''
@@ -2603,7 +2747,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
             hal_indices = hal_indices[np.argsort(hal.prop(mass_kind, hal_indices))]
 
-            print('halo number = {}'.format(hal_indices.size))
+            print(f'halo number = {hal_indices.size}')
 
             sfh = {}
 
@@ -2716,7 +2860,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 linewidth = 2.5 + 0.1 * hal_ii
                 # linewidth = 3.0
                 mass = ut.io.get_string_from_numbers(sfh['mass'][hal_ii][-1], 1, exponential=True)
-                label = '${}\,{{\\rm M}}_\odot$'.format(mass)
+                label = f'${mass}\,{{\\rm M}}_\odot$'
                 subplot.plot(
                     sfh[time_kind][hal_ii],
                     sfh[sfh_kind][hal_ii],
@@ -2731,94 +2875,28 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, time_value=part.snapshot['redshift'])
 
-        snapshot_dict = None
-        if part is not None:
-            snapshot_dict = part.snapshot
-        time_kind_file_name = 'redshift'
-        if hal is None:
-            time_kind_file_name = None
+        if plot_file_name is True or plot_file_name == '':
+            snapshot_dict = None
+            if part is not None:
+                snapshot_dict = part.snapshot
+            time_kind_file_name = 'redshift'
+            if hal is None:
+                time_kind_file_name = None
+            host_distance_limits = None
+            if 'host.distance' in property_select:
+                host_distance_limits = property_select['host.distance']
 
-        host_distance_limits = None
-        if 'host.distance' in property_select:
-            host_distance_limits = property_select['host.distance']
-
-        plot_name = ut.plot.get_file_name(
-            sfh_kind,
-            time_kind,
-            'star',
-            time_kind_file_name,
-            snapshot_dict,
-            host_distance_limits=host_distance_limits,
-        )
-        if gal is not None:
-            plot_name += '_lg'
-        ut.plot.parse_output(write_plot, plot_name, plot_directory)
-
-    def _get_time_bin_dictionary(
-        self,
-        time_kind='redshift',
-        time_limits=[0, 10],
-        time_width=0.01,
-        time_scaling='linear',
-        Cosmology=None,
-    ):
-        '''
-        Get dictionary of time bin information.
-
-        Parameters
-        ----------
-        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
-        time_limits : list : min and max limits of time_kind to impose
-        time_width : float : width of time_kind bin (in units set by time_scaling)
-        time_scaling : str : scaling of time_kind: 'log', 'linear'
-        Cosmology : class : cosmology class, to convert between time metrics
-
-        Returns
-        -------
-        time_dict : dict
-        '''
-        assert time_kind in ['time', 'time.lookback', 'redshift', 'scalefactor']
-
-        time_limits = np.array(time_limits)
-
-        if 'log' in time_scaling:
-            if time_kind == 'redshift':
-                time_limits += 1  # convert to z + 1 so log is well-defined
-            times = 10 ** np.arange(
-                np.log10(time_limits.min()), np.log10(time_limits.max()) + time_width, time_width
+            plot_file_name = ut.plot.get_file_name(
+                sfh_kind,
+                time_kind,
+                'star',
+                time_kind_file_name,
+                snapshot_dict,
+                host_distance_limits=host_distance_limits,
             )
-            if time_kind == 'redshift':
-                times -= 1
-        else:
-            times = np.arange(time_limits.min(), time_limits.max() + time_width, time_width)
-
-        # if input limits is reversed, get reversed array
-        if time_limits[1] < time_limits[0]:
-            times = times[::-1]
-
-        time_dict = {}
-
-        if 'time' in time_kind:
-            if 'lookback' in time_kind:
-                time_dict['time.lookback'] = times
-                time_dict['time'] = Cosmology.get_time(0) - times
-            else:
-                time_dict['time'] = times
-                time_dict['time.lookback'] = Cosmology.get_time(0) - times
-            time_dict['redshift'] = Cosmology.convert_time('redshift', 'time', time_dict['time'])
-            time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
-
-        else:
-            if 'redshift' in time_kind:
-                time_dict['redshift'] = times
-                time_dict['scalefactor'] = 1 / (1 + time_dict['redshift'])
-            elif 'scalefactor' in time_kind:
-                time_dict['scalefactor'] = times
-                time_dict['redshift'] = 1 / time_dict['scalefactor'] - 1
-            time_dict['time'] = Cosmology.get_time(time_dict['redshift'])
-            time_dict['time.lookback'] = Cosmology.get_time(0) - time_dict['time']
-
-        return time_dict
+            if gal is not None:
+                plot_file_name += '_lg'
+        ut.plot.parse_output(plot_file_name, plot_directory)
 
     def _get_star_form_history(
         self,
@@ -2839,7 +2917,8 @@ class StarFormHistoryClass(ut.io.SayClass):
         Parameters
         ----------
         part : dict : catalog of particles
-        time_kind : str : time metric to use: 'time', 'time.lookback', 'redshift'
+        time_kind : str : time metric to use:
+            'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
         time_limits : list : min and max limits of time_kind to impose
         time_width : float : width of time_kind bin (in units set by time_scaling)
         time_scaling : str : scaling of time_kind: 'log', 'linear'
@@ -2889,7 +2968,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
         # get time bins, ensure are ordered from earliest
-        time_dict = self._get_time_bin_dictionary(
+        time_dict = part.Cosmology.get_time_bins(
             time_kind, time_limits, time_width, time_scaling, part.Cosmology
         )
         time_bins = np.sort(time_dict['time'])
@@ -2942,8 +3021,8 @@ StarFormHistory = StarFormHistoryClass()
 def plot_gas_neutral_fraction_v_redshift(
     parts=None,
     redshift_limits=[6, 8.4],
-    simulation_directory='.',
-    write_plot=False,
+    simulation_directory=gizmo_default.simulation_directory,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -3045,7 +3124,9 @@ def plot_gas_neutral_fraction_v_redshift(
 
     ut.plot.make_legends(subplot)
 
-    ut.plot.parse_output(write_plot, 'gas.neutral.frac_v_redshift', plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = 'gas.neutral.frac_v_redshift'
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
     return parts
 
@@ -3062,7 +3143,7 @@ def explore_galaxy(
     distance_bin_width=0.2,
     distance_bin_number=None,
     plot_only_members=True,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
 ):
     '''
@@ -3078,7 +3159,8 @@ def explore_galaxy(
     distance_bin_width : float : length of pixel for galaxy image
     distance_bin_number : int : number of pixels for galaxy image
     plot_only_members : bool : whether to plat only particles that are members of halo
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     '''
     from halo_analysis import halo_plot
@@ -3109,7 +3191,7 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('star.position', hi),
                 part_indices=part_indices,
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=10,
             )
@@ -3126,7 +3208,7 @@ def explore_galaxy(
                 distance_bin_width,
                 distance_bin_number,
                 hal.prop('star.position', hi),
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=11,
             )
@@ -3148,7 +3230,7 @@ def explore_galaxy(
                 part_indices,
                 [0, None],
                 'linear',
-                write_plot,
+                plot_file_name,
                 plot_directory,
                 figure_index=12,
             )
@@ -3171,7 +3253,7 @@ def explore_galaxy(
                 part_indicess=part_indices,
                 axis_y_limits=[0, None],
                 axis_y_scaling='linear',
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=13,
             )
@@ -3191,7 +3273,7 @@ def explore_galaxy(
                 center_positions=hal.prop('star.position', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=14,
             )
@@ -3201,7 +3283,7 @@ def explore_galaxy(
             #    [0.1, distance_max], 0.1, 'log', 3,
             #    center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
             #    distance_reference=hal.prop('star.radius.50', hi),
-            #    write_plot=write_plot, plot_directory=plot_directory, figure_index=15,
+            #    plot_file_name=plot_file_name, plot_directory=plot_directory, figure_index=15,
             # )
 
             plot_property_v_distance(
@@ -3220,7 +3302,7 @@ def explore_galaxy(
                 center_velocities=hal.prop('star.velocity', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=16,
             )
@@ -3240,7 +3322,7 @@ def explore_galaxy(
                 center_positions=hal.prop('star.position', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=17,
             )
@@ -3255,7 +3337,7 @@ def explore_galaxy(
                 part_indicess=part_indices,
                 sfh_limits=[0, 1],
                 sfh_scaling='linear',
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=18,
             )
@@ -3285,7 +3367,7 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('star.position', hi),
                 background_color='black',
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=20,
             )
@@ -3303,7 +3385,7 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('position', hi),
                 background_color='black',
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=21,
             )
@@ -3323,7 +3405,7 @@ def explore_galaxy(
                 center_positions=center_position,
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=22,
             )
@@ -3334,7 +3416,7 @@ def explore_galaxy(
             #    center_positions=center_position, center_velocities=center_velocity,
             #    part_indicess=part_indices,
             #    distance_reference=distance_reference,
-            #    write_plot=write_plot, plot_directory=plot_directory, figure_index=23)
+            #    plot_file_name=plot_file_name, plot_directory=plot_directory, figure_index=23)
 
             plot_property_v_distance(
                 part,
@@ -3351,7 +3433,7 @@ def explore_galaxy(
                 center_positions=center_position,
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                write_plot=write_plot,
+                plot_file_name=plot_file_name,
                 plot_directory=plot_directory,
                 figure_index=24,
             )
@@ -3374,7 +3456,7 @@ def explore_galaxy(
                     distance_bin_number,
                     hal.prop('star.position', hi),
                     part_indices=part_indices,
-                    write_plot=write_plot,
+                    plot_file_name=plot_file_name,
                     plot_directory=plot_directory,
                     figure_index=30,
                 )
@@ -3391,7 +3473,7 @@ def explore_galaxy(
                     distance_bin_number,
                     hal.prop('star.position', hi),
                     part_indices=part_indices,
-                    write_plot=write_plot,
+                    plot_file_name=plot_file_name,
                     plot_directory=plot_directory,
                     figure_index=31,
                 )
@@ -3410,7 +3492,7 @@ def plot_density_profile_halo(
     center_position=None,
     distance_limits=[0.1, 2],
     distance_bin_width=0.1,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -3426,7 +3508,8 @@ def plot_density_profile_halo(
     center_position : array : position to center profile (to use instead of halo position)
     distance_max : float : max distance (radius) for galaxy image
     distance_bin_width : float : length of pixel for galaxy image
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -3465,7 +3548,7 @@ def plot_density_profile_halo(
         center_positions=center_positions,
         part_indicess=None,
         distance_reference=distance_reference,
-        write_plot=write_plot,
+        plot_file_name=plot_file_name,
         plot_directory=plot_directory,
         figure_index=figure_index,
     )
@@ -3480,12 +3563,13 @@ def plot_density_profiles_halos(
     distance_limits=[0.05, 1],
     distance_bin_width=0.2,
     plot_only_members=False,
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=0,
 ):
     '''
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -3517,7 +3601,7 @@ def plot_density_profiles_halos(
         3,
         center_positions=center_positions,
         part_indicess=part_indicess,
-        write_plot=write_plot,
+        plot_file_name=plot_file_name,
         plot_directory=plot_directory,
         figure_index=figure_index,
     )
@@ -3526,7 +3610,9 @@ def plot_density_profiles_halos(
 # --------------------------------------------------------------------------------------------------
 # galaxy mass and radius at snapshots
 # --------------------------------------------------------------------------------------------------
-def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], species=['star']):
+def write_galaxy_properties_v_time(
+    simulation_directory=gizmo_default.simulation_directory, redshifts=[], species=['star']
+):
     '''
     Read snapshots and store dictionary of host galaxy properties (such as mass and radius)
     at snapshots.
@@ -3555,14 +3641,14 @@ def write_galaxy_properties_v_time(simulation_directory='.', redshifts=[], speci
     gal = {'index': [], 'redshift': [], 'scalefactor': [], 'time': [], 'time.lookback': []}
 
     for spec_name in species:
-        gal['{}.position'.format(spec_name)] = []
+        gal[f'{spec_name}.position'] = []
         for mass_percent in mass_percents:
             gal['{}.radius.{:.0f}'.format(spec_name, mass_percent)] = []
             gal['{}.mass.{:.0f}'.format(spec_name, mass_percent)] = []
 
     if redshifts == 'all' or redshifts is None or redshifts == []:
         Snapshot = ut.simulation.SnapshotClass()
-        Snapshot.read_snapshots('snapshot_times.txt', simulation_directory)
+        Snapshot.read_snapshots(gizmo_default.snapshot_time_file_name, simulation_directory)
         redshifts = Snapshot['redshift']
     else:
         if np.isscalar(redshifts):
@@ -3610,7 +3696,7 @@ def plot_galaxy_property_v_time(
     snapshot_subsample_factor=1,
     axis_y_limits=[],
     axis_y_scaling='log',
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
     figure_index=1,
 ):
@@ -3630,7 +3716,8 @@ def plot_galaxy_property_v_time(
     snapshot_subsample_factor : int : factor by which to sub-sample snapshots from gals
     axis_y_limits : list : min and max limits for y-axis
     axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
-    write_plot : bool : whether to write figure to file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
     plot_directory : str : directory to write figure file
     figure_index : int : index of figure for matplotlib
     '''
@@ -3695,8 +3782,9 @@ def plot_galaxy_property_v_time(
 
     ut.plot.make_legends(subplot)
 
-    plot_name = 'galaxy_{}_v_{}'.format(property_name, time_kind)
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = f'galaxy_{property_name}_v_{time_kind}'
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -4187,7 +4275,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [0, None],
                 [0.1, self.halo_profile_radius_limits[1]],
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4201,7 +4289,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [None, None],
                 self.halo_profile_radius_limits,
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4215,7 +4303,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [0, 2],
                 [10, 2000],
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4231,7 +4319,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [None, None],
                 self.halo_profile_radius_limits,
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4245,7 +4333,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [None, None],
                 self.halo_profile_radius_limits,
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4261,7 +4349,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [None, None],
                 self.halo_profile_radius_limits,
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4277,7 +4365,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [None, None],
                         self.halo_profile_radius_limits,
                         distance_bin_width,
-                        write_plot=True,
+                        plot_file_name=True,
                         plot_directory=self.plot_directory,
                     )
 
@@ -4292,7 +4380,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'probability',
                         self.halo_profile_radius_limits,
                         axis_y_limits=[1e-4, None],
-                        write_plot=True,
+                        plot_file_name=True,
                         plot_directory=self.plot_directory,
                     )
                 except Exception:
@@ -4302,7 +4390,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             #    plot_property_v_distance(
             #        parts, spec, 'host.velocity.rad', 'average', 'linear', True,
             #        [None, None], self.halo_profile_radius_limits, 0.25,
-            #        write_plot=True, plot_directory=self.plot_directory,
+            #        plot_file_name=True, plot_directory=self.plot_directory,
             #    )
 
         spec_name = 'star'
@@ -4317,7 +4405,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [None, None],
                 self.halo_profile_radius_limits,
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4331,7 +4419,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 [None, None],
                 self.galaxy_profile_radius_limits,
                 distance_bin_width,
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=self.plot_directory,
             )
 
@@ -4347,7 +4435,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [None, None],
                         self.galaxy_profile_radius_limits,
                         distance_bin_width,
-                        write_plot=True,
+                        plot_file_name=True,
                         plot_directory=self.plot_directory,
                     )
 
@@ -4362,7 +4450,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'probability',
                         self.galaxy_radius_limits,
                         axis_y_limits=[1e-4, None],
-                        write_plot=True,
+                        plot_file_name=True,
                         plot_directory=self.plot_directory,
                     )
                 except Exception:
@@ -4379,7 +4467,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         [None, None],
                         self.galaxy_profile_radius_limits,
                         distance_bin_width,
-                        write_plot=True,
+                        plot_file_name=True,
                         plot_directory=self.plot_directory,
                     )
 
@@ -4394,7 +4482,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'probability',
                         self.galaxy_radius_limits,
                         axis_y_limits=[1e-4, None],
-                        write_plot=True,
+                        plot_file_name=True,
                         plot_directory=self.plot_directory,
                     )
                 except Exception:
@@ -4412,7 +4500,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     self.galaxy_radius_limits,
                     distance_bin_width * 2,
                     'linear',
-                    write_plot=True,
+                    plot_file_name=True,
                     plot_directory=self.plot_directory,
                 )
 
@@ -4442,7 +4530,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'linear',
                 galaxy_radius_limits,
                 sfh_limits=[None, None],
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=plot_directory,
             )
 
@@ -4455,7 +4543,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'linear',
                 galaxy_radius_limits,
                 sfh_limits=[None, None],
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=plot_directory,
             )
 
@@ -4469,7 +4557,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                 galaxy_radius_limits,
                 sfh_limits=[0, None],
                 sfh_scaling='linear',
-                write_plot=True,
+                plot_file_name=True,
                 plot_directory=plot_directory,
             )
 
@@ -4483,7 +4571,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             #    galaxy_radius_limits,
             #    sfh_limits=[0, None],
             #    sfh_scaling='linear',
-            #    write_plot=True,
+            #    plot_file_name=True,
             #    plot_directory=plot_directory,
             # )
 
@@ -4496,7 +4584,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             #    'linear',
             #    galaxy_radius_limits,
             #    sfh_limits=[None, None],
-            #    write_plot=True,
+            #    plot_file_name=True,
             #    plot_directory=plot_directory,
             # )
 
@@ -4528,7 +4616,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                             property_bin_number,
                             host_distance_limits=self.galaxy_radius_limits,
                             draw_statistics=False,
-                            write_plot=True,
+                            plot_file_name=True,
                             plot_directory=plot_directory,
                             add_simulation_name=True,
                         )
@@ -4545,7 +4633,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                             property_bin_number,
                             host_distance_limits=self.galaxy_radius_limits,
                             draw_statistics=True,
-                            write_plot=True,
+                            plot_file_name=True,
                             plot_directory=plot_directory,
                             add_simulation_name=True,
                         )
@@ -4562,7 +4650,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                             property_bin_number,
                             host_distance_limits=self.galaxy_radius_limits,
                             draw_statistics=True,
-                            write_plot=True,
+                            plot_file_name=True,
                             plot_directory=plot_directory,
                             add_simulation_name=True,
                         )
@@ -4577,7 +4665,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             #        'temperature', [10, 1e7], 'log',
             #        property_bin_number, host_distance_limits=self.galaxy_radius_limits,
             #        draw_statistics=False,
-            #        write_plot=True, plot_directory=plot_directory, add_simulation_name=True,
+            #        plot_file_name=True, plot_directory=plot_directory, add_simulation_name=True,
             #    )
 
     def plot_images(
@@ -4610,7 +4698,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     rotation=align_principal_axes,
                     image_limits=[10 ** 6, 10 ** 10.5],
                     background_color='black',
-                    write_plot=True,
+                    plot_file_name=True,
                     plot_directory=plot_directory,
                 )
 
@@ -4628,7 +4716,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     rotation=align_principal_axes,
                     image_limits=[10 ** 4, 10 ** 9],
                     background_color='black',
-                    write_plot=True,
+                    plot_file_name=True,
                     plot_directory=plot_directory,
                 )
 
@@ -4646,12 +4734,122 @@ class CompareSimulationsClass(ut.io.SayClass):
                     rotation=align_principal_axes,
                     image_limits=[10 ** 5.5, 10 ** 9],
                     background_color='black',
-                    write_plot=True,
+                    plot_file_name=True,
                     plot_directory=plot_directory,
                 )
 
 
 CompareSimulations = CompareSimulationsClass()
+
+
+def compare_star_formation_models(
+    parts,
+    density_limits=[1, 1e6],
+    density_bin_width=0.2,
+    distance_limits=[0, 12],
+    distance_bin_width=0.05,
+):
+    '''
+    .
+    '''
+    # get indices of star-forming gas
+    part_indicess = []
+    for part in parts:
+        part_indicess.append(ut.array.get_indices(part['gas']['sfr'], [1e-10, 1e10]))
+
+    # distribution of gas densities ----------
+    # plot density of star-forming gas
+    plot_file_name = 'gas.sf.density_distribution_z.{:.1f}'.format(parts[0].snapshot['redshift'])
+    plot_property_distribution(
+        parts,
+        'gas',
+        'number.density',
+        density_limits,
+        density_bin_width,
+        None,
+        weight_property_name='',
+        part_indicess=part_indicess,
+        distance_limits=None,
+        plot_file_name=plot_file_name,
+    )
+
+    # plot density of star-forming gas weighted by SFR
+    plot_file_name = 'gas.sf.density*sfr_distribution_z.{:.1f}'.format(
+        parts[0].snapshot['redshift']
+    )
+    plot_property_distribution(
+        parts,
+        'gas',
+        'number.density',
+        density_limits,
+        density_bin_width,
+        None,
+        weight_property_name='sfr',
+        part_indicess=part_indicess,
+        distance_limits=None,
+        plot_file_name=plot_file_name,
+    )
+
+    # plot density of all gas
+    plot_file_name = 'gas.density_distribution_z.{:.1f}'.format(parts[0].snapshot['redshift'])
+    plot_property_distribution(
+        parts,
+        'gas',
+        'number.density',
+        density_limits,
+        density_bin_width,
+        None,
+        distance_limits=distance_limits,
+        plot_file_name=plot_file_name,
+    )
+
+    # image ----------
+    distance_max = max(distance_limits)
+
+    # plot image of all gas
+    for part_i, part in enumerate(parts):
+        Image.plot_image(
+            part,
+            'gas',
+            'mass',
+            'histogram',
+            [0, 1],
+            distances_max=distance_max,
+            distance_bin_width=distance_bin_width,
+            rotation=True,
+            image_limits=[2e6, 1e9],
+            plot_file_name=part.info['simulation.name'] + '_gas',
+        )
+
+        # plot image of dense gas
+        Image.plot_image(
+            part,
+            'gas',
+            'mass',
+            'histogram',
+            [0, 1],
+            distances_max=distance_max,
+            distance_bin_width=distance_bin_width,
+            rotation=True,
+            property_select={'number.density': [10, np.Inf]},
+            image_limits=[2e6, 1e9],
+            plot_file_name=part.info['simulation.name'] + '_gas.10cm3',
+        )
+
+        # plot image of young stars
+        Image.plot_image(
+            part,
+            'star',
+            'mass',
+            'histogram',
+            [0, 1],
+            distances_max=distance_max,
+            distance_bin_width=distance_bin_width,
+            rotation=True,
+            property_select={'age': [0, 0.1]},
+            image_limits=[2e6, 3e8],
+            plot_file_name=part.info['simulation.name'] + '_star.100Myr',
+        )
 
 
 def compare_resolution(
@@ -4702,7 +4900,7 @@ def compare_resolution(
         [None, None],
         distance_limits,
         distance_bin_width,
-        write_plot=True,
+        plot_file_name=True,
     )
 
     plot_property_v_distance(
@@ -4715,7 +4913,7 @@ def compare_resolution(
         [None, None],
         distance_limits,
         distance_bin_width,
-        write_plot=True,
+        plot_file_name=True,
     )
 
     plot_property_v_distance(
@@ -4728,7 +4926,7 @@ def compare_resolution(
         [None, None],
         distance_limits,
         distance_bin_width,
-        write_plot=True,
+        plot_file_name=True,
     )
 
     return parts

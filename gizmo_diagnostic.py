@@ -13,6 +13,7 @@ import glob
 import numpy as np
 
 import utilities as ut
+from . import gizmo_default
 from . import gizmo_io
 from . import gizmo_plot
 
@@ -22,7 +23,11 @@ class RuntimeClass(ut.io.SayClass):
     .
     '''
 
-    def get_cpu_numbers(self, simulation_directory='.', runtime_file_name='gizmo.out*'):
+    def get_cpu_numbers(
+        self,
+        simulation_directory=gizmo_default.simulation_directory,
+        gizmo_out_file_name=gizmo_default.gizmo_out_file_name,
+    ):
         '''
         Get number of MPI tasks and OpenMP threads from run-time file.
         If cannot find any, default to 1.
@@ -30,7 +35,7 @@ class RuntimeClass(ut.io.SayClass):
         Parameters
         ----------
         simulation_directory : str : top-level directory of simulation
-        runtime_file_name : str : name of run-time file name (set in submission script)
+        gizmo_out_file_name : str : name of Gizmo run-time file
 
         Returns
         -------
@@ -39,7 +44,7 @@ class RuntimeClass(ut.io.SayClass):
         '''
         loop_number_max = 1000
 
-        file_name = ut.io.get_path(simulation_directory) + runtime_file_name
+        file_name = ut.io.get_path(simulation_directory) + gizmo_out_file_name
         path_file_names = glob.glob(file_name)
         file_read = open(path_file_names[0], 'r')
 
@@ -61,13 +66,13 @@ class RuntimeClass(ut.io.SayClass):
                 break
 
         if mpi_number:
-            self.say('MPI tasks = {}'.format(mpi_number))
+            self.say(f'MPI tasks = {mpi_number}')
         else:
             self.say('! unable to find number of MPI tasks')
             mpi_number = 1
 
         if omp_number:
-            self.say('OpenMP threads = {}'.format(omp_number))
+            self.say(f'OpenMP threads = {omp_number}')
         else:
             self.say('did not find any OpenMP threads')
             omp_number = 1
@@ -76,10 +81,11 @@ class RuntimeClass(ut.io.SayClass):
 
     def print_run_times(
         self,
-        simulation_directory='.',
-        output_directory='output/',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         core_number=None,
-        runtime_file_name='gizmo.out*',
+        gizmo_out_file_name=gizmo_default.gizmo_out_file_name,
+        gizmo_cpu_file_name=gizmo_default.gizmo_cpu_file_name,
         wall_time_restart=0,
         scalefactors=[],
     ):
@@ -90,9 +96,9 @@ class RuntimeClass(ut.io.SayClass):
         Parameters
         ----------
         simulation_directory : str : directory of simulation
-        output_directory : str : directory of output files within simulation directory
+        snapshot_directory : str : directory of snapshot files and Gizmo output files
         core_number : int : total number of CPU cores (input instead of reading from run-time file)
-        runtime_file_name : str : name of run-time file to read CPU info
+        gizmo_out_file_name : str : name of Gizmo run-time file
         wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
         scalefactors : array-like : list of scale-factors at which to print run times
 
@@ -111,8 +117,6 @@ class RuntimeClass(ut.io.SayClass):
             else:
                 scalefactor_string = '{:.3f}'.format(scalefactor)
             return scalefactor_string
-
-        file_name = 'cpu.txt'
 
         if scalefactors is None or (not np.isscalar(scalefactors) and len(scalefactors) == 0):
             scalefactors = [
@@ -134,14 +138,16 @@ class RuntimeClass(ut.io.SayClass):
         scalefactors = ut.array.arrayize(scalefactors)
 
         path_file_name = (
-            ut.io.get_path(simulation_directory) + ut.io.get_path(output_directory) + file_name
+            ut.io.get_path(simulation_directory)
+            + ut.io.get_path(snapshot_directory)
+            + gizmo_cpu_file_name
         )
         file_read = open(path_file_name, 'r')
 
         wall_times = []
 
         i = 0
-        scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
+        scalefactor = f'Time: {get_scalefactor_string(scalefactors[i])}'
         print_next_line = False
 
         for line in file_read:
@@ -152,7 +158,7 @@ class RuntimeClass(ut.io.SayClass):
                 if i >= len(scalefactors):
                     break
                 else:
-                    scalefactor = 'Time: {}'.format(get_scalefactor_string(scalefactors[i]))
+                    scalefactor = f'Time: {get_scalefactor_string(scalefactors[i])}'
             elif scalefactor in line:
                 print_next_line = True
 
@@ -168,11 +174,11 @@ class RuntimeClass(ut.io.SayClass):
 
         if not core_number:
             # get core number from run-time file
-            mpi_number, omp_number = self.get_cpu_numbers(simulation_directory, runtime_file_name)
+            mpi_number, omp_number = self.get_cpu_numbers(simulation_directory, gizmo_out_file_name)
             core_number = mpi_number * omp_number
-            print('# core = {} (mpi = {}, omp = {})'.format(core_number, mpi_number, omp_number))
+            print(f'# core = {core_number} (mpi = {mpi_number}, omp = {omp_number})')
         else:
-            print('# core = {}'.format(core_number))
+            print(f'# core = {core_number}')
 
         cpu_times = wall_times * core_number
 
@@ -196,9 +202,10 @@ class RuntimeClass(ut.io.SayClass):
 
     def print_run_times_ratios(
         self,
-        simulation_directories=['.'],
-        output_directory='output/',
-        runtime_file_name='gizmo.out*',
+        simulation_directories=[gizmo_default.simulation_directory],
+        snapshot_directory=gizmo_default.snapshot_directory,
+        gizmo_out_file_name=gizmo_default.gizmo_out_file_name,
+        gizmo_cpu_file_name=gizmo_default.gizmo_cpu_file_name,
         wall_times_restart=[],
         scalefactors=[
             0.2,
@@ -226,8 +233,8 @@ class RuntimeClass(ut.io.SayClass):
         Parameters
         ----------
         simulation_directories : str or list : top-level directory[s] of simulation[s]
-        output_directory : str : directory of output files within simulation directory
-        runtime_file_name : str : name of run-time file  to read CPU info
+        snapshot_directory : str : directory of snapshot files and Gizmo output files
+        gizmo_out_file_name : str : name of Gizmo run-time file
         wall_times_restart : float or list :
             wall time[s] [sec] of previous run[s] (if restart from snapshot)
         scalefactors : array-like : list of scale-factors at which to print run times
@@ -246,9 +253,10 @@ class RuntimeClass(ut.io.SayClass):
         for d_i, directory in enumerate(simulation_directories):
             scalefactors, redshifts, wall_times, cpu_times = self.print_run_times(
                 directory,
-                output_directory,
+                snapshot_directory,
                 None,
-                runtime_file_name,
+                gizmo_out_file_name,
+                gizmo_cpu_file_name,
                 wall_times_restart[d_i],
                 scalefactors,
             )
@@ -285,7 +293,9 @@ class ContaminationClass(ut.io.SayClass):
     Contamination by low-resolution dark matter.
     '''
 
-    def plot_contamination_v_distance_both(self, redshift=0, simulation_directory='.'):
+    def plot_contamination_v_distance_both(
+        self, redshift=0, simulation_directory=gizmo_default.simulation_directory
+    ):
         '''
         Plot contamination from lower-resolution particles around halo center as a function of
         distance.
@@ -320,7 +330,7 @@ class ContaminationClass(ut.io.SayClass):
             distance_bin_width,
             halo_radius=halo_prop['radius'],
             scale_to_halo_radius=False,
-            write_plot=True,
+            plot_file_name=True,
             plot_directory='plot',
         )
 
@@ -330,7 +340,7 @@ class ContaminationClass(ut.io.SayClass):
             distance_bin_width,
             halo_radius=halo_prop['radius'],
             scale_to_halo_radius=True,
-            write_plot=True,
+            plot_file_name=True,
             plot_directory='plot',
         )
 
@@ -346,7 +356,7 @@ class ContaminationClass(ut.io.SayClass):
         host_index=0,
         axis_y_limits=[0.0001, 1],
         axis_y_scaling='log',
-        write_plot=False,
+        plot_file_name=None,
         plot_directory='.',
         figure_index=1,
     ):
@@ -355,19 +365,32 @@ class ContaminationClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at snapshot
-        distance_limits : list : min and max limits for distance from galaxy
-        distance_bin_width : float : width of each distance bin (in units of distance_scaling)
-        distance_scaling : str : 'log', 'linear'
-        halo_radius : float : radius of halo [kpc physical]
-        scale_to_halo_radius : bool : whether to scale distance to halo_radius
-        center_position : array : position of galaxy/halo center
-        host_index : int : index of host halo to get position of (if not input center_position)
-        axis_y_limits : list : min and max limits for y-axis
-        axis_y_scaling : str : scaling of y-axis: 'log', 'linear'
-        write_plot : bool : whether to write figure to file
-        plot_directory : str : directory to write figure file
-        figure_index : int : index of figure for matplotlib
+        part : dict
+            catalog of particles at snapshot
+        distance_limits : list
+            min and max limits for distance from galaxy
+        distance_bin_width : float
+            width of each distance bin (in units of distance_scaling)
+        distance_scaling : str
+            'log', 'linear'
+        halo_radius : float
+            radius of halo [kpc physical]
+        scale_to_halo_radius : bool
+            whether to scale distance to halo_radius
+        center_position : array
+            position of galaxy/halo center
+        host_index : int
+            index of host halo to get position of (if not input center_position)
+        axis_y_limits : list
+            min and max limits for y-axis
+        axis_y_scaling : str
+            scaling of y-axis: 'log', 'linear'
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory in which to write figure file
+        figure_index : int
+            index of figure for matplotlib
         '''
         virial_kind = '200m'
 
@@ -442,12 +465,12 @@ class ContaminationClass(ut.io.SayClass):
 
         species_lowres_dark = []
         for i in range(2, 10):
-            dark_name = 'dark{}'.format(i)
+            dark_name = f'dark{i}'
             if dark_name in part:
                 species_lowres_dark.append(dark_name)
 
         for spec_name in species_lowres_dark:
-            self.say('* {}'.format(spec_name))
+            self.say(f'* {spec_name}')
             if profile_mass[spec_name]['sum.cum'][-1] == 0:
                 self.say('  none. yay!')
                 continue
@@ -537,7 +560,7 @@ class ContaminationClass(ut.io.SayClass):
                 )
         print()
 
-        if write_plot is None:
+        if plot_file_name is None or len(plot_file_name) == 0:
             return
 
         # plot ----------
@@ -549,7 +572,7 @@ class ContaminationClass(ut.io.SayClass):
 
         subplot.set_ylabel('$M_{{\\rm species}} / M_{{\\rm total}}$')
         if scale_to_halo_radius:
-            axis_x_label = '$d \, / \, R_{{\\rm {}}}$'.format(virial_kind)
+            axis_x_label = f'$d \, / \, R_{{\\rm {virial_kind}}}$'
         else:
             axis_x_label = 'distance $[\\rm kpc]$'
         subplot.set_xlabel(axis_x_label)
@@ -574,11 +597,14 @@ class ContaminationClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, 'best')
 
-        distance_name = 'dist'
-        if halo_radius and scale_to_halo_radius:
-            distance_name += '.' + virial_kind
-        plot_name = ut.plot.get_file_name('mass.ratio', distance_name, snapshot_dict=part.snapshot)
-        ut.plot.parse_output(write_plot, plot_name, plot_directory)
+        if plot_file_name is True or plot_file_name == '':
+            distance_name = 'dist'
+            if halo_radius and scale_to_halo_radius:
+                distance_name += '.' + virial_kind
+            plot_file_name = ut.plot.get_file_name(
+                'mass.ratio', distance_name, snapshot_dict=part.snapshot
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 Contamination = ContaminationClass()
@@ -587,10 +613,10 @@ Contamination = ContaminationClass()
 def print_properties_statistics(
     species='all',
     snapshot_value_kind='index',
-    snapshot_value=600,
-    simulation_directory='.',
-    snapshot_directory='output/',
-    track_directory='track/',
+    snapshot_value=gizmo_default.snapshot_index,
+    simulation_directory=gizmo_default.simulation_directory,
+    snapshot_directory=gizmo_default.snapshot_directory,
+    track_directory=gizmo_default.track_directory,
 ):
     '''
     For each property of each species in particle catalog, print range and median.
@@ -633,9 +659,9 @@ def print_properties_statistics(
 
 
 def print_properties_snapshots(
-    simulation_directory='.',
-    snapshot_directory='output/',
-    track_directory='track/',
+    simulation_directory=gizmo_default.simulation_directory,
+    snapshot_directory=gizmo_default.snapshot_directory,
+    track_directory=gizmo_default.track_directory,
     species_property_dict={'gas': ['size', 'number.density']},
 ):
     '''
@@ -712,12 +738,11 @@ def print_properties_snapshots(
                         )
                         species_property_dict[spec_name][prop_name].append(prop_name_ext)
                     except Exception:
-                        Say.say('! {} {} not in particle dictionary'.format(spec_name, prop_name))
+                        Say.say(f'! {spec_name} {prop_name} not in particle dictionary')
         except Exception:
             Say.say(
-                '! cannot read snapshot index {} in {}'.format(
-                    snapshot_i, simulation_directory + snapshot_directory
-                )
+                f'! cannot read snapshot index {snapshot_i} in'
+                + f' {simulation_directory + snapshot_directory}'
             )
 
     Statistic = ut.statistic.StatisticClass()
@@ -729,7 +754,7 @@ def print_properties_snapshots(
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
-            Say.say('\n{} {} {}:'.format(spec_name, prop_name, prop_func_name))
+            Say.say(f'\n{spec_name} {prop_name} {prop_func_name}:')
             for stat_name in ['min', 'percent.16', 'median', 'percent.84', 'max']:
                 Say.say('{:10s} = {:.3f}'.format(stat_name, Statistic.stat[stat_name]))
 
@@ -831,7 +856,7 @@ def plot_scaling(
     time_kind='core',
     axis_x_scaling='log',
     axis_y_scaling='log',
-    write_plot=False,
+    plot_file_name=False,
     plot_directory='.',
 ):
     '''
@@ -845,8 +870,10 @@ def plot_scaling(
     time_kind : str : 'node', 'core', 'wall', 'speedup', 'efficiency'
     axis_x_scaling : str : scaling along x-axis: 'log', 'linear'
     axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
-    write_plot : bool : whether to write plot to file
-    plot_directory : str : directory to write plot file
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory to write figure file
     '''
     # weak_dark = {
     #    'res57000': {'particle.number': 8.82e6, 'core.number': 64,
@@ -1101,8 +1128,9 @@ def plot_scaling(
         #             alpha=0.7)
         subplot.plot(baryon_particle_numbers, baryon_times, '*-', linewidth=2.0, color='blue')
 
-    plot_name = 'scaling'
-    ut.plot.parse_output(write_plot, plot_name, plot_directory)
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = 'scaling'
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------
