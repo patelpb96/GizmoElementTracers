@@ -84,7 +84,7 @@ Gas particles also have:
     'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
     'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
     'sfr' : instantaneous star formation rate [M_sun / yr]
-    'magnetic.field' : 3-D vector of magnetic vield [Gauss]
+    'magnetic.field' : 3-D vector of magnetic field [Gauss]
 
 
 Derived properties
@@ -153,6 +153,7 @@ import numpy as np
 import copy
 
 import utilities as ut
+from . import gizmo_default
 
 # --------------------------------------------------------------------------------------------------
 # particle dictionary class
@@ -798,7 +799,7 @@ class ReadClass(ut.io.SayClass):
     Read Gizmo snapshot[s].
     '''
 
-    def __init__(self, snapshot_name_base='snap*[!txt]', verbose=True):
+    def __init__(self, snapshot_name_base=gizmo_default.snapshot_name_base, verbose=True):
         '''
         Set properties for snapshot files.
 
@@ -839,10 +840,10 @@ class ReadClass(ut.io.SayClass):
         self,
         species='all',
         snapshot_value_kind='index',
-        snapshot_values=600,
-        simulation_directory='.',
-        snapshot_directory='output/',
-        track_directory='track/',
+        snapshot_values=gizmo_default.snapshot_index,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
+        track_directory=gizmo_default.track_directory,
         simulation_name='',
         properties='all',
         element_indices=None,
@@ -878,7 +879,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_values : int or float or list thereof :
             index[s] or redshift[s] or scale-factor[s] of snapshot[s]
         simulation_directory : str : directory of simulation
-        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        snapshot_directory: str : directory of snapshot files within simulation_directory
         track_directory : str :
             directory of files for particle pointers, formation coordinates, and host coordinates
         simulation_name : str : name to store for future identification
@@ -898,8 +899,8 @@ class ReadClass(ut.io.SayClass):
                 'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
                     during particle tracking using only stars that are in each host at z = 0
                 'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
-                'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
-                    weighting each particle by that property
+                'mass' or 'potential' or 'massfraction.metals': assign coordinates during read in
+                    via iterative zoom-in, weighting each particle by that property
             if True (default), will try a few methods in the following order of preference:
                 if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
                 if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
@@ -955,7 +956,7 @@ class ReadClass(ut.io.SayClass):
 
             # read header from snapshot file
             header = self.read_header(
-                'index', snapshot_index, simulation_directory, snapshot_directory, simulation_name
+                simulation_directory, snapshot_directory, 'index', snapshot_index, simulation_name
             )
 
             if not header['cosmological']:
@@ -963,10 +964,10 @@ class ReadClass(ut.io.SayClass):
 
             # read particles from snapshot file[s]
             part = self.read_particles(
-                'index',
-                snapshot_index,
                 simulation_directory,
                 snapshot_directory,
+                'index',
+                snapshot_index,
                 properties,
                 element_indices,
                 convert_float32,
@@ -1100,7 +1101,7 @@ class ReadClass(ut.io.SayClass):
                 ParticleCoordinate = self.gizmo_track.ParticleCoordinateClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
-                ParticleCoordinate.io_formation_coordinates(part)
+                ParticleCoordinate.io_hosts_and_formation_coordinates(part)
 
             if assign_pointers:
                 # assign star and gas particle pointers from z = 0 to this snapshot
@@ -1126,10 +1127,10 @@ class ReadClass(ut.io.SayClass):
         self,
         species='all',
         snapshot_value_kind='index',
-        snapshot_value=600,
+        snapshot_value=gizmo_default.snapshot_index,
         simulation_directories=[],
-        snapshot_directory='output/',
-        track_directory='track/',
+        snapshot_directory=gizmo_default.snapshot_directory,
+        track_directory=gizmo_default.track_directory,
         properties='all',
         element_indices=[0, 1, 6, 10],
         assign_hosts=True,
@@ -1149,9 +1150,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind : str :
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_value : int or float : index or redshift or scale-factor of snapshot
-        simulation_directories : list or list of lists :
-            list of simulation directories, or list of pairs of directory + simulation name
-        snapshot_directory: str : directory of snapshot files, within simulation_directory
+        simulation_directories : list or dict :
+            list of simulation directories, or dict of simulation_directories: simulation_names
+        snapshot_directory: str : directory of snapshot files within simulation_directory
         track_directory : str :
             directory of files for particle pointers, formation coordinates, and host coordinates
         properties : str or list : name[s] of properties to read
@@ -1180,31 +1181,38 @@ class ReadClass(ut.io.SayClass):
         parts : list of dictionaries
         '''
         # parse list of directories
-        if np.ndim(simulation_directories) == 0:
-            raise ValueError(
-                f'input simulation_directories = {simulation_directories} but need to input list'
-            )
-        elif np.ndim(simulation_directories) == 1:
-            # assign null names
-            simulation_directories = list(
-                zip(simulation_directories, ['' for _ in simulation_directories])
-            )
-        elif np.ndim(simulation_directories) == 2:
+        if isinstance(simulation_directories, dict):
             pass
-        elif np.ndim(simulation_directories) >= 3:
+        elif isinstance(simulation_directories, list) or isinstance(simulation_directories, tuple):
+            if np.ndim(simulation_directories) not in [1, 2]:
+                raise ValueError(
+                    f'not sure how to parse simulation_directories = {simulation_directories}'
+                )
+            elif np.ndim(simulation_directories) == 1:
+                # assign null names
+                simulation_directories = {
+                    simulation_directory: '' for simulation_directory in simulation_directories
+                }
+            elif np.ndim(simulation_directories) == 2:
+                simulation_directories = {
+                    simulation_directory[0]: simulation_directory[1]
+                    for simulation_directory in simulation_directories
+                }
+        else:
             raise ValueError(
                 f'not sure how to parse simulation_directories = {simulation_directories}'
             )
 
         # first pass, read only header, to check that can read all simulations
         bad_snapshot_value = 0
-        for simulation_directory, simulation_name in simulation_directories:
+        for simulation_directory in simulation_directories:
+            simulation_name = simulation_directories[simulation_directory]
             try:
                 _ = self.read_header(
-                    snapshot_value_kind,
-                    snapshot_value,
                     simulation_directory,
                     snapshot_directory,
+                    snapshot_value_kind,
+                    snapshot_value,
                     simulation_name,
                 )
             except IOError:
@@ -1220,14 +1228,15 @@ class ReadClass(ut.io.SayClass):
             return
 
         parts = []
-        directories_read = []
-        for directory, simulation_name in simulation_directories:
+        simulation_directories_read = []
+        for simulation_directory in simulation_directories:
+            simulation_name = simulation_directories[simulation_directory]
             try:
                 part = self.read_snapshots(
                     species,
                     snapshot_value_kind,
                     snapshot_value,
-                    directory,
+                    simulation_directory,
                     snapshot_directory,
                     track_directory,
                     simulation_name,
@@ -1242,7 +1251,8 @@ class ReadClass(ut.io.SayClass):
                 )
             except IOError:
                 self.say(
-                    f'! cannot read snapshot {snapshot_value_kind}={snapshot_value} in {directory}'
+                    f'! cannot read snapshot {snapshot_value_kind}={snapshot_value} in'
+                    + ' {simulation_directory}'
                 )
                 part = None
 
@@ -1251,17 +1261,17 @@ class ReadClass(ut.io.SayClass):
                     self.assign_orbits(part, 'gas')
 
                 parts.append(part)
-                directories_read.append(directory)
+                simulation_directories_read.append(simulation_directory)
 
         if len(parts) == 0:
             self.say(f'! cannot read any snapshots at {snapshot_value_kind} = {snapshot_value}')
             return
 
         if 'mass' in properties and 'star' in part:
-            for part, directory in zip(parts, directories_read):
+            for part, simulationdirectory in zip(parts, simulation_directories_read):
                 print(
                     '{}\n* M_star simulation = {} Msun\n'.format(
-                        directory,
+                        simulationdirectory,
                         ut.io.get_string_from_numbers(part['star']['mass'].sum(), 2, True),
                     )
                 )
@@ -1270,10 +1280,10 @@ class ReadClass(ut.io.SayClass):
 
     def read_header(
         self,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_value_kind='index',
-        snapshot_value=600,
-        simulation_directory='.',
-        snapshot_directory='output/',
+        snapshot_value=gizmo_default.snapshot_index,
         simulation_name='',
         snapshot_block_index=0,
         verbose=True,
@@ -1285,7 +1295,7 @@ class ReadClass(ut.io.SayClass):
         ----------
         snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
-        simulation_directory : root directory of simulation
+        simulation_directory : str : directory of simulation
         snapshot_directory: str : directory of snapshot files within simulation_directory
         simulation_name : str : name to store for future identification
         snapshot_block_index : int : index of file block (if multiple files per snapshot)
@@ -1425,10 +1435,10 @@ class ReadClass(ut.io.SayClass):
 
     def read_particles(
         self,
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
         snapshot_value_kind='index',
-        snapshot_value=600,
-        simulation_directory='.',
-        snapshot_directory='output/',
+        snapshot_value=gizmo_default.snapshot_index,
         properties='all',
         element_indices=None,
         convert_float32=False,
@@ -1439,10 +1449,10 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
+        simulation_directory : str : directory of simulation
+        snapshot_directory: str : directory of snapshot files within simulation_directory
         snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
-        simulation_directory : root directory of simulation
-        snapshot_directory: str : directory of snapshot files within simulation_directory
         properties : str or list : name[s] of particle properties to read - options:
             'all' = all species in file
             otherwise, choose subset from among property_dict
@@ -1555,7 +1565,7 @@ class ReadClass(ut.io.SayClass):
 
         if not header:
             header = self.read_header(
-                'index', snapshot_index, simulation_directory, snapshot_directory
+                simulation_directory, snapshot_directory, 'index', snapshot_index,
             )
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
@@ -1600,7 +1610,7 @@ class ReadClass(ut.io.SayClass):
 
                     # need to read in other snapshot files until find one with particles of species
                     for file_i in range(1, header['file.number.per.snapshot']):
-                        file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
+                        file_name_i = path_file_name.replace('.0.', f'.{file_i}.')
                         # try each snapshot file
                         with h5py.File(file_name_i, 'r') as file_read_i:
                             part_numbers_in_file_i = file_read_i['Header'].attrs['NumPart_ThisFile']
@@ -1672,7 +1682,7 @@ class ReadClass(ut.io.SayClass):
         # loop over all file blocks at given snapshot
         for file_i in range(header['file.number.per.snapshot']):
             # open i'th of multiple files for snapshot
-            file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
+            file_name_i = path_file_name.replace('.0.', f'.{file_i}.')
 
             # open snapshot file
             with h5py.File(file_name_i, 'r') as file_in:
@@ -1754,9 +1764,7 @@ class ReadClass(ut.io.SayClass):
             dark_lowres_masses = np.unique(part[species_name]['mass'])
             if dark_lowres_masses.size > 9:
                 self.say(
-                    '! warning: {} different masses of low-resolution dark matter'.format(
-                        dark_lowres_masses.size
-                    )
+                    f'! warning: {dark_lowres_masses.size} different masses of low-res dark matter'
                 )
 
             if separate_dark_lowres and dark_lowres_masses.size > 1:
@@ -1767,7 +1775,7 @@ class ReadClass(ut.io.SayClass):
 
                 for dark_i, dark_mass in enumerate(dark_lowres_masses):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
-                    spec_name = 'dark{}'.format(dark_i + 2)
+                    spec_name = f'dark{dark_i + 2}'
 
                     part[spec_name] = ParticleDictionaryClass(simulation_directory)
 
@@ -1992,7 +2000,7 @@ class ReadClass(ut.io.SayClass):
 
     def get_cosmology(
         self,
-        directory='.',
+        simulation_directory=gizmo_default.simulation_directory,
         omega_lambda=None,
         omega_matter=None,
         omega_baryon=None,
@@ -2007,7 +2015,7 @@ class ReadClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directory : str : directory of simulation (where directory of initial conditions is)
+        simulation_directory : str : directory of simulation
 
         Returns
         -------
@@ -2025,9 +2033,11 @@ class ReadClass(ut.io.SayClass):
                     print(f'! read {line}, but previously assigned = {value_test}')
             return value
 
-        if directory:
+        if simulation_directory:
             # find MUSIC file, assuming named *.conf
-            file_name_find = ut.io.get_path(directory) + '*/*.conf'
+            file_name_find = (
+                ut.io.get_path(simulation_directory) + '*/' + gizmo_default.music_config_file_name
+            )
             path_file_names = ut.io.get_file_names(file_name_find, verbose=False)
             if len(path_file_names) > 0:
                 path_file_name = path_file_names[0]
@@ -2147,10 +2157,11 @@ class ReadClass(ut.io.SayClass):
         species_name='',
         part_indicess=None,
         method=True,
+        velocity_distance_max=8,
         host_number=1,
         exclusion_distance=300,
-        simulation_directory='.',
-        track_directory='track/',
+        simulation_directory=gizmo_default.simulation_directory,
+        track_directory=gizmo_default.track_directory,
         verbose=True,
     ):
         '''
@@ -2175,6 +2186,7 @@ class ReadClass(ut.io.SayClass):
             if True (default), will try a few methods in the following order of preference:
                 if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
                 if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
+        velocity_distance_max : float : maximum distance to keep particles to compute velocity
         host_number : int : number of hosts to assign
         exclusion_distance : float :
             radius around previous hosts' center position[s] to exclude particles in
@@ -2190,7 +2202,15 @@ class ReadClass(ut.io.SayClass):
             species_name = 'dark'
 
         assert species_name in ['star', 'dark', 'gas', 'dark2', 'blackhole']
-        assert method in [True, 'track', 'halo', 'mass', 'potential']
+        assert method in [
+            True,
+            'track',
+            'halo',
+            'mass',
+            'potential',
+            'massfraction.metals',
+            'metallicity.total',
+        ]
 
         if method is True:
             if species_name == 'star':
@@ -2200,10 +2220,18 @@ class ReadClass(ut.io.SayClass):
             else:
                 method = 'mass'
 
-        if method in ['mass', 'potential']:
+        if method in ['mass', 'potential', 'massfraction.metals', 'metallicity.total']:
             self._assign_hosts_coordinates_from_particles(
-                part, species_name, part_indicess, method, host_number, exclusion_distance, verbose
+                part,
+                species_name,
+                part_indicess,
+                method,
+                velocity_distance_max,
+                host_number,
+                exclusion_distance,
+                verbose,
             )
+
         elif method in ['track', 'halo']:
             try:
                 if method == 'track':
@@ -2233,6 +2261,7 @@ class ReadClass(ut.io.SayClass):
                     species_name,
                     part_indicess,
                     method,
+                    velocity_distance_max,
                     host_number,
                     exclusion_distance,
                     verbose,
@@ -2249,9 +2278,10 @@ class ReadClass(ut.io.SayClass):
         part,
         species_name,
         part_indicess,
-        method,
-        host_number,
-        exclusion_distance,
+        method='mass',
+        velocity_distance_max=8,
+        host_number=1,
+        exclusion_distance=300,
         verbose=True,
     ):
         '''
@@ -2262,14 +2292,15 @@ class ReadClass(ut.io.SayClass):
             or 'position' not in part[species_name]
             or len(part[species_name]['position']) == 0
         ):
-            self.say('! did not read star or dark particles, so cannot assign host[s]')
+            self.say('! did not read star or dark particles, so cannot assign any hosts')
             return
 
         # max radius around each host position to includer particles to compute center velocity
-        if species_name == 'dark':
-            velocity_radius_max = 30
-        else:
-            velocity_radius_max = 10
+        if velocity_distance_max is None or velocity_distance_max <= 0:
+            if species_name == 'dark':
+                velocity_distance_max = 30
+            else:
+                velocity_distance_max = 8
 
         if 'position' in part[species_name]:
             # assign to particle dictionary
@@ -2291,7 +2322,7 @@ class ReadClass(ut.io.SayClass):
                 species_name,
                 part_indicess,
                 method,
-                velocity_radius_max,
+                velocity_distance_max,
                 part.host['position'],
                 return_array=False,
                 verbose=verbose,
@@ -2303,7 +2334,11 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name].host[host_prop_name] = part.host[host_prop_name]
 
     def _assign_hosts_coordinates_from_halos(
-        self, part, host_number, simulation_directory='.', verbose=True
+        self,
+        part,
+        host_number,
+        simulation_directory=gizmo_default.simulation_directory,
+        verbose=True,
     ):
         '''
         Utility function for assign_hosts_coordinates().
@@ -2336,7 +2371,7 @@ class ReadClass(ut.io.SayClass):
                 print(') [km / s]')
 
     def assign_hosts_rotation(
-        self, part, species_name='star', distance_max=10, mass_percent=100, age_percent=25
+        self, part, species_name='star', distance_max=10, mass_percent=90, age_percent=25
     ):
         '''
         Assign rotation tensors and axis ratios of principal axes (defined via the moment of
@@ -2411,8 +2446,8 @@ class ReadClass(ut.io.SayClass):
         value_adjust=None,
         snapshot_value_kind='redshift',
         snapshot_value=0,
-        simulation_directory='.',
-        snapshot_directory='output/',
+        simulation_directory=gizmo_default.simulation_directory,
+        snapshot_directory=gizmo_default.snapshot_directory,
     ):
         '''
         Read snapshot file[s].
@@ -2430,7 +2465,7 @@ class ReadClass(ut.io.SayClass):
         value_adjust : float : value by which to adjust property (if not deleting)
         snapshot_value_kind : str : input snapshot number kind: 'index', 'redshift'
         snapshot_value : int or float : index (number) of snapshot file
-        simulation_directory : root directory of simulation
+        simulation_directory : str : directory of simulation
         snapshot_directory : str : directory of snapshot files within simulation_directory
         '''
         if np.isscalar(species):
@@ -2456,7 +2491,7 @@ class ReadClass(ut.io.SayClass):
             # read and delete input species ----------
             for file_i in range(header['NumFilesPerSnapshot']):
                 # open i'th of multiple files for snapshot
-                file_name_i = path_file_name.replace('.0.', '.{}.'.format(file_i))
+                file_name_i = path_file_name.replace('.0.', f'.{file_i}.')
                 file_read = h5py.File(file_name_i, 'r+')
 
                 self.say('reading particles from: ' + file_name_i.split('/')[-1])
