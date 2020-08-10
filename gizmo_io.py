@@ -545,6 +545,21 @@ class ParticleDictionaryClass(dict):
 
             return values
 
+        if 'mu' in property_name or 'molecular_weight' in property_name:
+            helium_mass_fracs = self.prop('massfraction.helium')
+            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
+            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
+            values = mus
+
+            if 'molecular_weight' in property_name:
+                values *= ut.constant.proton_mass
+
+            return values
+
+#        if 'pressure' in property_name and (not ('magnetic' in property_name)):
+            
+
+
         # formation time or coordinates
         if (
             ('form.' in property_name or property_name == 'age')
@@ -1876,6 +1891,7 @@ class ReadClass(ut.io.SayClass):
                     / ut.constant.boltzmann
                 )
                 del (helium_mass_fracs, ys_helium, mus, molecular_weights)
+
 
         # renormalize so potential max = 0
         renormalize_potential = False
