@@ -4807,7 +4807,7 @@ def compare_star_formation_models(
     distance_max = max(distance_limits)
 
     # plot image of all gas
-    for part_i, part in enumerate(parts):
+    for part in parts:
         Image.plot_image(
             part,
             'gas',

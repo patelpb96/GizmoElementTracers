@@ -2112,6 +2112,8 @@ class ReadClass(ut.io.SayClass):
         )
         for host_prop_name in ['position', 'velocity']:
             part.host[host_prop_name] = hal[host_prop_name][host_indices]
+            for spec_name in part:
+                part[spec_name].host[host_prop_name] = hal[host_prop_name][host_indices]
 
         if verbose:
             for host_i, host_position in enumerate(part.host['position']):
