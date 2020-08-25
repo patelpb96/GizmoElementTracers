@@ -1,3 +1,4 @@
+from . import gizmo_default as default
 from . import gizmo_diagnostic as diagnostic
 from . import gizmo_file as file
 from . import gizmo_ic as ic
