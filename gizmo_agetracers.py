@@ -201,10 +201,13 @@ class NuGrid_yields(YieldsObject):
         return
 
     def compute_yields(self, **kwargs):
-        '''
+        """
         Runs through the Sygma model given model parameters.
-
-        '''
+        This function is not strictly necessary in a YieldsObject,
+        but exists here to pre-compute information needed for
+        the `yields` function so it is not re-computed each time
+        it is called.
+        """
 
         for k in kwargs:
             self.model_parameters[k] = kwargs[k]
@@ -337,6 +340,13 @@ class FIRE2_yields(YieldsObject):
         return
 
     def compute_yields(self, model_Z = None):
+        """
+        This function is not necessary in a YieldsObject but exists here
+        to generate the yields from different channels from the underlying
+        model in gizmo_analysis in order keep the `yields` function
+        cleaner and to avoid having to re-compute this every time the
+        yields function is called.
+        """
 
         if not (model_Z is None):
             self.model_parameters['model_Z'] = model_Z

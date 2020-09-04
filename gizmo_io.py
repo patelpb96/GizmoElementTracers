@@ -182,6 +182,11 @@ class ParticleDictionaryClass(dict):
         self.element_dict['iron'] = self.element_dict['fe'] = 10
 
         # for age tracer post-processing (if available)
+        #   _yield_table is the internal table used to convert
+        #   the age-tracer values in each age-bin to individual
+        #   elemental abundances. See `gizmo_agetracers.py` for more info
+        #
+        #   ageprop is a dictionary of the age tracer properties
         self._yield_table = None
         self.ageprop = ut.simulation.read_agetracer_times(directory = simulation_directory)
 
@@ -338,6 +343,7 @@ class ParticleDictionaryClass(dict):
 
                 return values
 
+            # post-processing elemental abundances using the age tracer model
             elif 'agetracers.' in property_name or 'agetracer.' in property_name:
 
                 if self.ageprop.info['flag_agetracers'] == 0:
@@ -396,10 +402,7 @@ class ParticleDictionaryClass(dict):
                     values = self['massfraction'][indices, start_index:end_index+1]
 
 
-                values =   np.sum( values * self._yield_table[:,age_element_index], axis=1)  #*\
-#                        (  self.prop('mass', indices, dict_only=True)) # in code, tracers are stored as mass fractions
-                                                                # so need to be multiplied by particle mass
-                                                                # in code units as a correction factor
+                values =   np.sum( values * self._yield_table[:,age_element_index], axis=1)
 
                 if hasattr(self,'_initial_abundances'):
                     values = values + self._initial_abundances[age_element]
@@ -556,9 +559,6 @@ class ParticleDictionaryClass(dict):
                 values *= ut.constant.proton_mass
 
             return values
-
-#        if 'pressure' in property_name and (not ('magnetic' in property_name)):
-            
 
 
         # formation time or coordinates
@@ -788,7 +788,12 @@ class ParticleDictionaryClass(dict):
 
     @property
     def yield_table(self):
-        return self._yield_table
+        """
+        Returns a copy of the internal yield table for age tracer
+        post-processing such that this table is read-only. It can be
+        changed using `set_yield_table`
+        """
+        return self._yield_table.copy()
 
 
 # --------------------------------------------------------------------------------------------------
