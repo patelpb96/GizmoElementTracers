@@ -3,7 +3,7 @@
 '''
 Read Gizmo snapshots, intended for use with FIRE simulations.
 
-@author: Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>
+@author: Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>, Andrew Emerick <aemerick11@gmail.com>
 
 ----------
 Units: unless otherwise noted, this package converts all quantities to (combinations of):
@@ -150,10 +150,11 @@ import os
 import collections
 import h5py
 import numpy as np
+import copy
 
 import utilities as ut
 from . import gizmo_default
-
+from . import gizmo_agetracers
 
 # --------------------------------------------------------------------------------------------------
 # particle dictionary class
@@ -166,7 +167,7 @@ class ParticleDictionaryClass(dict):
     information and cosmological parameters) and calling derived quantities via .prop().
     '''
 
-    def __init__(self):
+    def __init__(self, simulation_directory = '.'):
         # use to translate between element name and index in element table
         self.element_dict = collections.OrderedDict()
         self.element_dict['metals'] = self.element_dict['total'] = 0
@@ -180,6 +181,15 @@ class ParticleDictionaryClass(dict):
         self.element_dict['sulphur'] = self.element_dict['s'] = 8
         self.element_dict['calcium'] = self.element_dict['ca'] = 9
         self.element_dict['iron'] = self.element_dict['fe'] = 10
+
+        # for age tracer post-processing (if available)
+        #   _yield_table is the internal table used to convert
+        #   the age-tracer values in each age-bin to individual
+        #   elemental abundances. See `gizmo_agetracers.py` for more info
+        #
+        #   ageprop is a dictionary of the age tracer properties
+        self._yield_table = None
+        self.ageprop = gizmo_agetracers.read_agetracer_times(directory = simulation_directory)
 
         # use if read only subset of elemental abundances
         self.element_pointer = np.arange(len(self.element_dict) // 2)
@@ -338,6 +348,81 @@ class ParticleDictionaryClass(dict):
 
                 return values
 
+            # post-processing elemental abundances using the age tracer model
+            elif 'agetracers.' in property_name or 'agetracer.' in property_name:
+
+                if self.ageprop.info['flag_agetracers'] == 0:
+                    raise RuntimeError("Post-process age tracer element field requested but no age tracer model found to exist")
+
+                if self._yield_table is None:
+                    raise RuntimeError("Post-process age tracer element field requested but no yield table set")
+
+                # compute the yield for given element
+                age_element = property_name.split('.')[-1]
+
+                if age_element != 'alpha':
+
+                    # make sure element name can be found in table
+                    # check for both full element names and symbols in case
+                    # table list only has one or the other and not both
+                    if not (age_element in self._postprocess_elements):
+                        element_found = False
+
+                        if age_element in ut.constant.element_symbol_from_name.keys():
+                            element_found = ut.constant.element_symbol_from_name[age_element] in self._postprocess_elements
+
+                            if element_found:
+                                age_element = ut.constant.element_symbol_from_name[age_element]
+
+                        if age_element in ut.constant.element_name_from_symbol.keys():
+                            element_found = ut.constant.element_name_from_symbol[age_element] in self._postprocess_elements
+
+                            if element_found:
+                                age_element = ut.constant.element_name_from_symbol[age_element]
+
+                        if not element_found:
+                            raise KeyError(f'not sure how to parse property = {property_name} as age tracer for element {age_element}'+\
+                                            'the current yield table has the following elements available: ', self._postprocess_elements)
+
+                if age_element == 'alpha':
+                    return np.mean(
+                        [
+                            self.prop('metallicity.agetracer.o', indices),
+                            self.prop('metallicity.agetracer.mg', indices),
+                            self.prop('metallicity.agetracer.si', indices),
+                            self.prop('metallicity.agetracer.ca', indices),
+                        ],
+                        0,
+                    )
+
+                # get index corresponding to the element name in table
+                age_element_index = self._postprocess_elements.index(age_element)
+
+                # first and last indices for age tracer Metallicity fields in output
+                start_index = self.ageprop.info['metallicity_start']
+                end_index   = self.ageprop.info['metallicity_end']
+                if indices is None:
+                    values = self['massfraction'][:,start_index:end_index+1]
+                else:
+                    values = self['massfraction'][indices, start_index:end_index+1]
+
+
+                values =   np.sum( values * self._yield_table[:,age_element_index], axis=1)
+
+                if hasattr(self,'_initial_abundances'):
+                    values = values + self._initial_abundances[age_element]
+                else:
+                    print("no initial abundances")
+
+                if 'metallicity.' in property_name:
+                    values = ut.math.get_log(
+                                 values / ut.constant.sun_composition[age_element]['massfraction']
+                    )
+
+
+
+                return values
+
             elif 'alpha' in property_name:
                 return np.mean(
                     [
@@ -348,6 +433,7 @@ class ParticleDictionaryClass(dict):
                     ],
                     0,
                 )
+
 
             # normal cases
             element_index = None
@@ -467,6 +553,18 @@ class ParticleDictionaryClass(dict):
             )
 
             return values
+
+        if 'mu' in property_name or 'molecular_weight' in property_name:
+            helium_mass_fracs = self.prop('massfraction.helium')
+            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
+            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
+            values = mus
+
+            if 'molecular_weight' in property_name:
+                values *= ut.constant.proton_mass
+
+            return values
+
 
         # formation time or coordinates
         if (
@@ -614,6 +712,93 @@ class ParticleDictionaryClass(dict):
 
         # should not get this far without a return
         raise KeyError(f'not sure how to parse property = {property_name}')
+
+
+    def set_initial_abundances(self, initial_abundances):
+        '''
+        For use with post-processing of elemental abundances with age
+        tracer model. Sets the initial abundances to add to the returned age tracer
+        values.
+
+        Parameters
+        ----------
+
+        initial_abundances : dict :
+            Dictionary with keys matching element names and values corresponding
+            to the initial mass fractions for that element. Excluded elements
+            will be given an initial abundance of zero by default.
+        '''
+
+        if self._postprocess_elements is None:
+            print("Yield table (set_yield_table) must be set first")
+            raise RuntimeError
+
+        self._initial_abundances = {}
+
+        # set initial values in both element name and
+        # symbol for versatility
+        for e in self._postprocess_elements:
+            self._initial_abundances[e] = 0.0
+            if e != 'metals' and (not ('rprocess' in e)):
+                self._initial_abundances[ut.constant.element_map_name_symbol[e]]=0.0
+
+        # set actual values in both name and symbol
+        for e in initial_abundances:
+            self._initial_abundances[e] = initial_abundances[e]
+            if e != 'metals' and (not ('rprocess' in e)):
+                self._initial_abundances[ut.constant.element_map_name_symbol[e]]=initial_abundances[e]
+
+        for k in self.keys():
+            self[k]._initial_abundances = self._initial_abundances
+
+        return
+
+    def set_yield_table(self, yield_table, elements):
+        '''
+        For use with post-processing of elemental abundances with age tracer model.
+        Sets the yield table to use in generating the fields along with some error checking.
+
+        Parameters
+        -----------
+        yield_table : ndarray, float :
+            A 2-d numpy array containing the yield table scalings to map the age tracer field
+            values to individual element yields in each bin. Each element should contain the
+            mass produced of a given element in each time bin per solar mass of star formation
+            (see gizmo_agetracers.py for more information). First axis should be the number of
+            age bins and second the number of elements.
+
+        elements : list, str
+            Element names corresponding to the elements available in the yield table
+        '''
+
+        if np.shape(yield_table)[0] != self.ageprop.info['num_tracers']:
+            raise ValueError("Yield table provided does not have correct dimensions. First dimension "+\
+                             "should be %i not %i"%(self.ageprop.info['num_tracers'], np.shape(yield_table)[0]))
+
+        if np.shape(yield_table)[1] != len(elements):
+            raise ValueError("Yield table provided does not have correct dimensions. Second "+\
+                             "dimension (%i) should match provided elements length (%i)"%(np.shape(yield_table)[1],len(elements)))
+
+        self._yield_table          = copy.deepcopy(yield_table)
+        self._postprocess_elements = copy.deepcopy(elements)
+
+        # make sure individual particle types can access this
+        # information (shallow copies only)
+        for k in self.keys():
+            self[k]._yield_table          = self._yield_table
+            self[k]._postprocess_elements = self._postprocess_elements
+            self[k].ageprop               = self.ageprop
+
+        return
+
+    @property
+    def yield_table(self):
+        """
+        Returns a copy of the internal yield table for age tracer
+        post-processing such that this table is read-only. It can be
+        changed using `set_yield_table`
+        """
+        return self._yield_table.copy()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -825,6 +1010,12 @@ class ReadClass(ut.io.SayClass):
             for spec_name in part:
                 part[spec_name].Cosmology = part.Cosmology
 
+            # assign auxilliary information to particle dictionary class
+            # store header dictionary
+            part.info = header
+            for spec_name in part:
+                part[spec_name].info = part.info
+
             # adjust properties for each species
             self.adjust_particle_properties(
                 part, header, particle_subsample_factor, separate_dark_lowres, sort_dark_by_id
@@ -833,12 +1024,6 @@ class ReadClass(ut.io.SayClass):
             # check sanity of particle properties read in
             if check_properties:
                 self.check_properties(part)
-
-            # assign auxilliary information to particle dictionary class
-            # store header dictionary
-            part.info = header
-            for spec_name in part:
-                part[spec_name].info = part.info
 
             # store information about snapshot time
             if header['cosmological']:
@@ -871,6 +1056,45 @@ class ReadClass(ut.io.SayClass):
             part.Snapshot = Snapshot
             for spec_name in part:
                 part[spec_name].Snapshot = part.Snapshot
+
+            # check for and store information about r-process enerichment:
+            num_rprocess = 0
+            rprocess_start = None
+            if part.info['has.metals'] > 11:
+                # if > 11 we may have r-process (assuming the hard-coded default 11 elements for FIRE)
+                if (part.ageprop.info['flag_agetracers'] > 0):
+                    # if 11 then we don't have any rproc
+                    if part.ageprop.info['metallicity_start'] == 11:
+                        rprocess_start = -1
+                        num_rprocess   = 0
+                    else:
+                        rprocess_start = 11
+                        num_rprocess   = part.ageprop.info['metallicity_start'] - 11
+                else:
+                    rprocess_start = 11
+                    num_rprocess = part.info['has.metals'] - 11
+
+            if num_rprocess < 0:
+                raise RuntimeError("Getting negative number of r-process fields. Need to check things")
+
+            part.info['has.rprocess']   = num_rprocess
+            part.info['rprocess_start'] = rprocess_start
+
+            # now do a bit of a hack to get the rprocess fields accessed the same way as the elements
+            if (part.info['has.rprocess'] > 0):
+                # generate new keys in the elementdict for these
+                # labelled unexciting names. using both rprocessN and rN just
+                # to keep this exactly the same style as the elements
+                for n in np.arange(0, part.info['has.rprocess'],1):
+                    part.element_dict['rprocess%i'%(n)] = part.element_dict['r%i'%(n)] = part.info['rprocess_start'] + n
+                part.element_pointer = np.arange(len(part.element_dict)//2)
+
+                # make sure this info progates (should probably do this at the part level, not here)
+                if len(list(part.keys())) > 0:
+                    for k in part.keys():
+                        for n in np.arange(0, part.info['has.rprocess'],1):
+                          part[k].element_dict['rprocess%i'%(n)] = part[k].element_dict['r%i'%(n)] = part[k].info['rprocess_start'] + n
+                    part[k].element_pointer = np.arange(len(part[k].element_dict)//2)
 
             # store each host's position, velocity, principal axes rotation tensor + axis ratios
             # store as dictionary of lists to accommodate multiple hosts
@@ -1332,6 +1556,7 @@ class ReadClass(ut.io.SayClass):
             # mass fraction of individual elements ----------
             # 0 = all metals (everything not H, He)
             # 1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
+            #
             'Metallicity': 'massfraction',
             # star particles ----------
             # 'time' when star particle formed
@@ -1346,7 +1571,8 @@ class ReadClass(ut.io.SayClass):
         }
 
         # dictionary class to store properties for particle species
-        part = ParticleDictionaryClass()
+        part = ParticleDictionaryClass(simulation_directory)
+        # part = ut.array.DictClass()
 
         # parse input list of properties to read
         if 'all' in properties or not properties:
@@ -1405,7 +1631,7 @@ class ReadClass(ut.io.SayClass):
                 part_number_tot = header['particle.numbers.total'][spec_id]
 
                 # add species to particle dictionary
-                part[spec_name] = ParticleDictionaryClass()
+                part[spec_name] = ParticleDictionaryClass(simulation_directory)
 
                 # set element pointers if reading only subset of elements
                 if (
@@ -1604,7 +1830,7 @@ class ReadClass(ut.io.SayClass):
                     spec_indices = np.where(dark_lowres['mass'] == dark_mass)[0]
                     spec_name = f'dark{dark_i + 2}'
 
-                    part[spec_name] = ParticleDictionaryClass()
+                    part[spec_name] = ParticleDictionaryClass(simulation_directory)
 
                     for prop_name in dark_lowres:
                         part[spec_name][prop_name] = dark_lowres[prop_name][spec_indices]
@@ -1627,6 +1853,7 @@ class ReadClass(ut.io.SayClass):
 
         # apply unit conversions
         for spec_name in part:
+
             if 'position' in part[spec_name]:
                 # convert to [kpc comoving]
                 part[spec_name]['position'] /= header['hubble']
@@ -1643,6 +1870,30 @@ class ReadClass(ut.io.SayClass):
             if 'mass' in part[spec_name]:
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
+
+            if 'has.age.tracer' in part[spec_name].info.keys():
+                if part[spec_name].info['has.age.tracer'] > 0:
+                    # normalize age-tracer species appropriately
+                    # since these don't actually represent a mass fraction
+                    # this is just the inverse of the mass conversion above
+                    age_start = part.ageprop.info['metallicity_start']
+                    age_end   = part.ageprop.info['metallicity_end']
+                    part[spec_name]['massfraction'][:,age_start:age_end] *= (header['hubble'] / 1.0E10)
+            else:
+                # the old version of the agetracers (pre-merge with main Gizmo repo) was missing
+                # a factor of h, which cancelled out with a missing h I had in converting these units
+                #
+                # if we are here, the 'has.age.tracer' flag does not exist so we are using a
+                # pre-merge dataset.
+                # assume we are in the OLD version and normalize without the hubble constant
+                #
+                # but check to see if there are tracers in the first place
+                if part.ageprop.info['flag_agetracers'] > 0:
+                    if part.ageprop.info['metallicity_start'] > 0 and part.ageprop.info['metallicity_end'] > part.ageprop.info['metallicity_start']:
+                        age_start = part.ageprop.info['metallicity_start']
+                        age_end   = part.ageprop.info['metallicity_end']
+                        part[spec_name]['massfraction'][:,age_start:age_end] *= (1.0 / 1.0E10)
+
 
             if 'blackhole.mass' in part[spec_name]:
                 # convert to [M_sun]
@@ -1701,6 +1952,7 @@ class ReadClass(ut.io.SayClass):
                     / ut.constant.boltzmann
                 )
                 del (helium_mass_fracs, ys_helium, mus, molecular_weights)
+
 
         # renormalize so potential max = 0
         renormalize_potential = False
