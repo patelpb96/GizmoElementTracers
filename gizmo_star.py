@@ -128,7 +128,7 @@ def get_nucleosynthetic_yields(
         yield_dict['calcium'] = 0.00458  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
         yield_dict['iron'] = 0.0741
 
-        # yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
+        yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
 
         # nitrogen yield strongly depends on initial metallicity of star
         if star_metal_mass_fraction < 0.033:
@@ -136,7 +136,7 @@ def get_nucleosynthetic_yields(
         else:
             yield_dict['nitrogen'] *= 1.65
         # correct total metal mass for nitrogen
-        # yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
+        yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
@@ -162,6 +162,8 @@ def get_nucleosynthetic_yields(
         # allow for larger abundances in the progenitor star - usually irrelevant
         pure_mass_fraction = 1 - star_metal_mass_fraction
         for element_name in yield_dict:
+            yield_dict[element_name] = yield_dict[element_name] / ejecta_mass
+
             if yield_dict[element_name] > 0:
                 # apply yield only to non-metal mass of star
                 yield_dict[element_name] *= pure_mass_fraction
@@ -169,6 +171,8 @@ def get_nucleosynthetic_yields(
                     star_massfraction[element_name] - sun_massfraction[element_name]
                 )
                 yield_dict[element_name] = np.clip(yield_dict[element_name], 0, 1)
+
+            yield_dict[element_name] = yield_dict[element_name] * ejecta_mass
 
     if normalize:
         for k in yield_dict:
