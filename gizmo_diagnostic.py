@@ -34,13 +34,17 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : str : top-level directory of simulation
-        gizmo_out_file_name : str : name of Gizmo run-time file
+        simulation_directory : str
+            top-level directory of simulation
+        gizmo_out_file_name : str
+            name of Gizmo run-time file
 
         Returns
         -------
-        mpi_number : int : number of MPI tasks
-        omp_number : int : number of OpenMP threads per MPI task
+        mpi_number : int
+            number of MPI tasks
+        omp_number : int
+            number of OpenMP threads per MPI task
         '''
         loop_number_max = 1000
 
@@ -95,12 +99,18 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : str : directory of simulation
-        snapshot_directory : str : directory of snapshot files and Gizmo output files
-        core_number : int : total number of CPU cores (input instead of reading from run-time file)
-        gizmo_out_file_name : str : name of Gizmo run-time file
-        wall_time_restart : float : wall time [sec] of previous run (if restarted from snapshot)
-        scalefactors : array-like : list of scale-factors at which to print run times
+        simulation_directory : str
+            directory of simulation
+        snapshot_directory : str
+            directory of snapshot files and Gizmo output files
+        core_number : int
+            total number of CPU cores (input instead of reading from run-time file)
+        gizmo_out_file_name : str
+            name of Gizmo run-time file
+        wall_time_restart : float
+            wall time [sec] of previous run (if restarted from snapshot)
+        scalefactors : array-like
+            list of scale-factors at which to print run times
 
         Returns
         -------
@@ -232,12 +242,16 @@ class RuntimeClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directories : str or list : top-level directory[s] of simulation[s]
-        snapshot_directory : str : directory of snapshot files and Gizmo output files
-        gizmo_out_file_name : str : name of Gizmo run-time file
-        wall_times_restart : float or list :
+        simulation_directories : str or list
+            top-level directory[s] of simulation[s]
+        snapshot_directory : str
+            directory of snapshot files and Gizmo output files
+        gizmo_out_file_name : str
+            name of Gizmo run-time file
+        wall_times_restart : float or list
             wall time[s] [sec] of previous run[s] (if restart from snapshot)
-        scalefactors : array-like : list of scale-factors at which to print run times
+        scalefactors : array-like
+            list of scale-factors at which to print run times
         '''
         wall_timess = []
         cpu_timess = []
@@ -302,8 +316,10 @@ class ContaminationClass(ut.io.SayClass):
 
         Parameters
         ----------
-        redshift : float : redshift of snapshot
-        simulation_directory : str : top-level directory of simulation
+        redshift : float
+            redshift of snapshot
+        simulation_directory : str
+            top-level directory of simulation
         '''
         distance_bin_width = 0.01
         distance_limits_phys = [10, 2000]  # [kpc physical]
@@ -349,13 +365,13 @@ class ContaminationClass(ut.io.SayClass):
         part,
         distance_limits=[10, 2000],
         distance_bin_width=0.01,
-        distance_scaling='log',
+        distance_log_scale=True,
         halo_radius=None,
         scale_to_halo_radius=False,
         center_position=None,
         host_index=0,
         axis_y_limits=[0.0001, 1],
-        axis_y_scaling='log',
+        axis_y_log_scale=True,
         plot_file_name=None,
         plot_directory='.',
         figure_index=1,
@@ -371,8 +387,8 @@ class ContaminationClass(ut.io.SayClass):
             min and max limits for distance from galaxy
         distance_bin_width : float
             width of each distance bin (in units of distance_scaling)
-        distance_scaling : str
-            'log', 'linear'
+        distance_log_scale : bool
+            whether to use log scaling for distance bins
         halo_radius : float
             radius of halo [kpc physical]
         scale_to_halo_radius : bool
@@ -382,9 +398,9 @@ class ContaminationClass(ut.io.SayClass):
         host_index : int
             index of host halo to get position of (if not input center_position)
         axis_y_limits : list
-            min and max limits for y-axis
-        axis_y_scaling : str
-            scaling of y-axis: 'log', 'linear'
+            min and max limits for y axis
+        axis_y_log_scale : bool
+            whether to use logarithmic scaling for y axis
         plot_file_name : str
             whether to write figure to file and its name. True = use default naming convention
         plot_directory : str
@@ -400,7 +416,7 @@ class ContaminationClass(ut.io.SayClass):
             assert halo_radius and halo_radius > 0
 
         DistanceBin = ut.binning.DistanceBinClass(
-            distance_scaling, distance_limits, distance_bin_width
+            distance_limits, distance_bin_width, log_scale=distance_log_scale
         )
 
         profile_mass = collections.OrderedDict()
@@ -567,7 +583,7 @@ class ContaminationClass(ut.io.SayClass):
         _fig, subplot = ut.plot.make_figure(figure_index)
 
         ut.plot.set_axes_scaling_limits(
-            subplot, distance_scaling, distance_limits, None, axis_y_scaling, axis_y_limits
+            subplot, distance_log_scale, distance_limits, None, axis_y_log_scale, axis_y_limits
         )
 
         subplot.set_ylabel('$M_{{\\rm species}} / M_{{\\rm total}}$')
@@ -623,17 +639,23 @@ def print_properties_statistics(
 
     Parameters
     ----------
-    species : str or list : name[s] of particle species to print
-    snapshot_value_kind : str : input snapshot number kind: index, redshift
-    snapshot_value : int or float : index (number) of snapshot file
-    simulation_directory : root directory of simulation
-    snapshot_directory: str : directory of snapshot files within simulation_directory
-    track_directory : str :
+    species : str or list
+        name[s] of particle species to print
+    snapshot_value_kind : str
+        input snapshot number kind: index, redshift
+    snapshot_value : int or float
+        index (number) of snapshot file
+    simulation_directory : str
+        directory of simulation
+    snapshot_directory: str
+        directory of snapshot files within simulation_directory
+    track_directory : str
         directory of files for particle pointers, formation coordinates, and host coordinates
 
     Returns
     -------
-    part : dict : catalog of particles
+    part : dict
+        catalog of particles
     '''
     species = ut.array.arrayize(species)
     if 'all' in species:
@@ -670,11 +692,14 @@ def print_properties_snapshots(
 
     Parameters
     ----------
-    simulation_directory : str : directory of simulation
-    snapshot_directory : str : directory of snapshot files
-    track_directory : str :
+    simulation_directory : str
+        directory of simulation
+    snapshot_directory : str
+        directory of snapshot files
+    track_directory : str
         directory of files for particle pointers, formation coordinates, and host coordinates
-    species_property_dict : dict : keys = species, values are string or list of property[s]
+    species_property_dict : dict
+        keys = species, values are string or list of property[s]
     '''
     element_indices = [0, 1]
 
@@ -778,7 +803,7 @@ def test_stellar_mass_loss(
         gizmo_track.ParticlePointer.io_pointers(part_z)
 
     MetalBin = ut.binning.BinClass(
-        metallicity_limits, metallicity_bin_width, include_max=True, scaling='log'
+        metallicity_limits, metallicity_bin_width, include_max=True, log_scale=True
     )
 
     # MassLoss = gizmo_star.MassLossClass()
@@ -854,8 +879,8 @@ def plot_scaling(
     scaling_kind='strong',
     resolution='res7100',
     time_kind='core',
-    axis_x_scaling='log',
-    axis_y_scaling='log',
+    axis_x_log_scale=True,
+    axis_y_log_scale=True,
     plot_file_name=False,
     plot_directory='.',
 ):
@@ -866,10 +891,14 @@ def plot_scaling(
 
     Parameters
     ----------
-    scaling_kind : str : 'strong', 'weak'
-    time_kind : str : 'node', 'core', 'wall', 'speedup', 'efficiency'
-    axis_x_scaling : str : scaling along x-axis: 'log', 'linear'
-    axis_y_scaling : str : scaling along y-axis: 'log', 'linear'
+    scaling_kind : str
+        'strong', 'weak'
+    time_kind : str
+        'node', 'core', 'wall', 'speedup', 'efficiency'
+    axis_x_log_scale : bool
+        whether to use logarithmic scaling for x axis
+    axis_y_log_scale : bool
+        whether to use logarithmic scaling for y axis
     plot_file_name : str
         whether to write figure to file and its name. True = use default naming convention
     plot_directory : str
@@ -1046,7 +1075,7 @@ def plot_scaling(
             subplot.set_ylabel('parallel efficiency $T(1)/T(N)/N$')
 
         ut.plot.set_axes_scaling_limits(
-            subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits
+            subplot, axis_x_log_scale, axis_x_limits, None, axis_y_log_scale, axis_y_limits
         )
 
         subplot.plot(strong[axis_x_kind], times, '*-', linewidth=2.0, color='blue')
@@ -1118,7 +1147,7 @@ def plot_scaling(
             )
 
         ut.plot.set_axes_scaling_limits(
-            subplot, axis_x_scaling, axis_x_limits, None, axis_y_scaling, axis_y_limits
+            subplot, axis_x_log_scale, axis_x_limits, None, axis_y_log_scale, axis_y_limits
         )
 
         # subplot.plot(dm_particle_numbers, dm_times, '.-', linewidth=2.0, color='red')

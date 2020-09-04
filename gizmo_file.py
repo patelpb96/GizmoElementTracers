@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Edit Gizmo snapshot files: compress, delete, transfer across machines.
+Manipulate files in a Gizmo simulation directory: compress, tar, delete, transfer across machines.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 '''
@@ -107,13 +107,20 @@ class CompressClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : str : directory of simulation
-        snapshot_directory : str : directory of snapshots
-        snapshot_directory_out : str : directory to write compressed snapshots
-        snapshot_index_limits : list : min and max snapshot indices to compress
-        analysis_directory : str : directory of analysis code
-        python_executable : str : python executable to use to run compression script
-        proc_number : int : number of parallel processes to use
+        simulation_directory : str
+            directory of simulation
+        snapshot_directory : str
+            directory of snapshots
+        snapshot_directory_out : str
+            directory to write compressed snapshots
+        snapshot_index_limits : list
+            min and max snapshot indices to compress
+        analysis_directory : str
+            directory of analysis code
+        python_executable : str
+            python executable to use to run compression script
+        proc_number : int
+            number of parallel processes to use
         '''
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
@@ -145,12 +152,18 @@ class CompressClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : str : directory of simulation
-        snapshot_directory : str : directory of snapshot files
-        snapshot_directory_out : str : directory to write compressed snapshot files
-        code_directory : str : directory of code that contains the manipulate_hdf5/ package
-        python_executable : str : python executable to use to run compression script
-        snapshot_index : int : index of snapshot
+        simulation_directory : str
+            directory of simulation
+        snapshot_directory : str
+            directory of snapshot files
+        snapshot_directory_out : str
+            directory to write compressed snapshot files
+        code_directory : str
+            directory of code that contains the manipulate_hdf5/ package
+        python_executable : str
+            python executable to use to run compression script
+        snapshot_index : int
+            index of snapshot
         '''
         executable = f'{python_executable} {code_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
 
@@ -294,16 +307,22 @@ class ArchiveClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directories : str or list thereof : directory[s] to run this on
-            can be a single simulation directory, a list of simulation directories,
-            or a directory that contains multiple simulation directories for which this function
-            will run recursively on each one
-        gizmo_directory : str : directory of Gizmo source code
-        snapshot_directory : str : output directory that contains snapshots
-        restart_directory : str : directory within snapshot_directory that stores restart files
-        gizmo_out_file : str : Gizmo 'out' file
-        gizmo_err_file : str : Gizmo error file
-        snapshot_scalefactor_file : str : file that contains snapshot scale-factors (only)
+        directories : str or list thereof
+            directory[s] to run this on. can be a single simulation directory, a list of simulation
+            directories, or a directory that contains multiple simulation directories for which this
+            function will run recursively on each one
+        gizmo_directory : str
+            directory of Gizmo source code
+        snapshot_directory : str
+            output directory that contains snapshots
+        restart_directory : str
+            directory within snapshot_directory that stores restart files
+        gizmo_out_file : str
+            Gizmo 'out' file
+        gizmo_err_file : str
+            Gizmo error file
+        snapshot_scalefactor_file : str
+            file that contains snapshot scale-factors (only)
         '''
         gizmo_config_file_used = 'GIZMO_config.h'
         gizmo_config_file_save = (
@@ -313,8 +332,10 @@ class ArchiveClass(ut.io.SayClass):
         if np.isscalar(directories):
             directories = [directories]
 
-        gizmo_directory = gizmo_directory.rstrip('/')
-        snapshot_directory = snapshot_directory.rstrip('/')
+        if gizmo_directory[-1] != '/':
+            gizmo_directory += '/'
+        if snapshot_directory[-1] != '/':
+            snapshot_directory += '/'
         gizmo_out_file = gizmo_out_file.rstrip('*')
 
         cwd = os.getcwd()  # save current directory
@@ -335,7 +356,7 @@ class ArchiveClass(ut.io.SayClass):
                 self.say(f'! could not find any directories to clean in {directory}/')
                 os.chdir(f'{cwd}')
                 return
-            elif snapshot_directory + '/' not in directory_names:
+            elif snapshot_directory not in directory_names:
                 # this is a directory of simulation directories, recursively run on each one
                 for directory_name in directory_names:
                     self.clean_directories(
@@ -354,7 +375,7 @@ class ArchiveClass(ut.io.SayClass):
                 # clean directory of gizmo source code
                 # save config file, move to simulation directory
                 os.chdir(f'{gizmo_directory}')
-                self.say(f'* cleaning + tar-ing:  {gizmo_directory}/')
+                self.say(f'* cleaning + tar-ing:  {gizmo_directory}')
                 os.system(f'mv {gizmo_config_file_used} ../{gizmo_config_file_save}')
                 os.system('make clean')
 
@@ -383,10 +404,11 @@ class ArchiveClass(ut.io.SayClass):
                 os.chdir('..')
 
                 # tar gizmo directory
-                os.system(f'tar -cf {gizmo_directory}.tar {gizmo_directory}')
-                os.system(f'rm -rf {gizmo_directory}')
+                gizmo_directory_name = gizmo_directory.rstrip('/')
+                os.system(f'tar -cf {gizmo_directory_name}.tar {gizmo_directory_name}')
+                os.system(f'rm -rf {gizmo_directory_name}')
             else:
-                self.say(f'! could not find:  {gizmo_directory}/')
+                self.say(f'! could not find:  {gizmo_directory}')
 
             # clean output files
             os.system(f'rm -f {gizmo_err_file}')
@@ -398,12 +420,12 @@ class ArchiveClass(ut.io.SayClass):
             # clean snapshot directory
             if os.path.exists(f'{snapshot_directory}'):
                 os.chdir(f'{snapshot_directory}')
-                self.say(f'* cleaning:  {snapshot_directory}/')
+                self.say(f'* cleaning:  {snapshot_directory}')
                 os.system(f'rm -rf {restart_directory}')
                 os.system('rm -f HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
                 os.chdir('..')
             else:
-                self.say(f'! could not find:  {snapshot_directory}/')
+                self.say(f'! could not find:  {snapshot_directory}')
 
             # clean backup files
             os.system('rm -f *~ .#* ._* /#*#')
@@ -440,30 +462,44 @@ class ArchiveClass(ut.io.SayClass):
 
         Parameters
         ----------
-        directories : str or list thereof : directory[s] to run this on
-            can be a single simulation directory, a list of simulation directories,
-            or a directory that contains multiple simulation directories for which this function
-            will run recursively on each one
-        snapshot_directory : str : output directory that contains snapshot files
-        job_directory : str : directory that contains slurm/pbs job files
-        ic_directory : str : directory that contains initial condition files from MUSIC
-        particle_track_directory : str : directory of particle tracking files
-        halo_directory : str : directory of (all) halo files/directories
-        rockstar_directory : str : directory of (all) Rockstar files/directories
-        rockstar_job_directory : str : directory of Rockstar run-time log/job files
-        rockstar_catalog_directory : str : directory of Rockstar (text) halo catalog + tree files
-        rockstar_hdf5_directory : str : directory of post-processed catalog + tree hdf5 files
-        delete_directories : bool :
+        directories : str or list thereof
+            directory[s] to run this on. can be a single simulation directory, a list of simulation
+            directories, or a directory that contains multiple simulation directories for which this
+            function will run recursively on each one
+        snapshot_directory : str
+            output directory that contains snapshot files
+        job_directory : str
+            directory that contains slurm/pbs job files
+        ic_directory : str
+            directory that contains initial condition files from MUSIC
+        particle_track_directory : str
+            directory of particle tracking files
+        halo_directory : str
+            directory of (all) halo files/directories
+        rockstar_directory : str
+            directory of (all) Rockstar files/directories
+        rockstar_job_directory : str
+            directory of Rockstar run-time log/job files
+        rockstar_catalog_directory : str
+            directory of Rockstar (text) halo catalog + tree files
+        rockstar_hdf5_directory : str
+            directory of post-processed catalog + tree hdf5 files
+        delete_directories : bool
             whether to delete the (raw) directories after tar-ing them into a single file
-        delete_tarballs : bool : whether to delete existing tar-balls
+        delete_tarballs : bool
+            whether to delete existing tar-balls
             use this to clean safely the tar-balls that this function creates
-        proc_number : int : number of parallel processes for tar-ing halo directories + snapshots
+        proc_number : int
+            number of parallel processes for tar-ing halo directories + snapshots
         '''
         if np.isscalar(directories):
             directories = [directories]
 
         if proc_number > 1:
             from multiprocessing import Pool
+
+        if snapshot_directory[-1] != '/':
+            snapshot_directory += '/'
 
         # move to this directory
         cwd = os.getcwd()
@@ -484,7 +520,7 @@ class ArchiveClass(ut.io.SayClass):
                 self.say(f'\n! could not find any directories to tar in {directory}/')
                 os.chdir(f'{cwd}')
                 return
-            elif snapshot_directory + '/' not in directory_names:
+            elif snapshot_directory not in directory_names:
                 # this is a directory of simulation directories, recursively run on each one
                 for directory_name in directory_names:
                     self.tar_directories(
@@ -554,7 +590,7 @@ class ArchiveClass(ut.io.SayClass):
                     snapshot_names = [s for s in snapshot_names if '.tar' not in s]
                 snapshot_names.sort()
                 if len(snapshot_names) > 0:
-                    self.say(f'\n* moving into:  {snapshot_directory}/')
+                    self.say(f'\n* moving into:  {snapshot_directory}')
 
                 if proc_number > 1:
                     # tar snapshot directories in parallel
@@ -572,7 +608,7 @@ class ArchiveClass(ut.io.SayClass):
 
                 os.chdir('..')
             else:
-                self.say(f'\n! could not find:  {snapshot_directory}/')
+                self.say(f'\n! could not find:  {snapshot_directory}')
 
             # clean backup files
             os.system('rm -f *~ .#* ._* /#*#')
@@ -584,6 +620,8 @@ class ArchiveClass(ut.io.SayClass):
         '''
         Helper function.
         '''
+        directory_name = directory_name.rstrip('/')
+
         if delete_tarballs:
             if os.path.exists(f'{directory_name}.tar'):
                 self.say(f'\n* deleting:  {directory_name}.tar')
@@ -613,10 +651,14 @@ class ArchiveClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : str : directory of simulation
-        snapshot_directory : str : directory of snapshot files
-        snapshot_index_limits : list : min and max snapshot indices to delete
-        delete_halos : bool : whether to delete halo catalog files at the same snapshots
+        simulation_directory : str
+            directory of simulation
+        snapshot_directory : str
+            directory of snapshot files
+        snapshot_index_limits : list
+            min and max snapshot indices to delete
+        delete_halos : bool
+            whether to delete halo catalog files at the same snapshots
         '''
         snapshot_name_base = 'snap*_{:03d}*'
 
@@ -675,10 +717,14 @@ class GlobusClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_path_directory : str : '.' or full path + directory of simulation
-        snapshot_directory : str : directory of snapshot files within simulation_directory
-        batch_file_name : str : name of file to write
-        machine_name : str : name of machine transfering files to
+        simulation_path_directory : str
+            '.' or full path + directory of simulation
+        snapshot_directory : str
+            directory of snapshot files within simulation_directory
+        batch_file_name : str
+            name of file to write
+        machine_name : str
+            name of machine transfering files to
         '''
         # set directory from which to transfer
         simulation_path_directory = ut.io.get_path(simulation_path_directory)
@@ -724,9 +770,12 @@ class GlobusClass(ut.io.SayClass):
 
         Parameters
         ----------
-        simulation_directory : str : directory of simulation
-        snapshot_directory : str : directory of snapshot files within simulation_directory
-        file_name : str : name of batch file to write
+        simulation_directory : str
+            directory of simulation
+        snapshot_directory : str
+            directory of snapshot files within simulation_directory
+        file_name : str
+            name of batch file to write
         '''
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
@@ -810,11 +859,14 @@ class RsyncClass(ut.io.SayClass):
 
         Parameters
         ----------
-        machine_from : str : name of (remote) machine to copy from:
-            'pfe', 'stampede', 'frontera', 'peloton'
-        directory_from : str : directory to copy from
-        directory_to : str : local directory to put snapshots
-        snapshot_indices : int or list : index[s] of snapshots to transfer
+        machine_from : str
+            name of (remote) machine to copy from: 'pfe', 'stampede', 'frontera', 'peloton'
+        directory_from : str
+            directory to copy from
+        directory_to : str
+            local directory to put snapshots
+        snapshot_indices : int or list
+            index[s] of snapshots to transfer
         '''
         directory_from = (
             ut.io.get_path(simulation_directory_from) + gizmo_default.snapshot_directory
@@ -852,11 +904,14 @@ class RsyncClass(ut.io.SayClass):
 
         Parameters
         ----------
-        machine_from : str : name of (remote) machine to copy from:
-            'pfe', 'stampede', 'frontera', 'peloton'
-        directory_from : str : directory to copy from
-        directory_to : str : directory to copy files to
-        snapshot_index : int : which snapshot to include
+        machine_from : str
+            name of (remote) machine to copy from: 'pfe', 'stampede', 'frontera', 'peloton'
+        directory_from : str
+            directory to copy from
+        directory_to : str
+            directory to copy files to
+        snapshot_index : int
+            which snapshot to include
         '''
         include_names = []
         if snapshot_index:

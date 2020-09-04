@@ -47,17 +47,21 @@ def get_nucleosynthetic_yields(
 
     Parameters
     ----------
-    event_kind : str : stellar event: 'wind', 'supernova.ia', 'supernova.ii'
-    star_metallicity : float :
+    event_kind : str
+        stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+    star_metallicity : float
         total metallicity of star prior to event,
         fraction relative to solar (solar = sun_metal_mass_fraction)
-    star_massfraction : dict : dictionary of elemental mass fractions in star
+    star_massfraction : dict
+        dictionary of elemental mass fractions in star
         need to input this to get higher-order correction of yields
-    normalize : bool : whether to normalize yields to be mass fractions (instead of masses)
+    normalize : bool
+        whether to normalize yields to be mass fractions (instead of masses)
 
     Returns
     -------
-    yields : ordered dictionary : yield mass [M_sun] or mass fraction for each element
+    yields : ordered dictionary
+        yield mass [M_sun] or mass fraction for each element
         can covert to regular dictionary via dict(yields) or list of values via yields.values()
     '''
     yield_dict = collections.OrderedDict()
@@ -182,8 +186,8 @@ def plot_nucleosynthetic_yields(
     star_metallicity=0.1,
     star_massfraction={},
     normalize=False,
-    axis_y_scaling='linear',
     axis_y_limits=[1e-3, None],
+    axis_y_log_scale=True,
     plot_file_name=False,
     plot_directory='.',
     figure_index=1,
@@ -202,10 +206,10 @@ def plot_nucleosynthetic_yields(
         need to input this to get higher-order correction of yields
     normalize : bool
         whether to normalize yields to be mass fractions (instead of masses)
-    axis_y_scaling : str
-        scaling along y-axis: 'log', 'linear'
     axis_y_limits : list
-        min and max limits of y-axis
+        min and max limits of y axis
+    axis_y_log_scale: bool
+        whether to use logarithmic scaling for y axis
     plot_file_name : str
         whether to write figure to file and its name. True = use default naming convention
     plot_directory : str
@@ -237,7 +241,9 @@ def plot_nucleosynthetic_yields(
 
     for si in range(1):
         subplots[si].set_xlim([yield_indices.min() - 0.5, yield_indices.max() + 0.5])
-        subplots[si].set_ylim(ut.plot.get_axis_limits(yield_values, axis_y_scaling, axis_y_limits))
+        subplots[si].set_ylim(
+            ut.plot.get_axis_limits(yield_values, axis_y_log_scale, axis_y_limits)
+        )
 
         subplots[si].set_xticks(yield_indices)
         subplots[si].set_xticklabels(yield_labels)
@@ -292,11 +298,13 @@ class SupernovaIIClass:
 
         Parameters
         ----------
-        ages : float or array : age[s] of stellar population [Myr]
+        ages : float or array
+            age[s] of stellar population [Myr]
 
         Returns
         -------
-        rates : float or array : specific rate[s] [Myr ^ -1 M_sun ^ -1]
+        rates : float or array
+            specific rate[s] [Myr ^ -1 M_sun ^ -1]
         '''
         star_age_min = 3.4  # [Myr]
         star_age_transition = 10.37  # [Myr]
@@ -329,12 +337,15 @@ class SupernovaIIClass:
 
         Parameters
         ----------
-        age_min : float : min age of stellar population [Myr]
-        age_maxs : float or array : max age[s] of stellar population [Myr]
+        age_min : float
+            min age of stellar population [Myr]
+        age_maxs : float or array
+            max age[s] of stellar population [Myr]
 
         Returns
         -------
-        numbers : float or array : specific number[s] of supernovae events [per M_sun]
+        numbers : float or array
+            specific number[s] of supernovae events [per M_sun]
         '''
         age_bin_width = 0.01
 
@@ -358,10 +369,14 @@ class SupernovaIIClass:
 
         Parameters
         ----------
-        age_min : float : min age of stellar population [Myr]
-        age_maxs : float or array : max age[s] of stellar population [Myr]
-        element_name : bool : name of element to get yield of
-        metallicity : float : metallicity of star (for Nitrogen yield)
+        age_min : float
+            min age of stellar population [Myr]
+        age_maxs : float or array
+            max age[s] of stellar population [Myr]
+        element_name : bool
+            name of element to get yield of
+        metallicity : float
+            metallicity of star (for Nitrogen yield)
 
         Returns
         -------
@@ -403,15 +418,19 @@ class SupernovaIaClass:
 
         Parameters
         ----------
-        ages : float : age of stellar population [Myr]
-        ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
+        ages : float
+            age of stellar population [Myr]
+        ia_kind : str
+            supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float
+            minimum age for supernova Ia to occur [Myr]
             decreasing to 10 Myr increases total number by ~50%,
             increasing to 100 Myr decreases total number by ~50%
 
         Returns
         -------
-        rate : float : specific rate of supernovae [Myr ^ -1 M_sun ^ -1]
+        rate : float
+            specific rate of supernovae [Myr ^ -1 M_sun ^ -1]
         '''
 
         def get_rate(ages, kind):
@@ -451,14 +470,19 @@ class SupernovaIaClass:
 
         Parameters
         ----------
-        age_min : float : min age of stellar population [Myr]
-        age_maxs : float or array : max age[s] of stellar population [Myr]
-        ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
+        age_min : float
+            min age of stellar population [Myr]
+        age_maxs : float or array
+            max age[s] of stellar population [Myr]
+        ia_kind : str
+            supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float
+            minimum age for supernova Ia to occur [Myr]
 
         Returns
         -------
-        numbers : float or array : specific number[s] of supernovae [M_sun ^ -1]
+        numbers : float or array
+            specific number[s] of supernovae [M_sun ^ -1]
         '''
         if np.isscalar(age_maxs):
             numbers = integrate.quad(self.get_rate, age_min, age_maxs, (ia_kind, ia_age_min))[0]
@@ -479,15 +503,21 @@ class SupernovaIaClass:
 
         Parameters
         ----------
-        age_min : float : min age of stellar population [Myr]
-        age_maxs : float or array : max age[s] of stellar population [Myr]
-        ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
-        element_name : str : name of element to get yield of
+        age_min : float
+            min age of stellar population [Myr]
+        age_maxs : float or array
+            max age[s] of stellar population [Myr]
+        ia_kind : str
+            supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float
+            minimum age for supernova Ia to occur [Myr]
+        element_name : str
+            name of element to get yield of
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s] (ejecta mass per M_sun)
+        mass_loss_fractions : float or array
+            mass loss fraction[s] (ejecta mass per M_sun)
         '''
         mass_loss_fractions = self.ejecta_mass * self.get_number(
             age_min, age_maxs, ia_kind, ia_age_min
@@ -524,13 +554,17 @@ class StellarWindClass:
 
         Parameters
         ----------
-        age : float or array : age[s] of stellar population [Myr]
-        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
-        metal_mass_fraction : float : mass fration of all metals (everything not H, He)
+        age : float or array
+            age[s] of stellar population [Myr]
+        metallicity : float
+            total abundance of metals wrt solar_metal_mass_fraction
+        metal_mass_fraction : float
+            mass fration of all metals (everything not H, He)
 
         Returns
         -------
-        rates : float or array : rate[s] of fractional mass loss [Myr ^ -1]
+        rates : float or array
+            rate[s] of fractional mass loss [Myr ^ -1]
         '''
         metallicity_min = 0.01  # min and max imposed in Gizmo for stellar wind rates for stability
         metallicity_max = 3
@@ -586,15 +620,21 @@ class StellarWindClass:
 
         Parameters
         ----------
-        age_min : float : min age of stellar population [Myr]
-        age_maxs : float or array : max age[s] of stellar population [Myr]
-        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
-        metal_mass_fraction : float : mass fraction of all metals (everything not H, He)
-        element_name : str : name of element to get yield of
+        age_min : float
+            min age of stellar population [Myr]
+        age_maxs : float or array
+            max age[s] of stellar population [Myr]
+        metallicity : float
+            total abundance of metals wrt solar_metal_mass_fraction
+        metal_mass_fraction : float
+            mass fraction of all metals (everything not H, He)
+        element_name : str
+            name of element to get yield of
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s]
+        mass_loss_fractions : float or array
+            mass loss fraction[s]
         '''
         if np.isscalar(age_maxs):
             mass_loss_fractions = integrate.quad(
@@ -649,11 +689,16 @@ class MassLossClass(ut.io.SayClass):
 
         Parameters
         ----------
-        age : float or array : age[s] of stellar population [Myr]
-        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
-        metal_mass_fraction : float : mass fration of all metals (everything not H, He)
-        ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
+        age : float or array
+            age[s] of stellar population [Myr]
+        metallicity : float
+            total abundance of metals wrt solar_metal_mass_fraction
+        metal_mass_fraction : float
+            mass fration of all metals (everything not H, He)
+        ia_kind : str
+            supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float
+            minimum age for supernova Ia to occur [Myr]
 
         Returns
         -------
@@ -680,16 +725,23 @@ class MassLossClass(ut.io.SayClass):
 
         Parameters
         ----------
-        age_min : float : min (starting) age of stellar population [Myr]
-        age_maxs : float or array : max (ending) age[s] of stellar population [Myr]
-        metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
-        metal_mass_fraction : float : mass fration of all metals (everything not H, He)
-        ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
+        age_min : float
+            min (starting) age of stellar population [Myr]
+        age_maxs : float or array
+            max (ending) age[s] of stellar population [Myr]
+        metallicity : float
+            total abundance of metals wrt solar_metal_mass_fraction
+        metal_mass_fraction : float
+            mass fration of all metals (everything not H, He)
+        ia_kind : str
+            supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float
+            minimum age for supernova Ia to occur [Myr]
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s]
+        mass_loss_fractions : float or array
+            mass loss fraction[s]
         '''
         return (
             self.SupernovaII.get_mass_loss_fraction(age_min, age_maxs)
@@ -708,13 +760,17 @@ class MassLossClass(ut.io.SayClass):
 
         Parameters
         ----------
-        ages : float or array : age[s] of stellar population [Myr]
-        metallicities : float or array : total abundance[s] of metals wrt solar_metal_mass_fraction
-        metal_mass_fractions : float or array : mass fration[s] of all metals (everything not H, He)
+        ages : float or array
+            age[s] of stellar population [Myr]
+        metallicities : float or array
+            total abundance[s] of metals wrt solar_metal_mass_fraction
+        metal_mass_fractions : float or array
+            mass fration[s] of all metals (everything not H, He)
 
         Returns
         -------
-        mass_loss_fractions : float or array : mass loss fraction[s]
+        mass_loss_fractions : float or array
+            mass loss fraction[s]
         '''
         if metal_mass_fractions is not None:
             # convert mass fraction to metallicity using Solar value assumed in Gizmo
@@ -749,15 +805,22 @@ class MassLossClass(ut.io.SayClass):
 
         Parameters
         ----------
-        age_limits : list : min and max limits of age of stellar population [Myr]
-        age_bin_width : float : log width of age bin [Myr]
-        metallicity_limits : list :
+        age_limits : list
+            min and max limits of age of stellar population [Myr]
+        age_bin_width : float
+            log width of age bin [Myr]
+        metallicity_limits : list
             min and max limits of metal abundance wrt solar_metal_mass_fraction
-        metallicity_bin_width : float : width of metallicity bin
-        ia_kind : str : supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
-        ia_age_min : float : minimum age for supernova Ia to occur [Myr]
-        force_remake : bool : force a recalculation of the spline, even if file exists
-        save_spline : bool : save the spline to a pickle file for rapid loading in the future
+        metallicity_bin_width : float
+            width of metallicity bin
+        ia_kind : str
+            supernova Ia rate kind: 'mannucci' (Gizmo default), 'maoz' (power law)
+        ia_age_min : float
+            minimum age for supernova Ia to occur [Myr]
+        force_remake : bool
+            force a recalculation of the spline, even if file exists
+        save_spline : bool
+            save the spline to a pickle file for rapid loading in the future
         '''
         from os.path import isfile
 
@@ -770,10 +833,10 @@ class MassLossClass(ut.io.SayClass):
         age_min = 0
 
         self.AgeBin = ut.binning.BinClass(
-            age_limits, age_bin_width, include_max=True, scaling='log'
+            age_limits, age_bin_width, include_max=True, log_scale=True,
         )
         self.MetalBin = ut.binning.BinClass(
-            metallicity_limits, metallicity_bin_width, include_max=True, scaling='log'
+            metallicity_limits, metallicity_bin_width, include_max=True, log_scale=True,
         )
 
         self.say('* generating 2-D spline to compute stellar mass loss from age + metallicity')
@@ -814,10 +877,10 @@ MassLoss = MassLossClass()
 def plot_supernova_v_age(
     age_limits=[1, 3000],
     age_bin_width=1,
-    age_scaling='log',
-    y_axis_kind='rate',
-    y_axis_limits=[None, None],
-    y_axis_scaling='log',
+    age_log_scale=True,
+    axis_y_kind='rate',
+    axis_y_limits=[None, None],
+    axis_y_log_scale=True,
     plot_file_name=False,
     plot_directory='.',
     figure_index=1,
@@ -828,12 +891,18 @@ def plot_supernova_v_age(
 
     Parameters
     ----------
-    age_limits : list : min and max limits of age of stellar population [Myr]
-    age_bin_width : float : width of stellar age bin [Myr]
-    age_scaling : str : 'log' or 'linear'
-    y_axis_limits : str : 'rate' or 'number'
-    y_axis_limits : list : min and max limits to impose on y-axis
-    y_axis_scaling : str : 'log' or 'linear'
+    age_limits : list
+        min and max limits of age of stellar population [Myr]
+    age_bin_width : float
+        width of stellar age bin [Myr]
+    age_log_scale : bool
+        whether to use logarithmic scaling for age bins
+    y_axis_limits : str
+        'rate' or 'number'
+    y_axis_limits : list
+        min and max limits to impose on y axis
+    axis_y_log_scale : bool
+        whether to use logarithmic scaling for y axis
     plot_file_name : str
         whether to write figure to file and its name. True = use default naming convention
     plot_directory : str
@@ -841,15 +910,15 @@ def plot_supernova_v_age(
     figure_index : int
         index for matplotlib window
     '''
-    assert y_axis_kind in ['rate', 'number']
+    assert axis_y_kind in ['rate', 'number']
 
     AgeBin = ut.binning.BinClass(age_limits, age_bin_width, include_max=True)
 
-    if y_axis_kind == 'rate':
+    if axis_y_kind == 'rate':
         supernova_II_rates = SupernovaII.get_rate(AgeBin.mins)
         supernova_Ia_rates_mannucci = SupernovaIa.get_rate(AgeBin.mins, 'mannucci')
         supernova_Ia_rates_maoz = SupernovaIa.get_rate(AgeBin.mins, 'maoz')
-    elif y_axis_kind == 'number':
+    elif axis_y_kind == 'number':
         supernova_II_rates = SupernovaII.get_number(min(age_limits), AgeBin.maxs)
         supernova_Ia_rates_mannucci = SupernovaIa.get_number(
             min(age_limits), AgeBin.maxs, 'mannucci'
@@ -861,18 +930,18 @@ def plot_supernova_v_age(
 
     ut.plot.set_axes_scaling_limits(
         subplot,
-        age_scaling,
+        age_log_scale,
         age_limits,
         None,
-        y_axis_scaling,
-        y_axis_limits,
+        axis_y_log_scale,
+        axis_y_limits,
         [supernova_II_rates, supernova_Ia_rates_mannucci, supernova_Ia_rates_maoz],
     )
 
     subplot.set_xlabel('star age $\\left[ {\\rm Myr} \\right]$')
-    if y_axis_kind == 'rate':
+    if axis_y_kind == 'rate':
         subplot.set_ylabel('SN rate $\\left[ {\\rm Myr}^{-1} {\\rm M}_\odot^{-1} \\right]$')
-    elif y_axis_kind == 'number':
+    elif axis_y_kind == 'number':
         subplot.set_ylabel('SN number $\\left[ {\\rm M}_\odot^{-1} \\right]$')
 
     colors = ut.plot.get_colors(3, use_black=False)
@@ -884,9 +953,9 @@ def plot_supernova_v_age(
     ut.plot.make_legends(subplot, 'best')
 
     if plot_file_name is True or plot_file_name == '':
-        if y_axis_kind == 'rate':
+        if axis_y_kind == 'rate':
             plot_file_name = 'supernova.rate_v_time'
-        elif y_axis_kind == 'number':
+        elif axis_y_kind == 'number':
             plot_file_name = 'supernova.number.cum_v_time'
     ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -894,10 +963,10 @@ def plot_supernova_v_age(
 def plot_mass_loss_v_age(
     age_limits=[1, 10000],
     age_bin_width=0.01,
-    age_scaling='log',
+    age_log_scale=True,
     mass_loss_kind='rate',
     mass_loss_limits=[None, None],
-    mass_loss_scaling='log',
+    mass_loss_log_scale=True,
     element_name='',
     metallicity=1,
     metal_mass_fraction=None,
@@ -910,15 +979,24 @@ def plot_mass_loss_v_age(
 
     Parameters
     ----------
-    age_limits : list : min and max limits of age of stellar population [Myr]
-    age_bin_width : float : width of stellar age bin [Myr]
-    age_scaling : str : 'log' or 'linear'
-    mass_loss_kind : str : 'rate' or 'cumulative'
-    mass_loss_limits : list : min and max limits to impose on y-axis
-    mass_loss_scaling : str : 'log' or 'linear'
-    element_name : str : name of element to get yield of (if None, compute total mass loss)
-    metallicity : float : total abundance of metals wrt solar_metal_mass_fraction
-    metal_mass_fraction : float : mass fration of all metals (everything not H, He)
+    age_limits : list
+        min and max limits of age of stellar population [Myr]
+    age_bin_width : float
+        width of stellar age bin [Myr]
+    age_log_scale : bool
+        whether to use logarithmic scaling for age bins
+    mass_loss_kind : str
+        'rate' or 'cumulative'
+    mass_loss_limits : list
+        min and max limits to impose on y-axis
+    mass_loss_log_scale : bool
+        whether to use logarithmic scaling for age bins
+    element_name : str
+        name of element to get yield of (if None, compute total mass loss)
+    metallicity : float
+        total abundance of metals wrt solar_metal_mass_fraction
+    metal_mass_fraction : float
+        mass fration of all metals (everything not H, He)
     plot_file_name : str
         whether to write figure to file and its name. True = use default naming convention
     plot_directory : str
@@ -930,7 +1008,9 @@ def plot_mass_loss_v_age(
 
     assert mass_loss_kind in ['rate', 'cumulative']
 
-    AgeBin = ut.binning.BinClass(age_limits, age_bin_width, scaling=age_scaling, include_max=True)
+    AgeBin = ut.binning.BinClass(
+        age_limits, age_bin_width, include_max=True, log_scale=age_log_scale
+    )
 
     if mass_loss_kind == 'rate':
         supernova_II = SupernovaII.get_rate(AgeBin.mins) * SupernovaII.ejecta_mass
@@ -952,10 +1032,10 @@ def plot_mass_loss_v_age(
 
     ut.plot.set_axes_scaling_limits(
         subplot,
-        age_scaling,
+        age_log_scale,
         age_limits,
         None,
-        mass_loss_scaling,
+        mass_loss_log_scale,
         mass_loss_limits,
         [supernova_II, supernova_Ia, wind, total],
     )
