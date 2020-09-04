@@ -30,7 +30,247 @@ import numpy as np
 from scipy import integrate
 
 from . import gizmo_star
-# import utilities as ut
+import utilities as ut
+
+# --------------------------------------------------------------------------------------------------
+# Agetracers
+# --------------------------------------------------------------------------------------------------
+class AgetracerClass(dict, ut.io.SayClass):
+    '''
+    Dictionary class to store information about age tracer bins.
+    '''
+
+    def __init__(self, verbose=True):
+        self.info = {'flag_agetracers' : 0} # assume off initially
+        self.verbose = verbose
+
+        # left edges (in Myr) of stellar age bins plus right edge
+        # of last bin
+        self.age_bins = None
+
+        return
+
+    def determine_tracer_info(self, directory='.'):
+        '''
+        Checks for GIZMO_config.h in directory or the 'gizmo' subdirectory in
+        directory (if present), or checks for 'gizmo.out' in directory. One of
+        these is needed to read in the compile-time flags which determine the
+        presence and number of age tracer time bins contained in the output.
+
+        Parameters
+        -----------
+        directory : str : top-level work directory for files (optional). Default: '.'
+        '''
+        # use a few different methods to find information
+        # search for either GIZMO_config.h or gizmo.out
+
+        possible_files = ["GIZMO_config.h","gizmo_config.h","gizmo.out","gizmo.out.txt"]
+        possible_paths = [ut.io.get_path(directory), ut.io.get_path(directory + 'gizmo'),
+                          ut.io.get_path(directory) + 'code']
+
+        path_file_name = None
+        for fname in possible_files:
+            for pname in possible_paths:
+                if os.path.exists( pname + fname):
+                    path_file_name = pname + fname
+                    break
+
+        if path_file_name is None:
+            print("Cannot find GIZMO_config.h or gizmo.out in {}".format(directory)+\
+                  " or in {}".format(directory + '/gizmo'))
+            print("Assuming no age tracer information")
+            self.info['flag_agetracers'] = 0
+            self.info['flag_agetracers_custom'] = 0
+            return
+
+        if "GIZMO_config.h" in path_file_name:
+            delimiter = " "
+        else:
+            delimiter = "="
+
+        self.info['flag_agetracers']        = 0
+        self.info['flag_agetracers_custom'] = 0
+
+        self._logbins = True   # assume by default
+        count         = 0
+
+
+        self.info['metallicity_start'] = -1
+        for line in open(path_file_name, 'r'):
+
+            #
+            # ----------------------  WARNING: ---------------------------------
+            #
+            #          If the number of age tracers is ever controlled outside
+            #          of this flag (e.g. some other flag turns on a default
+            #          value), this WILL need to be changed to account for that.
+            #
+
+            if "GALSF_FB_FIRE_AGE_TRACERS"+delimiter in line:
+                self.info['num_tracers'] = int(line.strip("\n").split(delimiter)[-1])
+                self.info['flag_agetracers'] = 1
+
+            if "GALSF_FB_FIRE_AGE_TRACERS_CUSTOM" in line:
+                self.info['flag_agetracers_custom'] = 1
+                self._logbins = False
+
+            #
+            # ----------------------  WARNING: ---------------------------------
+            #
+            # if number of default elements and r process elements
+            # changes from 11 (10 + metallicity) and 4 respecitvely, then
+            # this cannot be hard-coded like this any longer. Will need some trickier
+            # if statements too in this case to ensure backwards compatability
+            #
+            # hard-coded values:  11 = number of metals tracked
+            #                      4 = number of rprocess fields
+            if "FIRE_PHYSICS_DEFAULTS" in line:
+                if self.info['metallicity_start'] == -1:
+                    self.info['metallicity_start'] = 11 + 4 # first age tracer is field Metallicity_XX
+                else:
+                    self.info['metallicity_start'] = self.info['metallicity_start'] + 11
+
+            # if this is specified, then more than 4 are being tracked.
+            # check this.
+            if "GALSF_FB_FIRE_RPROCESS" in line:
+                numr = int(line.split(delimiter)[-1])
+                if self.info['metallicity_start'] == -1:
+                    self.info['metallicity_start'] = 0 + numr
+                else:
+                    self.info['metallicity_start'] = self.info['metallicity_start'] - 4 + numr
+
+            if count > 400: # arbitrary limit
+                break
+            count = count + 1
+
+        self.info['metallicity_end'] = self.info['metallicity_start']
+        if self.info['flag_agetracers']:
+            self.info['metallicity_end'] += self.info['num_tracers']
+
+        return
+
+    def generate_age_bins(self, file_name = 'age_bins.txt', directory = '.'):
+        '''
+        If age tracers are contained in the output file (as determined by
+        determine_tracer_info), generates or reads in the age tracer bins used
+        by the simulation. This requires either the presence of params.txt-usedvalues,
+        parameters-usedvalues, or gizmo.out in the top-level directory or
+        the 'output' subdirectory if log-spaced bins are used. Otherwise, this requires
+        the presence of the 'age-bins.txt' input file to read in custom-spaced bins.
+
+        Parameters
+        ----------
+        file_name : str : Only used if custom space age tracers are used. Name of
+                          bin file, assumed to be a single column of bin left edges
+                          plus the right edge of last bin (number of lines should be
+                          number of tracers + 1). Default : 'age_bins.txt'
+
+        directory : str : Top-level work directory. Default : '.'
+        '''
+
+        if self.info['flag_agetracers'] == 0:
+            self.age_bins = None
+
+            return
+
+        if self._logbins:
+
+            # ----------------------  WARNING: ---------------------------------
+            # this wil need to be changed if the Gizmo parameters are changed
+            # from AgeTracerBinStart and AgeTracerBinEnd
+            #
+            # need to grab this from parameter file or gizmo.out
+            path_file_name = ut.io.get_path(directory) + 'params.txt-usedvalues'
+            if not os.path.exists(path_file_name):
+                path_file_name = ut.io.get_path(directory) + 'gizmo.out'
+
+                if not os.path.exists(path_file_name):
+                    path_file_name = ut.io.get_path(directory + 'output') + 'parameters-usedvalues'
+                    if not os.path.exists(path_file_name):
+
+                        raise OSError("Cannot find 'params.txt-usedvalues' or 'gizmo.out' in {}".format(directory))
+
+            self.say('* reading age bin information from :  {}\n'.format(path_file_name.strip('./')),
+                     verbose=self.verbose)
+
+            for line in open(path_file_name):
+                if 'AgeTracerBinStart' in line:
+                    self.info['agetracer_bin_start'] = float(line.split(" ")[-1])
+                if 'AgeTracerBinEnd'   in line:
+                    self.info['agetracer_bin_end']   = float(line.split(" ")[-1])
+
+            binstart = np.log10(self.info['agetracer_bin_start'])
+            binend   = np.log10(self.info['agetracer_bin_end'])
+            self.age_bins = np.logspace(binstart,binend, self.info['num_tracers'] + 1)
+            self.age_bins[0] = 0 # always left edge at zero
+
+        else:
+
+            self.read_age_bins(file_name=file_name, directory=directory)
+
+        if len(self.age_bins) > self.info['num_tracers'] + 1:
+            raise RuntimeError("Number of age bins implies there should be more tracers. Something is wrong here.")
+        elif len(self.age_bins) < self.info['num_tracers'] + 1:
+            raise RuntimeError("Number of age bins implies there should be less tracers. Something is wrong here")
+
+        return
+
+    def read_age_bins(self, file_name = 'age_bins.txt', directory = '.'):
+        '''
+        Parameters
+        ----------
+        file_name : str : Only used if custom space age tracers are used. Name of
+                          bin file, assumed to be a single column of bin left edges
+                          plus the right edge of last bin (number of lines should be
+                          number of tracers + 1). Default : 'age_bins.txt'
+
+        directory : str : Top-level work directory. Default : '.'
+        '''
+
+        if self.info['flag_agetracers'] == 0:
+            self.age_bins = None
+            return
+
+        try:
+            path_file_name = ut.io.get_path(directory) + file_name
+            self.age_bins = np.genfromtxt(path_file_name)
+        except OSError:
+            raise OSError("cannot find file of age tracer bins: {}".format(path_file_name))
+
+
+        return
+
+
+Agetracers = AgetracerClass()
+
+def read_agetracer_times(directory='.', filename = 'age_bins.txt', verbose=True):
+    '''
+    Within input directory, search for and read stellar age tracer field
+    bin times (if custom sized age tracer fields used). Return as
+    an array.
+
+    Parameters
+    -----------
+    directory : str : directory where snapshot times/scale-factor file is
+
+    Returns
+    -------
+    Agetracers : dictionary class : age tracer information
+    '''
+
+    Agetracers = AgetracerClass(verbose=verbose)
+
+    Agetracers.determine_tracer_info(directory = directory)
+
+    Agetracers.generate_age_bins(filename, directory)
+
+    return Agetracers
+
+#
+#
+# Functions and classes for generating post-processing yield tables
+#
+#
 
 
 def construct_yield_table(yield_object, agebins,
@@ -414,4 +654,3 @@ class FIRE2_yields(YieldsObject):
                (self.snII_yields[element] * snIIrate))  # in Msun / Myr
 
         return y * 1000.0 # Msun / Gyr
-

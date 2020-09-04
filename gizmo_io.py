@@ -154,6 +154,7 @@ import copy
 
 import utilities as ut
 from . import gizmo_default
+from . import gizmo_agetracers
 
 # --------------------------------------------------------------------------------------------------
 # particle dictionary class
@@ -188,7 +189,7 @@ class ParticleDictionaryClass(dict):
         #
         #   ageprop is a dictionary of the age tracer properties
         self._yield_table = None
-        self.ageprop = ut.simulation.read_agetracer_times(directory = simulation_directory)
+        self.ageprop = gizmo_agetracers.read_agetracer_times(directory = simulation_directory)
 
         # use if read only subset of elemental abundances
         self.element_pointer = np.arange(len(self.element_dict) // 2)
