@@ -836,8 +836,8 @@ class MassLossClass(ut.io.SayClass):
         )
 
         self.say('* generating 2-D spline to compute stellar mass loss from age + metallicity')
-        self.say('number of age bins = {}'.format(self.AgeBin.number))
-        self.say('number of metallicity bins = {}'.format(self.MetalBin.number))
+        self.say(f'number of age bins = {self.AgeBin.number}')
+        self.say(f'number of metallicity bins = {self.MetalBin.number}')
 
         self.mass_loss_fractions = np.zeros((self.AgeBin.number, self.MetalBin.number))
         for metallicity_i, metallicity in enumerate(self.MetalBin.mins):
@@ -857,14 +857,14 @@ class MassLossClass(ut.io.SayClass):
 
         with open(self.filename, 'wb') as f:
             pickle.dump(self.Spline, f)
-        print("Saved spline as {}".format(self.filename))
+        print(f'saved spline as {self.filename}')
 
     def _load_mass_fraction_spline(self):
         import pickle
 
         with open(self.filename, 'rb') as f:
             self.Spline = pickle.load(f)
-            print("Loaded spline from {}".format(self.filename))
+            print(f'loaded spline from {self.filename}')
 
 
 MassLoss = MassLossClass()
@@ -893,9 +893,9 @@ def plot_supernova_v_age(
         width of stellar age bin [Myr]
     age_log_scale : bool
         whether to use logarithmic scaling for age bins
-    y_axis_limits : str
+    axis_y_limits : str
         'rate' or 'number'
-    y_axis_limits : list
+    axis_y_limits : list
         min and max limits to impose on y axis
     axis_y_log_scale : bool
         whether to use logarithmic scaling for y axis
@@ -1040,10 +1040,10 @@ def plot_mass_loss_v_age(
     if mass_loss_kind == 'rate':
         subplot.set_ylabel('mass loss rate $\\left[ {\\rm Myr}^{-1} \\right]$')
     else:
-        y_axis_label = 'fractional mass loss'
+        axis_y_label = 'fractional mass loss'
         if element_name:
-            y_axis_label = '{} yield per ${{\\rm M}}_\odot$'.format(element_name)
-        subplot.set_ylabel(y_axis_label)
+            axis_y_label = f'{element_name} yield per ${{\\rm M}}_\odot$'
+        subplot.set_ylabel(axis_y_label)
 
     colors = ut.plot.get_colors(3, use_black=False)
 
