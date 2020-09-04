@@ -26,6 +26,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     time [Gyr]
 '''
 
+import os
 import numpy as np
 from scipy import integrate
 
