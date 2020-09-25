@@ -609,7 +609,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 self.reference_snapshot_index,
                 snapshot_directory=self.snapshot_directory,
                 properties=properties_read,
-                element_indices=[0],
+                elements=['metals'],
                 assign_hosts=False,
                 check_properties=False,
             )
@@ -631,7 +631,7 @@ class ParticlePointerClass(ut.io.SayClass):
                     self.reference_snapshot_index,
                     snapshot_directory=self.snapshot_directory,
                     properties=properties_read,
-                    element_indices=[0],
+                    elements=['metals'],
                     assign_hosts=False,
                     check_properties=False,
                 )
@@ -735,7 +735,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 self.reference_snapshot_index,
                 snapshot_directory=self.snapshot_directory,
                 properties=properties_read,
-                element_indices=[0],
+                elements=['metals'],
                 assign_hosts=False,
                 check_properties=False,
             )
@@ -751,7 +751,7 @@ class ParticlePointerClass(ut.io.SayClass):
             snapshot_index,
             snapshot_directory=self.snapshot_directory,
             properties=properties_read,
-            element_indices=[0],
+            elements=['metals'],
             assign_hosts=False,
             check_properties=False,
         )
@@ -1332,7 +1332,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     'id.child',
                     'form.scalefactor',
                 ],
-                element_indices=[0],
+                elements=['metals'],
                 host_number=host_number,
                 assign_hosts='mass',
                 check_properties=False,

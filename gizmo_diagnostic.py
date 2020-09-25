@@ -701,7 +701,7 @@ def print_properties_snapshots(
     species_property_dict : dict
         keys = species, values are string or list of property[s]
     '''
-    element_indices = [0, 1]
+    elements = ['metals', 'he']
 
     property_statistic = {
         'size': {'function.name': 'min', 'function': np.min},
@@ -750,7 +750,7 @@ def print_properties_snapshots(
                 track_directory,
                 '',
                 properties_read,
-                element_indices,
+                elements,
                 assign_hosts=False,
                 sort_dark_by_id=False,
             )
