@@ -9,7 +9,7 @@ Units: unless otherwise noted, all quantities are in (combinations of):
     position [kpc comoving]
     distance, radius [kpc physical]
     velocity [km / s]
-    time [Gyr]
+    time [Myr]
 '''
 
 import collections
@@ -19,7 +19,7 @@ from scipy import integrate
 import utilities as ut
 
 
-# elemental abundances (mass fraction) of the Sun that Gizmo assumes
+# elemental abundances (mass fraction) of the Sun that Gizmo uses for FIRE-2
 sun_massfraction = {}
 sun_massfraction['metals'] = 0.02  # total metal mass fraction
 sun_massfraction['helium'] = 0.28
@@ -38,50 +38,54 @@ sun_massfraction['iron'] = 1.73e-3
 # nucleosynthetic yields
 # --------------------------------------------------------------------------------------------------
 def get_nucleosynthetic_yields(
-    event_kind='supernova.ii', star_metallicity=1.0, star_massfraction={}, normalize=True
+    event_kind='supernova.cc', star_metallicity=1.0, star_massfraction={}, normalize=True
 ):
     '''
     Get nucleosynthetic element yields, according to input event_kind.
-    Note: this only returns the *additional* nucleosynthetic yields that Gizmo adds to the
-    star's existing metallicity, so these are not the actual yields that get deposited to gas.
+    This computes the *additional* nucleosynthetic yields that Gizmo adds to the star's existing
+    metallicity, so these are not the actual yields that get deposited to gas.
+    The total mass fraction (wrt total mass of star) returned for each element is:
+        (1 - ejecta_total_mass_fraction) * star_element_mass_fraction
+            + ejecta_total_mass_fraction * ejecta_element_mass_fraction
 
     Parameters
     ----------
     event_kind : str
-        stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+        stellar event: 'wind', 'supernova.cc' or 'supernova.ii', 'supernova.ia'
     star_metallicity : float
-        total metallicity of star prior to event,
-        fraction relative to solar (solar = sun_metal_mass_fraction)
+        total metallicity of star prior to event, specifically, *linear* mass fraction relative to
+        solar (solar := sun_metal_mass_fraction)
     star_massfraction : dict
-        dictionary of elemental mass fractions in star
-        need to input this to get higher-order correction of yields
+        optional: dictionary of elemental mass fractions of stars
+        use to get higher-order correction of yields that Gizmo includes
     normalize : bool
         whether to normalize yields to be mass fractions (instead of masses)
 
     Returns
     -------
-    yields : ordered dictionary
-        yield mass [M_sun] or mass fraction for each element
-        can covert to regular dictionary via dict(yields) or list of values via yields.values()
+    star_yield : ordered dict
+        stellar yield for each element, in mass [M_sun] or mass fraction
     '''
-    yield_dict = collections.OrderedDict()
-    yield_dict['metals'] = 0.0
-    yield_dict['helium'] = 0.0
-    yield_dict['carbon'] = 0.0
-    yield_dict['nitrogen'] = 0.0
-    yield_dict['oxygen'] = 0.0
-    yield_dict['neon'] = 0.0
-    yield_dict['magnesium'] = 0.0
-    yield_dict['silicon'] = 0.0
-    yield_dict['sulphur'] = 0.0
-    yield_dict['calcium'] = 0.0
-    yield_dict['iron'] = 0.0
+    star_yield = collections.OrderedDict()
+    star_yield['metals'] = 0.0
+    star_yield['helium'] = 0.0
+    star_yield['carbon'] = 0.0
+    star_yield['nitrogen'] = 0.0
+    star_yield['oxygen'] = 0.0
+    star_yield['neon'] = 0.0
+    star_yield['magnesium'] = 0.0
+    star_yield['silicon'] = 0.0
+    star_yield['sulphur'] = 0.0
+    star_yield['calcium'] = 0.0
+    star_yield['iron'] = 0.0
 
-    assert event_kind in ['wind', 'supernova.ii', 'supernova.ia']
+    event_kind = event_kind.lower()
 
-    if len(star_massfraction) > 0:
+    assert event_kind in ['wind', 'supernova.cc', 'supernova.ii', 'supernova.ia']
+
+    if star_massfraction is not None and len(star_massfraction) > 0:
         # input full array of stellar elemental mass fractions
-        for element_name in yield_dict:
+        for element_name in star_yield:
             assert element_name in star_massfraction
         star_metal_mass_fraction = star_massfraction['metals']
     else:
@@ -92,23 +96,23 @@ def get_nucleosynthetic_yields(
         # treat AGB and O-star yields in more detail for light elements
         ejecta_mass = 1.0  # these yields already are mass fractions
 
-        yield_dict['helium'] = 0.36
-        yield_dict['carbon'] = 0.016
-        yield_dict['nitrogen'] = 0.0041
-        yield_dict['oxygen'] = 0.0118
+        star_yield['helium'] = 0.36
+        star_yield['carbon'] = 0.016
+        star_yield['nitrogen'] = 0.0041
+        star_yield['oxygen'] = 0.0118
 
-        # oxygen yield strongly depends on initial metallicity of star
+        # oxygen yield depends linearly on metallicity of progenitor star
         if star_metal_mass_fraction < 0.033:
-            yield_dict['oxygen'] *= star_metal_mass_fraction / sun_massfraction['metals']
+            star_yield['oxygen'] *= star_metal_mass_fraction / sun_massfraction['metals']
         else:
-            yield_dict['oxygen'] *= 1.65
+            star_yield['oxygen'] *= 1.65
 
         # sum total metal mass (not including hydrogen or helium)
-        for k in yield_dict:
+        for k in star_yield:
             if k != 'helium':
-                yield_dict['metals'] += yield_dict[k]
+                star_yield['metals'] += star_yield[k]
 
-    elif event_kind == 'supernova.ii':
+    elif event_kind in ['supernova.cc' or 'supernova.ii']:
         # yields from Nomoto et al 2006, IMF averaged
         # rates from Starburst99
         # in Gizmo core-collapse occur 3.4 to 37.53 Myr after formation
@@ -116,27 +120,27 @@ def get_nucleosynthetic_yields(
         # from 10.37 to 37.53 Myr, rate / M_sun = 2.516e-10 yr ^ -1
         ejecta_mass = 10.5  # [M_sun]
 
-        yield_dict['metals'] = 2.0
-        yield_dict['helium'] = 3.87
-        yield_dict['carbon'] = 0.133
-        yield_dict['nitrogen'] = 0.0479
-        yield_dict['oxygen'] = 1.17
-        yield_dict['neon'] = 0.30
-        yield_dict['magnesium'] = 0.0987
-        yield_dict['silicon'] = 0.0933
-        yield_dict['sulphur'] = 0.0397
-        yield_dict['calcium'] = 0.00458  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
-        yield_dict['iron'] = 0.0741
+        star_yield['metals'] = 2.0  # [M_sun]
+        star_yield['helium'] = 3.87
+        star_yield['carbon'] = 0.133
+        star_yield['nitrogen'] = 0.0479
+        star_yield['oxygen'] = 1.17
+        star_yield['neon'] = 0.30
+        star_yield['magnesium'] = 0.0987
+        star_yield['silicon'] = 0.0933
+        star_yield['sulphur'] = 0.0397
+        star_yield['calcium'] = 0.00458  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
+        star_yield['iron'] = 0.0741
 
-        yield_nitrogen_orig = np.float(yield_dict['nitrogen'])
+        yield_nitrogen_orig = np.float(star_yield['nitrogen'])
 
-        # nitrogen yield strongly depends on initial metallicity of star
+        # nitrogen yield depends linearly on metallicity of progenitor star
         if star_metal_mass_fraction < 0.033:
-            yield_dict['nitrogen'] *= star_metal_mass_fraction / sun_massfraction['metals']
+            star_yield['nitrogen'] *= star_metal_mass_fraction / sun_massfraction['metals']
         else:
-            yield_dict['nitrogen'] *= 1.65
+            star_yield['nitrogen'] *= 1.65
         # correct total metal mass for nitrogen
-        yield_dict['metals'] += yield_dict['nitrogen'] - yield_nitrogen_orig
+        star_yield['metals'] += star_yield['nitrogen'] - yield_nitrogen_orig
 
     elif event_kind == 'supernova.ia':
         # yields from Iwamoto et al 1999, W7 model, IMF averaged
@@ -145,40 +149,45 @@ def get_nucleosynthetic_yields(
         # 5.3e-14 + 1.6e-11 * exp(-0.5 * ((age - 0.05) / 0.01) * ((age - 0.05) / 0.01)) yr^-1
         ejecta_mass = 1.4  # [M_sun]
 
-        yield_dict['metals'] = 1.4
-        yield_dict['helium'] = 0.0
-        yield_dict['carbon'] = 0.049
-        yield_dict['nitrogen'] = 1.2e-6
-        yield_dict['oxygen'] = 0.143
-        yield_dict['neon'] = 0.0045
-        yield_dict['magnesium'] = 0.0086
-        yield_dict['silicon'] = 0.156
-        yield_dict['sulphur'] = 0.087
-        yield_dict['calcium'] = 0.012
-        yield_dict['iron'] = 0.743
+        star_yield['metals'] = 1.4  # [M_sun]
+        star_yield['helium'] = 0.0
+        star_yield['carbon'] = 0.049
+        star_yield['nitrogen'] = 1.2e-6
+        star_yield['oxygen'] = 0.143
+        star_yield['neon'] = 0.0045
+        star_yield['magnesium'] = 0.0086
+        star_yield['silicon'] = 0.156
+        star_yield['sulphur'] = 0.087
+        star_yield['calcium'] = 0.012
+        star_yield['iron'] = 0.743
 
     if len(star_massfraction) > 0:
         # enforce that yields obey pre-existing surface abundances
         # allow for larger abundances in the progenitor star - usually irrelevant
-        pure_mass_fraction = 1 - star_metal_mass_fraction
-        for element_name in yield_dict:
-            yield_dict[element_name] = yield_dict[element_name] / ejecta_mass
 
-            if yield_dict[element_name] > 0:
-                # apply yield only to non-metal mass of star
-                yield_dict[element_name] *= pure_mass_fraction
-                yield_dict[element_name] += (
+        # get pure (non-metal) mass fraction of star
+        pure_mass_fraction = 1 - star_metal_mass_fraction
+
+        for element_name in star_yield:
+            if star_yield[element_name] > 0:
+                star_yield[element_name] /= ejecta_mass
+
+                # apply (new) yield only to pure (non-metal) mass of star
+                star_yield[element_name] *= pure_mass_fraction
+                # correction relative to solar abundance
+                star_yield[element_name] += (
                     star_massfraction[element_name] - sun_massfraction[element_name]
                 )
-                yield_dict[element_name] = np.clip(yield_dict[element_name], 0, 1)
+                star_yield[element_name] = np.clip(star_yield[element_name], 0, 1)
 
-            yield_dict[element_name] = yield_dict[element_name] * ejecta_mass
+                star_yield[element_name] *= ejecta_mass
 
     if normalize:
-        for k in yield_dict:
-            yield_dict[k] /= ejecta_mass
+        # convert yield masses to mass fraction wrt total ejecta
+        for element_name in star_yield:
+            star_yield[element_name] /= ejecta_mass
 
-    return yield_dict
+    return star_yield
 
 
 def plot_nucleosynthetic_yields(
@@ -198,7 +207,7 @@ def plot_nucleosynthetic_yields(
     Parameters
     ----------
     event_kind : str
-        stellar event: 'wind', 'supernova.ia', 'supernova.ii'
+        stellar event: 'wind', 'supernova.cc' or supernova.ii', 'supernova.ia'
     star_metallicity : float
         total metallicity of star, fraction wrt to solar
     star_massfraction : dict
@@ -218,31 +227,37 @@ def plot_nucleosynthetic_yields(
         index of figure for matplotlib
     '''
     title_dict = {
-        'wind': 'Stellar Wind',
-        'supernova.ii': 'Supernova: Core Collapse',
-        'supernova.ia': 'Supernova: Ia',
+        'wind': 'stellar wind',
+        'supernova.cc': 'supernova CC',
+        'supernova.ii': 'supernova CC',
+        'supernova.ia': 'supernova Ia',
     }
 
-    yield_dict = get_nucleosynthetic_yields(
+    event_kind = event_kind.lower()
+
+    star_yield = get_nucleosynthetic_yields(
         event_kind, star_metallicity, star_massfraction, normalize=normalize
     )
 
-    yield_indices = np.arange(1, len(yield_dict))
-    yield_values = np.array(yield_dict.values())[yield_indices]
-    yield_names = np.array(yield_dict.keys())[yield_indices]
+    yield_indices = np.arange(1, len(star_yield))
+    yield_names = np.array([k for k in star_yield])[yield_indices]
+    yield_values = np.array([star_yield[k] for k in star_yield])[yield_indices]
     yield_labels = [str.capitalize(ut.constant.element_symbol_from_name[k]) for k in yield_names]
     yield_indices = np.arange(yield_indices.size)
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index)
+    _fig, subplot = ut.plot.make_figure(figure_index, top=0.92)
     subplots = [subplot]
 
     colors = ut.plot.get_colors(yield_indices.size, use_black=False)
 
     for si in range(1):
-        subplots[si].set_xlim([yield_indices.min() - 0.5, yield_indices.max() + 0.5])
-        subplots[si].set_ylim(
-            ut.plot.get_axis_limits(yield_values, axis_y_log_scale, axis_y_limits)
+        ut.plot.set_axes_scaling_limits(
+            subplots[si],
+            x_limits=[yield_indices.min() - 0.5, yield_indices.max() + 0.5],
+            y_log_scale=axis_y_log_scale,
+            y_limits=axis_y_limits,
+            y_values=yield_values,
         )
 
         subplots[si].set_xticks(yield_indices)
@@ -258,27 +273,27 @@ def plot_nucleosynthetic_yields(
         for yi in yield_indices:
             if yield_values[yi] > 0:
                 subplot.plot(
-                    yield_indices[yi], yield_values[yi], 'o', markersize=14, color=colors[yi]
+                    yield_indices[yi], yield_values[yi], 'o', markersize=10, color=colors[yi]
                 )
+                # add element symbols near points
                 subplots[si].text(
-                    yield_indices[yi] * 0.98, yield_values[yi] * 0.6, yield_labels[yi]
+                    yield_indices[yi] * 0.98, yield_values[yi] * 0.5, yield_labels[yi]
                 )
 
         subplots[si].set_title(title_dict[event_kind])
 
-        ut.plot.make_label_legend(
-            subplots[si], '$\\left[ Z / Z_\odot={:.3f} \\right]$'.format(star_metallicity)
-        )
+        metal_label = ut.io.get_string_from_numbers(star_metallicity, exponential=None, strip=True)
+        ut.plot.make_label_legend(subplots[si], f'$Z / Z_\odot={metal_label}$')
 
     if plot_file_name is True or plot_file_name == '':
-        plot_file_name = 'element.yields_{}_Z.{:.2f}'.format(event_kind, star_metallicity)
+        plot_file_name = f'{event_kind}.yields_Z.{metal_label}'
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------
 # stellar mass loss
 # --------------------------------------------------------------------------------------------------
-class SupernovaIIClass:
+class SupernovaCCClass:
     '''
     Compute rates, cumulative numbers, and cumulative ejecta masses for core-collapse supernovae,
     as implemented in Gizmo.
@@ -292,7 +307,7 @@ class SupernovaIIClass:
         Get specific rate [Myr ^ -1 M_sun ^ -1] of core-collapse supernovae.
 
         Rates are from Starburst99 energetics: assume each core-collapse is 10^51 erg, derive rate.
-        Core-collapse occur from 3.4 to 37.53 Myr after formation:
+        Core-collapse supernovae occur from 3.4 to 37.53 Myr after formation:
             3.4 to 10.37 Myr: rate / M_sun = 5.408e-10 yr ^ -1
             10.37 to 37.53 Myr: rate / M_sun = 2.516e-10 yr ^ -1
 
@@ -345,7 +360,7 @@ class SupernovaIIClass:
         Returns
         -------
         numbers : float or array
-            specific number[s] of supernovae events [per M_sun]
+            specific number[s] of supernova events [per M_sun]
         '''
         age_bin_width = 0.01
 
@@ -380,18 +395,19 @@ class SupernovaIIClass:
 
         Returns
         -------
-        mass_loss_fractions : float : fractional mass loss (ejecta mass[es] per M_sun)
+        mass_loss_fractions : float
+            fractional mass loss (ejecta mass[es] per M_sun)
         '''
         mass_loss_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs)
 
         if element_name:
-            element_yields = get_nucleosynthetic_yields('supernova.ii', metallicity, normalize=True)
+            element_yields = get_nucleosynthetic_yields('supernova.cc', metallicity, normalize=True)
             mass_loss_fractions *= element_yields[element_name]
 
         return mass_loss_fractions
 
 
-SupernovaII = SupernovaIIClass()
+SupernovaCC = SupernovaCCClass()
 
 
 class SupernovaIaClass:
@@ -536,18 +552,18 @@ SupernovaIa = SupernovaIaClass()
 class StellarWindClass:
     '''
     Compute mass loss rates rates and cumulative mass loss fractions for stellar winds,
-    as implemented in Gizmo.
+    as implemented in Gizmo for FIRE-2.
     '''
 
     def __init__(self):
-        self.ejecta_mass = 1.0  # these already are mass fractions
+        self.ejecta_mass = 1.0  # for stellar winds, the values below are mass fractions
         self.solar_metal_mass_fraction = 0.02  # Gizmo assumes this
 
     def get_rate(self, ages, metallicity=1, metal_mass_fraction=None):
         '''
         Get rate of fractional mass loss [Myr ^ -1] from stellar winds.
 
-        Includes all non-supernova mass-loss channels, but dominated by O, B, and AGB-star winds.
+        Includes all non-supernova mass-loss channels, but dominated by O, B, and AGB stars.
 
         Note: Gizmo assumes solar abundance (total metal mass fraction) of 0.02,
         while Asplund et al 2009 is 0.0134.
@@ -665,11 +681,12 @@ StellarWind = StellarWindClass()
 
 class MassLossClass(ut.io.SayClass):
     '''
-    Compute mass loss from all channels (supernova II, Ia, stellar winds) as implemented in Gizmo.
+    Compute mass loss from all channels (stellar winds, core-collapse and Ia supernovae) as
+    implemented in Gizmo for FIRE-2.
     '''
 
     def __init__(self):
-        self.SupernovaII = SupernovaIIClass()
+        self.SupernovaCC = SupernovaCCClass()
         self.SupernovaIa = SupernovaIaClass()
         self.StellarWind = StellarWindClass()
         self.Spline = None
@@ -702,10 +719,11 @@ class MassLossClass(ut.io.SayClass):
 
         Returns
         -------
-        rates : float or array : fractional mass loss rate[s] [Myr ^ -1]
+        rates : float or array
+            fractional mass loss rate[s] [Myr ^ -1]
         '''
         return (
-            self.SupernovaII.get_rate(ages) * self.SupernovaII.ejecta_mass
+            self.SupernovaCC.get_rate(ages) * self.SupernovaCC.ejecta_mass
             + +self.SupernovaIa.get_rate(ages, ia_kind, ia_age_min) * self.SupernovaIa.ejecta_mass
             + self.StellarWind.get_rate(ages, metallicity, metal_mass_fraction)
         )
@@ -744,7 +762,7 @@ class MassLossClass(ut.io.SayClass):
             mass loss fraction[s]
         '''
         return (
-            self.SupernovaII.get_mass_loss_fraction(age_min, age_maxs)
+            self.SupernovaCC.get_mass_loss_fraction(age_min, age_maxs)
             + self.SupernovaIa.get_mass_loss_fraction(age_min, age_maxs, ia_kind, ia_age_min)
             + self.StellarWind.get_mass_loss_fraction(
                 age_min, age_maxs, metallicity, metal_mass_fraction
@@ -915,11 +933,11 @@ def plot_supernova_v_age(
     AgeBin = ut.binning.BinClass(age_limits, age_bin_width, include_max=True)
 
     if axis_y_kind == 'rate':
-        supernova_II_rates = SupernovaII.get_rate(AgeBin.mins)
+        supernova_CC_rates = SupernovaCC.get_rate(AgeBin.mins)
         supernova_Ia_rates_mannucci = SupernovaIa.get_rate(AgeBin.mins, 'mannucci')
         supernova_Ia_rates_maoz = SupernovaIa.get_rate(AgeBin.mins, 'maoz')
     elif axis_y_kind == 'number':
-        supernova_II_rates = SupernovaII.get_number(min(age_limits), AgeBin.maxs)
+        supernova_CC_rates = SupernovaCC.get_number(min(age_limits), AgeBin.maxs)
         supernova_Ia_rates_mannucci = SupernovaIa.get_number(
             min(age_limits), AgeBin.maxs, 'mannucci'
         )
@@ -935,7 +953,7 @@ def plot_supernova_v_age(
         None,
         axis_y_log_scale,
         axis_y_limits,
-        [supernova_II_rates, supernova_Ia_rates_mannucci, supernova_Ia_rates_maoz],
+        [supernova_CC_rates, supernova_Ia_rates_mannucci, supernova_Ia_rates_maoz],
     )
 
     subplot.set_xlabel('star age $\\left[ {\\rm Myr} \\right]$')
@@ -946,7 +964,7 @@ def plot_supernova_v_age(
 
     colors = ut.plot.get_colors(3, use_black=False)
 
-    subplot.plot(AgeBin.mins, supernova_II_rates, color=colors[0], label='II')
+    subplot.plot(AgeBin.mins, supernova_CC_rates, color=colors[0], label='CC')
     subplot.plot(AgeBin.mins, supernova_Ia_rates_mannucci, color=colors[1], label='Ia (manucci)')
     subplot.plot(AgeBin.mins, supernova_Ia_rates_maoz, color=colors[2], label='Ia (maoz)')
 
@@ -967,7 +985,7 @@ def plot_mass_loss_v_age(
     mass_loss_kind='rate',
     mass_loss_limits=[None, None],
     mass_loss_log_scale=True,
-    element_name='',
+    element_name=None,
     metallicity=1,
     metal_mass_fraction=None,
     plot_file_name=False,
@@ -975,7 +993,8 @@ def plot_mass_loss_v_age(
     figure_index=1,
 ):
     '''
-    Compute mass loss from all channels (supernova II, Ia, stellar winds) versus stellar age.
+    Compute mass loss from all channels (core-collapse supernovae, supernovae Ia, stellar winds)
+    versus stellar age.
 
     Parameters
     ----------
@@ -1013,11 +1032,11 @@ def plot_mass_loss_v_age(
     )
 
     if mass_loss_kind == 'rate':
-        supernova_II = SupernovaII.get_rate(AgeBin.mins) * SupernovaII.ejecta_mass
+        supernova_cc = SupernovaCC.get_rate(AgeBin.mins) * SupernovaCC.ejecta_mass
         supernova_Ia = SupernovaIa.get_rate(AgeBin.mins, ia_kind) * SupernovaIa.ejecta_mass
         wind = StellarWind.get_rate(AgeBin.mins, metallicity, metal_mass_fraction)
     else:
-        supernova_II = SupernovaII.get_mass_loss_fraction(0, AgeBin.mins, element_name, metallicity)
+        supernova_cc = SupernovaCC.get_mass_loss_fraction(0, AgeBin.mins, element_name, metallicity)
         supernova_Ia = SupernovaIa.get_mass_loss_fraction(
             0, AgeBin.mins, ia_kind, element_name=element_name
         )
@@ -1025,7 +1044,7 @@ def plot_mass_loss_v_age(
             0, AgeBin.mins, metallicity, metal_mass_fraction, element_name
         )
 
-    total = supernova_II + supernova_Ia + wind
+    total = supernova_cc + supernova_Ia + wind
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
@@ -1037,7 +1056,7 @@ def plot_mass_loss_v_age(
         None,
         mass_loss_log_scale,
         mass_loss_limits,
-        [supernova_II, supernova_Ia, wind, total],
+        [supernova_cc, supernova_Ia, wind, total],
     )
 
     subplot.set_xlabel('star age $\\left[ {\\rm Myr} \\right]$')
@@ -1051,7 +1070,7 @@ def plot_mass_loss_v_age(
 
     colors = ut.plot.get_colors(3, use_black=False)
 
-    subplot.plot(AgeBin.mins, supernova_II, color=colors[0], label='supernova II')
+    subplot.plot(AgeBin.mins, supernova_cc, color=colors[0], label='supernova cc')
     subplot.plot(AgeBin.mins, supernova_Ia, color=colors[1], label='supernova Ia')
     subplot.plot(AgeBin.mins, wind, color=colors[2], label='stellar winds')
     subplot.plot(AgeBin.mins, total, color='black', linestyle=':', label='total')
@@ -1059,5 +1078,9 @@ def plot_mass_loss_v_age(
     ut.plot.make_legends(subplot, 'best')
 
     if plot_file_name is True or plot_file_name == '':
-        plot_file_name = f'star.mass.loss.{mass_loss_kind}_v_time'
+        mass_loss_kind = mass_loss_kind.replace('cumulative', 'cum')
+        if element_name is not None and len(element_name):
+            plot_file_name = f'{element_name}.yield.{mass_loss_kind}_v_time'
+        else:
+            plot_file_name = f'star.mass.loss.{mass_loss_kind}_v_time'
     ut.plot.parse_output(plot_file_name, plot_directory)

@@ -33,8 +33,10 @@ def print_properties_statistics(part, species='all'):
 
     Parameters
     ----------
-    part : dict : catalog of particles (use this instead of reading in)
-    species : str or list : name[s] of particle species to print
+    part : dict
+        catalog of particles (use this instead of reading in)
+    species : str or list
+        name[s] of particle species to print
     '''
     Say = ut.io.SayClass(print_properties_statistics)
 
@@ -98,9 +100,7 @@ def print_properties_statistics(part, species='all'):
             else:
                 number_format = '{:.1e}'
 
-            print_string = '{}:  {},  {},  {}'.format(
-                prop_name, number_format, number_format, number_format
-            )
+            print_string = f'{prop_name}: {number_format}, {number_format}, {number_format}'
 
             Say.say(
                 print_string.format(prop_values.min(), np.median(prop_values), prop_values.max())
@@ -222,7 +222,7 @@ def plot_metal_v_distance(
             metal_mass_label, radius_label, species_name, radius_label
         )
     elif 'mass' in metal_name:
-        # axis_y_label = '${}(< r) \, / \, M_{{\\rm Z,tot}}$'.format(metal_mass_label)
+        # axis_y_label = f'${metal_mass_label}(< r) \, / \, M_{{\\rm Z,tot}}$'
         axis_y_label = f'${metal_mass_label}{radius_label} \, [M_\odot]$'
     # axis_y_label = '$Z \, / \, Z_\odot$'
     subplot.set_ylabel(axis_y_label)
@@ -1761,7 +1761,7 @@ def print_densities(
             density_2d = mass / area
             density_3d = mass / volume
 
-            Say.say('{}:'.format(spec_name))
+            Say.say(f'{spec_name}:')
             Say.say('  density_2d = {:.5f} Msun / pc^2'.format(density_2d))
             Say.say('  density_3d = {:.5f} Msun / pc^3'.format(density_3d))
 
@@ -3118,9 +3118,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
         # get time bins, ensure are ordered from earliest
-        time_dict = part.Cosmology.get_time_bins(
-            time_kind, time_limits, time_width, time_log_scale
-        )
+        time_dict = part.Cosmology.get_time_bins(time_kind, time_limits, time_width, time_log_scale)
         time_bins = np.sort(time_dict['time'])
         time_difs = np.diff(time_bins)
 
@@ -4192,7 +4190,8 @@ def print_galaxy_mass_v_redshift(gal):
 
     Parameters
     ----------
-    gal : dict : dictionary of galaxy properties across snapshots
+    gal : dict
+        dictionary of galaxy properties across snapshots
     '''
     print('# redshift scale-factor time[Gyr] ', end='')
     print('star_position(x,y,z)[kpc comov] ', end='')
