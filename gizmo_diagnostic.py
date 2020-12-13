@@ -559,12 +559,15 @@ class ContaminationClass(ut.io.SayClass):
                 species, distances_phys[dist_i], distances_halo[dist_i]
             )
         )
-        dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.01)[0][0]
-        print(
-            '* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
-                species, distances_phys[dist_i], distances_halo[dist_i]
+        if profile_mass_ratio[species]['sum.cum'].max() > 0.01:
+            dist_i = np.where(profile_mass_ratio[species]['sum.cum'] > 0.01)[0][0]
+            print(
+                '* {} mass_ratio = 1% at d < {:.1f} kpc, {:.1f} R_halo'.format(
+                    species, distances_phys[dist_i], distances_halo[dist_i]
+                )
             )
-        )
+        else:
+            print(f'* {species} mass_ratio = 1% at no distance within limits')
 
         for spec_name in species_lowres_dark:
             if species != 'dark2' and profile_number[spec_name]['sum.cum'][dist_i_halo] > 0:
