@@ -308,7 +308,10 @@ class ContaminationClass(ut.io.SayClass):
     '''
 
     def plot_contamination_v_distance_both(
-        self, redshift=0, simulation_directory=gizmo_default.simulation_directory
+        self,
+        redshift=0,
+        simulation_directory=gizmo_default.simulation_directory,
+        plot_file_name=None,
     ):
         '''
         Plot contamination from lower-resolution particles around halo center as a function of
@@ -320,6 +323,8 @@ class ContaminationClass(ut.io.SayClass):
             redshift of snapshot
         simulation_directory : str
             top-level directory of simulation
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
         '''
         distance_bin_width = 0.01
         distance_limits_phys = [10, 2000]  # [kpc physical]
@@ -346,7 +351,7 @@ class ContaminationClass(ut.io.SayClass):
             distance_bin_width,
             halo_radius=halo_prop['radius'],
             scale_to_halo_radius=False,
-            plot_file_name=True,
+            plot_file_name=plot_file_name,
             plot_directory='plot',
         )
 
@@ -356,7 +361,7 @@ class ContaminationClass(ut.io.SayClass):
             distance_bin_width,
             halo_radius=halo_prop['radius'],
             scale_to_halo_radius=True,
-            plot_file_name=True,
+            plot_file_name=plot_file_name,
             plot_directory='plot',
         )
 
@@ -576,7 +581,7 @@ class ContaminationClass(ut.io.SayClass):
                 )
         print()
 
-        if plot_file_name is None or len(plot_file_name) == 0:
+        if plot_file_name is None or plot_file_name is False:
             return
 
         # plot ----------
