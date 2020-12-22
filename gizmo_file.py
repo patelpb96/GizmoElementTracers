@@ -265,7 +265,7 @@ class CompressClass(ut.io.SayClass):
                 len(snapshot_indices), min(snapshot_indices), max(snapshot_indices)
             )
         )
-        self.say('* {} are uncompressed'.format(len(compression_none_snapshots)))
+        self.say(f'* {len(compression_none_snapshots)} are uncompressed')
         if len(compression_none_snapshots) > 0:
             self.say(f'{compression_none_snapshots}')
         self.say(
@@ -809,7 +809,7 @@ class GlobusClass(ut.io.SayClass):
         for transfer_item in transfer_items:
             if '.ics' not in transfer_item:
                 transfer_item = transfer_item.replace(simulation_directory, '')
-                command = '{} {}\n'.format(transfer_item, transfer_item)
+                command = f'{transfer_item} {transfer_item}\n'
                 transfer_string += command
 
         # snapshot files

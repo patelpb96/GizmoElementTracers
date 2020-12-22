@@ -42,10 +42,14 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         Parameters
         ----------
-        part_z0 : dict : catalog of particles at the reference (later) snapshot
-        part_z : dict : catalog of particles at the earlier snapshot
-        species_names : str or list : name[s] of particle species to track
-        id_name : str : dictionary key of particle id
+        part_z0 : dict
+            catalog of particles at the reference (later) snapshot
+        part_z : dict
+            catalog of particles at the earlier snapshot
+        species_names : str or list
+            name[s] of particle species to track
+        id_name : str
+            dictionary key of particle id
         '''
         self.id_name = ID_NAME
         self.z0_name = 'z0.'  # prefactor name for reference (latest) snapshot
@@ -107,22 +111,26 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         Parameters
         ----------
-        species_name_from : str : name of species at the reference (later, z0) snapshot
-        species_names_to : str or list :
+        species_name_from : str
+            name of species at the reference (later, z0) snapshot
+        species_names_to : str or list
             name[s] of species to get pointers to at the (earlier, z) snapshot
-        part_indices : arr : indices of particles at the reference (later, z0) snapshot
-        forward : bool : whether to get pointers from the (earlier, z) snapshot to the
-            reference (later, z0) snapshot, that is, tracking forward in time
-            default (forward=False) is tracking backwards in time
-        intermediate_snapshot : bool :
+        part_indices : arr
+            indices of particles at the reference (later, z0) snapshot
+        forward : bool
+            whether to get pointers from the (earlier, z) snapshot to the reference (later, z0)
+            snapshot, that is, tracking forward in time default (forward=False) is tracking
+            backwards in time
+        intermediate_snapshot : bool
             whether to get pointers between z and an intermediate snapshot (at z > 0)
             default (intermediate_snapshot=False) is to get pointers to/from z0
-        return_array : bool : if tracking single species at both snapshots, return just array of
-            pointer indices (and not a pointer dictionary that includes species names)
+        return_array : bool
+            if tracking single species at both snapshots, return just array of pointer indices
+            (and not a pointer dictionary that includes species names)
 
         Returns
         -------
-        pointer : arr or dict :
+        pointer : arr or dict
             array of pointer indices between snapshots
             OR
             dictionary that contains both pointer indices and species names
@@ -217,7 +225,8 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         Parameters
         ----------
-        Pointer : dict class : pointers to an intemediate snapshot (between z0 and z)
+        Pointer : dict class
+            pointers to an intemediate snapshot (between z0 and z)
         '''
         assert Pointer[Pointer.z_name + 'snapshot.index'] < self[self.z0_name + 'snapshot.index']
         assert Pointer[Pointer.z_name + 'snapshot.index'] > self[self.z_name + 'snapshot.index']
@@ -244,7 +253,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
         Parameters
         ----------
-        intermediate_snapshot : bool :
+        intermediate_snapshot : bool
             whether to get pointers between z and an intermediate snapshot (at z > 0)
         '''
         if intermediate_snapshot:
@@ -301,11 +310,15 @@ class ParticlePointerClass(ut.io.SayClass):
         '''
         Parameters
         ----------
-        species_names : str or list : name[s] of particle species to track
-        simulation_directory : str : directory of simulation
-        track_directory : str : directory of files for particle pointers and formation coordinates
-        snapshot_directory : str : directory of snapshot files (within simulation directory)
-        reference_snapshot_index : int :
+        species_names : str or list
+            name[s] of particle species to track
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers and formation coordinates
+        snapshot_directory : str
+            directory of snapshot files (within simulation directory)
+        reference_snapshot_index : int
             index of reference (later) snapshot to compute particle pointers relative to
         '''
         self.id_name = ID_NAME
@@ -340,16 +353,23 @@ class ParticlePointerClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at a the (earlier, z) snapshot
-        snapshot_index : int : index of the (earlier, z) snapshot to read
-        Pointer : dict class : particle pointers (if writing)
-        simulation_directory : str : directory of simulation
-        track_directory : str : directory of files for particle pointers and formation coordinates
-        verbose : bool : whether to print diagnostic information
+        part : dict
+            catalog of particles at a the (earlier, z) snapshot
+        snapshot_index : int
+            index of the (earlier, z) snapshot to read
+        Pointer : dict class
+            particle pointers (if writing)
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers and formation coordinates
+        verbose : bool
+            whether to print diagnostic information
 
         Returns
         -------
-        Pointer : dict class : particle pointers
+        Pointer : dict class
+            particle pointers
         '''
         if part is not None:
             snapshot_index = part.snapshot['index']
@@ -429,15 +449,21 @@ class ParticlePointerClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at a (non-reference) snapshot (z)
-        snapshot_index : int : index of other (non-reference) snapshot to read
-        Pointer : dict class : particle pointers (if writing)
-        simulation_directory : str : directory of simulation
-        track_directory : str: directory of files for particle pointers and formation coordinates
+        part : dict
+            catalog of particles at a (non-reference) snapshot (z)
+        snapshot_index : int
+            index of other (non-reference) snapshot to read
+        Pointer : dict class
+            particle pointers (if writing)
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers and formation coordinates
 
         Returns
         -------
-        Pointer : dict class : particle pointers
+        Pointer : dict class
+            particle pointers
         '''
         species_name = 'star'
         hdf5_dict_name = 'indices'
@@ -503,14 +529,18 @@ class ParticlePointerClass(ut.io.SayClass):
 
         Parameters
         ----------
-        snapshot_index_from : int : snapshot index to get pointers from
-        snapshot_index_to : int : snapshot index to get pointers to
-        species_name : str : name of particle species to track
-        simulation_directory : str : directory of simulation
+        snapshot_index_from : int
+            snapshot index to get pointers from
+        snapshot_index_to : int
+            snapshot index to get pointers to
+        species_name : str
+            name of particle species to track
+        simulation_directory : str
+            directory of simulation
 
         Returns
         -------
-        part_pointers : array :
+        part_pointers : array
             particle pointer indices from snapshot_index_from to snapshot_index_to
         '''
         if snapshot_index_from > snapshot_index_to:
@@ -584,14 +614,19 @@ class ParticlePointerClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part_z0 : dict : catalog of particles at reference (later, z0) snapshot
-        match_property : str :
+        part_z0 : dict
+            catalog of particles at reference (later, z0) snapshot
+        match_property : str
             some particles have the same id, so this is the property to use to match them.
             options (in order of preference): 'id.child', 'form.scalefactor', 'massfraction.metals'
-        match_propery_tolerance : float : fractional tolerance for matching via match_property
-        test_property : str : additional property to use to test matching
-        snapshot_indices : array-like : snapshot indices at which to assign pointers
-        proc_number : int : number of parallel processes to run
+        match_propery_tolerance : float
+            fractional tolerance for matching via match_property
+        test_property : str
+            additional property to use to test matching
+        snapshot_indices : array-like
+            snapshot indices at which to assign pointers
+        proc_number : int
+            number of parallel processes to run
         '''
         assert match_property in ['id.child', 'massfraction.metals', 'form.scalefactor']
 
@@ -721,9 +756,12 @@ class ParticlePointerClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part_z0 : dict : catalog of particles at the reference (later, z0) snapshot
-        snapshot_index : int : snapshot index to assign pointers to at the (earlier, z) snapshot
-        count_tot : dict : diagnostic counters
+        part_z0 : dict
+            catalog of particles at the reference (later, z0) snapshot
+        snapshot_index : int
+            snapshot index to assign pointers to at the (earlier, z) snapshot
+        count_tot : dict
+            diagnostic counters
         '''
         properties_read = [self.id_name, self.match_property, self.test_property]
 
@@ -1032,13 +1070,17 @@ class ParticleCoordinateClass(ut.io.SayClass):
         '''
         Parameters
         ----------
-        species : str : name of particle species to track
-        simulation_directory : str : directory of simulation
-        track_directory : str : directory of files for particle pointers and formation coordinates
-        reference_snapshot_index : float :
+        species : str
+            name of particle species to track
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers and formation coordinates
+        reference_snapshot_index : float
             index of reference (later) snapshot to compute particle pointers from
-        snapshot_directory : str : directory of snapshot files (within simulation directory)
-        host_distance_limits : list :
+        snapshot_directory : str
+            directory of snapshot files (within simulation directory)
+        host_distance_limits : list
             min and max distance [kpc physical] to select particles near each primary host at the
             reference snapshot - use only these to compute host coordinates at earlier snapshots
         '''
@@ -1207,10 +1249,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at a snapshot
-        simulation_directory : str : directory of simulation
-        track_directory : str : directory of files for particle pointers and formation coordinates
-        verbose : bool : whether to print diagnostic information
+        part : dict
+            catalog of particles at a snapshot
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers and formation coordinates
+        verbose : bool
+            whether to print diagnostic information
         '''
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
@@ -1225,12 +1271,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
         path_file_name = (
             simulation_directory + track_directory + gizmo_default.hosts_coordinates_file_name
         )
-
-        # self.say(
-        #    '* reading hosts position, velocity, rotation, axis ratios from:  {}'.format(
-        #        path_file_name.lstrip('./')
-        #    )
-        # )
 
         # backwards compatibility with old file name
         dict_read = ut.io.file_hdf5(path_file_name, verbose=False)
@@ -1303,10 +1343,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles at the reference snapshot
-        host_number : int : number of host galaxies to assign and compute coordinates relative to
-        proc_number : int : number of parallel processes to run
-        simulation_directory : str : directory of simulation
+        part : dict
+            catalog of particles at the reference snapshot
+        host_number : int
+            number of host galaxies to assign and compute coordinates relative to
+        proc_number : int
+            number of parallel processes to run
+        simulation_directory : str
+            directory of simulation
         '''
         # if 'elvis' is in simulation directory name, force 2 hosts
         host_number = ut.catalog.get_host_number_from_directory(host_number, './', os)
@@ -1433,12 +1477,16 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part_z0 : dict : catalog of particles at the reference (latest) snapshot
-        hosts_part_z0_indices : list of arrays :
+        part_z0 : dict
+            catalog of particles at the reference (latest) snapshot
+        hosts_part_z0_indices : list of arrays
             indices of particles near each primary host at the reference (latest) snapshot
-        host_number : int : number of host galaxies to assign and compute coordinates relative to
-        snapshot_index : int : snapshot index at which to assign particle pointers to
-        count_tot : dict : diagnostic counters
+        host_number : int
+            number of host galaxies to assign and compute coordinates relative to
+        snapshot_index : int
+            snapshot index at which to assign particle pointers to
+        count_tot : dict
+            diagnostic counters
         '''
         part_z0_indices = ut.array.get_arange(part_z0[self.species_name][self.id_name])
 

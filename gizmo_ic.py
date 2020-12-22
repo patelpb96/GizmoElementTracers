@@ -311,9 +311,7 @@ class InitialConditionClass(ut.io.SayClass):
                 ConvexHull = spatial.ConvexHull(positions_ini)
                 positions_ini = positions_ini[ConvexHull.vertices]
                 Write.write(
-                    '# using convex hull with {} vertices to define initial volume'.format(
-                        positions_ini.shape[0]
-                    )
+                    f'# using convex hull with {positions_ini.shape[0]} vertices for initial volume'
                 )
 
         with open(file_name, 'w') as file_out:

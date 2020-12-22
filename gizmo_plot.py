@@ -218,8 +218,9 @@ def plot_metal_v_distance(
     if '.cum' in metal_name:
         radius_label = '(< r)'
     if 'massfraction' in metal_name:
-        axis_y_label = '${}{} \, / \, M_{{\\rm {}}}{}$'.format(
-            metal_mass_label, radius_label, species_name, radius_label
+        axis_y_label = (
+            f'${metal_mass_label}{radius_label} \, / \,'
+            + ' M_{{\\rm {species_name}}}{radius_label}$'
         )
     elif 'mass' in metal_name:
         # axis_y_label = f'${metal_mass_label}(< r) \, / \, M_{{\\rm Z,tot}}$'
