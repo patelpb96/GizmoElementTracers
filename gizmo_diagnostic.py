@@ -210,7 +210,7 @@ class RuntimeClass(ut.io.SayClass):
             core_number = mpi_number * omp_number
             print_string = f'# core = {core_number} (mpi = {mpi_number}, omp = {omp_number})'
             if machine_name is not None:
-                node_number = mpi_number / self.machine[machine_name]
+                node_number = int(round(mpi_number / self.machine[machine_name]))
                 print_string = f'{machine_name}\n' + print_string + f', node = {node_number}'
             print(print_string)
         else:
