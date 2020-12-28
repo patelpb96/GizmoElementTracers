@@ -23,6 +23,17 @@ class RuntimeClass(ut.io.SayClass):
     .
     '''
 
+    def __init__(self):
+        # dictionary of cluster name and (default) number of cores per node
+        self.machine = {
+            'stampede2': 48,
+            'frontera': 56,
+            'bridges2': 1,
+            'pleiades': 20,
+            'pfe': 20,
+            'peloton': 32,
+        }
+
     def get_cpu_numbers(
         self,
         simulation_directory=gizmo_default.simulation_directory,
@@ -45,6 +56,8 @@ class RuntimeClass(ut.io.SayClass):
             number of MPI tasks
         omp_number : int
             number of OpenMP threads per MPI task
+        machine_name : string
+            name of machine run on
         '''
         loop_number_max = 1000
 
@@ -55,12 +68,20 @@ class RuntimeClass(ut.io.SayClass):
         loop_i = 0
         mpi_number = None
         omp_number = None
+        machine_name = None
 
         for line in file_read:
             if 'MPI tasks' in line:
                 mpi_number = int(line.split()[2])
             elif 'OpenMP threads' in line:
                 omp_number = int(line.split()[1])
+            elif 'running on' in line:
+                for mn in self.machine_names:
+                    if mn in line:
+                        machine_name = mn
+                        if machine_name == 'pfe':
+                            machine_name = 'pleiades'
+                        break
 
             if mpi_number and omp_number:
                 break
@@ -81,7 +102,7 @@ class RuntimeClass(ut.io.SayClass):
             self.say('did not find any OpenMP threads')
             omp_number = 1
 
-        return mpi_number, omp_number
+        return mpi_number, omp_number, machine_name
 
     def print_run_times(
         self,
@@ -184,9 +205,16 @@ class RuntimeClass(ut.io.SayClass):
 
         if not core_number:
             # get core number from run-time file
-            mpi_number, omp_number = self.get_cpu_numbers(simulation_directory, gizmo_out_file_name)
+            mpi_number, omp_number, machine_name = self.get_cpu_numbers(
+                simulation_directory, gizmo_out_file_name
+            )
             core_number = mpi_number * omp_number
-            print(f'# core = {core_number} (mpi = {mpi_number}, omp = {omp_number})')
+            print_string = f'# core = {core_number} (mpi = {mpi_number}, omp = {omp_number})'
+            if machine_name is not None:
+                print_string = (
+                    f'{machine_name}\n' + print_string + f', node = {self.machine[machine_name]}'
+                )
+            print(print_string)
         else:
             print(f'# core = {core_number}')
 

@@ -1152,8 +1152,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             ut.io.file_hdf5(path_file_name, dict_out)
 
         else:
-            # read in
-            # backwards compatibility with old file name
+            # read - backwards compatibility with old file name
             try:
                 dict_read = ut.io.file_hdf5(path_file_name)
             except OSError:

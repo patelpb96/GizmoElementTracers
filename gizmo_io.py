@@ -200,9 +200,9 @@ class ParticleDictionaryClass(dict):
             'axis.ratios': [],
         }
 
-        # these classes exist only for certain paricle species if initialized
-        self.MassLoss = None
-        self.ElementAgeTracer = None
+        # these classes are relevant only for star and gas particles
+        self.MassLoss = None  # relevant only for star particles
+        self.ElementAgeTracer = None  # relevant for star and gas particles
 
     def prop(self, property_name='', indices=None, _dict_only=False):
         '''
@@ -1487,7 +1487,7 @@ class ReadClass(ut.io.SayClass):
         # dictionary class to store properties for particle species
         part = ParticleDictionaryClass()
 
-        # delete these by default because they only apply to some particle species
+        # delete these classes by default, because they only apply to some particle species
         del part.MassLoss
         del part.ElementAgeTracer
 
