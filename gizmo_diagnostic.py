@@ -76,9 +76,8 @@ class RuntimeClass(ut.io.SayClass):
             elif 'OpenMP threads' in line:
                 omp_number = int(line.split()[1])
             elif 'running on' in line:
-                for mn in self.machine_names:
-                    if mn in line:
-                        machine_name = mn
+                for machine_name in self.machine:
+                    if machine_name in line:
                         if machine_name == 'pfe':
                             machine_name = 'pleiades'
                         break
