@@ -1311,7 +1311,7 @@ class ReadClass(ut.io.SayClass):
             snapshot_directory, snapshot_index, snapshot_block_index
         )
 
-        self._is_first_print = True
+        self.print_function_name = True
         self.say('* reading header from:  {}'.format(path_file_name.lstrip('./')), verbose)
 
         # open snapshot file
