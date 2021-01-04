@@ -715,6 +715,7 @@ class ParticlePointerClass(ut.io.SayClass):
             'match prop no match': 0,
             'match prop redundant': 0,
             'test prop offset': 0,
+            'bad snapshots': [],
         }
 
         # initiate threads, if asking for > 1
@@ -733,19 +734,21 @@ class ParticlePointerClass(ut.io.SayClass):
 
         # print cumulative diagnostics
         print()
-        if count['id no match']:
-            self.say('! {} total not have id match!'.format(count['id no match']))
-        if count['match prop no match']:
+        if len(count['bad snapshots']) > 0:
+            self.say('!!! could not read these snapshots:  {}'.format(count['bad snapshots']))
+            self.say('    they had possibly missing or corrupt snapshot files')
+            self.say('    could not assign pointers to those snapshots')
+        if count['id no match'] > 0:
+            self.say('! {} total not have id match'.format(count['id no match']))
+        if count['match prop no match'] > 0:
             self.say(
-                '! {} total not have {} match!'.format(count['match prop no match'], match_property)
+                '! {} total not have {} match'.format(count['match prop no match'], match_property)
             )
-        if count['match prop redundant']:
+        if count['match prop redundant'] > 0:
             self.say(
-                '! {} total have redundant {}!'.format(
-                    count['match prop redundant'], match_property
-                )
+                '! {} total have redundant {}'.format(count['match prop redundant'], match_property)
             )
-        if count['test prop offset']:
+        if count['test prop offset'] > 0:
             self.say('! {} total have offset {}'.format(count['test prop offset'], test_property))
 
     def _write_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot={}):
@@ -782,17 +785,23 @@ class ParticlePointerClass(ut.io.SayClass):
             )
 
         # read particles at this snapshot
-        # need to do this to get the exact scale-factor of snapshot
-        part_z = self.GizmoRead.read_snapshots(
-            self.species_names,
-            'index',
-            snapshot_index,
-            snapshot_directory=self.snapshot_directory,
-            properties=properties_read,
-            elements=['metals'],
-            assign_hosts=False,
-            check_properties=False,
-        )
+        try:
+            part_z = self.GizmoRead.read_snapshots(
+                self.species_names,
+                'index',
+                snapshot_index,
+                snapshot_directory=self.snapshot_directory,
+                properties=properties_read,
+                elements=['metals'],
+                assign_hosts=False,
+                check_properties=False,
+            )
+        except IOError:
+            self.say(f'!!! could not read snapshot {snapshot_index}')
+            self.say('    possibly missing or corrupt snapshot file')
+            self.say('    must skip assigning pointers to this snapshot')
+            count_tot['bad snapshots'].append(snapshot_index)
+            return
 
         # diagnostic
         species_names_print = self.species_names[0]
