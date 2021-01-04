@@ -10,32 +10,35 @@ python 3, numpy, scipy, h5py, matplotlib.
 
 This package also requires the [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
-We develop this package using Python 3.7 and recommend that you use the same version.
+We develop and test this package using the latest version of Python (3.8).
 
 
 ---
 # Contents
 
 ## gizmo_io.py
-* read Gizmo snapshot files
-
-## gizmo_plot.py
-* plotting analysis of particle data
-
-## gizmo_diagnostic.py
-* run diagnostics on simulations
-
-## gizmo_file.py
-* compress, delete, or transfer snapshot files across machines
-
-## gizmo_ic.py
-* generate cosmological zoom-in initial conditions from snapshot files
+* read particles from Gizmo snapshot files
 
 ## gizmo_star.py
-* get/plot rates of supernovae and stellar winds, stellar mass loss, nucleosynthetic yields, as used in Gizmo
+* models of stellar evolution as implemented in FIRE-2 and FIRE-3: rates and yields from supernovae (core-collapse and Ia) and stellar winds
+
+## gizmo_agetracer.py
+* generate elemental abundances in star and gas particles in post-processing, using the age-tracer module in FIRE-3
 
 ## gizmo_track.py
 * track star and gas particles across snapshots
+
+## gizmo_plot.py
+* analyze and plot particle data
+
+## gizmo_file.py
+* clean, compress, delete, or transfer Gizmo snapshot files
+
+## gizmo_diagnostic.py
+* run diagnostics on Gizmo simulations
+
+## gizmo_ic.py
+* generate cosmological zoom-in initial conditions from snapshot files
 
 ## snapshot_times.txt
 * example file for storing information about snapshots: scale-factors, redshifts, times, etc
@@ -129,7 +132,7 @@ gizmo.io
 ---
 # License
 
-Copyright 2014-2020 by Andrew Wetzel <arwetzel@gmail.com> and Shea Garrison-Kimmel <sheagk@gmail.com>.
+Copyright 2014-2021 by Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>, and Andrew Emerick <aemerick11@gmail.com>.
 
 If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), which first was used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
 
