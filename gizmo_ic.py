@@ -195,7 +195,7 @@ class InitialConditionClass(ut.io.SayClass):
         density_ini = part_ini.Cosmology.get_density(
             'matter', part_ini.snapshot['redshift'], 'kpc comoving'
         )
-        if part_ini.info['baryonic']:
+        if part_ini.info['has.baryons']:
             # subtract baryonic mass
             density_ini *= part_ini.Cosmology['omega_dm'] / part_ini.Cosmology['omega_matter']
 

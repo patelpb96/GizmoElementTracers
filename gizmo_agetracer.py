@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 
 '''
-Post-process elemental abundances using age-tracer passive scalars in FIRE-3 simulations.
+Assign elemental abundances to star and gas particles in post-processing using age-tracer passive
+scalars in Gizmo simulations.
 
-In addition to elemental abundances tracked natively (see gizmo_star.py), FIRE-3 simulations can
-compute elemental enrichment via a stored array of weights in bins of age, as stars at a given age
-deposit weights (into their corresponding age bin) into neighboring gas elements.
+If age-tracer was enabled when running a Gizmo simulation, each gas particle stored an array of
+weights in bins of stellar age, assigned as the simulation ran, when star particles of a given age
+deposited weights (into their corresponding age bin) into their neighboring gas particles.
+Each star particle inherits the age-tracer weight array from its progenitor gas particle.
 
-This post-processing requires one to compute the weightings for each age bin for each element.
-This consists of a table which contains the total amount of mass of each element produced during
-each time bin. You can construct this here using a default rate + yield model, or you can define
-your own custom rate and/or yield model, via an object that accepts an element name and time as
-parameters and returns the instantaneous mass loss rate of that element at that time.
+Assigning elemental abundances then requires you to compute the weightings for each stellar age bin
+for each element. This consists of a table that contains the total amount of mass of each element
+that a stellar population produced in each age bin. You can construct this using a default
+rate + yield model below, or you can define your own custom rate and yield model that accepts
+stellar age[s] and an element name as inputs and returns the instantaneous mass-loss rate of that
+element at that stellar age.
 
 @author:
     Andrew Emerick <aemerick11@gmail.com>
@@ -20,116 +23,88 @@ parameters and returns the instantaneous mass loss rate of that element at that 
 Units: unless otherwise noted, all quantities are in (combinations of):
     mass [M_sun]
     time [Gyr]
-    elemental abundance [mass fraction]
+    elemental abundance [(linear) mass fraction]
 '''
 
 import os
-import copy
 import numpy as np
 from scipy import integrate
 
 import utilities as ut
-from . import gizmo_star
 
 
 # --------------------------------------------------------------------------------------------------
-# age tracers
+# master class for using age tracers to assign elemental abundances
 # --------------------------------------------------------------------------------------------------
-class ElementAgetracerClass(dict, ut.io.SayClass):
+class ElementAgetracerClass(ut.io.SayClass):
     '''
-    Dictionary class to store information about age-tracer bins for post-processing elemental
-    abundances.
+    Class for storing and using the age-tracer weights from a Gizmo simulation to assign
+    elemental abundances to star and gas particles in post-processing.
     '''
 
     def __init__(self):
-        self.info = {}
-        self.info['has.element.agetracer'] = 0  # assume off initially
-
-        self._yield_table = None
-        self._postprocess_elements = None
-
-        self._initial_abundances = {}  # dictionary to store elemental abundances at the IC
-
-        # left edges of stellar age bins plus right edge of last bin [Myr]
-        self.age_bins = None
-
-    def set_initial_abundances(self, initial_abundances):
         '''
-        For use with post-processing of elemental abundances with element age tracer model.
-        Sets the initial abundances to add to the returned age tracer values.
+        .
+        '''
+        self.info = {
+            'age.bin.number': 0,
+            'has.custom.age.bins': False,
+        }
+
+        # stellar age bins [Gyr]
+        # should have N_age-bins + 1 values: left edges plus right edge of final bin
+        self.age_bins = None
+        self.yield_dict = {}
+        self._abundances_initial = {}  # dictionary to store elemental abundances at the IC
+
+    def assign_element_yield_dict(self, element_yield_dict):
+        '''
+        Assign the yield table and list of element names to self.
+
+        Parameters
+        -----------
+        element_yield_dict : dict of 1-D arrays
+            nucleosynthetic yield fractional mass [M_sun per M_sun of stars formed] of each element
+            produced *within* each age bin, to map the age-tracer weights into individual element
+            yields in each age bin
+        '''
+        for element_name in element_yield_dict:
+            assert np.shape(element_yield_dict[element_name])[1] == self.info['age.bin.number']
+
+        for element_name in element_yield_dict:
+            self.yield_dict[element_name] = 1.0 * element_yield_dict[element_name]
+
+    def assign_element_abundances_intitial(self, initial_abundances):
+        '''
+        Set the initial conditions for the elemental abundances, to add to the age-tracer enrichment
+        values.
 
         Parameters
         ----------
-        initial_abundances : dict
+        initial_abundances : float or dict
             Dictionary with keys matching element names and values corresponding
             to the initial mass fractions for that element. Excluded elements
             will be given an initial abundance of zero by default.
         '''
-
-        if self._postprocess_elements is None:
-            print('yield table (set_yield_table) must be set first')
+        if self.element_names is None:
+            print('first must set element_names via assign_element_yields()')
             raise RuntimeError
 
         # set initial values in both element name and symbol for versatility
-        for e in self._postprocess_elements:
+        for e in self.element_names:
             self._initial_abundances[e] = 0.0
             if e != 'metals' and 'rprocess' not in e:
                 self._initial_abundances[ut.constant.element_map_name_symbol[e]] = 0.0
 
         # set actual values in both name and symbol
-        for e in initial_abundances:
-            self._initial_abundances[e] = initial_abundances[e]
-            if e != 'metals' and 'rprocess' not in e:
+        for element_name in initial_abundances:
+            self._initial_abundances[element_name] = initial_abundances[element_name]
+            if element_name != 'metals' and 'rprocess' not in element_name:
                 self._initial_abundances[
-                    ut.constant.element_map_name_symbol[e]
-                ] = initial_abundances[e]
+                    ut.constant.element_map_name_symbol[element_name]
+                ] = initial_abundances[element_name]
 
-    def set_yield_table(self, yield_table, elements):
-        '''
-        For post-processing of elemental abundances with age-tracer model.
-        Set the yield table to use in generating the fields along with some error checking.
-
-        Parameters
-        -----------
-        yield_table : ndarray, float
-            A 2-d numpy array containing the yield table scalings to map the age tracer field
-            values to individual element yields in each bin. Each element should contain the
-            mass produced of a given element in each time bin per solar mass of star formation
-            (see gizmo_agetracers.py for more information). First axis should be the number of
-            age bins and second the number of elements.
-
-        elements :  str or list
-            name[s] of element[s] to get from the yield table
-        '''
-
-        if np.shape(yield_table)[0] != self.info['age.bin.number']:
-            raise ValueError(
-                'yield table provided has incorrect dimensions.'
-                + ' first dimension should be {} not {}'.format(
-                    self.info['age.bin.number'], np.shape(yield_table)[0],
-                )
-            )
-
-        if np.shape(yield_table)[1] != len(elements):
-            raise ValueError(
-                'yield table provided has incorrect dimensions.'
-                + ' second dimension ({}) should match provided elements length ({})'.format(
-                    np.shape(yield_table)[1], len(elements)
-                )
-            )
-
-        self._yield_table = copy.deepcopy(yield_table)
-        self._postprocess_elements = copy.deepcopy(elements)
-
-    @property
-    def yield_table(self):
-        '''
-        Return a copy of the internal yield table for age tracer post-processing, such that this
-        table is read-only. You can change it using 'set_yield_table'.
-        '''
-        return self._yield_table.copy()
-
-    def read_agetracer_times(self, directory='.', file_name='age_bins.txt'):
+    def read_assign_age_bins(self, directory='.', file_name='age_bins.txt'):
         '''
         Within input directory, search for and read stellar age tracer field bin times
         (if custom sized age tracer fields used). Store as an array.
@@ -143,7 +118,7 @@ class ElementAgetracerClass(dict, ut.io.SayClass):
 
         self.read_age_bin_info(directory=directory)
 
-        self.generate_age_bins(directory, file_name)
+        self.assign_age_bins(directory, file_name)
 
     def read_age_bin_info(self, directory='.'):
         '''
@@ -154,19 +129,21 @@ class ElementAgetracerClass(dict, ut.io.SayClass):
         Parameters
         -----------
         directory : str
-            top-level simulation directory
+            base directoy of a simulation
         '''
         directory = ut.io.get_path(directory)
 
         possible_file_names = ['GIZMO_config.h', 'gizmo_config.h', 'gizmo.out', 'gizmo.out.txt']
         possible_path_names = [directory, ut.io.get_path(directory + 'gizmo')]
 
+        path_file_name = None
         for file_name in possible_file_names:
             for path_name in possible_path_names:
                 if os.path.exists(path_name + file_name):
                     path_file_name = path_name + file_name
                     break
-        else:
+
+        if path_file_name is None:
             print(f'cannot read gizmo_config.h or gizmo.out* in {directory} or {directory}/gizmo')
             print('cannot assign element age-tracer information')
             self.info['has.element.agetracer'] = 0
@@ -218,7 +195,6 @@ class ElementAgetracerClass(dict, ut.io.SayClass):
                     self.info['element.index.min'] = self.info['element.index.min'] + 11
 
             # if this is specified, then more than 4 are being tracked.
-            # check this.
             if 'GALSF_FB_FIRE_RPROCESS' in line:
                 numr = int(line.split(delimiter)[-1])
                 if self.info['element.index.min'] == -1:
@@ -234,7 +210,7 @@ class ElementAgetracerClass(dict, ut.io.SayClass):
         if self.info['has.element.agetracer']:
             self.info['element.index.max'] += self.info['age.bin.number']
 
-    def generate_age_bins(self, directory='.', file_name='age_bins.txt'):
+    def assign_age_bins(self, directory='.', file_name='age_bins.txt'):
         '''
         If element age-tracers are contained in the output file (as determined by
         determine_tracer_info), generate or read the age-tracer bins used by the simulation.
@@ -304,158 +280,66 @@ class ElementAgetracerClass(dict, ut.io.SayClass):
         self, directory='.', file_name='age_bins.txt',
     ):
         '''
+        Read file that contains custom age bins for age tracers.
+        Relevant if defined GALSF_FB_FIRE_AGE_TRACERS_CUSTOM in Config.sh.
+        file_name set via AgeTracerListFilename in gizmo_parameters.txt.
+
         Parameters
         ----------
         directory : str
             top-level simulation directory
-
         file_name : str
-            Only used if custom space age tracers are used. Name of bin file, assumed to be a
-            single column of bin left edges plus the right edge of last bin (number of lines
-            should be number of tracers + 1). Default : 'age_bins.txt'
+            name of file that contains custom age bins for age tracers
+            assume this to be a single column of bin left edges plus the right edge of final bin
+            (number of lines should be number of tracers + 1)
         '''
-
-        if self.info['has.element.agetracer'] == 0:
-            self.age_bins = None
-            return
-
         try:
             path_file_name = ut.io.get_path(directory) + file_name
             self.age_bins = np.genfromtxt(path_file_name)
-        except OSError:
-            raise OSError(f'cannot find file of age tracer bins: {path_file_name}')
+        except OSError as exc:
+            raise OSError(f'cannot find file of age-tracer age bins: {path_file_name}') from exc
 
 
 ElementAgetracer = ElementAgetracerClass()
 
 
-# Functions and classes for generating post-processing yield tables
-
-
-def construct_yield_table(yield_object, agebins, elements=None, integration_points=None):
-    '''
-    Construct a table of weights to post-process the age tracer fields
-    with individual elemental abundances. Given a function that accepts
-    elements and time as arguments, build this table by summing up the total
-    yield for each element during each time bin. This integrates over the
-    `yield` function in the passed `yield_object` (see below) for each time bin.
-
-    Parameters
-    -----------
-    yield_object : obj
-        An object with a required method 'yield' that is a function of 2 arguments:
-        the first is time [Gyr] and the second is an element name (for example, 'oxygen','carbon').
-        This function must return the instantaneous specific mass loss rate for that
-        element [Msun / Gyr per Msun of star formation].
-
-        This object also must have an attribute 'elements', which lists
-        all elements generated by this yield model. If making your own object to generate a yields
-        table, for convenience, one can refer to the 'element_*' dictionaries
-        in the `utilities` package in `basic/constant.py`. If you will compute total metallicity,
-        'metals' MUST be one of these elements.
-
-        If `yield_object` contains the attribute 'integration_points', will pass these to the
-        integrator (scipy.integrate.quad). Otherwise you can provide these as a separate argument.
-
-    elements : list
-        List of elements to generate for the table, if only generating a subset.
-        If None, will use all possible elements in yield_object.elements.
-
-    integration_points : (sequence of floats, ints)
-        Points to pass to scipy.integrate.quad to be careful around.
-        You also can pass these if 'integration_points' is an attribute of the yields_object.
-        This argument overrides the yield_object attribute if provided.
-
-    Returns
-    -------
-    yield_table : np.ndarray
-        2-D array (N_tracer x N_elements) containing the weights for each element in each age-tracer
-        time bin. Each value represents the mass  of each element produced during each time bin
-        [Msun per Msun of star formation].
-    '''
-
-    # assume to generate this for all elements
-    if elements is None:
-        elements = yield_object.elements
-    else:
-        for e in elements:
-            assert e in yield_object.elements
-
-    yield_table = np.zeros((np.size(agebins) - 1, np.size(elements)))
-
-    # grab points to be carful around for integration (if available)
-    points = None
-    if integration_points is not None:
-        points = integration_points
-    else:
-        if hasattr(yield_object, 'integration_points'):
-            if len(yield_object.integration_points) > 0:
-                points = yield_object.integration_points
-
-    # generate yield weights for each age bin
-    for i in np.arange(np.size(agebins) - 1):
-        if i == 0:  # ensure min time starts at 0
-            t_min = 0.0
-        else:
-            t_min = agebins[i]
-
-        t_max = agebins[i + 1]
-
-        for j, e in enumerate(elements):
-            yield_table[i][j] = integrate.quad(
-                yield_object.yields, t_min, t_max, args=(e,), points=points
-            )[0]
-
-    return yield_table
-
-
-class YieldsObject:
-    '''
-    .
-    '''
-
-    def __init__(self, name=''):
-        self.name = name
-
-        self.elements = []
-
-        return
-
-    def yields(self, t, element):
-        pass
-
-
 # --------------------------------------------------------------------------------------------------
-# FIRE-2 Yield Class object for generating yield tables for post-processing via age-tracers
+# FIRE-2 and FIRE-3 model for nucleosynthetic yields
 # --------------------------------------------------------------------------------------------------
-class FIRE2YieldClass(YieldsObject):
+class FIREYieldClass:
     '''
-    Object to use with the construct_yield_table method.
-    This object provides the yields in the FIRE-2 model.
-    This model uses some metallicity-dependent yields, determined by 2 paramters.
+    Provide the stellar nucleosynthetic yields in the FIRE-2 or FIRE-3 model.
+
+    In FIRE-2, these nucleosynthetic yields and mass-loss rates depend on progenitor metallicity:
+        stellar wind: overall mass-loss rate and oxygen yield
+        core-collapse supernova: nitrogen yield
     '''
 
-    def __init__(self, name='fire2', metallicity=1.0, scale_metallicity=True):
+    def __init__(self, model='fire2', progenitor_metallicity=1.0):
         '''
-        Initialize object and pre-load some things for convenience.
-
         Parameters
         -----------
-        name : str
-            Optional name for this table
-        metallicity : float
-            metallicity (wrt Solar) for  progenitor metallicity dependent yields
-        scale_metallicity : bool
-            apply progenitor metallicity dependence (in approximate fashion)
+        model : str
+            name for this yield model
+        progenitor_metallicity : float
+            metallicity [mass fraction wrt Solar], for yields that depend on progenitor metallicity
         '''
+        from . import gizmo_star
 
-        super().__init__(name)
+        self.model = model.lower()
+        assert self.model in ['fire2', 'fire3']
 
-        # not required. Specific parameters for this model
-        self.model_parameters = {'metallicity': metallicity, 'scale.metallicity': scale_metallicity}
+        self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+        self.SupernovaCC = gizmo_star.SupernovaCCClass(model)
+        self.SupernovaIa = gizmo_star.SupernovaIaClass(model)
+        self.StellarWind = gizmo_star.StellarWindClass(model)
 
-        # not required, but useful
-        self.elements = [
+        # names of elements tracked in this model
+        self.element_names = [
+            element_name.lower() for element_name in self.NucleosyntheticYield.sun_massfraction
+        ]
+        """
+        self.element_names = [
             'metals',
             'helium',
             'carbon',
@@ -468,121 +352,144 @@ class FIRE2YieldClass(YieldsObject):
             'calcium',
             'iron',
         ]
+        """
 
-        # not required
-        # to use for metallicity dependent corrections on the yields
-        # this just assumes that all yields come from stars with metallicities
-        # and individual abundances scaled to the solar abundance pattern
-        # this isn't accurate in practice but gives better agreement between
-        # post-processed yields and native simulated yields in FIRE-2
-        self._star_massfraction = {}
-        for e in self.elements:
-            self._star_massfraction[e] = metallicity * gizmo_star.sun_massfraction[e]
+        # critical/transition/discontinuous ages [Gyr] in this model to be careful around when
+        # integrating across age to get cumulative yields
+        # self.ages_critical = None
+        self.ages_critical = np.sort([3.401, 10.37, 37.53, 1, 50, 100, 1000, 14000]) / 1000  # [Gyr]
 
-        # pre-load yields since they are constants in time.
-        # in general, this probably cannot be done if they are time-varying
-        # and would have to make separete function calls or something in
-        # the yields method
-        self.compute_yields()
+        # store this (default) progenitor metallicity and the mass fraction of each element
+        # use the latter to compute metallicity-dependent corrections to the yields
+        # scale all abundances to Solar abundance ratios - this is not accurate in detail,
+        # but it provides better agreement between post-processed yields and native yields in FIRE-2
+        self.progenitor_metallicity = progenitor_metallicity
+        self.progenitor_massfraction_dict = {}
+        for element_name in self.element_names:
+            # scale to Solar abundance ratios
+            self.progenitor_massfraction_dict[element_name] = (
+                progenitor_metallicity * self.NucleosyntheticYield.sun_massfraction[element_name]
+            )
 
-        # ages [Gyr] to be careful around during integration
-        self.integration_points = np.sort([3.401, 10.37, 37.53, 1, 50, 100, 1000, 14000]) / 1000
-
-    def compute_yields(self, metallicity=None):
-        '''
-        This function is not necessary in a YieldsObject but exists here
-        to generate the yields from different channels from the underlying
-        model in gizmo_analysis in order keep the `yields` function
-        cleaner and to avoid having to re-compute this every time the
-        yields function is called.
-        '''
-
-        if metallicity is not None:
-            self.model_parameters['metallicity'] = metallicity
-
-        if self.model_parameters['metallicity'] is None:
-            self.model_parameters['metallicity'] = 1.0  # default
-
-        # Yields here is a dictionary with element names as kwargs
-        # and yields (in Msun) as values
-        self.snia_yield = gizmo_star.get_nucleosynthetic_yields(
-            'supernova.ia',
-            star_metallicity=self.model_parameters['metallicity'],
-            star_massfraction=self._star_massfraction,
-            normalize=False,
+        # store all yields, because in FIRE-2 they are independent of both stellar age and
+        # ejecta/mass-loss rates
+        self.NucleosyntheticYield.assign_yields(
+            progenitor_massfraction_dict=self.progenitor_massfraction_dict
         )
 
-        self.sncc_yield = gizmo_star.get_nucleosynthetic_yields(
-            'supernova.cc',
-            star_metallicity=self.model_parameters['metallicity'],
-            star_massfraction=self._star_massfraction,
-            normalize=False,
-        )
-
-        # wind yields do not have quantized rates. These are mass fraction
-        self.wind_yield = gizmo_star.get_nucleosynthetic_yields(
-            'wind',
-            star_metallicity=self.model_parameters['metallicity'],
-            star_massfraction=self._star_massfraction,
-            normalize=False,
-        )
-
-    def yields(self, age, element_name):
+    def get_element_yield_dict(self, age_bins, element_names=None):
         '''
-        Return the total yields for all stellar processes.
-        construct_yield_table requires this method.
+        Construct and return a dictionary of nucleosynthetic yields,
+        with element names as keys, and a 1-D array of yields in each age bins as values.
+        Construct by integrating the total yield for each element within each input age bin.
+        Use to assign elemental abundances via the age-tracer weights in a Gizmo simulation.
 
         Parameters
-        ----------
-        age : float or array
-            stellar age [Gyr] to compute instantaneous yield
-        element_name : str
-            name of element, must be in self.elements
+        -----------
+        age_bins : array
+            stellar age bins used in Gizmo for age-tracer module [Gyr]
+            should have N_age-bins + 1 values: left edges plus right edge of final bin
+        element_names : list
+            names of elements to generate, if only generating a subset
+            if None, assign all elements in this model
 
         Returns
         -------
-        y : float or np.ndarray
-            total yields at a given time for desired element, in units of Msun / Gyr per Msun of
-            star formation
+        element_yield_dict : dict of 1-D arrays
+            fractional mass of each element [M_sun per M_sun of stars formed] produced *within* each
+            age bin
+        '''
+        if element_names is None:
+            element_names = self.element_names  # generate yields for all elements in this model
+        else:
+            element_names_safe = []
+            for element_name in element_names:
+                assert element_name in self.element_names
+                element_names_safe = element_name.lower()
+            element_names = element_names_safe
+
+        element_yield_dict = {}
+        for element_name in element_names:
+            element_yield_dict[element_name] = np.zeros(np.size(age_bins) - 1)
+
+        # ages to be careful around during integration
+        if not hasattr(self, 'ages_critical'):
+            self.ages_critical = None
+
+        # compile yields within each age bin by integrating over the underlying rates
+        for ai in np.arange(np.size(age_bins) - 1):
+            if ai == 0:
+                age_min = 0  # ensure min age starts at 0
+            else:
+                age_min = age_bins[ai]
+
+            age_max = age_bins[ai + 1]
+
+            for element_name in element_names:
+                element_yield_dict[element_name][ai] = integrate.quad(
+                    self._get_yield_rate,
+                    age_min,
+                    age_max,
+                    args=(element_name,),
+                    points=self.ages_critical,
+                )[0]
+
+        return element_yield_dict
+
+    def _get_yield_rate(self, age, element_name, progenitor_metallicity=None):
+        '''
+        Return the specific rate[s] [M_sun / Gyr per M_sun of star formation] of nucleosynthetic
+        yield[s] at input stellar age[s] [Gyr] for input element_name, from all stellar processes.
+        get_yields() uses this method to integrate over ages within each stellar age bin.
+
+        Parameters
+        ----------
+        ages : float or array
+            stellar age[s] [Gyr] at which to compute the nucleosynthetic yield rate[s]
+        element_name : str
+            name of element, must be in self.element_names
+        progenitor_metallicity : float
+            metallicity [linear mass fraction, wrt Solar], for stellar wind rate
+
+        Returns
+        -------
+        element_yield_rate : float or array
+            specific rate[s] of nucleosynthetic yield[s] at input age[s] for input element_name
+            [M_sun / Gyr per M_sun of star formation]
         '''
 
-        assert element_name in self.elements
+        assert element_name in self.element_names
 
-        # get supernova Ia rate at input time [units of 1/Myr per Msun of stars formed]
-        snia_rate = gizmo_star.SupernovaIa.get_rate(age * 1000, 'mannucci')
+        if progenitor_metallicity is None:
+            progenitor_metallicity = self.progenitor_metallicity
 
-        # get core-collapse supernova rate at input time [units of 1/Myr per Msun of stars formed]
-        sncc_rate = gizmo_star.SupernovaCC.get_rate(age * 1000)
+        age_Myr = age * 1000  # convert to [Myr]
 
-        # get stellar wind rate at input time [units of M_sun / Myr per Msun of stars formed]
+        # stellar wind rate[s] at input age[s] [M_sun / Myr per M_sun of stars formed]
         # this is the only rate in FIRE-2 that depends on metallicity
-        wind_rate = gizmo_star.StellarWind.get_rate(
-            age * 1000, metallicity=self.model_parameters['metallicity']
-        )
+        wind_rate = self.StellarWind.get_rate(age_Myr, metallicity=progenitor_metallicity)
 
-        y = (
-            self.wind_yield[element_name] * wind_rate
-            + self.snia_yield[element_name] * snia_rate
-            + self.sncc_yield[element_name] * sncc_rate
-        ) * 1000  # [M_sun / Gyr]
+        # core-collapse supernova rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
+        sncc_rate = self.SupernovaCC.get_rate(age_Myr)
 
-        return y
+        # supernova Ia rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
+        snia_rate = self.SupernovaIa.get_rate(age_Myr)
 
+        element_yield_rate = (
+            self.NucleosyntheticYield.wind_yield[element_name] * wind_rate
+            + self.NucleosyntheticYield.snia_yield[element_name] * snia_rate
+            + self.NucleosyntheticYield.sncc_yield[element_name] * sncc_rate
+        )  # [M_sun / Myr]
 
-# ------------------------------------------------------------------------------
-# NuGrid yield class object for generating yield tables for age-tracer
-# postprocessing using the Sygma module
-# ------------------------------------------------------------------------------
+        element_yield_rate *= 1000  # [M_sun / Gyr]
 
-try:
-    import sygma
-
-    NuPyCEE_loaded = True
-except ImportError:
-    NuPyCEE_loaded = False
+        return element_yield_rate
 
 
-class NuGridYieldClass(YieldsObject):
+# --------------------------------------------------------------------------------------------------
+# NuGrid/Sygma model for nucleosynthetic yields
+# --------------------------------------------------------------------------------------------------
+class NuGridYieldClass:
     '''
     Object designed for use with the construct_yield_table method. This
     object proves the yields from the NuGrid collaboration using the
@@ -593,18 +500,22 @@ class NuGridYieldClass(YieldsObject):
     '''
 
     def __init__(self, name='NuGrid', **kwargs):
+        '''
+        .
+        '''
+        try:
+            import sygma  # pyright: reportMissingImports=false
 
-        if not NuPyCEE_loaded:
-            print(
-                'Cannot load the NuPyCEE module Sygma. '
-                + 'This is necessary to use the NuGrid yields.'
-                + 'Make sure this is installed in your python path. '
-                + 'For more info: https://nugrid.github.io/NuPyCEE/index.html'
-            )
+            self.sygma = sygma
+        except ImportError as exc:
+            raise ImportError(
+                '! Cannot load the NuPyCEE module Sygma.'
+                + ' This is necessary to use the NuGrid yields.'
+                + ' Make sure this is installed in your python path.'
+                + ' For more info: https://nugrid.github.io/NuPyCEE/index.html'
+            ) from exc
 
-            raise RuntimeError
-
-        super().__init__(name)
+        self.name = name
 
         # if elements is None
         # if isinstance(elements,str):
@@ -635,10 +546,8 @@ class NuGridYieldClass(YieldsObject):
     def compute_yields(self, **kwargs):
         '''
         Runs through the Sygma model given model parameters.
-        This function is not strictly necessary in a YieldsObject,
-        but exists here to pre-compute information needed for
-        the `yields` function so it is not re-computed each time
-        it is called.
+        This function is not strictly necessary in a YieldsObject, but exists here to pre-compute
+        information needed for the `yields` function so it is not re-computed each time called.
         '''
 
         for k in kwargs:
@@ -652,7 +561,7 @@ class NuGridYieldClass(YieldsObject):
             print('Galaxy mass is not 1 solar mass. Are you sure?')
             print('This will throw off scalings')
 
-        self._sygma_model = sygma.sygma(**self.model_parameters)
+        self._sygma_model = self.sygma.sygma(**self.model_parameters)
 
         # get yields. This is the 'ISM' mass fraction of all elements. But since
         # mgal above is 1.0, this is the solar masses of each element in the ISM
@@ -672,7 +581,7 @@ class NuGridYieldClass(YieldsObject):
         self._model_yield_rate = (np.diff(self._model_yields, axis=0).transpose() / dt).transpose()
         self._model_total_metal_rate = (np.diff(self._total_metals) / dt).transpose()
 
-    def yields(self, t, element):
+    def get_yields(self, t, element):
         '''
 
         Returns the total yields for all yield channels in NuGrid.
@@ -680,16 +589,16 @@ class NuGridYieldClass(YieldsObject):
 
         Parameters
         -----------
-        t : float or np.ndarray
-            Time (in Gyr) to compute instantaneous yield rate
-        element : str : Must be in self.elements
-            Element name
+        t : float or array
+            time [Gyr] to compute instantaneous yield rate
+        element : str
+            element name, must be in self dictionary
 
         Returns
         -----------
-        y : float or np.ndarray
-            Total yields at a given time for desired element in units of
-            Msun / Gyr per Msun of star formation.
+        y : float or array
+            total yields at a given time for desired element in units of Msun / Gyr per Msun of
+            star formation
         '''
 
         assert element in self.elements

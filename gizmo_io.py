@@ -16,7 +16,7 @@ Units: unless otherwise noted, this package converts all quantities to (combinat
     velocity [km / s]
     time [Gyr]
     magnetic field [Gauss]
-    elemental abundance [mass fraction]
+    elemental abundance [(linear) mass fraction]
 
 ----------
 Reading a snapshot
@@ -327,155 +327,14 @@ class ParticleDictionaryClass(dict):
             )
 
             if property_name == 'mass.hydrogen.neutral':
-                # mass from neutral hydrogen (excluding Helium, metals, and ionized hydrogen)
+                # mass from neutral hydrogen (excluding helium, metals, and ionized hydrogen)
                 values = values * self.prop('hydrogen.neutral.fraction', indices, _dict_only=True)
 
             return values
 
         # elemental abundance
-        if 'massfraction.' in property_name or 'metallicity.' in property_name:
-            # compute elemental abundances in post-processing using the age-tracer model
-            if 'agetracer.' in property_name:
-                if (
-                    'ElementAgeTracer' not in self.__dict__
-                    or self.ElementAgeTracer is None
-                    or self.ElementAgeTracer.info['has.element.agetracer'] == 0
-                ):
-                    raise RuntimeError(
-                        'requested age-tracer elemental abundance, but no age-tracer model exists'
-                    )
-
-                if self.ElementAgeTracer._yield_table is None:
-                    raise RuntimeError(
-                        'requested age-tracer elemental abundance, but no yield table exists'
-                    )
-
-                # compute the yield for given element
-                element_name = property_name.split('.')[-1]
-
-                if element_name != 'alpha':
-                    # make sure element name can be found in table
-                    # check for both full element names and symbols in case
-                    # table list only has one or the other and not both
-                    if element_name not in self.ElementAgeTracer._postprocess_elements:
-                        element_found = False
-
-                        if element_name in ut.constant.element_symbol_from_name.keys():
-                            element_found = (
-                                ut.constant.element_symbol_from_name[element_name]
-                                in self.ElementAgeTracer._postprocess_elements
-                            )
-
-                            if element_found:
-                                element_name = ut.constant.element_symbol_from_name[element_name]
-
-                        if element_name in ut.constant.element_name_from_symbol.keys():
-                            element_found = (
-                                ut.constant.element_name_from_symbol[element_name]
-                                in self.ElementAgeTracer._postprocess_elements
-                            )
-
-                            if element_found:
-                                element_name = ut.constant.element_name_from_symbol[element_name]
-
-                        if not element_found:
-                            raise KeyError(
-                                f'not sure how to parse property = {property_name} as age tracer'
-                                + f' for element {element_name} the current yield table has the'
-                                + ' following elements available:'
-                                + f' {self.ElementAgeTracer._postprocess_elements}'
-                            )
-
-                if element_name == 'alpha':
-                    return np.mean(
-                        [
-                            self.prop('metallicity.agetracer.o', indices),
-                            self.prop('metallicity.agetracer.mg', indices),
-                            self.prop('metallicity.agetracer.si', indices),
-                            self.prop('metallicity.agetracer.ca', indices),
-                        ],
-                        0,
-                    )
-
-                # get index corresponding to the element name in table
-                element_index = self.ElementAgeTracer._postprocess_elements.index(element_name)
-
-                # first and last indices for age tracer Metallicity fields in output
-                start_index = self.ElementAgeTracer.info['element.index.min']
-                end_index = self.ElementAgeTracer.info['element.index.max']
-                if indices is None:
-                    values = self['massfraction'][:, start_index : end_index + 1]
-                else:
-                    values = self['massfraction'][indices, start_index : end_index + 1]
-
-                values = np.sum(
-                    values * self.ElementAgeTracer._yield_table[:, element_index], axis=1
-                )
-
-                if hasattr(self, '_initial_abundances'):
-                    values = values + self.ElementAgeTracer._initial_abundances[element_name]
-                else:
-                    print('no initial abundances')
-
-                if 'metallicity.' in property_name:
-                    values = ut.math.get_log(
-                        values / ut.constant.sun_composition[element_name]['massfraction']
-                    )
-
-                return values
-
-            # special case: hydrogen
-            elif 'massfraction.hydrogen' in property_name or property_name.endswith(
-                'massfraction.h'
-            ):
-                # special case: mass fraction of hydrogen (excluding Helium and metals)
-                values = (
-                    1
-                    - self.prop('massfraction.total', indices)
-                    - self.prop('massfraction.helium', indices)
-                )
-
-                if 'neutral' in property_name:
-                    # mass fraction of neutral hydrogen (excluding Helium, metals, and ionized H)
-                    values = values * self.prop(
-                        'hydrogen.neutral.fraction', indices, _dict_only=True
-                    )
-
-                return values
-
-            # special case: total alpha abundance
-            elif 'alpha' in property_name:
-                return np.mean(
-                    [
-                        self.prop('metallicity.o', indices),
-                        self.prop('metallicity.mg', indices),
-                        self.prop('metallicity.si', indices),
-                        self.prop('metallicity.ca', indices),
-                    ],
-                    0,
-                )
-
-            # normal case
-            else:
-                for prop_name in property_name.split('.'):
-                    if prop_name in self._element_index:
-                        element_index = self._element_index[prop_name]
-                        element_name = prop_name
-                        break
-                else:
-                    raise KeyError(f'not sure how to parse property = {property_name}')
-
-                if indices is None:
-                    values = self['massfraction'][:, element_index]
-                else:
-                    values = self['massfraction'][indices, element_index]
-
-                if 'metallicity.' in property_name:
-                    values = ut.math.get_log(
-                        values / ut.constant.sun_composition[element_name]['massfraction']
-                    )
-
-                return values
+        if 'massfraction' in property_name or 'metallicity' in property_name:
+            return self._get_abundances(property_name, indices)
 
         if 'number.density' in property_name:
             values = (
@@ -731,6 +590,131 @@ class ParticleDictionaryClass(dict):
         # should not get this far without a return
         raise KeyError(f'not sure how to parse property = {property_name}')
 
+    def _get_abundances(self, property_name, indices=None):
+        '''
+        Get element mass fraction[s] or metallicity[s],
+        either as stored in catalog or via post-processing the age-tracer fields.
+
+        Parameters
+        ----------
+        property_name : str
+            name of property to get
+        indices : array [optional]
+            indices of particles to select
+
+        Returns
+        -------
+        values : float or array
+            mass fraction[s] or metallicity[s]
+        '''
+        # special case: total alpha-element abundance - compute and return as a metallicity
+        if 'alpha' in property_name:
+            assert 'metallicity' in property_name
+            alpha_elements = ['oxygen', 'magnesium', 'silicon', 'calcium']
+            metallicity_name = 'metallicity.'
+            if 'agetracer' in property_name:
+                metallicity_name += 'agetracer.'
+            metallicities = [self.prop(metallicity_name + a, indices) for a in alpha_elements]
+
+            return np.mean(metallicities, 0)
+
+        # special case: hydrogen (exclude helium and metals)
+        elif 'hydrogen' in property_name or property_name.endswith('.h'):
+            element_name = 'hydrogen'
+            massfraction_name = 'massfraction.'
+            if 'agetracer' in property_name:
+                massfraction_name += 'agetracer.'
+            values = (
+                1
+                - self.prop(massfraction_name + 'metals', indices)
+                - self.prop(massfraction_name + 'helium', indices)
+            )
+
+            if 'neutral' in property_name:
+                # mass fraction of neutral hydrogen (excluding Helium, metals, and ionized H)
+                values = values * self.prop('hydrogen.neutral.fraction', indices, _dict_only=True)
+
+        # normal case
+        elif 'agetracer' not in property_name:
+            for prop_name in property_name.split('.'):
+                if prop_name in self._element_index:
+                    element_index = self._element_index[prop_name]
+                    element_name = prop_name
+                    break
+            else:
+                raise KeyError(f'not sure how to parse property = {property_name}')
+
+            if indices is None:
+                values = self['massfraction'][:, element_index]
+            else:
+                values = self['massfraction'][indices, element_index]
+
+        # compute elemental abundances in post-processing using age-tracers
+        elif 'agetracer' in property_name:
+            assert 'ElementAgeTracer' in self.__dict__ and self.ElementAgeTracer is not None
+            assert self.ElementAgeTracer.yields is not None
+
+            element_name = property_name.split('.')[-1]
+
+            # make sure element name can be found in table
+            # check for both full element names and symbols in case
+            # table list only has one or the other and not both
+            if element_name not in self.ElementAgeTracer.element_names:
+                element_found = False
+
+                if element_name in ut.constant.element_symbol_from_name.keys():
+                    element_found = (
+                        ut.constant.element_symbol_from_name[element_name]
+                        in self.ElementAgeTracer._postprocess_elements
+                    )
+
+                    if element_found:
+                        element_name = ut.constant.element_symbol_from_name[element_name]
+
+                if element_name in ut.constant.element_name_from_symbol.keys():
+                    element_found = (
+                        ut.constant.element_name_from_symbol[element_name]
+                        in self.ElementAgeTracer.element_names
+                    )
+
+                    if element_found:
+                        element_name = ut.constant.element_name_from_symbol[element_name]
+
+                if not element_found:
+                    raise KeyError(
+                        f'not sure how to parse property = {property_name} as age tracer'
+                        + f' for element {element_name} the current yield table has the'
+                        + ' following elements available:'
+                        + f' {self.ElementAgeTracer.element_names}'
+                    )
+
+            # get index corresponding to the element name in table
+            element_index = self.ElementAgeTracer.element_names.index(element_name)
+
+            # first and last indices for age-tracer fields in output
+            index_start = self.ElementAgeTracer.info['element.index.min']
+            index_end = self.ElementAgeTracer.info['element.index.max']
+            if indices is None:
+                values = self['massfraction'][:, index_start : index_end + 1]
+            else:
+                values = self['massfraction'][indices, index_start : index_end + 1]
+
+            values = np.sum(values * self.ElementAgeTracer.yields[element_index], axis=1)
+
+            # add initial abundances (if applicable)
+            if hasattr(self, '_initial_abundances'):
+                values = values + self.ElementAgeTracer._initial_abundances[element_name]
+            else:
+                print('no initial abundances')
+
+        # convert to metallicity := log10(mass_fraction / mass_fraction_solar)
+        if 'metallicity' in property_name:
+            values = ut.math.get_log(
+                values / ut.constant.sun_composition[element_name]['massfraction']
+            )
+
+        return values
+
 
 # --------------------------------------------------------------------------------------------------
 # read
@@ -755,13 +739,13 @@ class ReadClass(ut.io.SayClass):
 
         self.gizmo_track = gizmo_track
 
-        # this format avoids accidentally reading text file that contains snapshot indices
-        self.snapshot_name_base = snapshot_name_base
-        if '*' not in self.snapshot_name_base:
-            self.snapshot_name_base += '*'
-        self.file_extension = '.hdf5'
-
         self.gas_eos = 5 / 3  # assumed equation of state of gas
+
+        # this format avoids accidentally reading text file that contains snapshot indices
+        self._snapshot_name_base = snapshot_name_base
+        if '*' not in self._snapshot_name_base:
+            self._snapshot_name_base += '*'
+        self._file_extension = '.hdf5'
 
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
@@ -774,10 +758,10 @@ class ReadClass(ut.io.SayClass):
         self.species_dict['star'] = 4
         self.species_dict['blackhole'] = 5
 
-        self.species_all = tuple(self.species_dict.keys())
-        self.species_read = list(self.species_all)
+        self._species_all = tuple(self.species_dict.keys())
+        self._species_read = list(self._species_all)
 
-        self.verbose = verbose
+        self._verbose = verbose
 
     def read_snapshots(
         self,
@@ -874,7 +858,7 @@ class ReadClass(ut.io.SayClass):
         # parse input species to read
         if species == 'all' or species == ['all'] or not species:
             # read all species in snapshot
-            species = self.species_all
+            species = self._species_all
         else:
             # read subsample of species in snapshot
             if np.isscalar(species):
@@ -884,7 +868,7 @@ class ReadClass(ut.io.SayClass):
                 if spec_name not in self.species_dict:
                     species.remove(spec_name)
                     self.say(f'! not recognize input species = {spec_name}')
-        self.species_read = list(species)
+        self._species_read = list(species)
 
         # read information about snapshot times
         simulation_directory = ut.io.get_path(simulation_directory)
@@ -896,7 +880,7 @@ class ReadClass(ut.io.SayClass):
                 host_number, simulation_directory, os
             )
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
@@ -904,16 +888,13 @@ class ReadClass(ut.io.SayClass):
         # read all input snapshots
         for snapshot_value in snapshot_values:
             snapshot_index = Snapshot.parse_snapshot_values(
-                snapshot_value_kind, snapshot_value, self.verbose
+                snapshot_value_kind, snapshot_value, self._verbose
             )
 
             # read header from snapshot file
             header = self.read_header(
                 simulation_directory, snapshot_directory, 'index', snapshot_index, simulation_name
             )
-
-            if not header['cosmological']:
-                header['scalefactor'] = 1.0
 
             # read particles from snapshot file[s]
             part = self.read_particles(
@@ -927,22 +908,23 @@ class ReadClass(ut.io.SayClass):
                 header,
             )
 
-            # read/get (additional) cosmological parameters
-            # if header['cosmological']:
-            part.Cosmology = self.get_cosmology(
-                simulation_directory,
-                header['omega_lambda'],
-                header['omega_matter'],
-                hubble=header['hubble'],
-            )
-            for spec_name in part:
-                part[spec_name].Cosmology = part.Cosmology
-
             # assign auxilliary information to particle dictionary class
             # store header dictionary
             part.info = header
             for spec_name in part:
                 part[spec_name].info = part.info
+
+            # read/get (additional) cosmological parameters
+            if header['cosmological']:
+                part.Cosmology = self.get_cosmology(
+                    simulation_directory,
+                    header['omega_lambda'],
+                    header['omega_matter'],
+                    header['omega_baryon'],
+                    hubble=header['hubble'],
+                )
+                for spec_name in part:
+                    part[spec_name].Cosmology = part.Cosmology
 
             # adjust properties for each species
             self.adjust_particle_properties(
@@ -988,12 +970,9 @@ class ReadClass(ut.io.SayClass):
             # check for and store information about r-process enerichment:
             num_rprocess = 0
             rprocess_start = None
-            if part.info['has.metals'] > 11:
+            if part.info['element.number'] > 11:
                 # if > 11, we may have r-process (assuming hard-coded default 11 elements for FIRE)
-                if (
-                    'ElementAgeTracer' in part.__dict__
-                    and part.ElementAgeTracer.info['has.element.agetracer'] > 0
-                ):
+                if 'ElementAgeTracer' in part.__dict__ and part.ElementAgeTracer is not None:
                     # if 11 then we don't have any rproc
                     if part.ElementAgeTracer.info['element.index.min'] == 11:
                         rprocess_start = -1
@@ -1003,7 +982,7 @@ class ReadClass(ut.io.SayClass):
                         num_rprocess = part.ElementAgeTracer.info['element.index.min'] - 11
                 else:
                     rprocess_start = 11
-                    num_rprocess = part.info['has.metals'] - 11
+                    num_rprocess = part.info['element.number'] - 11
 
             if num_rprocess < 0:
                 raise RuntimeError('getting negative number for r-process fields')
@@ -1261,32 +1240,55 @@ class ReadClass(ut.io.SayClass):
         header : dictionary class
             header dictionary
         '''
-        # convert name in snapshot's header dictionary to custom name preference
-        header_dict = {
+        # convert name in snapshot's header dictionary to custom name
+        header_name_dict = {
             # 6-element array of number of particles of each type in file
             'NumPart_ThisFile': 'particle.numbers.in.file',
             # 6-element array of total number of particles of each type (across all files)
             'NumPart_Total': 'particle.numbers.total',
             'NumPart_Total_HighWord': 'particle.numbers.total.high.word',
+            # number of file blocks per snapshot
+            'NumFilesPerSnapshot': 'file.number.per.snapshot',
+            # numerical parameters
+            'UnitLength_In_CGS': 'unit.length',
+            'UnitMass_In_CGS': 'unit.mass',
+            'UnitVelocity_In_CGS': 'unit.velocity',
+            'Effective_Kernel_NeighborNumber': 'kernel.number',
+            'Fixed_ForceSoftening_Keplerian_Kernel_Extent': 'kernel.sizes',
+            'Kernel_Function_ID': 'kernel.id',
+            'TurbDiffusion_Coefficient': 'diffusion.coefficient',
+            'Solar_Abundances_Adopted': 'sun.massfractions',
             # mass of each particle species, if all particles are same
             # (= 0 if they are different, which is usually true)
             'MassTable': 'particle.masses',
-            'Time': 'time',  # [Gyr/h]
-            'BoxSize': 'box.length',  # [kpc/h comoving]
+            # time
+            'Time': 'time',  # [scale-factor or Gyr/h in file]
             'Redshift': 'redshift',
-            # number of file blocks per snapshot
-            'NumFilesPerSnapshot': 'file.number.per.snapshot',
-            'Omega0': 'omega_matter',
-            'OmegaLambda': 'omega_lambda',
+            # cosmology
+            'BoxSize': 'box.length',  # [kpc/h comoving in file]
+            'Omega0': 'omega_matter',  # old name convention
+            'OmegaLambda': 'omega_lambda',  # old name convention
+            'Omega_Matter': 'omega_matter',
+            'Omega_Lambda': 'omega_lambda',
+            'Omega_Baryon': 'omega_baryon',
+            'Omega_Radiation': 'omega_radiation',
             'HubbleParam': 'hubble',
+            'ComovingIntegrationOn': 'cosmological',
+            # physics flags
+            'Flag_DoublePrecision': 'has.double.precision',
             'Flag_Sfr': 'has.star.formation',
             'Flag_Cooling': 'has.cooling',
             'Flag_StellarAge': 'has.star.age',
-            'Flag_Metals': 'has.metals',
             'Flag_Feedback': 'has.feedback',
-            'Flag_DoublePrecision': 'has.double.precision',
-            'Flag_IC_Info': 'has.ic.info',
-            'Flag_AgeTracers': 'has.element.age.tracer',
+            'Flag_IC_Info': 'initial.condition.kind',
+            'Flag_Metals': 'element.number',
+            # age-tracers to assign elemental abundances in post-processing
+            # will have either agetracer.min + agetracer.max or agetracer.bins
+            'AgeTracer_NumberOfBins': 'agetracer.number',
+            'AgeTracerBinStart': 'agetracer.min',
+            'AgeTracerBinEnd': 'agetracer.max',
+            'AgeTracer_CustomTimeBins': 'agetracer.bins',  # or this array
+            'AgeTracerEventsPerTimeBin': 'agetracer.events.per.bin',
             # level of compression of snapshot file
             'CompactLevel': 'compression.level',
             'Compactify_Version': 'compression.version',
@@ -1300,9 +1302,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
             snapshot_index = Snapshot.parse_snapshot_values(
-                snapshot_value_kind, snapshot_value, self.verbose
+                snapshot_value_kind, snapshot_value, self._verbose
             )
         else:
             snapshot_index = snapshot_value
@@ -1319,25 +1321,60 @@ class ReadClass(ut.io.SayClass):
             header_read = file_read['Header'].attrs  # load header dictionary
 
             for prop_read_name in header_read:
-                prop_name = header_dict[prop_read_name]
-                header[prop_name] = header_read[prop_read_name]  # transfer to custom header dict
+                if prop_read_name in header_name_dict:
+                    prop_save_name = header_name_dict[prop_read_name]
+                else:
+                    prop_save_name = prop_read_name
+                header[prop_save_name] = header_read[prop_read_name]  # transfer to my header dict
 
-        # determine whether simulation is cosmological
-        if (
+        # determine if simulation is cosmological
+        if 'cosmological' in header and header['cosmological']:
+            assert 0 < header['hubble'] < 1
+            assert 0 < header['omega_matter'] <= 1
+            assert 0 < header['omega_lambda'] <= 1
+        elif (
             0 < header['hubble'] < 1
             and 0 < header['omega_matter'] <= 1
             and 0 < header['omega_lambda'] <= 1
         ):
-            header['cosmological'] = True
+            header['cosmological'] = True  # compatible with old file headers
         else:
             header['cosmological'] = False
             self.say('assuming that simulation is not cosmological', verbose)
             self.say(
-                'read h = {:.3f}, omega_matter_0 = {:.3f}, omega_lambda_0 = {:.3f}'.format(
-                    header['hubble'], header['omega_matter'], header['omega_lambda']
+                'read: h = {:.3f}, Omega_matter,0 = {:.3f}, Omega_lambda,0 = {:.3f}'.format(
+                    header['hubble'], header['omega_matter'], header['omega_lambda'],
                 ),
                 verbose,
             )
+
+        # if important properties not in header (old file format), initialize to None
+        for prop_name in ['omega_baryon', 'omega_radiation']:
+            if prop_name not in header:
+                header[prop_name] = None
+
+        # check if simulation contains baryons
+        header['has.baryons'] = False
+        for spec_name in self._species_all:
+            if 'dark' not in spec_name:
+                if header['particle.numbers.total'][self.species_dict[spec_name]] > 0:
+                    header['has.baryons'] = True
+                    break
+
+        # check if simulation contains age-tracers to assign elemental abundances in post-processing
+        if 'agetracer.number' in header and header['agetracer.number'] > 0:
+            header['has.agetracer'] = True
+        else:
+            header['has.agetracer'] = False
+
+        # assign simulation name
+        if not simulation_name and simulation_directory != './':
+            simulation_name = simulation_directory.split('/')[-2]
+            simulation_name = simulation_name.replace('_', ' ')
+            simulation_name = simulation_name.replace('res', 'r')
+        header['simulation.name'] = simulation_name
+
+        header['catalog.kind'] = 'particle'
 
         # convert header quantities
         if header['cosmological']:
@@ -1347,11 +1384,12 @@ class ReadClass(ut.io.SayClass):
             header['box.length'] /= header['hubble']  # convert to [kpc comoving]
         else:
             header['time'] /= header['hubble']  # convert to [Gyr]
+            header['scalefactor'] = 1.0
 
         self.say('snapshot contains the following number of particles:', verbose)
         # keep only species that have any particles
         read_particle_number = 0
-        for spec_name in ut.array.get_list_combined(self.species_all, self.species_read):
+        for spec_name in ut.array.get_list_combined(self._species_all, self._species_read):
             spec_id = self.species_dict[spec_name]
             self.say(
                 '  {:9s} (id = {}): {} particles'.format(
@@ -1362,28 +1400,13 @@ class ReadClass(ut.io.SayClass):
 
             if header['particle.numbers.total'][spec_id] > 0:
                 read_particle_number += header['particle.numbers.total'][spec_id]
-            elif spec_name in self.species_read:
-                self.species_read.remove(spec_name)
+            elif spec_name in self._species_read:
+                self._species_read.remove(spec_name)
 
         if read_particle_number <= 0:
-            raise OSError(f'snapshot file[s] contain no particles of species = {self.species_read}')
-
-        # check if simulation contains baryons
-        header['baryonic'] = False
-        for spec_name in self.species_all:
-            if 'dark' not in spec_name:
-                if header['particle.numbers.total'][self.species_dict[spec_name]] > 0:
-                    header['baryonic'] = True
-                    break
-
-        # assign simulation name
-        if not simulation_name and simulation_directory != './':
-            simulation_name = simulation_directory.split('/')[-2]
-            simulation_name = simulation_name.replace('_', ' ')
-            simulation_name = simulation_name.replace('res', 'r')
-        header['simulation.name'] = simulation_name
-
-        header['catalog.kind'] = 'particle'
+            raise OSError(
+                f'snapshot file[s] contain no particles of species = {self._species_read}'
+            )
 
         self.say('', verbose)
 
@@ -1401,7 +1424,7 @@ class ReadClass(ut.io.SayClass):
         header=None,
     ):
         '''
-        Read from snapshot file[s] all particles of species type[s] in self.species_read list.
+        Read from snapshot file[s] all particles of species type[s] in self._species_read list.
 
         Parameters
         ----------
@@ -1496,9 +1519,9 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
         if snapshot_value_kind != 'index':
-            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+            Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
             snapshot_index = Snapshot.parse_snapshot_values(
-                snapshot_value_kind, snapshot_value, self.verbose
+                snapshot_value_kind, snapshot_value, self._verbose
             )
         else:
             snapshot_index = snapshot_value
@@ -1547,25 +1570,24 @@ class ReadClass(ut.io.SayClass):
             elements = [str.lower(element_name) for element_name in elements]
             for element_name in elements:
                 assert element_name in part._element_index
-        del (
-            part._element_index
-        )  # future calls to this element dictionary are via each species' catalog
+        # all subsequent calls to this element dictionary should be via each species' dictionary
+        del part._element_index
 
-        self.say(f'* reading species: {self.species_read}')
+        self.say(f'* reading species: {self._species_read}')
 
         # open snapshot file
         with h5py.File(path_file_name, 'r') as file_read:
             part_numbers_in_file = file_read['Header'].attrs['NumPart_ThisFile']
 
             # loop over each particle species to read
-            for spec_name in self.species_read:
+            for spec_name in self._species_read:
                 spec_id = self.species_dict[spec_name]
                 part_number_tot = header['particle.numbers.total'][spec_id]
 
                 # initialize particle dictionary class for this species
                 part[spec_name] = ParticleDictionaryClass()
 
-                if spec_name in ['star', 'gas'] and 'has.element.age.tracer' in header:
+                if 'has.agetracer' in header and spec_name in ['star', 'gas']:
                     # for age tracer post-processing (if available)
                     # _yield_table is internal table used to convert the age-tracer values in each
                     # age-bin to individual elemental abundances.
@@ -1574,7 +1596,7 @@ class ReadClass(ut.io.SayClass):
                     from . import gizmo_agetracer
 
                     part[spec_name].ElementAgeTracer = gizmo_agetracer.ElementAgetracerClass()
-                    part[spec_name].ElementAgeTracer.read_agetracer_times(simulation_directory)
+                    # part[spec_name].ElementAgeTracer.read_agetracer_times(simulation_directory)
                     part[spec_name].ElementAgeTracer._initial_abundances = {}  # set here
                 else:
                     del part[spec_name].ElementAgeTracer
@@ -1680,7 +1702,7 @@ class ReadClass(ut.io.SayClass):
 
         # read properties for each species ----------
         # initial particle indices to assign to each species from each file
-        part_indices_lo = np.zeros(len(self.species_read), dtype=np.int64)
+        part_indices_lo = np.zeros(len(self._species_read), dtype=np.int64)
 
         if header['file.number.per.snapshot'] == 1:
             self.say('* reading particles from:\n    {}'.format(path_file_name.lstrip('./')))
@@ -1700,7 +1722,7 @@ class ReadClass(ut.io.SayClass):
                 part_numbers_in_file = file_in['Header'].attrs['NumPart_ThisFile']
 
                 # read particle properties
-                for spec_i, spec_name in enumerate(self.species_read):
+                for spec_i, spec_name in enumerate(self._species_read):
                     spec_id = self.species_dict[spec_name]
                     if part_numbers_in_file[spec_id] > 0:
                         part_read = file_in['PartType' + str(spec_id)]
@@ -1827,13 +1849,10 @@ class ReadClass(ut.io.SayClass):
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
-            if (
-                'has.element.age.tracer' in part[spec_name].info.keys()
-                and part[spec_name].info['has.element.age.tracer'] > 0
-            ):
-                # normalize the mass weights in the age-tracer time bins
-                element_index_start = part.ElementAgeTracer.info['element.index.min']
-                element_index_end = part.ElementAgeTracer.info['element.index.max']
+            if part[spec_name].info['has.agetracer']:
+                # convert the mass weights in the age-tracer bins to [M_sun]
+                element_index_start = part[spec_name].ElementAgeTracer.info['element.index.min']
+                element_index_end = part[spec_name].ElementAgeTracer.info['element.index.max']
                 part[spec_name]['massfraction'][:, element_index_start:element_index_end] *= (
                     header['hubble'] / 1e10
                 )
@@ -1876,9 +1895,7 @@ class ReadClass(ut.io.SayClass):
                 # part[spec_name]['size'] /= 2.8
 
             if 'form.scalefactor' in part[spec_name]:
-                if header['cosmological']:
-                    pass
-                else:
+                if not header['cosmological']:
                     part[spec_name]['form.scalefactor'] /= header['hubble']  # convert to [Gyr]
 
             if 'temperature' in part[spec_name]:
@@ -1959,7 +1976,7 @@ class ReadClass(ut.io.SayClass):
 
         # get names and indices of all snapshot files in directory
         path_file_names, file_indices = ut.io.get_file_names(
-            directory + self.snapshot_name_base, (int, float)
+            directory + self._snapshot_name_base, (int, float)
         )
 
         # if ask for all snapshots, return all files/directories and indices
@@ -1974,10 +1991,10 @@ class ReadClass(ut.io.SayClass):
 
         path_file_names = path_file_names[np.where(file_indices == snapshot_index)[0][0]]
 
-        if self.file_extension not in path_file_names and isinstance(snapshot_block_index, int):
+        if self._file_extension not in path_file_names and isinstance(snapshot_block_index, int):
             # got snapshot directory with multiple files
             # get file name with snapshot_block_index in name
-            path_file_names = ut.io.get_file_names(path_file_names + '/' + self.snapshot_name_base)
+            path_file_names = ut.io.get_file_names(path_file_names + '/' + self._snapshot_name_base)
             path_file_block_name = None
 
             if len(path_file_names) > 0:
@@ -2005,19 +2022,21 @@ class ReadClass(ut.io.SayClass):
         n_s=None,
     ):
         '''
-        Get cosmological parameters, stored in Cosmology class.
-        Read cosmological parameters from MUSIC initial condition config file.
-        If cannot find file, assume AGORA cosmology as default.
+        Return cosmological parameters via Cosmology dictionary class.
+        If input simulation_directory, (try to) read cosmological parameters from the MUSIC
+        initial condition config file within this simulation_directory.
+        If cannot find the MUSIC config file, use what cosmological parameters are input,
+        and assume the rest from the AGORA simulation.
 
         Parameters
         ----------
         simulation_directory : str
-            directory of simulation
+            base directory of simulation
 
         Returns
         -------
-        Cosmology : class
-            stores cosmological parameters and functions
+        Cosmology : dict class
+            stores cosmological parameters via dict and useful functions as methods of this class
         '''
 
         def get_check_value(line, value_test=None):
@@ -2064,9 +2083,9 @@ class ReadClass(ut.io.SayClass):
             else:
                 self.say('! cannot find MUSIC config file:  {}'.format(file_name_find.lstrip('./')))
 
-        # AGORA box (use as default, if cannot find MUSIC config file)
+        # use cosmology from the AGORA simulation as default, if cannot find MUSIC config file
         if omega_baryon is None or sigma_8 is None or n_s is None:
-            self.say('! missing cosmological parameters, assuming the following (from AGORA box):')
+            self.say('! missing cosmological parameters, assuming the following (from AGORA):')
             if omega_baryon is None:
                 omega_baryon = 0.0455
                 self.say(f'assuming omega_baryon = {omega_baryon}')
@@ -2499,9 +2518,9 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self.verbose)
+        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
         snapshot_index = Snapshot.parse_snapshot_values(
-            snapshot_value_kind, snapshot_value, self.verbose
+            snapshot_value_kind, snapshot_value, self._verbose
         )
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)

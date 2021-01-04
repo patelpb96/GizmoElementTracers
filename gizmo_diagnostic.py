@@ -111,9 +111,9 @@ class RuntimeClass(ut.io.SayClass):
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        core_number=None,
         gizmo_out_file_name=gizmo_default.gizmo_out_file_name,
         gizmo_cpu_file_name=gizmo_default.gizmo_cpu_file_name,
+        core_number=None,
         wall_time_restart=0,
         scalefactors=[],
     ):
@@ -127,10 +127,12 @@ class RuntimeClass(ut.io.SayClass):
             directory of simulation
         snapshot_directory : str
             directory of snapshot files and Gizmo output files
-        core_number : int
-            total number of CPU cores (input instead of reading from run-time file)
         gizmo_out_file_name : str
             name of Gizmo run-time file
+        gizmo_cpu_file_name : str
+            name of Gizmo timing file
+        core_number : int
+            total number of CPU cores (input instead of reading from run-time file)
         wall_time_restart : float
             wall time [sec] of previous run (if restarted from snapshot)
         scalefactors : array-like
@@ -294,13 +296,13 @@ class RuntimeClass(ut.io.SayClass):
         elif np.isscalar(wall_times_restart):
             wall_times_restart = [wall_times_restart]
 
-        for d_i, directory in enumerate(simulation_directories):
+        for d_i, simulation_directory in enumerate(simulation_directories):
             scalefactors, redshifts, wall_times, cpu_times = self.print_run_times(
-                directory,
+                simulation_directory,
                 snapshot_directory,
-                None,
                 gizmo_out_file_name,
                 gizmo_cpu_file_name,
+                None,
                 wall_times_restart[d_i],
                 scalefactors,
             )
@@ -888,7 +890,7 @@ def print_summary(
     track_directory=gizmo_default.track_directory,
 ):
     '''
-    Print summary of most useful diagnostics.
+    Print the most useful diagnostics.
 
     Parameters
     ----------
@@ -1070,33 +1072,32 @@ def plot_scaling(
     # conversion to stampede2
     weak_baryon = collections.OrderedDict()
 
-    """
-    weak_baryon['res450000'] = {
-        'particle.number': 1.10e6 * 2,
-        'node.number': 1,
-        'node.time': 73,
-        'wall.time': 73,
-    }
-    weak_baryon['res57000'] = {
-        'particle.number': 8.82e6 * 2,
-        'node.number': 8,
-        'node.time': 1904,
-        'wall.time': 239,
-    }
-    weak_baryon['res7100'] = {
-        'particle.number': 7.05e7 * 2,
-        'node.number': 64,
-        'node.time': 52000,
-        'wall.time': 821,
-    }
+    # weak_baryon['res450000'] = {
+    #    'particle.number': 1.10e6 * 2,
+    #    'node.number': 1,
+    #    'node.time': 73,
+    #    'wall.time': 73,
+    # }
+    # weak_baryon['res57000'] = {
+    #    'particle.number': 8.82e6 * 2,
+    #    'node.number': 8,
+    #    'node.time': 1904,
+    #    'wall.time': 239,
+    # }
+    # weak_baryon['res7100'] = {
+    #    'particle.number': 7.05e7 * 2,
+    #    'node.number': 64,
+    #    'node.time': 52000,
+    #    'wall.time': 821,
+    # }
 
-    weak_baryon['res880'] = {
-        'particle.number': 7.e7 * 2,
-        'node.number': 64,
-        'node.time': 52000,
-        'wall.time': 821,
-    }
-    """
+    # weak_baryon['res880'] = {
+    #    'particle.number': 7.e7 * 2,
+    #    'node.number': 64,
+    #   'node.time': 52000,
+    #    'wall.time': 821,
+    # }
+
     # m12f to z = 1, Stampede2 equivalent node-hours
     # weak_baryon['res450000'] = {
     #    'particle.number': 8.14e7 * 2 / 64,
@@ -1368,7 +1369,6 @@ if __name__ == '__main__':
 
     elif 'summary' in function_kind:
         snapshot_redshift = 0
-        print_galaxy_properties()
         if len(sys.argv) > 2:
             snapshot_redshift = float(sys.argv[2])
         print_summary()
