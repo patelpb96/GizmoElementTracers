@@ -1220,6 +1220,7 @@ class ReadClass(ut.io.SayClass):
             'Flag_Feedback': 'has.feedback',
             'Flag_IC_Info': 'initial.condition.kind',
             'Flag_Metals': 'element.number',
+            'Flag_AgeTracers': 'has.agetracer',  # not in newer headers
             # age-tracers to assign elemental abundances in post-processing
             # will have either agetracer.min + agetracer.max or agetracer.bins
             'AgeTracer_NumberOfBins': 'agetracer.number',
@@ -1532,38 +1533,45 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name] = ParticleDictionaryClass()
 
                 if spec_name != 'star':
-                    # mass loss class only applies to star particles
+                    # mass loss class only relevant for stars
                     del part[spec_name].MassLoss
 
-                if spec_name not in ['star', 'gas']:
-                    # mass loss class only applies to star particles
-                    del part[spec_name]._element_index
+                if spec_name in ['star', 'gas']:
+                    if 'has.rprocess' in header and not header['has.rprocess']:
+                        # simulation does not have the r-process model, so delete its index pointers
+                        for element in list(part[spec_name]._element_index):
+                            if element.startswith('rp'):
+                                del part[spec_name]._element_index[element]
 
-                if 'has.rprocess' in header and not header['has.rprocess']:
-                    for element in list(part[spec_name]._element_index):
-                        if element.startswith('rp'):
-                            del part[spec_name]._element_index[element]
+                    if 'has.agetracer' in header and header['has.agetracer']:
+                        # simulation stored age-tracer weights for post-processing elemental
+                        # abundances - initialize element age-tracer dictionary class,
+                        # to store age bins and nucleosynthetic yields within this model
+                        # see 'gizmo_agetracer.py' for more info
+                        from . import gizmo_agetracer
 
-                if 'has.agetracer' in header and spec_name in ['star', 'gas']:
-                    # simulation stored age-tracer weights for post-processing elemental abundances
-                    # initialize element age-tracer dictionary class, to store age bins and
-                    # nucleosynthetic yields within this model
-                    # see 'gizmo_agetracer.py' for more info
-                    from . import gizmo_agetracer
+                        # append age-tracer dictionary class  to particle species catalog
+                        part[spec_name].ElementAgeTracer = gizmo_agetracer.ElementAgeTracerClass(
+                            header
+                        )
+                        # set initial conditions for elemental mass fractions
+                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(1e-5)
 
-                    # initialize age-tracer dictionary class and append to particle species catalog
-                    part[spec_name].ElementAgeTracer = gizmo_agetracer.ElementAgeTracerClass(header)
-                    # set initial elemental abundances (mass fractions)
-                    part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(1e-5)
+                        # generate nucleosynthetic yields for this stellar evolution model
+                        FIREYield = gizmo_agetracer.FIREYieldClass(
+                            'fire2', progenitor_metallicity=0.2
+                        )
+                        yield_dict = FIREYield.get_element_yields(
+                            part[spec_name].ElementAgeTracer['age.bins']
+                        )
+                        # assign yields to age-tracer dictionary class
+                        part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
+                    else:
+                        del part[spec_name].ElementAgeTracer
 
-                    # generate nucleosynthetic yields for this stellar evolution model
-                    FIREYield = gizmo_agetracer.FIREYieldClass('fire2', progenitor_metallicity=0.2)
-                    yield_dict = FIREYield.get_element_yields(
-                        part[spec_name].ElementAgeTracer['age.bins']
-                    )
-                    # assign yields to age-tracer dictionary class
-                    part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
                 else:
+                    # element index pointers and age-tracers only relevant for stars and gas
+                    del part[spec_name]._element_index
                     del part[spec_name].ElementAgeTracer
 
                 # re-set element dictionary pointers if reading a subset of elements in snapshot
