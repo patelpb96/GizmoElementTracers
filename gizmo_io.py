@@ -2098,8 +2098,6 @@ class ReadClass(ut.io.SayClass):
             #'massfraction': [0, 1], # has arbitrarily large values if using age-tracers
         }
 
-        mass_factor_wrt_median = 3.5  # particle masses should not vary by more than this!
-
         self.say('* checking sanity of particle properties')
 
         for spec_name in part:
@@ -2120,12 +2118,12 @@ class ReadClass(ut.io.SayClass):
                             ut.io.get_string_from_numbers(part[spec_name][prop_name].max(), 3),
                         )
                     )
+
                 elif prop_name == 'mass' and spec_name in ['star', 'gas', 'dark']:
-                    m_min = np.median(part[spec_name][prop_name]) / mass_factor_wrt_median
-                    m_max = np.median(part[spec_name][prop_name]) * mass_factor_wrt_median
+                    m_med = np.median(part[spec_name][prop_name])
                     if (
-                        part[spec_name][prop_name].min() < m_min
-                        or part[spec_name][prop_name].max() > m_max
+                        part[spec_name][prop_name].min() < 0.5 * m_med
+                        or part[spec_name][prop_name].max() > 4 * m_med
                     ):
                         self.say(
                             '! warning: {} {} [min, med, max] = [{}, {}, {}]'.format(

@@ -106,6 +106,10 @@ class ElementAgeTracerClass(dict):
         age_max : float
             maximum age (right edge of final bin)
         '''
+        # min and max ages [Myr] to impose on age bins
+        age_min = 0
+        age_max = 137000
+
         if header_dict is not None:
             if 'agetracer.number' not in header_dict:
                 print('! input header dict, but it has no age-tracer information')
@@ -159,9 +163,41 @@ class ElementAgeTracerClass(dict):
                 + f' age_bin_number = {age_bin_number}, age_min = {age_min}, age_max = {age_max}'
             )
 
-        self['age.bins'][0] = 0  # ensure minimum age is 0 Myr
+        # ensure minimum and maximum age of
+        self['age.bins'][0] = age_min
+        if self['age.bins'][-1] > age_max:
+            self['age.bins'][-1] = age_max
 
-    def assign_element_yields(self, element_yield_dict):
+    def _read_age_bins(self, directory='.', file_name='age_bins.txt'):
+        '''
+        Read file that contains (custom) age bins for age-tracer model.
+        Relevant if defined GALSF_FB_FIRE_AGE_TRACERS_CUSTOM in Gizmo's Config.sh.
+        Gizmo determines file_name via AgeTracerListFilename in gizmo_parameters.txt.
+
+        Gizmo now stores this information in its header, but retain this method for debugging.
+
+        Parameters
+        ----------
+        directory : str
+            base directory of simulation
+        file_name : str
+            name of file that contains custom age bins for the age-tracer model
+            this should be a single column of bin left edges plus the right edge of the final bin,
+            so the number of lines should be number of age bins + 1
+        '''
+        if directory[-1] != '/':
+            directory += '/'
+        path_file_name = directory + file_name
+
+        try:
+            self['age.bins'] = np.genfromtxt(path_file_name)
+            self['age.bin.number'] = len(self['age.bins']) - 1
+        except OSError as exc:
+            raise OSError(
+                f'cannot read file of custom age-tracer age bins:  {path_file_name}'
+            ) from exc
+
+    def assign_element_yields(self, element_yield_dict=None):
         '''
         Assign dictionary of stellar nucleosynthetic yields within stellar age bins to self.
 
@@ -175,7 +211,7 @@ class ElementAgeTracerClass(dict):
         for element_name in element_yield_dict:
             assert len(element_yield_dict[element_name]) == self['age.bin.number']
             self['yields'][element_name] = np.array(element_yield_dict[element_name])
-            # assign element symbol name to dict as well, for convenience
+            # assign element symbol name as dictionary key as well, for convenience later
             if element_name == 'metals':
                 element_symbol = 'total'
             else:
@@ -217,24 +253,26 @@ class ElementAgeTracerClass(dict):
                 f'not sure how to parse input abundances_initial = {massfraction_initial}'
             )
 
-        # set actual values in both name and symbol
-        # for element_name in initial_abundances:
-        #    self._initial_abundances[element_name] = initial_abundances[element_name]
-        #    if element_name != 'metals' and 'rprocess' not in element_name:
-        #        self._initial_abundances[
-        #            ut.constant.element_map_name_symbol[element_name]
-        #        ] = initial_abundances[element_name]
-
     def get_element_massfractions(self, part, element_name, part_indices=None):
         '''
+        Get the actual mass fraction of element_name for particles of a given species,
+        using the age-tracer weights within the particle catalog.
+
+        Before you call this method, you must:
+            set up the age bins via assign_age_bins()
+            assigned the nucleosynthetic yield within each age bin for each element via
+                assign_element_yields()
+            and (optinally) assigned the initial abundance (mass fraction) for each element via
+                assign_element_massfraction_initial()
+
         Parameters
         ----------
-        part : dictionary class
-            catalog of particle species at snapshot
+        part : dict
+            catalog of particles of a single species at a single snapshot
         element_name : str
-            name of element to get mass fraction[s] (abundance[s]) of
-        part_indices : array
-            indices of particles, if sub-selecting - else get mass fractions for all particles
+            name of element to get mass fraction of
+        part_indices : array [optional]
+            indices of particles to sub-select - if None, get mass fractions for all particles
         '''
         # sanity check
         if element_name not in self['yields']:
@@ -245,57 +283,32 @@ class ElementAgeTracerClass(dict):
                 )
             )
 
-        # slice on first index for age-tracer fields in particle's element mass fraction array
+        # get age-tracer weights for each particle
+        # slice particle's element mass fraction array on first index for age-tracer field
         if part_indices is None:
-            element_mass_fractions = part['massfraction'][:, self['element.index.start'] :]
+            agetracer_mass_weights = part['massfraction'][:, self['element.index.start'] :]
         else:
-            element_mass_fractions = part['massfraction'][
+            agetracer_mass_weights = part['massfraction'][
                 part_indices, self['element.index.start'] :
             ]
 
-        # sum yields within each age bin, weighted by age-tracer mass weights, across all age bins
+        # weight the yield within each age bin by the age-tracer mass weights
+        # and sum all age bins to get the total enrichment
         element_mass_fractions = np.sum(
-            element_mass_fractions * self['yields'][element_name], axis=1
+            agetracer_mass_weights * self['yields'][element_name], axis=1
         )
 
         # add initial abundances (if applicable)
         if self['massfraction.initial'] is not None:
             if isinstance(self['massfraction.initial'], dict):
+                # if using a different initial abundance for each element
                 assert element_name in self['massfraction.initial']
                 element_mass_fractions += self['massfraction.initial'][element_name]
             elif self['massfraction.initial'] > 0:
+                # if using the same initial abundance for all elements
                 element_mass_fractions += self['massfraction.initial']
 
         return element_mass_fractions
-
-    def _read_age_bins(self, directory='.', file_name='age_bins.txt'):
-        '''
-        Read file that contains (custom) age bins for age-tracer model.
-        Relevant if defined GALSF_FB_FIRE_AGE_TRACERS_CUSTOM in Gizmo's Config.sh.
-        Gizmo determines file_name via AgeTracerListFilename in gizmo_parameters.txt.
-
-        Gizmo now stores this information in its header, but retain this method for debugging.
-
-        Parameters
-        ----------
-        directory : str
-            base directory of simulation
-        file_name : str
-            name of file that contains custom age bins for the age-tracer model
-            this should be a single column of bin left edges plus the right edge of the final bin,
-            so the number of lines should be number of age bins + 1
-        '''
-        if directory[-1] != '/':
-            directory += '/'
-        path_file_name = directory + file_name
-
-        try:
-            self['age.bins'] = np.genfromtxt(path_file_name)
-            self['age.bin.number'] = len(self['age.bins']) - 1
-        except OSError as exc:
-            raise OSError(
-                f'cannot read file of custom age-tracer age bins:  {path_file_name}'
-            ) from exc
 
 
 ElementAgeTracer = ElementAgeTracerClass()
@@ -421,7 +434,7 @@ class FIREYieldClass:
         # compile yields within each age bin by integrating over the underlying rates
         for ai in np.arange(np.size(age_bins) - 1):
             if ai == 0:
-                age_min = 0  # ensure min age starts at 0
+                age_min = 0  # ensure min age starts at 0 Myr
             else:
                 age_min = age_bins[ai]
 
