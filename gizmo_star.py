@@ -13,10 +13,8 @@ These nucleosynthetic yields and mass-loss rates depend on progenitor metallicit
 
 Units: unless otherwise noted, all quantities are in (combinations of):
     mass [M_sun]
-    position [kpc comoving]
-    distance, radius [kpc physical]
-    velocity [km / s]
-    time [Myr] (this is different than most other modules in the package, which default to Gyr)
+    time [Myr] (different than most other modules in this package, which default to Gyr)
+    elemental abundance [(linear) mass fraction]
 '''
 
 import collections
