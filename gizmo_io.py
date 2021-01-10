@@ -666,7 +666,17 @@ class ParticleDictionaryClass(dict):
                     )
                 )
 
-            values = self.ElementAgeTracer.get_element_massfractions(self, element_name, indices)
+            # get age-tracer weights for each particle
+            # slice particle's element mass fraction array on first index for age-tracer weights
+            agetracer_index_start = self.ElementAgeTracer['element.index.start']
+            if indices is None:
+                agetracer_mass_weights = self['massfraction'][:, agetracer_index_start:]
+            else:
+                agetracer_mass_weights = self['massfraction'][indices, agetracer_index_start:]
+
+            values = self.ElementAgeTracer.get_element_massfractions(
+                agetracer_mass_weights, element_name
+            )
 
         # convert to metallicity := log10(mass_fraction / mass_fraction_solar)
         if 'metallicity' in property_name:
@@ -1304,6 +1314,12 @@ class ReadClass(ut.io.SayClass):
         if 'agetracer.number' in header and header['agetracer.number'] > 0:
             header['has.agetracer'] = True
             header['has.rprocess'] = False
+            if 'agetracer.bins' in header:
+                header['has.agetracer.custom'] = True
+            elif 'agetracer.min' in header:
+                header['has.agetracer.custom'] = False
+            else:
+                raise ValueError('not sure how to parse age-tracer model in snapshot header')
         else:
             header['has.agetracer'] = False
             if header['element.number'] > 11:
@@ -1550,7 +1566,7 @@ class ReadClass(ut.io.SayClass):
                         # see 'gizmo_agetracer.py' for more info
                         from . import gizmo_agetracer
 
-                        # append age-tracer dictionary class  to particle species catalog
+                        # append age-tracer dictionary class to the particle species catalog
                         part[spec_name].ElementAgeTracer = gizmo_agetracer.ElementAgeTracerClass(
                             header
                         )
@@ -1559,7 +1575,7 @@ class ReadClass(ut.io.SayClass):
 
                         # generate nucleosynthetic yields for this stellar evolution model
                         FIREYield = gizmo_agetracer.FIREYieldClass(
-                            'fire2', progenitor_metallicity=0.2
+                            'fire2', progenitor_metallicity=0.1
                         )
                         yield_dict = FIREYield.get_element_yields(
                             part[spec_name].ElementAgeTracer['age.bins']

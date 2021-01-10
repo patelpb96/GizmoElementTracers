@@ -4,9 +4,14 @@
 Assign elemental abundances to star and gas particles in post-processing using stored age-tracer
 weights from Gizmo simulations.
 
-If age-tracer was enabled when running a Gizmo simulation, each gas particle stored an array of
-weights in bins of stellar age, assigned as the simulation ran, when star particles of a given age
-deposited weights (into their corresponding stellar age bin) into their neighboring gas particles.
+        Relevant if defined GALSF_FB_FIRE_AGE_TRACERS_CUSTOM in Gizmo's Config.sh.
+        Gizmo determines file_name via AgeTracerListFilename in gizmo_parameters.txt.
+
+If the age-tracer model was enabled when running a Gizmo simulation
+(via enabling GALSF_FB_FIRE_AGE_TRACERS to set the number of age bins in Gizmo's Config.sh),
+each gas particle stored an array of weights in bins of stellar age, assigned as the simulation ran,
+when star particles of a given age deposited weights (into their corresponding stellar age bin)
+into their neighboring gas particles.
 Each star particle inherits the age-tracer weight array from its progenitor gas particle.
 
 Assigning elemental abundances then requires you to compute the total nucleosynthetic yields
@@ -17,9 +22,20 @@ You can construct this dictionary using a default rate + yield model below,
 or you can define your own custom rate and yield model that accepts stellar age[s] and an element
 name as inputs and returns the instantaneous mass-loss rate of that element at that stellar age.
 
+For reference, these are the relevant age-tracer settings in Gizmo configuation and parameter files:
+    in Config.sh
+        GALSF_FB_FIRE_AGE_TRACERS - master switch that turns on age-tracers and sets the number
+            of age bins, which by default are equally spaced in log age
+        GALSF_FB_FIRE_AGE_TRACERS_CUSTOM - enables a custom list of arbitrary age bins
+    in gizmo_parameters.txt
+        AgeTracerBinStart - minimum age of age bins (if not custom list) [Myr]
+        AgeTracerBinEnd - maximum age of age bins (if not custom list) [Myr]
+        AgeTracerListFilename - name of text file that contains custom age bins
+        AgeTracerActiveTimestepFraction - targeted number of deposition events per age bin
+
 @author:
-    Andrew Emerick <aemerick11@gmail.com>
     Andrew Wetzel <arwetzel@gmail.com>
+    Andrew Emerick <aemerick11@gmail.com>
 
 Units: unless otherwise noted, all quantities are in (combinations of):
     mass [M_sun]
@@ -34,7 +50,7 @@ from utilities import constant
 
 
 # --------------------------------------------------------------------------------------------------
-# master class for using age tracers to assign elemental abundances
+# class for using age-tracer weights to assign elemental abundances
 # --------------------------------------------------------------------------------------------------
 class ElementAgeTracerClass(dict):
     '''
@@ -102,13 +118,13 @@ class ElementAgeTracerClass(dict):
         age_bin_number : int
             number of age bins
         age_min : float
-            minimum age (left edge of first bin), though will over-ride this to be 0 later
+            minimum age (left edge of first bin), though over-ride this to be age_min_impose
         age_max : float
-            maximum age (right edge of final bin)
+            maximum age (right edge of final bin), though over-ride this to be age_max_impose
         '''
-        # min and max ages [Myr] to impose on age bins
-        age_min = 0
-        age_max = 137000
+        # min and max ages [Myr] to impose on min and max age bins (after defining bins)
+        age_min_impose = 0
+        age_max_impose = 137000
 
         if header_dict is not None:
             if 'agetracer.number' not in header_dict:
@@ -164,11 +180,11 @@ class ElementAgeTracerClass(dict):
             )
 
         # ensure minimum and maximum age of
-        self['age.bins'][0] = age_min
-        if self['age.bins'][-1] > age_max:
-            self['age.bins'][-1] = age_max
+        self['age.bins'][0] = age_min_impose
+        if self['age.bins'][-1] > age_max_impose:
+            self['age.bins'][-1] = age_max_impose
 
-    def _read_age_bins(self, directory='.', file_name='age_bins.txt'):
+    def _read_age_bins(self, directory='.', file_name='agetracer_bins.txt'):
         '''
         Read file that contains (custom) age bins for age-tracer model.
         Relevant if defined GALSF_FB_FIRE_AGE_TRACERS_CUSTOM in Gizmo's Config.sh.
@@ -253,44 +269,40 @@ class ElementAgeTracerClass(dict):
                 f'not sure how to parse input abundances_initial = {massfraction_initial}'
             )
 
-    def get_element_massfractions(self, part, element_name, part_indices=None):
+    def get_element_massfractions(self, agetracer_mass_weights, element_name):
         '''
-        Get the actual mass fraction of element_name for particles of a given species,
-        using the age-tracer weights within the particle catalog.
+        Get the elemental abundances (mass fractions) for input element_name[s],
+        using the the input 2-D array of age-tracer weights.
 
         Before you call this method, you must:
-            set up the age bins via assign_age_bins()
-            assigned the nucleosynthetic yield within each age bin for each element via
+            set up the age bins via:  assign_age_bins()
+            assign the nucleosynthetic yield within each age bin for each element via:
                 assign_element_yields()
-            and (optinally) assigned the initial abundance (mass fraction) for each element via
+            (optinally) assign the initial abundance (mass fraction) for each element via:
                 assign_element_massfraction_initial()
 
         Parameters
         ----------
-        part : dict
-            catalog of particles of a single species at a single snapshot
+        agetracer_mass_weights : 2-D array (N_particle x N_age-bins)
+            age-tracer mass weights for particles - should be values from
+                part[species_name]['massfraction'][:, self['element.index.start']:],
+                where species_name = 'star' or 'gas'
         element_name : str
-            name of element to get mass fraction of
-        part_indices : array [optional]
-            indices of particles to sub-select - if None, get mass fractions for all particles
+            name of element to get mass fraction of for each particle
+
+        Returns
+        -------
+        element_mass_fractions : 1-D array
+            mass fraction of element_name for each particle
         '''
         # sanity check
         if element_name not in self['yields']:
             raise KeyError(
-                f'cannot get element_name = {element_name}\n'
+                f'cannot compute mass fraction for element_name = {element_name}\n'
                 + 'element age-tracer dictionary has these elements available:  {}'.format(
                     self['yields'].keys()
                 )
             )
-
-        # get age-tracer weights for each particle
-        # slice particle's element mass fraction array on first index for age-tracer field
-        if part_indices is None:
-            agetracer_mass_weights = part['massfraction'][:, self['element.index.start'] :]
-        else:
-            agetracer_mass_weights = part['massfraction'][
-                part_indices, self['element.index.start'] :
-            ]
 
         # weight the yield within each age bin by the age-tracer mass weights
         # and sum all age bins to get the total enrichment
