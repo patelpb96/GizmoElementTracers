@@ -1570,8 +1570,6 @@ class ReadClass(ut.io.SayClass):
                         part[spec_name].ElementAgeTracer = gizmo_agetracer.ElementAgeTracerClass(
                             header
                         )
-                        # set initial conditions for elemental mass fractions
-                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(1e-5)
 
                         # generate nucleosynthetic yields for this stellar evolution model
                         FIREYield = gizmo_agetracer.FIREYieldClass(
@@ -1580,6 +1578,17 @@ class ReadClass(ut.io.SayClass):
                         yield_dict = FIREYield.get_element_yields(
                             part[spec_name].ElementAgeTracer['age.bins']
                         )
+
+                        # set initial conditions for elemental mass fractions
+                        # metallicity_initial = 1e-5
+                        # massfraction_initial = {}
+                        # for element_name in FIREYield.NucleosyntheticYield.sun_massfraction:
+                        #    massfraction_initial[element_name] = (
+                        #       metallicity_initial
+                        # * FIREYield.NucleosyntheticYield.sun_massfraction[element_name])
+                        # part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
+                        #   massfraction_initial)
+
                         # assign yields to age-tracer dictionary class
                         part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
                     else:
