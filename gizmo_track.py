@@ -796,7 +796,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 assign_hosts=False,
                 check_properties=False,
             )
-        except IOError:
+        except (IOError, TypeError):
             self.say(f'!!! could not read snapshot {snapshot_index}')
             self.say('    possibly missing or corrupt snapshot file')
             self.say('    must skip assigning pointers to this snapshot')
