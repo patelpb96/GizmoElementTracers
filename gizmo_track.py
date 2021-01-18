@@ -1571,8 +1571,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 )
             except ValueError:
                 # this can happen if not enough progenitor star particles near a host galaxy
-                self.say(f'! unable to compute host properties at snapshot {snapshot_index}')
-                self.say('must skip assigning host coordinates at this snapshot')
+                self.say(
+                    f'! cannot compute host at snapshot {snapshot_index}, not assigning coordinates'
+                )
                 return
 
             if np.isnan(part_z.host['position']).max() or np.isnan(part_z.host['velocity']).max():
@@ -1608,7 +1609,14 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 part_z0_indices = part_z0_indices[masks]
 
             # compute rotation vectors for principal axes from young stars within R_90
-            self.GizmoRead.assign_hosts_rotation(part_z)
+            try:
+                self.GizmoRead.assign_hosts_rotation(part_z)
+            except ValueError:
+                # this can happen if not enough progenitor star particles near a host galaxy
+                self.say(
+                    f'! cannot compute host at snapshot {snapshot_index}, not assigning coordinates'
+                )
+                return
 
             # store host galaxy properties
             for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
