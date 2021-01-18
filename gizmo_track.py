@@ -1542,7 +1542,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     check_properties=False,
                 )
             except (IOError, TypeError):
-                self.say(f'! can not read snapshot {snapshot_index}')
+                self.say(f'\n! can not read snapshot {snapshot_index}')
                 self.say('possibly missing or corrupt snapshot file')
                 self.say('must skip assigning host coordinates at this snapshot')
                 count_tot['bad snapshots'].append(snapshot_index)
@@ -1553,12 +1553,13 @@ class ParticleCoordinateClass(ut.io.SayClass):
             hosts_part_z_indicess = []
             for host_i in range(host_number):
                 hosts_part_z_indices = part_pointers[hosts_part_z0_indicess[host_i]]
-                hosts_part_z_indicess.append(hosts_part_z_indices[hosts_part_z_indices >= 0])
-
-            if len(hosts_part_z_indicess) == 0:
-                self.say(f'! no particles near the host at snapshot {snapshot_index}')
-                self.say('must skip assigning host coordinates at this snapshot')
-                return
+                hosts_part_z_indices = hosts_part_z_indices[hosts_part_z_indices >= 0]
+                if len(hosts_part_z_indices) == 0:
+                    self.say(f'\n! no particles near host{host_i} at snapshot {snapshot_index}')
+                    self.say(f'skip assigning coordinates at this snapshot')
+                    return
+                else:
+                    hosts_part_z_indicess.append(hosts_part_z_indices)
 
             try:
                 self.GizmoRead.assign_hosts_coordinates(
@@ -1569,17 +1570,15 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     host_number=host_number,
                     exclusion_distance=None,
                 )
-            except ValueError:
-                # this can happen if not enough progenitor star particles near a host galaxy
-                self.say(
-                    f'! cannot compute host at snapshot {snapshot_index}, not assigning coordinates'
-                )
+            except Exception:
+                # if not enough progenitor star particles near a host galaxy
+                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
+                self.say('skip assigning coordinates at this snapshot')
                 return
 
             if np.isnan(part_z.host['position']).max() or np.isnan(part_z.host['velocity']).max():
-                self.say(
-                    f'! cannot compute host at snapshot {snapshot_index}, not assigning coordinates'
-                )
+                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
+                self.say('skip assigning coordinates at this snapshot')
                 return
 
             part_z_indices = part_pointers[part_z0_indices]
@@ -1613,9 +1612,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 self.GizmoRead.assign_hosts_rotation(part_z)
             except ValueError:
                 # this can happen if not enough progenitor star particles near a host galaxy
-                self.say(
-                    f'! cannot compute host at snapshot {snapshot_index}, not assigning coordinates'
-                )
+                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
+                self.say('skip assigning coordinates at this snapshot')
                 return
 
             # store host galaxy properties
