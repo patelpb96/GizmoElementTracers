@@ -1091,7 +1091,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
             directory of snapshot files (within simulation directory)
         host_distance_limits : list
             min and max distance [kpc physical] to select particles near each primary host at the
-            reference snapshot - use only these to compute host coordinates at earlier snapshots
+            reference snapshot (usually z = 0).
+            Use only these to compute host coordinates at earlier snapshots.
         '''
         self.id_name = ID_NAME
         self.species_name = species_name
@@ -1559,14 +1560,20 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 self.say('must skip assigning host coordinates at this snapshot')
                 return
 
-            self.GizmoRead.assign_hosts_coordinates(
-                part_z,
-                self.species_name,
-                hosts_part_z_indicess,
-                method='mass',
-                host_number=host_number,
-                exclusion_distance=None,
-            )
+            try:
+                self.GizmoRead.assign_hosts_coordinates(
+                    part_z,
+                    self.species_name,
+                    hosts_part_z_indicess,
+                    method='mass',
+                    host_number=host_number,
+                    exclusion_distance=None,
+                )
+            except ValueError:
+                # this can happen if not enough progenitor star particles near a host galaxy
+                self.say(f'! unable to compute host properties at snapshot {snapshot_index}')
+                self.say('must skip assigning host coordinates at this snapshot')
+                return
 
             if np.isnan(part_z.host['position']).max() or np.isnan(part_z.host['velocity']).max():
                 self.say(
