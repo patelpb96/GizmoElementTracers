@@ -735,9 +735,9 @@ class ParticlePointerClass(ut.io.SayClass):
         # print cumulative diagnostics
         print()
         if len(count['bad snapshots']) > 0:
-            self.say('!!! could not read these snapshots:  {}'.format(count['bad snapshots']))
-            self.say('    they had possibly missing or corrupt snapshot files')
-            self.say('    could not assign pointers to those snapshots')
+            self.say('! could not read these snapshots:  {}'.format(count['bad snapshots']))
+            self.say('they had possibly missing or corrupt snapshot files')
+            self.say('could not assign pointers to those snapshots')
         if count['id no match'] > 0:
             self.say('! {} total not have id match'.format(count['id no match']))
         if count['match prop no match'] > 0:
@@ -797,7 +797,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 check_properties=False,
             )
         except (IOError, TypeError):
-            self.say(f'!!! could not read snapshot {snapshot_index}')
+            self.say(f'!!! can not read snapshot {snapshot_index}')
             self.say('    possibly missing or corrupt snapshot file')
             self.say('    must skip assigning pointers to this snapshot')
             count_tot['bad snapshots'].append(snapshot_index)
@@ -1450,7 +1450,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     + np.nan
                 )
 
-        count = {'id none': 0, 'id wrong': 0}
+        count = {'id none': 0, 'id wrong': 0, 'bad snapshots': []}
 
         # initiate threads, if asking for > 1
         if proc_number > 1:
@@ -1470,6 +1470,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         # print cumulative diagnostics
         print()
+        if len(count['bad snapshots']) > 0:
+            self.say('! could not read these snapshots:  {}'.format(count['bad snapshots']))
+            self.say('they had possibly missing or corrupt snapshot files')
+            self.say('could not assign pointers to those snapshots')
         if count['id none']:
             self.say('! {} total do not have valid id!'.format(count['id none']))
         if count['id wrong']:
@@ -1514,6 +1518,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 )
             except IOError:
                 self.say(f'! can not read pointers to snapshot {snapshot_index}')
+                self.say(' must skip assigning host coordinates at this snapshot')
                 return
 
         part_z0_indices = part_z0_indices[part_pointers >= 0]
@@ -1525,15 +1530,22 @@ class ParticleCoordinateClass(ut.io.SayClass):
         count = {'id none': 0, 'id wrong': 0}
 
         if part_z0_indices.size > 0:
-            part_z = self.GizmoRead.read_snapshots(
-                self.species_name,
-                'index',
-                snapshot_index,
-                snapshot_directory=self.snapshot_directory,
-                properties=[self.id_name, 'position', 'velocity', 'mass', 'form.scalefactor'],
-                assign_hosts=False,
-                check_properties=True,
-            )
+            try:
+                part_z = self.GizmoRead.read_snapshots(
+                    self.species_name,
+                    'index',
+                    snapshot_index,
+                    snapshot_directory=self.snapshot_directory,
+                    properties=[self.id_name, 'position', 'velocity', 'mass', 'form.scalefactor'],
+                    assign_hosts=False,
+                    check_properties=False,
+                )
+            except (IOError, TypeError):
+                self.say(f'! can not read snapshot {snapshot_index}')
+                self.say('possibly missing or corrupt snapshot file')
+                self.say('must skip assigning host coordinates at this snapshot')
+                count_tot['bad snapshots'].append(snapshot_index)
+                return
 
             # only use the particles that are near each primary host at the reference snapshot
             # to compute the coordinates of host progenitors at earlier snapshots
@@ -1541,6 +1553,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
             for host_i in range(host_number):
                 hosts_part_z_indices = part_pointers[hosts_part_z0_indicess[host_i]]
                 hosts_part_z_indicess.append(hosts_part_z_indices[hosts_part_z_indices >= 0])
+
+            if len(hosts_part_z_indicess) == 0:
+                self.say(f'! no particles near the host at snapshot {snapshot_index}')
+                self.say('must skip assigning host coordinates at this snapshot')
+                return
 
             self.GizmoRead.assign_hosts_coordinates(
                 part_z,
