@@ -488,7 +488,7 @@ class ArchiveClass(ut.io.SayClass):
             whether to delete the (raw) directories after tar-ing them into a single file
         delete_tarballs : bool
             whether to delete existing tar-balls
-            use this to clean safely the tar-balls that this function creates
+            use this safely to clean the tar-balls that this function creates
         proc_number : int
             number of parallel processes for tar-ing halo directories + snapshots
         '''

@@ -73,6 +73,12 @@ class ElementAgeTracerClass(dict):
             index of first age-tracer field in Gizmo's particle element mass fraction array.
             if input header_dict, it will over-ride any value here.
         '''
+        # min and max ages [Myr] to impose on age bins
+        # impose this *after* defining the bins, so it does not affect bin spacing
+        # it only affect the integration of the yield rates into time-averaged age bins
+        self._age_min_impose = 0
+        self._age_max_impose = 138000
+
         # whether using custom stellar age bins
         # default (non-custom) is equally spaced in log age
         self['has.custom.age.bin'] = False
@@ -100,7 +106,7 @@ class ElementAgeTracerClass(dict):
             self['element.index.start'] = element_index_start
 
     def assign_age_bins(
-        self, header_dict=None, age_bins=None, age_bin_number=None, age_min=None, age_max=None,
+        self, header_dict=None, age_bins=None, age_bin_number=None, age_min=None, age_max=None
     ):
         '''
         Assign to self the age bins used by the age-tracer module in a Gizmo simulation.
@@ -125,11 +131,6 @@ class ElementAgeTracerClass(dict):
         age_max : float
             maximum age (right edge of final bin), though over-ride this to be age_max_impose
         '''
-        # min and max ages [Myr] to impose on min and max age bins (after defining bins)
-        age_min_impose = 0
-        # age_max_impose = 137000
-        age_max_impose = 140000
-
         if header_dict is not None:
             if 'agetracer.number' not in header_dict:
                 print('! input header dict, but it has no age-tracer information')
@@ -185,9 +186,9 @@ class ElementAgeTracerClass(dict):
             )
 
         # ensure minimum and maximum age of
-        self['age.bins'][0] = age_min_impose
-        if self['age.bins'][-1] > age_max_impose:
-            self['age.bins'][-1] = age_max_impose
+        self['age.bins'][0] = self._age_min_impose
+        if self['age.bins'][-1] > self._age_max_impose:
+            self['age.bins'][-1] = self._age_max_impose
 
     def _read_age_bins(self, directory='.', file_name='agetracer_bins.txt'):
         '''
@@ -396,7 +397,10 @@ class FIREYieldClass:
         # store all yields, because in FIRE-2 they are independent of both stellar age and
         # ejecta/mass-loss rates
         self.NucleosyntheticYield.assign_yields(
-            progenitor_massfraction_dict=self.progenitor_massfraction_dict
+            # match FIRE
+            progenitor_massfraction_dict=self.progenitor_massfraction_dict,
+            # test: do not model correction of yields from pre-existing surface abundances
+            # progenitor_metallicity=self.progenitor_metallicity, progenitor_massfraction_dict=None,
         )
 
     def get_element_yields(self, age_bins, element_names=None):

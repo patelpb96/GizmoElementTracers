@@ -802,8 +802,8 @@ class ReadClass(ut.io.SayClass):
         assign_hosts : bool or str
             whether to assign coordinates of each host.
             if a string, tells the code which method to use:
-                'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
-                    during particle tracking using only stars that are in each host at z = 0
+                'track' : reads host coordinates from track/host_coordinates.hdf5,
+                    compiled during particle tracking using only stars in each host at z = 0
                 'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
                 'mass' or 'potential' or 'massfraction.metals': assign coordinates during read in
                     via iterative zoom-in, weighting each particle by that property
@@ -1032,8 +1032,8 @@ class ReadClass(ut.io.SayClass):
         assign_hosts : bool or str
             whether to assign host coordinates.
             if a string, tells the code which method to use:
-                'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
-                    during particle tracking using only stars that are in each host at z = 0
+                'track' : reads host coordinates from track/host_coordinates.hdf5,
+                    compiled during particle tracking using only stars in each host at z = 0
                 'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
                 'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
                     weighting each particle by that property
@@ -2194,8 +2194,8 @@ class ReadClass(ut.io.SayClass):
         method : str
             method to use to get host coordinates.
             if a string, tells the code which method to use:
-                'track' : reads host coordinates from track/star_form_coordinates_600.hdf5, compiled
-                    during particle tracking using only stars that are in each host at z = 0
+                'track' : reads host coordinates from track/host_coordinates.hdf5,
+                    compiled during particle tracking using only stars in each host at z = 0
                 'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
                 'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
                     weighting each particle by that property

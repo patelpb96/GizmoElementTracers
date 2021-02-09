@@ -797,9 +797,9 @@ class ParticlePointerClass(ut.io.SayClass):
                 check_properties=False,
             )
         except (IOError, TypeError):
-            self.say(f'!!! can not read snapshot {snapshot_index}')
-            self.say('    possibly missing or corrupt snapshot file')
-            self.say('    must skip assigning pointers to this snapshot')
+            self.say(f'\n!!! can not read snapshot {snapshot_index}')
+            self.say('possibly missing or corrupt snapshot file')
+            self.say('skip assigning pointers to this snapshot')
             count_tot['bad snapshots'].append(snapshot_index)
             return
 
@@ -1518,8 +1518,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     self.species_name, self.species_name, return_array=True
                 )
             except IOError:
-                self.say(f'! can not read pointers to snapshot {snapshot_index}')
-                self.say(' must skip assigning host coordinates at this snapshot')
+                self.say(f'\n!!! can not read pointers to snapshot {snapshot_index}')
+                self.say('skip assigning host coordinates at this snapshot')
                 return
 
         part_z0_indices = part_z0_indices[part_pointers >= 0]
@@ -1542,9 +1542,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     check_properties=False,
                 )
             except (IOError, TypeError):
-                self.say(f'\n! can not read snapshot {snapshot_index}')
+                self.say(f'\n!!! can not read snapshot {snapshot_index}')
                 self.say('possibly missing or corrupt snapshot file')
-                self.say('must skip assigning host coordinates at this snapshot')
+                self.say('skip assigning host coordinates at this snapshot')
                 count_tot['bad snapshots'].append(snapshot_index)
                 return
 
@@ -1555,8 +1555,10 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 hosts_part_z_indices = part_pointers[hosts_part_z0_indicess[host_i]]
                 hosts_part_z_indices = hosts_part_z_indices[hosts_part_z_indices >= 0]
                 if len(hosts_part_z_indices) == 0:
-                    self.say(f'\n! no particles near host{host_i} at snapshot {snapshot_index}')
-                    self.say(f'skip assigning coordinates at this snapshot')
+                    self.say(
+                        f'\n!!! no particles near host{host_i + 1} at snapshot {snapshot_index}'
+                    )
+                    self.say('skip assigning host coordinates at this snapshot')
                     return
                 else:
                     hosts_part_z_indicess.append(hosts_part_z_indices)
@@ -1572,13 +1574,13 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 )
             except Exception:
                 # if not enough progenitor star particles near a host galaxy
-                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
-                self.say('skip assigning coordinates at this snapshot')
+                self.say(f'\n!!! cannot compute host at snapshot {snapshot_index}')
+                self.say('skip assigning host coordinates at this snapshot')
                 return
 
             if np.isnan(part_z.host['position']).max() or np.isnan(part_z.host['velocity']).max():
-                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
-                self.say('skip assigning coordinates at this snapshot')
+                self.say(f'\n!!! cannot compute host at snapshot {snapshot_index}')
+                self.say('skip assigning host coordinates at this snapshot')
                 return
 
             part_z_indices = part_pointers[part_z0_indices]
@@ -1588,7 +1590,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             count['id none'] = part_z_indices.size - np.sum(masks)
             if count['id none']:
                 self.say(
-                    '! {} have no id match at snapshot {}!'.format(count['id none'], snapshot_index)
+                    '! {} have no id match at snapshot {}'.format(count['id none'], snapshot_index)
                 )
                 part_z_indices = part_z_indices[masks]
                 part_z0_indices = part_z0_indices[masks]
@@ -1600,7 +1602,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             count['id wrong'] = part_z_indices.size - np.sum(masks)
             if count['id wrong']:
                 self.say(
-                    '! {} have wrong id match at snapshot {}!'.format(
+                    '! {} have wrong id match at snapshot {}'.format(
                         count['id wrong'], snapshot_index
                     )
                 )
@@ -1612,8 +1614,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 self.GizmoRead.assign_hosts_rotation(part_z)
             except ValueError:
                 # this can happen if not enough progenitor star particles near a host galaxy
-                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
-                self.say('skip assigning coordinates at this snapshot')
+                self.say(f'\n!!! cannot compute host at snapshot {snapshot_index}')
+                self.say('skip assigning host coordinates at this snapshot')
                 return
 
             # store host galaxy properties
