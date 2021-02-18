@@ -193,12 +193,7 @@ class ParticleDictionaryClass(dict):
         self.snapshot = {}
         self.Snapshot = None
         self.Cosmology = None
-        self.host = {
-            'position': [],
-            'velocity': [],
-            'rotation': [],
-            'axis.ratios': [],
-        }
+        self.host = {'position': [], 'velocity': [], 'rotation': [], 'axis.ratios': []}
 
         # these classes are relevant only for star and gas particles
         self.MassLoss = None  # relevant only for star particles
@@ -671,18 +666,18 @@ class ParticleDictionaryClass(dict):
             agetracer_index_start = self.ElementAgeTracer['element.index.start']
             if indices is None:
                 agetracer_mass_weights = self['massfraction'][:, agetracer_index_start:]
+                metallicities = self['massfraction'][:, 0]
             else:
                 agetracer_mass_weights = self['massfraction'][indices, agetracer_index_start:]
+                metallicities = self['massfraction'][indices, 0]
 
             values = self.ElementAgeTracer.get_element_massfractions(
-                agetracer_mass_weights, element_name
+                element_name, agetracer_mass_weights, metallicities
             )
 
         # convert to metallicity := log10(mass_fraction / mass_fraction_solar)
         if 'metallicity' in property_name:
-            values = ut.math.get_log(
-                values / ut.constant.sun_composition[element_name]['massfraction']
-            )
+            values = ut.math.get_log(values / ut.constant.sun_massfraction[element_name])
 
         return values
 
@@ -898,13 +893,13 @@ class ReadClass(ut.io.SayClass):
                     part[spec_name].Cosmology = part.Cosmology
 
             # adjust properties for each species
-            self.adjust_particle_properties(
+            self._adjust_particle_properties(
                 part, header, particle_subsample_factor, separate_dark_lowres, sort_dark_by_id
             )
 
             # check sanity of particle properties read in
             if check_properties:
-                self.check_properties(part)
+                self._check_particle_properties(part)
 
             # store information about snapshot time
             if header['cosmological']:
@@ -979,7 +974,9 @@ class ReadClass(ut.io.SayClass):
 
             # store orbital properties wrt each host galaxy/halo
             if assign_orbits and ('velocity' in properties or properties == 'all'):
-                self.assign_orbits(part, 'star', part.host['position'], part.host['velocity'])
+                self.assign_particle_orbits(
+                    part, 'star', part.host['position'], part.host['velocity']
+                )
 
             # if read only 1 snapshot, return as particle dictionary instead of list
             if len(snapshot_values) == 1:
@@ -1133,7 +1130,7 @@ class ReadClass(ut.io.SayClass):
 
             if part is not None:
                 if assign_orbits and 'velocity' in properties:
-                    self.assign_orbits(part, 'gas')
+                    self.assign_particle_orbits(part, 'gas')
 
                 parts.append(part)
                 simulation_directories_read.append(simulation_directory)
@@ -1258,7 +1255,7 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self.get_snapshot_file_names_indices(
+        path_file_name = self._get_snapshot_file_names_indices(
             snapshot_directory, snapshot_index, snapshot_block_index
         )
 
@@ -1292,7 +1289,7 @@ class ReadClass(ut.io.SayClass):
             self.say('assuming that simulation is not cosmological', verbose)
             self.say(
                 'read: h = {:.3f}, Omega_matter,0 = {:.3f}, Omega_lambda,0 = {:.3f}'.format(
-                    header['hubble'], header['omega_matter'], header['omega_lambda'],
+                    header['hubble'], header['omega_matter'], header['omega_lambda']
                 ),
                 verbose,
             )
@@ -1487,12 +1484,12 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self._get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         # check if need to read snapshot header information
         if not header:
             header = self.read_header(
-                simulation_directory, snapshot_directory, 'index', snapshot_index,
+                simulation_directory, snapshot_directory, 'index', snapshot_index
             )
 
         # parse input properties to read
@@ -1573,21 +1570,23 @@ class ReadClass(ut.io.SayClass):
 
                         # generate nucleosynthetic yields for this stellar evolution model
                         FIREYield = gizmo_agetracer.FIREYieldClass(
-                            'fire2', progenitor_metallicity=0.1
+                            'fire2', progenitor_metallicity=0.7
                         )
                         yield_dict = FIREYield.get_element_yields(
                             part[spec_name].ElementAgeTracer['age.bins']
                         )
 
                         # set initial conditions for elemental mass fractions
-                        # metallicity_initial = 1e-5
-                        # massfraction_initial = {}
-                        # for element_name in FIREYield.NucleosyntheticYield.sun_massfraction:
-                        #    massfraction_initial[element_name] = (
-                        #       metallicity_initial
-                        # * FIREYield.NucleosyntheticYield.sun_massfraction[element_name])
-                        # part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
-                        #   massfraction_initial)
+                        metallicity_initial = -5
+                        massfraction_initial = {}
+                        for element_name in FIREYield.sun_massfraction:
+                            massfraction_initial[element_name] = (
+                                10 ** metallicity_initial
+                                * FIREYield.NucleosyntheticYield.sun_massfraction[element_name]
+                            )
+                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
+                            massfraction_initial
+                        )
 
                         # assign yields to age-tracer dictionary class
                         part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
@@ -1756,7 +1755,7 @@ class ReadClass(ut.io.SayClass):
 
         return part
 
-    def adjust_particle_properties(
+    def _adjust_particle_properties(
         self,
         part,
         header,
@@ -1932,7 +1931,7 @@ class ReadClass(ut.io.SayClass):
                         ::particle_subsample_factor
                     ]
 
-    def get_snapshot_file_names_indices(
+    def _get_snapshot_file_names_indices(
         self, directory, snapshot_index=None, snapshot_block_index=0
     ):
         '''
@@ -2032,7 +2031,7 @@ class ReadClass(ut.io.SayClass):
             stores cosmological parameters via dict and useful functions as methods of this class
         '''
 
-        def get_check_value(line, value_test=None):
+        def _get_check_value(line, value_test=None):
             frac_dif_max = 0.01
             value = float(line.split('=')[-1].strip())
             if 'h0' in line:
@@ -2062,17 +2061,17 @@ class ReadClass(ut.io.SayClass):
                     for line in file_in:
                         line = line.lower().strip().strip('\n')  # ensure lowercase for safety
                         if 'omega_l' in line:
-                            omega_lambda = get_check_value(line, omega_lambda)
+                            omega_lambda = _get_check_value(line, omega_lambda)
                         elif 'omega_m' in line:
-                            omega_matter = get_check_value(line, omega_matter)
+                            omega_matter = _get_check_value(line, omega_matter)
                         elif 'omega_b' in line:
-                            omega_baryon = get_check_value(line, omega_baryon)
+                            omega_baryon = _get_check_value(line, omega_baryon)
                         elif 'h0' in line:
-                            hubble = get_check_value(line, hubble)
+                            hubble = _get_check_value(line, hubble)
                         elif 'sigma_8' in line:
-                            sigma_8 = get_check_value(line, sigma_8)
+                            sigma_8 = _get_check_value(line, sigma_8)
                         elif 'nspec' in line:
-                            n_s = get_check_value(line, n_s)
+                            n_s = _get_check_value(line, n_s)
             else:
                 self.say('! cannot find MUSIC config file:  {}'.format(file_name_find.lstrip('./')))
 
@@ -2096,7 +2095,7 @@ class ReadClass(ut.io.SayClass):
 
         return Cosmology
 
-    def check_properties(self, part):
+    def _check_particle_properties(self, part):
         '''
         Checks sanity of particle properties, print warning if they are outside given limits.
 
@@ -2115,10 +2114,10 @@ class ReadClass(ut.io.SayClass):
             'mass': [9, 1e11],  # [M_sun]
             'potential': [-1e9, 1e9],  # [km^2 / s^2]
             'temperature': [3, 1e9],  # [K]
-            'density': [0, 1e14],  # [M_sun/kpc^3]
+            'density': [0, 1e14],  # [M_sun / kpc^3]
             'size': [0, 1e9],  # [kpc]
             'hydrogen.neutral.fraction': [0, 1],
-            'sfr': [0, 1000],  # [M_sun/yr]
+            'sfr': [0, 1000],  # [M_sun / yr]
             'form.scalefactor': [0, 1],
             #'massfraction': [0, 1], # has arbitrarily large values if using age-tracers
         }
@@ -2430,7 +2429,7 @@ class ReadClass(ut.io.SayClass):
                 for spec_name in part:
                     part[spec_name].host[prop_name] = principal_axes[prop_name]
 
-    def assign_orbits(self, part, species=[], host_positions=None, host_velocities=None):
+    def assign_particle_orbits(self, part, species=[], host_positions=None, host_velocities=None):
         '''
         Assign derived orbital properties wrt each host to each particle species.
 
@@ -2469,8 +2468,8 @@ class ReadClass(ut.io.SayClass):
                 for prop_name in orb[spec_name]:
                     part[spec_name][host_name + prop_name] = orb[spec_name][prop_name]
 
-    # write to file ----------
-    def rewrite_snapshot(
+    # re-write to file ----------
+    def _rewrite_snapshot(
         self,
         species='gas',
         action='delete',
@@ -2481,8 +2480,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory=gizmo_default.snapshot_directory,
     ):
         '''
-        Read snapshot file[s].
-        Rewrite, deleting given species.
+        Read single snapshot. Rewrite, deleting given species and/or adjusting particle properties.
 
         Parameters
         ----------
@@ -2518,7 +2516,7 @@ class ReadClass(ut.io.SayClass):
             snapshot_value_kind, snapshot_value, self._verbose
         )
 
-        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self._get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(path_file_name.lstrip('./')), end='\n\n')
 
         # read header ----------
@@ -2576,92 +2574,88 @@ class ReadClass(ut.io.SayClass):
                     header['NumPart_ThisFile'] = part_number_in_file
                     header['NumPart_Total'] = part_number
 
+    def _rewrite_snapshot_text(self, part):
+        '''
+        Re-write snapshot to text file, one file per particle species.
+
+        Parameters
+        ----------
+        part : dict class
+            catalog of particles at snapshot
+        '''
+        spec_name = 'dark'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+        part_spec = part[spec_name]
+
+        with open(file_name, 'w') as file_out:
+            file_out.write(
+                '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n'
+            )
+
+            for pi, pid in enumerate(part_spec['id']):
+                file_out.write(
+                    '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f}\n'.format(
+                        pid,
+                        part_spec['mass'][pi],
+                        part_spec.prop('host.distance', pi)[0],
+                        part_spec.prop('host.distance', pi)[1],
+                        part_spec.prop('host.distance', pi)[2],
+                        part_spec.prop('host.velocity', pi)[0],
+                        part_spec.prop('host.velocity', pi)[1],
+                        part_spec.prop('host.velocity', pi)[2],
+                    )
+                )
+
+        spec_name = 'gas'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+        part_spec = part[spec_name]
+
+        with open(file_name, 'w') as file_out:
+            file_out.write(
+                '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
+                + ' density[M_sun/kpc^3] temperature[K]\n'
+            )
+
+            for pi, pid in enumerate(part_spec['id']):
+                file_out.write(
+                    '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.2e} {:.2e}\n'.format(
+                        pid,
+                        part_spec['mass'][pi],
+                        part_spec.prop('host.distance', pi)[0],
+                        part_spec.prop('host.distance', pi)[1],
+                        part_spec.prop('host.distance', pi)[2],
+                        part_spec.prop('host.velocity', pi)[0],
+                        part_spec.prop('host.velocity', pi)[1],
+                        part_spec.prop('host.velocity', pi)[2],
+                        part_spec['density'][pi],
+                        part_spec['temperature'][pi],
+                    )
+                )
+
+        spec_name = 'star'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
+        part_spec = part[spec_name]
+
+        with open(file_name, 'w') as file_out:
+            file_out.write(
+                '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
+                + ' age[Gyr]\n'
+            )
+
+            for pi, pid in enumerate(part_spec['id']):
+                file_out.write(
+                    '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.3f}\n'.format(
+                        pid,
+                        part_spec['mass'][pi],
+                        part_spec.prop('host.distance', pi)[0],
+                        part_spec.prop('host.distance', pi)[1],
+                        part_spec.prop('host.distance', pi)[2],
+                        part_spec.prop('host.velocity', pi)[0],
+                        part_spec.prop('host.velocity', pi)[1],
+                        part_spec.prop('host.velocity', pi)[2],
+                        part_spec.prop('age', pi),
+                    )
+                )
+
 
 Read = ReadClass()
-
-
-# --------------------------------------------------------------------------------------------------
-# write snapshot text file
-# --------------------------------------------------------------------------------------------------
-def write_snapshot_text(part):
-    '''
-    Write snapshot to text file, one file per species.
-
-    Parameters
-    ----------
-    part : dictionary class
-        catalog of particles at snapshot
-    '''
-    spec_name = 'dark'
-    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-    part_spec = part[spec_name]
-
-    with open(file_name, 'w') as file_out:
-        file_out.write(
-            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n'
-        )
-
-        for pi, pid in enumerate(part_spec['id']):
-            file_out.write(
-                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f}\n'.format(
-                    pid,
-                    part_spec['mass'][pi],
-                    part_spec.prop('host.distance', pi)[0],
-                    part_spec.prop('host.distance', pi)[1],
-                    part_spec.prop('host.distance', pi)[2],
-                    part_spec.prop('host.velocity', pi)[0],
-                    part_spec.prop('host.velocity', pi)[1],
-                    part_spec.prop('host.velocity', pi)[2],
-                )
-            )
-
-    spec_name = 'gas'
-    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-    part_spec = part[spec_name]
-
-    with open(file_name, 'w') as file_out:
-        file_out.write(
-            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
-            + ' density[M_sun/kpc^3] temperature[K]\n'
-        )
-
-        for pi, pid in enumerate(part_spec['id']):
-            file_out.write(
-                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.2e} {:.2e}\n'.format(
-                    pid,
-                    part_spec['mass'][pi],
-                    part_spec.prop('host.distance', pi)[0],
-                    part_spec.prop('host.distance', pi)[1],
-                    part_spec.prop('host.distance', pi)[2],
-                    part_spec.prop('host.velocity', pi)[0],
-                    part_spec.prop('host.velocity', pi)[1],
-                    part_spec.prop('host.velocity', pi)[2],
-                    part_spec['density'][pi],
-                    part_spec['temperature'][pi],
-                )
-            )
-
-    spec_name = 'star'
-    file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-    part_spec = part[spec_name]
-
-    with open(file_name, 'w') as file_out:
-        file_out.write(
-            '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
-            + ' age[Gyr]\n'
-        )
-
-        for pi, pid in enumerate(part_spec['id']):
-            file_out.write(
-                '{} {:.3e} {:.3f} {:.3f} {:.3f} {:.1f} {:.1f} {:.1f} {:.3f}\n'.format(
-                    pid,
-                    part_spec['mass'][pi],
-                    part_spec.prop('host.distance', pi)[0],
-                    part_spec.prop('host.distance', pi)[1],
-                    part_spec.prop('host.distance', pi)[2],
-                    part_spec.prop('host.velocity', pi)[0],
-                    part_spec.prop('host.velocity', pi)[1],
-                    part_spec.prop('host.velocity', pi)[2],
-                    part_spec.prop('age', pi),
-                )
-            )

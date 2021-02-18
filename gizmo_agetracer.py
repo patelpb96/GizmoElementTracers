@@ -83,7 +83,7 @@ class ElementAgeTracerClass(dict):
         # default (non-custom) is equally spaced in log age
         self['has.custom.age.bin'] = False
         # targeted number of (sampled) injection events per age bin when the simulation ran
-        self['events.per.age.bin'] = None
+        self['event.number.per.age.bin'] = None
         # number of stellar age bins
         self['age.bin.number'] = None
         # array of ages of bin edges [Myr]
@@ -94,7 +94,7 @@ class ElementAgeTracerClass(dict):
         # dictionary of nucleosynthetic yields for each element within each age bin
         self['yields'] = {}
         # float or dictionary to store initial conditions of elemental abundances
-        self['massfraction.initial'] = None
+        self['massfractions.initial'] = None
 
         if header_dict is not None:
             self.assign_age_bins(header_dict)
@@ -233,12 +233,6 @@ class ElementAgeTracerClass(dict):
         for element_name in element_yield_dict:
             assert len(element_yield_dict[element_name]) == self['age.bin.number']
             self['yields'][element_name] = np.array(element_yield_dict[element_name])
-            # assign element symbol name as dictionary key as well, for convenience later
-            if element_name == 'metals':
-                element_symbol = 'total'
-            else:
-                element_symbol = constant.element_symbol_from_name[element_name]
-            self['yields'][element_symbol] = np.array(element_yield_dict[element_name])
 
     def assign_element_massfraction_initial(self, massfraction_initial_dict=None):
         '''
@@ -255,12 +249,14 @@ class ElementAgeTracerClass(dict):
         if isinstance(massfraction_initial_dict, dict) and len(massfraction_initial_dict) > 0:
             assert self['yields'] is not None and len(self['yields']) > 0
             # initialize to 0 for all elements in model, then over-write with elements in input dict
-            self['massfraction.initial'] = {}
+            self['massfractions.initial'] = {}
             for element_name in self['yields']:
-                self['massfraction.initial'][element_name] = 0
+                self['massfractions.initial'][element_name] = 0
             for element_name in massfraction_initial_dict:
                 assert element_name in self['yields']
-                self['yields'][element_name] = massfraction_initial_dict[element_name]
+                self['massfractions.initial'][element_name] = massfraction_initial_dict[
+                    element_name
+                ]
 
         else:
             print(
@@ -268,7 +264,7 @@ class ElementAgeTracerClass(dict):
                 + f' = {massfraction_initial_dict}'
             )
 
-    def get_element_massfractions(self, agetracer_mass_weights, element_name):
+    def get_element_massfractions(self, element_name, agetracer_mass_weights, metallicities=None):
         '''
         Get the elemental abundances (mass fractions) for input element_name[s],
         using the the input 2-D array of age-tracer weights.
@@ -282,12 +278,120 @@ class ElementAgeTracerClass(dict):
 
         Parameters
         ----------
+        element_name : str
+            name of element to get mass fraction of for each particle
         agetracer_mass_weights : 2-D array (N_particle x N_age-bins)
             age-tracer mass weights for particles - should be values from
                 part[species_name]['massfraction'][:, self['element.index.start']:],
                 where species_name = 'star' or 'gas'
+
+        Returns
+        -------
+        element_mass_fractions : 1-D array
+            mass fraction of element_name for each particle
+        '''
+        # sanity check, if input element symbol or other alais, convert to default name
+        if element_name not in self['yields']:
+            if element_name == 'total':  # alias for convenience
+                element_name = 'metals'
+            elif element_name in constant.name_from_symbol:
+                element_name = constant.name_from_symbol[element_name]
+            else:
+                raise KeyError(
+                    f'cannot compute mass fraction for element_name = {element_name}\n'
+                    + 'element age-tracer dictionary has these elements available:  {}'.format(
+                        self['yields'].keys()
+                    )
+                )
+
+        # weight the yield within each age bin by the age-tracer mass weights
+        # and sum all age bins to get the total enrichment
+        element_mass_fractions = np.sum(
+            agetracer_mass_weights * self['yields'][element_name], axis=1
+        )
+
+        # add initial abundances (if applicable)
+        if self['massfractions.initial'] is not None:
+            if isinstance(self['massfractions.initial'], dict):
+                # if using a different initial abundance for each element
+                assert element_name in self['massfractions.initial']
+                element_mass_fractions += self['massfractions.initial'][element_name]
+            elif self['massfractions.initial'] > 0:
+                # if using the same initial abundance for all elements
+                element_mass_fractions += self['massfractions.initial']
+
+        return element_mass_fractions
+
+
+ElementAgeTracer = ElementAgeTracerClass()
+
+
+class ElementAgeTracerZClass(ElementAgeTracerClass):
+    '''
+    Store and assign yields in bins of progenitor metallicity.
+    '''
+
+    def assign_element_yields(self, element_yield_dicts=None, progenitor_metal_massfractions=None):
+        '''
+        Assign to self a dictionary of stellar nucleosynthetic yields within stellar age bins.
+
+        Parameters
+        -----------
+        element_yield_dicts : list of dicts of 1-D arrays
+            nucleosynthetic yield fractional mass [M_sun per M_sun of stars formed] of each element
+            produced within/across each age bin, to map the age-tracer mass weights in each age bin
+            into actual element yields
+        '''
+        element_yield_dict = element_yield_dicts[0]
+        element_name = tuple(element_yield_dict.keys())[0]
+        for element_name in element_yield_dict:
+            self['yields'][element_name] = np.zeros(
+                (progenitor_metal_massfractions.size, element_yield_dict[element_name].size),
+                element_yield_dict[element_name].dtype,
+            )
+            if element_name == 'metals':
+                element_symbol = 'total'
+            else:
+                element_symbol = constant.element_symbol_from_name[element_name]
+            self['yields'][element_symbol] = np.array(self['yields'][element_name])
+
+        for zi, _progenitor_metal_massfractions in enumerate(progenitor_metal_massfractions):
+            element_yield_dict = element_yield_dicts[zi]
+            for element_name in element_yield_dict:
+                assert len(element_yield_dict[element_name]) == self['age.bin.number']
+                self['yields'][element_name][zi] = np.array(element_yield_dict[element_name])
+                # assign element symbol name as dictionary key as well, for convenience later
+                if element_name == 'metals':
+                    element_symbol = 'total'
+                else:
+                    element_symbol = constant.element_symbol_from_name[element_name]
+                self['yields'][element_symbol][zi] = np.array(element_yield_dict[element_name])
+
+        self['progenitor.metal.massfractions'] = progenitor_metal_massfractions
+
+    def get_element_massfractions(
+        self, element_name, agetracer_mass_weights, metal_massfractions=None
+    ):
+        '''
+        Get the elemental abundances (mass fractions) for input element_name[s],
+        using the the input 2-D array of age-tracer weights.
+
+        Before you call this method, you must:
+            set up the age bins via:  assign_age_bins()
+            assign the nucleosynthetic yield within each age bin for each element via:
+                assign_element_yields()
+            (optinally) assign the initial abundance (mass fraction) for each element via:
+                assign_element_massfraction_initial()
+
+        Parameters
+        ----------
         element_name : str
             name of element to get mass fraction of for each particle
+        agetracer_mass_weights : 2-D array (N_particle x N_age-bins)
+            age-tracer mass weights for particles - should be values from
+                part[species_name]['massfraction'][:, self['element.index.start']:],
+                where species_name = 'star' or 'gas'
+        metallicities : array
 
         Returns
         -------
@@ -303,11 +407,23 @@ class ElementAgeTracerClass(dict):
                 )
             )
 
+        if metal_massfractions is not None:
+            # prog_metal_massfractions = 10 ** 0.45 * metal_massfractions
+            prog_metal_massfractions = metal_massfractions
+            zis = np.digitize(prog_metal_massfractions, self['progenitor.metal.massfractions'])
+            zis = np.clip(zis, 0, self['progenitor.metal.massfractions'].size - 1)
+
         # weight the yield within each age bin by the age-tracer mass weights
         # and sum all age bins to get the total enrichment
-        element_mass_fractions = np.sum(
-            agetracer_mass_weights * self['yields'][element_name], axis=1
+        element_mass_fractions = np.zeros(
+            agetracer_mass_weights.shape[0], agetracer_mass_weights.dtype
         )
+        for zi, _progenitor_metal_massfraction in enumerate(self['progenitor.metal.massfractions']):
+            pis = np.where(zis == zi)[0]
+            if pis.size > 0:
+                element_mass_fractions[pis] = np.sum(
+                    agetracer_mass_weights[pis] * self['yields'][element_name][zi], axis=1,
+                )
 
         # add initial abundances (if applicable)
         if self['massfraction.initial'] is not None:
@@ -320,9 +436,6 @@ class ElementAgeTracerClass(dict):
                 element_mass_fractions += self['massfraction.initial']
 
         return element_mass_fractions
-
-
-ElementAgeTracer = ElementAgeTracerClass()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -350,17 +463,16 @@ class FIREYieldClass:
         from . import gizmo_star
 
         self.model = model.lower()
-        assert self.model in ['fire2', 'fire3']
+        assert self.model in ['fire2', 'fire2.1', 'fire3']
 
         self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
         self.SupernovaCC = gizmo_star.SupernovaCCClass(model)
         self.SupernovaIa = gizmo_star.SupernovaIaClass(model)
         self.StellarWind = gizmo_star.StellarWindClass(model)
+        self.sun_massfraction = self.NucleosyntheticYield.sun_massfraction
 
         # names of elements tracked in this model
-        self.element_names = [
-            element_name.lower() for element_name in self.NucleosyntheticYield.sun_massfraction
-        ]
+        self.element_names = [element_name.lower() for element_name in self.sun_massfraction]
         """
         self.element_names = [
             'metals',
@@ -391,16 +503,17 @@ class FIREYieldClass:
         for element_name in self.element_names:
             # scale to Solar abundance ratios
             self.progenitor_massfraction_dict[element_name] = (
-                progenitor_metallicity * self.NucleosyntheticYield.sun_massfraction[element_name]
+                progenitor_metallicity * self.sun_massfraction[element_name]
             )
 
         # store all yields, because in FIRE-2 they are independent of both stellar age and
         # ejecta/mass-loss rates
         self.NucleosyntheticYield.assign_yields(
-            # match FIRE
+            # match FIRE-2
             progenitor_massfraction_dict=self.progenitor_massfraction_dict,
             # test: do not model correction of yields from pre-existing surface abundances
-            # progenitor_metallicity=self.progenitor_metallicity, progenitor_massfraction_dict=None,
+            # progenitor_metallicity=self.progenitor_metallicity,
+            # progenitor_massfraction_dict=None,
         )
 
     def get_element_yields(self, age_bins, element_names=None):

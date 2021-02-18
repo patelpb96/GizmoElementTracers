@@ -1953,18 +1953,121 @@ class ElementAgeTracerClass(ut.io.SayClass):
                 #    )
                 # )
 
+    def test_agetracers(
+        self, part, species_name='star', weight_property=None, pindices=None, adjust=False
+    ):
+        '''
+        .
+        '''
+        multiplier = 100
+
+        if weight_property is None:
+            weights = None
+        else:
+            weights = part[species_name].prop(weight_property, pindices)
+
+        print(f'offset(x{multiplier}): median, 68%, 95%')
+        for element_name in part[species_name].ElementAgeTracer['yields']:
+            difs = part[species_name].prop(
+                f'metallicity.agetracer.{element_name}', pindices
+            ) - part[species_name].prop(f'metallicity.{element_name}', pindices)
+
+            med = ut.math.percentile_weighted(difs, 50, weights)
+            p84 = ut.math.percentile_weighted(difs, 84, weights)
+            p16 = ut.math.percentile_weighted(difs, 16, weights)
+            w68 = (p84 - p16) / 2
+            p98 = ut.math.percentile_weighted(difs, 97.725, weights)
+            p02 = ut.math.percentile_weighted(difs, 2.275, weights)
+            w95 = (p98 - p02) / 2
+
+            print(
+                '{:10}: {:5.1f}  {:4.1f} {:4.1f}'.format(
+                    element_name, med * multiplier, w68 * multiplier, w95 * multiplier
+                )
+            )
+
+    def test_agetracers_progenitor_metallicity(
+        self, part, species_name='star', weight_property=None, pindices=None, model='fire2.1'
+    ):
+        '''
+        .
+        '''
+        from . import gizmo_agetracer
+
+        multiplier = 100
+        progenitor_metallicities = np.arange(0.4, 2.0, 0.05)
+        metallicity_initial = -5
+
+        if weight_property is None:
+            weights = None
+        else:
+            weights = part[species_name].prop(weight_property, pindices)
+
+        part[species_name].ElementAgeTracer = gizmo_agetracer.ElementAgeTracerClass(part.info)
+
+        FIREYield = gizmo_agetracer.FIREYieldClass(model)
+        massfraction_initial = {}
+        for element_name in FIREYield.sun_massfraction:
+            massfraction_initial[element_name] = (
+                10 ** metallicity_initial * FIREYield.sun_massfraction[element_name]
+            )
+        massfraction_initial['helium'] = 0.24
+
+        med_old = -Inf
+
+        print(f'offset(x{multiplier}): median, 68%, 95% | Z_proj')
+        for element_name in FIREYield.element_names:
+            for progenitor_metallicity in progenitor_metallicities:
+                FIREYield = gizmo_agetracer.FIREYieldClass(
+                    model, progenitor_metallicity=progenitor_metallicity
+                )
+                yield_dict = FIREYield.get_element_yields(
+                    part[species_name].ElementAgeTracer['age.bins']
+                )
+                part[species_name].ElementAgeTracer.assign_element_yields(yield_dict)
+                part[species_name].ElementAgeTracer.assign_element_massfraction_initial(
+                    massfraction_initial
+                )
+
+                difs = part[species_name].prop(
+                    f'metallicity.agetracer.{element_name}', pindices
+                ) - part[species_name].prop(f'metallicity.{element_name}', pindices)
+
+                med = ut.math.percentile_weighted(difs, 50, weights)
+                if med > 0 and med_old < 0:
+                    break
+                else:
+                    med_old = med
+
+            p84 = ut.math.percentile_weighted(difs, 84, weights)
+            p16 = ut.math.percentile_weighted(difs, 16, weights)
+            w68 = (p84 - p16) / 2
+            p98 = ut.math.percentile_weighted(difs, 97.725, weights)
+            p02 = ut.math.percentile_weighted(difs, 2.275, weights)
+            w95 = (p98 - p02) / 2
+
+            print(
+                '{:10}: {:5.1f}  {:4.1f} {:4.1f} | {:.2f}'.format(
+                    element_name,
+                    med * multiplier,
+                    w68 * multiplier,
+                    w95 * multiplier,
+                    progenitor_metallicity,
+                )
+            )
+
     def plot_element_distribution(
         self,
         part,
         species_name='gas',
-        element_name='fe',
-        element_limits=[-4, 1],
-        element_bin_width=None,
-        element_bin_number=100,
+        property_name='metallicity.fe',
+        property_limits=[-4, 1],
+        property_bin_width=0.1,
+        property_bin_number=None,
         property_statistic='probability',
         axis_y_limits=[],
         axis_y_log_scale=True,
-        weight_property_name='mass',
+        weight_property='mass',
         part_indices=None,
         plot_file_name=None,
         plot_directory='.',
@@ -1979,13 +2082,13 @@ class ElementAgeTracerClass(ut.io.SayClass):
             catalog of particles at snapshot
         species_name : str
             name of particle species
-        element_name : str
+        property_name : str
              name of element
-        element_limits : list
+        property_limits : list
             min and max limits of element
-        element_bin_width : float
+        property_bin_width : float
             width of element bin
-        element_bin_number : int
+        property_bin_number : int
             number of bins within limits (use this or element_bin_width)
         property_statistic : str
             statistic to plot: 'probability', 'probability.cum', 'probability.norm', 'histogram',
@@ -1994,7 +2097,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
             min and max limits for y axis
         axis_y_log_scale : bool
             whether to use logarithmic scaling for y axis
-        weight_property_name : str
+        weight_property : str
             property to weight each particle by
         part_indices : array
             indices of particles from which to select
@@ -2006,39 +2109,40 @@ class ElementAgeTracerClass(ut.io.SayClass):
             index of figure for matplotlib
         '''
         model_number = 2
+        at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
 
         Stat = ut.statistic.StatisticClass()
 
-        metal_name = f'metallicity.{element_name}'
-        metal_values = part[species_name].prop(metal_name, part_indices)
-        metal_at_name = f'metallicity.agetracer.{element_name}'
-        metal_at_values = part[species_name].prop(metal_at_name, part_indices)
+        property_values = part[species_name].prop(property_name, part_indices)
+        at_property_values = part[species_name].prop(at_property_name, part_indices)
 
         weights = None
-        if weight_property_name:
-            weights = part[species_name].prop(weight_property_name, part_indices)
+        if weight_property:
+            weights = part[species_name].prop(weight_property, part_indices)
 
-        masks = (metal_values > -Inf)
-        # masks *= (metal_values > element_limits[0]) * (metal_values < element_limits[1])
-        masks *= (metal_at_values > element_limits[0]) * (metal_at_values < element_limits[1])
+        masks = property_values > -Inf
+        # masks *= (property_values > element_limits[0]) * (property_values < element_limits[1])
+        masks *= (at_property_values > property_limits[0]) * (
+            at_property_values < property_limits[1]
+        )
 
-        metal_difs = metal_at_values[masks] - metal_values[masks]
-        ut.statistic.print_statistics(metal_difs, weights[masks])
+        property_difs = at_property_values[masks] - property_values[masks]
+        ut.statistic.print_statistics(property_difs, weights[masks])
 
         distr_sim = Stat.get_distribution_dict(
-            metal_values,
-            element_limits,
-            element_bin_width,
-            element_bin_number,
+            property_values,
+            property_limits,
+            property_bin_width,
+            property_bin_number,
             log_scale=False,
             weights=weights,
         )
 
         distr_at = Stat.get_distribution_dict(
-            metal_at_values,
-            element_limits,
-            element_bin_width,
-            element_bin_number,
+            at_property_values,
+            property_limits,
+            property_bin_width,
+            property_bin_number,
             log_scale=False,
             weights=weights,
         )
@@ -2049,15 +2153,15 @@ class ElementAgeTracerClass(ut.io.SayClass):
         y_values = np.array([distr_sim[property_statistic], distr_at[property_statistic]])
 
         ut.plot.set_axes_scaling_limits(
-            subplot, False, element_limits, None, axis_y_log_scale, axis_y_limits, y_values
+            subplot, False, property_limits, None, axis_y_log_scale, axis_y_limits, y_values
         )
 
         axis_x_label = ut.plot.Label.get_label(
-            metal_name, species_name=species_name, get_words=True
+            property_name, species_name=species_name, get_words=True
         )
         subplot.set_xlabel(axis_x_label)
         axis_y_label = ut.plot.Label.get_label(
-            metal_name, property_statistic, species_name, get_units=False
+            property_name, property_statistic, species_name, get_units=False
         )
         subplot.set_ylabel(axis_y_label)
 
@@ -2083,7 +2187,220 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
-                element_name, 'distribution', species_name, snapshot_dict=part.snapshot
+                property_name, 'distribution', species_name, snapshot_dict=part.snapshot
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+    def plot_element_v_element(
+        self,
+        part,
+        species_name='star',
+        x_property_name='metallicity.fe',
+        x_property_limits=[-4, 1],
+        x_property_width=0.1,
+        y_property_name='metallicity.mg - metallicity.fe',
+        y_property_limits=[],
+        weight_property='mass',
+        part_indices=None,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        Plot elemental abundance v elemental abundance.
+
+        Parameters
+        ----------
+        part : dict
+            catalog of particles at snapshot
+        species_name : str
+            name of particle species
+        x_property_name : str
+            name of element on x-axis
+        x_property_limits : list
+            min and max limits to impose
+        x_property_width : float
+            width of x-axis bin
+        y_property_name : str
+            name of element[s] on y-axis
+        y_property_limits : list
+            min and max limits to impose
+        weight_property : str
+            property by which to weight each particle
+        part_indices : array
+            indices of particles from which to select
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        model_number = 2
+        x_at_property_name = x_property_name.replace('metallicity', 'metallicity.agetracer')
+        y_at_property_name = y_property_name.replace('metallicity', 'metallicity.agetracer')
+
+        if x_property_limits is not None and len(x_property_limits) > 0:
+            part_indices = ut.array.get_indices(
+                part[species_name].prop(x_property_name), x_property_limits, part_indices
+            )
+            part_indices = ut.array.get_indices(
+                part[species_name].prop(x_at_property_name), x_property_limits, part_indices
+            )
+
+        weights = None
+        if weight_property:
+            weights = part[species_name].prop(weight_property, part_indices)
+
+        Bin = ut.binning.BinClass(x_property_limits, x_property_width)
+
+        stat_sim = Bin.get_statistics_of_array(
+            part[species_name].prop(x_property_name, part_indices),
+            part[species_name].prop(y_property_name, part_indices),
+            weights,
+        )
+        stat_at = Bin.get_statistics_of_array(
+            part[species_name].prop(x_at_property_name, part_indices),
+            part[species_name].prop(y_at_property_name, part_indices),
+            weights,
+        )
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        y_values = [
+            part[species_name].prop(y_property_name, part_indices),
+            part[species_name].prop(y_at_property_name, part_indices),
+        ]
+
+        ut.plot.set_axes_scaling_limits(
+            subplot, False, x_property_limits, None, False, y_property_limits, y_values
+        )
+
+        axis_x_label = ut.plot.Label.get_label(x_property_name, species_name=species_name)
+        subplot.set_xlabel(axis_x_label)
+
+        axis_y_label = ut.plot.Label.get_label(y_property_name, species_name=species_name)
+        subplot.set_ylabel(axis_y_label)
+
+        colors = ut.plot.get_colors(model_number)
+
+        ut.plot.draw_stats(subplot, stat_sim, 'bin.mid', 'median', 2, color=colors[0], label='FIRE')
+        ut.plot.draw_stats(
+            subplot, stat_at, 'bin.mid', 'median', 2, color=colors[1], label='age-tracer'
+        )
+
+        print(ut.io.get_string_from_numbers(stat_at['median'] - stat_sim['median']))
+
+        print('median {:.3f}'.format(np.mean(stat_at['median'] - stat_sim['median'])))
+
+        if plot_file_name is True or plot_file_name == '':
+            plot_file_name = ut.plot.get_file_name(
+                y_property_name, x_property_name, species_name, snapshot_dict=part.snapshot,
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+    def plot_element_v_time(
+        self,
+        part,
+        time_name='age',
+        time_limits=[13.7, 0],
+        time_width=0.1,
+        property_name='metallicity.fe',
+        property_limits=[-4, 1],
+        weight_property='mass',
+        part_indices=None,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        Plot elemental abundance v time.
+
+        Parameters
+        ----------
+        part : dict
+            catalog of particles at snapshot
+        time_name : str
+            name of time property: 'age', 'time', 'redshift'
+        time_limits : list
+            min and max limits on time property
+        time_width : float
+            width of time bin
+        property_name : str
+            name of element[s] on y-axis
+        property_limits : list
+            min and max limits on property_name
+        weight_property : str
+            property by which to weight each particle
+        part_indices : array
+            indices of particles from which to select
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        species_name = 'star'
+        model_number = 2
+        time_log_scale = False
+        at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
+
+        if time_limits is not None and len(time_limits) > 0:
+            part_indices = ut.array.get_indices(
+                part[species_name].prop(time_name), time_limits, part_indices
+            )
+
+        weights = None
+        if weight_property:
+            weights = part[species_name].prop(weight_property, part_indices)
+
+        Bin = ut.binning.BinClass(time_limits, time_width, log_scale=time_log_scale)
+
+        stat_sim = Bin.get_statistics_of_array(
+            part[species_name].prop(time_name, part_indices),
+            part[species_name].prop(property_name, part_indices),
+            weights,
+        )
+        stat_at = Bin.get_statistics_of_array(
+            part[species_name].prop(time_name, part_indices),
+            part[species_name].prop(at_property_name, part_indices),
+            weights,
+        )
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        y_values = [
+            part[species_name].prop(property_name, part_indices),
+            part[species_name].prop(at_property_name, part_indices),
+        ]
+
+        ut.plot.set_axes_scaling_limits(
+            subplot, time_log_scale, time_limits, None, False, property_limits, y_values
+        )
+
+        axis_x_label = ut.plot.Label.get_label(time_name, get_words=True)
+        subplot.set_xlabel(axis_x_label)
+
+        axis_y_label = ut.plot.Label.get_label(property_name, species_name=species_name)
+        subplot.set_ylabel(axis_y_label)
+
+        colors = ut.plot.get_colors(model_number)
+
+        ut.plot.draw_stats(subplot, stat_sim, 'bin.mid', 'median', 2, color=colors[0], label='FIRE')
+        ut.plot.draw_stats(
+            subplot, stat_at, 'bin.mid', 'median', 2, color=colors[1], label='age-tracer'
+        )
+
+        print(ut.io.get_string_from_numbers(stat_at['median'] - stat_sim['median']))
+
+        print('median {:.3f}'.format(np.mean(stat_at['median'] - stat_sim['median'])))
+
+        if plot_file_name is True or plot_file_name == '':
+            plot_file_name = ut.plot.get_file_name(
+                property_name, time_name, species_name, snapshot_dict=part.snapshot,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -2932,14 +3249,18 @@ def write_galaxy_properties_v_time(
 
     Parameters
     ----------
-    simulation_directory : str : root directory of simulation
-    redshifts : array-like : redshifts at which to get properties
-        'all' = read and store all snapshots
-    species : str or list : name[s] of species to read and get properties of
+    simulation_directory : str
+        root directory of simulation
+    redshifts : array-like
+        redshifts at which to get properties
+            'all' = read and store all snapshots
+    species : str or list
+        name[s] of species to read and get properties of
 
     Returns
     -------
-    gal : dict : dictionary of host galaxy properties at input redshifts
+    gal : dict
+        dictionary of host galaxy properties at input redshifts
     '''
     Read = gizmo_io.ReadClass()
 
