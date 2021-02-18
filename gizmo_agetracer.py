@@ -264,7 +264,7 @@ class ElementAgeTracerClass(dict):
                 + f' = {massfraction_initial_dict}'
             )
 
-    def get_element_massfractions(self, element_name, agetracer_mass_weights, metallicities=None):
+    def get_element_massfractions(self, element_name, agetracer_mass_weights, _metallicities=None):
         '''
         Get the elemental abundances (mass fractions) for input element_name[s],
         using the the input 2-D array of age-tracer weights.
@@ -294,8 +294,8 @@ class ElementAgeTracerClass(dict):
         if element_name not in self['yields']:
             if element_name == 'total':  # alias for convenience
                 element_name = 'metals'
-            elif element_name in constant.name_from_symbol:
-                element_name = constant.name_from_symbol[element_name]
+            elif element_name in constant.element_name_from_symbol:
+                element_name = constant.element_name_from_symbol[element_name]
             else:
                 raise KeyError(
                     f'cannot compute mass fraction for element_name = {element_name}\n'

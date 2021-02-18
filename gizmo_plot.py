@@ -1954,7 +1954,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
                 # )
 
     def test_agetracers(
-        self, part, species_name='star', weight_property=None, pindices=None, adjust=False
+        self, part, species_name='star', weight_property=None, pindices=None,
     ):
         '''
         .
