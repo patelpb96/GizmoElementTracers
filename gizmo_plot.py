@@ -4492,7 +4492,7 @@ def explore_galaxy(
                 element_name = 'metallicity.iron'
                 hal.prop('star.' + element_name)
             except KeyError:
-                element_name = 'metallicity.total'
+                element_name = 'metallicity.metals'
 
             plot_property_distribution(
                 part,
@@ -5023,7 +5023,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_property_v_distance(
                         parts,
                         spec_name,
-                        'metallicity.total',
+                        'metallicity.metals',
                         'median',
                         False,
                         True,
@@ -5037,7 +5037,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     plot_property_distribution(
                         parts,
                         spec_name,
-                        'metallicity.total',
+                        'metallicity.metals',
                         [-5, 1.3],
                         0.1,
                         None,

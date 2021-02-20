@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 '''
-Default names and values for files and directories used throughout the gizmo_analysis package.
-If you prefer a different default, change it here and it should propagate througout the package.
-Some names have wildcards, such as '*', or '!', these represent name bases, generally for finding
+Default names and values for files and directories used throughout this gizmo_analysis package.
+If you prefer a different default, change it here, and it will propagate througout this package.
+Some names have wildcards, such as '*', or '!': these represent name bases, generally for finding
 any/all such files in a directory via glob.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>

@@ -234,29 +234,49 @@ class ElementAgeTracerClass(dict):
             assert len(element_yield_dict[element_name]) == self['age.bin.number']
             self['yields'][element_name] = np.array(element_yield_dict[element_name])
 
-    def assign_element_massfraction_initial(self, massfraction_initial_dict=None):
+    def assign_element_massfraction_initial(
+        self, massfraction_initial_dict=None, metallicity=None, helium_massfraction=0.24
+    ):
         '''
         Set the initial conditions for the elemental abundances (mass fractions),
         to add to the age-tracer nucleosynthetic yields.
 
         Parameters
         ----------
-        massfraction_initial : dict
-            keys as element names and values as [(linear) mass fraction] (ABSOLUTE mass fraction,
-            NOT relative to Solar) for each element, to use as initial conditions.
-            Default to 0 for any element not in this input massfraction_initial dict.
+        massfraction_initial_dict : dict
+            Keys are element names and values are (linear) absolute mass fractions for each element,
+            to use as initial conditions (at arbitrarily early cosmic times) for each particle.
+            Default to 0 for any element not in this input massfraction_initial_dict.
+        metallicity : float
+            (linear) metallity relative to Solar.
+            If defined, assume that input massfraction_initial_dict mass fractions are relative to
+            Solar, and scale them by this value.
+        helium_massfraction : float
+            If defined, use this for the initial mass fraction of helium, over-writing any value in
+            input massfraction_initial_dict.
         '''
+        # sanity checks
+        assert self['yields'] is not None and len(self['yields']) > 0
+        for element_name in massfraction_initial_dict:
+            assert element_name in self['yields']
+        if metallicity is not None:
+            # ensure is linear mass fraction relative to Solar
+            assert np.isscalar(metallicity) and metallicity >= 0
+
         if isinstance(massfraction_initial_dict, dict) and len(massfraction_initial_dict) > 0:
-            assert self['yields'] is not None and len(self['yields']) > 0
             # initialize to 0 for all elements in model, then over-write with elements in input dict
             self['massfractions.initial'] = {}
             for element_name in self['yields']:
                 self['massfractions.initial'][element_name] = 0
             for element_name in massfraction_initial_dict:
-                assert element_name in self['yields']
                 self['massfractions.initial'][element_name] = massfraction_initial_dict[
                     element_name
                 ]
+                if metallicity is not None:
+                    self['massfractions.initial'][element_name] *= metallicity
+
+            if helium_massfraction is not None and 'helium' in self['massfractions.initial']:
+                self['massfractions.initial']['helium'] = helium_massfraction
 
         else:
             print(
@@ -292,9 +312,7 @@ class ElementAgeTracerClass(dict):
         '''
         # sanity check, if input element symbol or other alais, convert to default name
         if element_name not in self['yields']:
-            if element_name == 'total':  # alias for convenience
-                element_name = 'metals'
-            elif element_name in constant.element_name_from_symbol:
+            if element_name in constant.element_name_from_symbol:
                 element_name = constant.element_name_from_symbol[element_name]
             else:
                 raise KeyError(
@@ -345,26 +363,24 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
         element_yield_dict = element_yield_dicts[0]
         element_name = tuple(element_yield_dict.keys())[0]
         for element_name in element_yield_dict:
+            if element_name == 'metals':
+                continue
             self['yields'][element_name] = np.zeros(
                 (progenitor_metal_massfractions.size, element_yield_dict[element_name].size),
                 element_yield_dict[element_name].dtype,
             )
-            if element_name == 'metals':
-                element_symbol = 'total'
-            else:
-                element_symbol = constant.element_symbol_from_name[element_name]
+            element_symbol = constant.element_symbol_from_name[element_name]
             self['yields'][element_symbol] = np.array(self['yields'][element_name])
 
         for zi, _progenitor_metal_massfractions in enumerate(progenitor_metal_massfractions):
             element_yield_dict = element_yield_dicts[zi]
             for element_name in element_yield_dict:
+                if element_name == 'metals':
+                    continue
                 assert len(element_yield_dict[element_name]) == self['age.bin.number']
                 self['yields'][element_name][zi] = np.array(element_yield_dict[element_name])
                 # assign element symbol name as dictionary key as well, for convenience later
-                if element_name == 'metals':
-                    element_symbol = 'total'
-                else:
-                    element_symbol = constant.element_symbol_from_name[element_name]
+                element_symbol = constant.element_symbol_from_name[element_name]
                 self['yields'][element_symbol][zi] = np.array(element_yield_dict[element_name])
 
         self['progenitor.metal.massfractions'] = progenitor_metal_massfractions

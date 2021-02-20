@@ -172,7 +172,7 @@ class ParticleDictionaryClass(dict):
     def __init__(self):
         # internal dictionary, to translate element name to index in particle element array
         self._element_index = collections.OrderedDict()
-        self._element_index['metals'] = self._element_index['total'] = 0
+        self._element_index['metals'] = 0
         self._element_index['helium'] = self._element_index['he'] = 1
         self._element_index['carbon'] = self._element_index['c'] = 2
         self._element_index['nitrogen'] = self._element_index['n'] = 3
@@ -588,7 +588,7 @@ class ParticleDictionaryClass(dict):
     def _get_abundances(self, property_name, indices=None):
         '''
         Get element mass fraction[s] or metallicity[s],
-        either as stored in catalog or via post-processing the age-tracer fields.
+        either as stored in dictionary or via post-processing via age-tracers.
 
         Parameters
         ----------
@@ -631,10 +631,9 @@ class ParticleDictionaryClass(dict):
 
         # normal case
         elif 'agetracer' not in property_name:
-            for prop_name in property_name.split('.'):
-                if prop_name in self._element_index:
-                    element_index = self._element_index[prop_name]
-                    element_name = prop_name
+            for element_name in property_name.split('.'):
+                if element_name in self._element_index:
+                    element_index = self._element_index[element_name]
                     break
             else:
                 raise KeyError(f'not sure how to parse property = {property_name}')
@@ -649,14 +648,15 @@ class ParticleDictionaryClass(dict):
             assert 'ElementAgeTracer' in self.__dict__ and self.ElementAgeTracer is not None
             assert len(self.ElementAgeTracer['yields']) > 0
 
-            for prop_name in property_name.split('.'):
-                if prop_name in self.ElementAgeTracer['yields']:
-                    element_name = prop_name
+            for element_name in property_name.split('.'):
+                if element_name in ut.constant.element_name_from_symbol:
+                    element_name = ut.constant.element_name_from_symbol[element_name]
+                if element_name in self.ElementAgeTracer['yields']:
                     break
             else:
                 raise KeyError(
-                    f'not sure how to parse property = {property_name}\n'
-                    + 'element age-tracer dictionary has these elements available:  {}'.format(
+                    f'not sure how to parse property = {property_name}.'
+                    + ' element age-tracer dictionary has these elements available:  {}'.format(
                         self.ElementAgeTracer['yields'].keys()
                     )
                 )
@@ -1575,21 +1575,14 @@ class ReadClass(ut.io.SayClass):
                         yield_dict = FIREYield.get_element_yields(
                             part[spec_name].ElementAgeTracer['age.bins']
                         )
-
-                        # set initial conditions for elemental mass fractions
-                        metallicity_initial = -5
-                        massfraction_initial = {}
-                        for element_name in FIREYield.sun_massfraction:
-                            massfraction_initial[element_name] = (
-                                10 ** metallicity_initial
-                                * FIREYield.NucleosyntheticYield.sun_massfraction[element_name]
-                            )
-                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
-                            massfraction_initial
-                        )
-
                         # assign yields to age-tracer dictionary class
                         part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
+
+                        # set initial conditions for elemental mass fractions
+                        metallicity_initial = 10 ** -5
+                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
+                            FIREYield.sun_massfraction, metallicity_initial
+                        )
                     else:
                         del part[spec_name].ElementAgeTracer
 
@@ -2228,7 +2221,7 @@ class ReadClass(ut.io.SayClass):
             'mass',
             'potential',
             'massfraction.metals',
-            'metallicity.total',
+            'metallicity.metals',
         ]
 
         if method is True:
@@ -2239,7 +2232,7 @@ class ReadClass(ut.io.SayClass):
             else:
                 method = 'mass'
 
-        if method in ['mass', 'potential', 'massfraction.metals', 'metallicity.total']:
+        if method in ['mass', 'potential', 'massfraction.metals', 'metallicity.metals']:
             self._assign_hosts_coordinates_from_particles(
                 part,
                 species_name,
