@@ -160,7 +160,7 @@ class NucleosyntheticYieldClass:
             stellar event: 'wind', 'supernova.cc' or 'supernova.ii', 'supernova.ia'
         progenitor_metallicity : float
             total metallicity of progenitor stellar population
-            [*linear* mass fraction relative to sun_metal_mass_fraction]
+            [linear mass fraction relative to sun_mass_fraction['metals']]
         progenitor_massfraction_dict : dict or bool [optional]
             optional: dictionary that contains the mass fraction of each element in the progenitor
             if True, then assume Solar abundance ratios and use progenitor_metallicity to normalize
@@ -206,6 +206,7 @@ class NucleosyntheticYieldClass:
             ejecta_mass = 1  # stellar wind yields are intrinsically mass fractions
 
             if model == 'fire2':
+                # FIRE-2: stellar_evolution.c line 583
                 # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
                 # mass fractions
                 element_yield['helium'] = 0.36
@@ -222,6 +223,7 @@ class NucleosyntheticYieldClass:
                     element_yield['oxygen'] *= 1.65
 
             elif model == 'fire3':
+                # FIRE-3: stellar_evolution.c line 563
                 # everything except He and CNO and S-process is well approximated by surface
                 # abundances. CNO is conserved to high accuracy in sum for secondary production
 
@@ -333,6 +335,7 @@ class NucleosyntheticYieldClass:
 
         elif event_kind in ['supernova.cc' or 'supernova.ii']:
             if 'fire2' in model:
+                # FIRE-2: stellar_evolution.c line 501 (or so)
                 # yields from Nomoto et al 2006, IMF averaged
                 ejecta_mass = 10.5  # [M_sun]
                 # mass fractions
@@ -363,6 +366,7 @@ class NucleosyntheticYieldClass:
                 element_yield['metals'] += element_yield['nitrogen'] - yield_nitrogen_orig
 
             elif model == 'fire3':
+                # FIRE-3: stellar_evolution.c line 471 (or so)
                 ejecta_mass = 8.72  # [M_sun]
 
                 # numbers for interpolation of ejecta masses
@@ -451,6 +455,7 @@ class NucleosyntheticYieldClass:
             ejecta_mass = 1.4  # [M_sun]
 
             if 'fire2' in model:
+                # FIRE-2: stellar_evolution.c line 498 (or so)
                 # yields from Iwamoto et al 1999, W7 model, IMF averaged
                 # mass fractions
                 element_yield['metals'] = 1
@@ -466,6 +471,7 @@ class NucleosyntheticYieldClass:
                 element_yield['iron'] = 0.531
 
             elif model == 'fire3':
+                # FIRE-3: stellar_evolution.c line 460 (or so)
                 # total metal mass (species below, + residuals primarily in Ar, Cr, Mn, Ni)
                 element_yield['metals'] = 1
                 # adopted yield: mean of W7 and WDD2 in Mori et al 2018
@@ -515,8 +521,9 @@ class NucleosyntheticYieldClass:
         if (
             isinstance(progenitor_massfraction_dict, dict)
             and len(progenitor_massfraction_dict) > 0
-            and (model in ['fire2', 'fire3'] or (model == 'fire2.1' and 'supernova' in event_kind))
+            and (model == 'fire2' or (model == 'fire2.1' and 'supernova' in event_kind))
         ):
+            # FIRE-2: line 509
             # enforce that yields obey pre-existing surface abundances
             # allow for larger abundances in the progenitor star - usually irrelevant
 
@@ -765,6 +772,7 @@ class StellarWindClass:
         metallicity = np.clip(metallicity, metallicity_min, metallicity_max)
 
         if 'fire2' in model:
+            # FIRE-2: stellar_evolution.c line ~350
             if np.isscalar(ages):
                 assert ages >= 0 and ages < 14001
                 # FIRE-2: stellar_evolution.c line 352

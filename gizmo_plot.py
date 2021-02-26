@@ -664,7 +664,7 @@ def plot_property_distribution(
     property_bin_number=100,
     property_log_scale=True,
     property_statistic='probability',
-    weight_property_name='',
+    weight_property=None,
     distance_limits=[],
     center_positions=None,
     center_velocities=None,
@@ -699,7 +699,7 @@ def plot_property_distribution(
     property_statistic : str
         statistic to plot: 'probability', 'probability.cum', 'probability.norm', 'histogram',
         'histogram.cum'
-    weight_property_name : str
+    weight_property : str
         property to weight each particle by
     distance_limits : list
         min and max limits for distance from galaxy
@@ -773,8 +773,8 @@ def plot_property_distribution(
         else:
             prop_values = part[species_name].prop(property_name, part_indices)
 
-        if weight_property_name:
-            weights = part[species_name].prop(weight_property_name, part_indices)
+        if weight_property is not None and len(weight_property):
+            weights = part[species_name].prop(weight_property, part_indices)
         else:
             weights = None
 
@@ -944,7 +944,7 @@ def plot_property_v_property(
     y_property_limits=[],
     y_property_log_scale=True,
     property_bin_number=150,
-    weight_by_mass=True,
+    weight_property='mass',
     cut_percent=0,
     host_distance_limits=[0, 300],
     center_position=None,
@@ -980,8 +980,8 @@ def plot_property_v_property(
         whether to use logarithmic scaling for y axis
     property_bin_number : int
         number of bins for histogram along each axis
-    weight_by_mass : bool
-        whether to weight property by particle mass
+    weight_property : str
+        property to weight each particle by
     host_distance_limits : list
         min and max limits for distance from galaxy
     center_position : array
@@ -1031,9 +1031,9 @@ def plot_property_v_property(
 
     x_prop_values = part[species_name].prop(x_property_name, part_indices)
     y_prop_values = part[species_name].prop(y_property_name, part_indices)
-    masses = None
-    if weight_by_mass:
-        masses = part[species_name].prop('mass', part_indices)
+    weights = None
+    if weight_property is not None and len(weight_property):
+        weights = part[species_name].prop(weight_property, part_indices)
 
     part_indices = ut.array.get_arange(part_indices)
 
@@ -1051,8 +1051,8 @@ def plot_property_v_property(
 
     x_prop_values = x_prop_values[part_indices]
     y_prop_values = y_prop_values[part_indices]
-    if weight_by_mass:
-        masses = masses[part_indices]
+    if weight_property is not None and len(weight_property):
+        weights = weights[part_indices]
 
     Say.say(f'keeping {x_prop_values.size} particles')
 
@@ -1101,7 +1101,7 @@ def plot_property_v_property(
         property_bin_number,
         [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(),
-        weights=masses,
+        weights=weights,
         cmin=None,
         cmax=None,
         cmap=color_map,
@@ -1157,8 +1157,8 @@ def plot_property_v_distance(
     property_name='mass',
     property_statistic='sum',
     property_log_scale=True,
-    weight_by_mass=False,
     property_limits=[],
+    weight_property='mass',
     distance_limits=[0.1, 300],
     distance_bin_width=0.02,
     distance_log_scale=True,
@@ -1192,8 +1192,8 @@ def plot_property_v_distance(
         sum.cum.fraction, median, average
     property_log_scale : bool
         whether to use logarithmic scaling for property bins
-    weight_by_mass : bool
-        whether to weight property by particle mass
+    weight_property : str
+        property to weight each particle by
     property_limits : list
         limits to impose on y-axis
     distance_limits : list
@@ -1267,7 +1267,7 @@ def plot_property_v_distance(
             species_name,
             property_name,
             property_statistic,
-            weight_by_mass,
+            weight_property,
             host_index,
             center_positions[part_i],
             center_velocities[part_i],
@@ -1961,9 +1961,8 @@ class ElementAgeTracerClass(ut.io.SayClass):
         '''
         multiplier = 100
 
-        if weight_property is None:
-            weights = None
-        else:
+        weights = None
+        if weight_property is not None and len(weight_property):
             weights = part[species_name].prop(weight_property, pindices)
 
         print(f'offset(x{multiplier}): median, 68%, 95%')
@@ -1998,9 +1997,8 @@ class ElementAgeTracerClass(ut.io.SayClass):
         progenitor_metallicities = np.arange(0.4, 2.0, 0.05)
         metallicity_initial = -5
 
-        if weight_property is None:
-            weights = None
-        else:
+        weights = None
+        if weight_property is not None and len(weight_property):
             weights = part[species_name].prop(weight_property, pindices)
 
         part[species_name].ElementAgeTracer = gizmo_agetracer.ElementAgeTracerClass(part.info)
@@ -2035,6 +2033,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
                 med = ut.math.percentile_weighted(difs, 50, weights)
                 if med > 0 and med_old < 0:
+                    progenitor_metallicity = progenitor_metallicity
                     break
                 else:
                     med_old = med
@@ -2401,6 +2400,139 @@ class ElementAgeTracerClass(ut.io.SayClass):
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
                 property_name, time_name, species_name, snapshot_dict=part.snapshot,
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+    def plot_element_v_distance(
+        self,
+        part,
+        species_name='star',
+        property_name='metallicity.fe',
+        property_statistic='median',
+        property_limits=[],
+        weight_property='mass',
+        distance_limits=[0, 15],
+        distance_bin_width=0.1,
+        distance_log_scale=False,
+        dimension_number=3,
+        rotation=True,
+        other_axis_distance_limits=None,
+        part_indices=None,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        part : dict
+            catalog[s] of particles
+        species_name : str
+            name of particle species to compute mass from: 'star', 'gas'
+        property_name : str
+            property to get profile of
+        property_statistic : str
+            statistic/type to plot: 'median', 'average'
+        property_limits : list
+            limits to impose on y-axis
+        weight_property : str
+            property to weight each particle by
+        distance_limits : list
+            min and max distance for binning
+        distance_bin_width : float
+            width of distance bin
+        distance_log_scale : bool
+            whether to use logarithmic scaling for distance bins
+        dimension_number : int
+            number of spatial dimensions for profile. if 1, get profile along minor axis.
+            if 2, get profile along 2 major axes
+        rotation : bool or array
+            whether to rotate particles - two options:
+            (a) if input array of eigen-vectors, will define rotation axes
+            (b) if True, will rotate to align with principal axes stored in species dictionary
+        other_axis_distance_limits : float
+            min and max distances along other axis[s] to keep particles [kpc physical]
+        part_indices : array
+            indices of particles to select
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        model_number = 2
+
+        at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
+
+        SpeciesProfile = ut.particle.SpeciesProfileClass(
+            distance_limits,
+            width=distance_bin_width,
+            log_scale=distance_log_scale,
+            dimension_number=dimension_number,
+        )
+
+        pro_sim = SpeciesProfile.get_statistics_profiles(
+            part,
+            species_name,
+            property_name,
+            weight_property,
+            rotation=rotation,
+            other_axis_distance_limits=other_axis_distance_limits,
+            part_indicess=part_indices,
+        )[species_name]
+
+        pro_at = SpeciesProfile.get_statistics_profiles(
+            part,
+            species_name,
+            at_property_name,
+            weight_property,
+            rotation=rotation,
+            other_axis_distance_limits=other_axis_distance_limits,
+            part_indicess=part_indices,
+        )[species_name]
+
+        # print results
+        print(pro_at[property_statistic] - pro_sim[property_statistic])
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        y_values = [np.min(np.concatenate((pro_sim['percent.16'], pro_at['percent.16']))),
+                    np.max(np.concatenate((pro_sim['percent.84'], pro_at['percent.84'])))]
+
+        _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+            subplot, distance_log_scale, distance_limits, None, False, property_limits, y_values,
+        )
+
+        if dimension_number in [2, 3]:
+            axis_x_label = 'radius'
+        elif dimension_number == 1:
+            axis_x_label = 'height'
+        axis_x_label = ut.plot.Label.get_label(axis_x_label, get_words=True)
+        subplot.set_xlabel(axis_x_label)
+
+        axis_y_label = ut.plot.Label.get_label(property_name, property_statistic)
+        subplot.set_ylabel(axis_y_label)
+
+        colors = ut.plot.get_colors(model_number)
+
+        ut.plot.draw_stats(
+            subplot, pro_sim, 'distance.mid', 'median', 2, color=colors[0], label='FIRE'
+        )
+        ut.plot.draw_stats(
+            subplot, pro_at, 'distance.mid', 'median', 2, color=colors[1], label='age-tracer'
+        )
+
+        ut.plot.make_legends(subplot)
+
+        distance_name = 'radius'
+        if dimension_number == 2:
+            distance_name += '.2d'
+        elif dimension_number == 1:
+            distance_name = 'height'
+
+        if plot_file_name is True or plot_file_name == '':
+            plot_file_name = ut.plot.get_file_name(
+                property_name + '.' + property_statistic, distance_name, species_name,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -3989,8 +4121,8 @@ class HalosClass(ut.io.SayClass):
         property_name='mass',
         property_statistic='vel.circ',
         property_log_scale=False,
-        weight_by_mass=False,
         property_limits=[],
+        weight_property='mass',
         distance_limits=[0.1, 3],
         distance_bin_width=0.1,
         distance_log_scale=True,
@@ -4021,8 +4153,8 @@ class HalosClass(ut.io.SayClass):
             sum.cum.fraction, median, ave
         property_log_scale : bool
             whether to use logarithmic scaling for property bins
-        weight_by_mass : bool
-            whether to weight property by particle mass
+        weight_property : str
+            property to weight each particle by
         property_limits : list
             limits to impose on y-axis
         distance_limits : list
@@ -4101,7 +4233,7 @@ class HalosClass(ut.io.SayClass):
                             species_name,
                             property_name,
                             property_statistic,
-                            weight_by_mass,
+                            weight_property,
                             center_position=hal[position_kind][hal_i],
                             center_velocity=hal[velocity_kind][hal_i],
                             part_indicess=part_indices,
@@ -5432,7 +5564,7 @@ def compare_star_formation_models(
         density_limits,
         density_bin_width,
         None,
-        weight_property_name='',
+        weight_property=None,
         part_indicess=part_indicess,
         distance_limits=None,
         plot_file_name=plot_file_name,
@@ -5449,7 +5581,7 @@ def compare_star_formation_models(
         density_limits,
         density_bin_width,
         None,
-        weight_property_name='sfr',
+        weight_property='sfr',
         part_indicess=part_indicess,
         distance_limits=None,
         plot_file_name=plot_file_name,

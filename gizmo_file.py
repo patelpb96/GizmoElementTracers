@@ -223,7 +223,7 @@ class CompressClass(ut.io.SayClass):
         snapshot_block_number = 1
 
         # get all snapshot file names and indices in directory
-        path_file_names, file_snapshot_indices = Read.get_snapshot_file_names_indices(
+        path_file_names, file_snapshot_indices = Read._get_snapshot_file_names_indices(
             simulation_directory + snapshot_directory
         )
 
