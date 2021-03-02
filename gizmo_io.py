@@ -863,7 +863,7 @@ class ReadClass(ut.io.SayClass):
             )
 
             # read particles from snapshot file[s]
-            part = self.read_particles(
+            part = self._read_particles(
                 simulation_directory,
                 snapshot_directory,
                 'index',
@@ -882,7 +882,7 @@ class ReadClass(ut.io.SayClass):
 
             # read/get (additional) cosmological parameters
             if header['cosmological']:
-                part.Cosmology = self.get_cosmology(
+                part.Cosmology = self._get_cosmology(
                     simulation_directory,
                     header['omega_lambda'],
                     header['omega_matter'],
@@ -1370,7 +1370,7 @@ class ReadClass(ut.io.SayClass):
 
         return header
 
-    def read_particles(
+    def _read_particles(
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
@@ -1996,7 +1996,7 @@ class ReadClass(ut.io.SayClass):
 
         return path_file_names
 
-    def get_cosmology(
+    def _get_cosmology(
         self,
         simulation_directory=gizmo_default.simulation_directory,
         omega_lambda=None,
