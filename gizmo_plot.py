@@ -1032,7 +1032,7 @@ def plot_property_v_property(
     x_prop_values = part[species_name].prop(x_property_name, part_indices)
     y_prop_values = part[species_name].prop(y_property_name, part_indices)
     weights = None
-    if weight_property is not None and len(weight_property):
+    if weight_property is not None and len(weight_property) > 0:
         weights = part[species_name].prop(weight_property, part_indices)
 
     part_indices = ut.array.get_arange(part_indices)
@@ -1051,7 +1051,7 @@ def plot_property_v_property(
 
     x_prop_values = x_prop_values[part_indices]
     y_prop_values = y_prop_values[part_indices]
-    if weight_property is not None and len(weight_property):
+    if weight_property is not None and len(weight_property) > 0:
         weights = weights[part_indices]
 
     Say.say(f'keeping {x_prop_values.size} particles')
@@ -2033,7 +2033,6 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
                 med = ut.math.percentile_weighted(difs, 50, weights)
                 if med > 0 and med_old < 0:
-                    progenitor_metallicity = progenitor_metallicity
                     break
                 else:
                     med_old = med
@@ -2496,8 +2495,10 @@ class ElementAgeTracerClass(ut.io.SayClass):
         # plot ----------
         _fig, subplot = ut.plot.make_figure(figure_index)
 
-        y_values = [np.min(np.concatenate((pro_sim['percent.16'], pro_at['percent.16']))),
-                    np.max(np.concatenate((pro_sim['percent.84'], pro_at['percent.84'])))]
+        y_values = [
+            np.min(np.concatenate((pro_sim['percent.16'], pro_at['percent.16']))),
+            np.max(np.concatenate((pro_sim['percent.84'], pro_at['percent.84']))),
+        ]
 
         _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
             subplot, distance_log_scale, distance_limits, None, False, property_limits, y_values,

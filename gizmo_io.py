@@ -343,7 +343,7 @@ class ParticleDictionaryClass(dict):
                 values = values * self.prop('massfraction.hydrogen', indices)
             else:
                 # number density of 'hydrogen', assuming solar metallicity for particles [cm ^ -3]
-                values = values * ut.constant.sun_hydrogen_mass_fraction
+                values = values * ut.constant.sun_massfraction['hydrogen']
 
             return values
 

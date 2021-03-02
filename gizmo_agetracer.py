@@ -363,14 +363,10 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
         element_yield_dict = element_yield_dicts[0]
         element_name = tuple(element_yield_dict.keys())[0]
         for element_name in element_yield_dict:
-            if element_name == 'metals':
-                continue
             self['yields'][element_name] = np.zeros(
                 (progenitor_metal_massfractions.size, element_yield_dict[element_name].size),
                 element_yield_dict[element_name].dtype,
             )
-            element_symbol = constant.element_symbol_from_name[element_name]
-            self['yields'][element_symbol] = np.array(self['yields'][element_name])
 
         for zi, _progenitor_metal_massfractions in enumerate(progenitor_metal_massfractions):
             element_yield_dict = element_yield_dicts[zi]

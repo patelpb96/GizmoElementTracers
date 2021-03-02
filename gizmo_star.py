@@ -142,7 +142,7 @@ class NucleosyntheticYieldClass:
         progenitor_metallicity=1.0,
         progenitor_massfraction_dict={},
         age=None,
-        model=DEFAULT_MODEL,
+        model=None,
         normalize=True,
     ):
         '''
@@ -205,7 +205,7 @@ class NucleosyntheticYieldClass:
         if event_kind == 'wind':
             ejecta_mass = 1  # stellar wind yields are intrinsically mass fractions
 
-            if model == 'fire2':
+            if 'fire2' in model:
                 # FIRE-2: stellar_evolution.c line 583
                 # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
                 # mass fractions
@@ -523,7 +523,7 @@ class NucleosyntheticYieldClass:
             and len(progenitor_massfraction_dict) > 0
             and (model == 'fire2' or (model == 'fire2.1' and 'supernova' in event_kind))
         ):
-            # FIRE-2: line 509
+            # FIRE-2: stellar_evolution.c line 509
             # enforce that yields obey pre-existing surface abundances
             # allow for larger abundances in the progenitor star - usually irrelevant
 
