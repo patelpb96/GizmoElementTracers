@@ -4902,8 +4902,10 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def _parse_inputs(self, parts=None, species=None, redshifts=None):
         '''
-        parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
+        parts : list
+            dictionaries of particles at snapshot
+        species : str or list
+            name[s] of particle species to read and analyze
         redshifts : float or list
         '''
         if parts is not None and isinstance(parts, dict):
@@ -4944,9 +4946,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
-        simulation_directories : list : simulation directories and names/labels for figure
+        parts : list
+            dictionaries of particles at snapshot
+        species : str or list
+            name[s] of particle species to read and analyze
+        simulation_directories : list
+            simulation directories and names/labels for figure
         redshifts : float or list
         '''
         parts, species, redshifts = self._parse_inputs(parts, species, redshifts)
@@ -5058,9 +5063,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        distance_bin_width : float : width of distance bin
-        plot_abundances : bool : whether to plot elemental abundances
+        parts : list
+            dictionaries of particles at snapshot
+        distance_bin_width : float
+            width of distance bin
+        plot_abundances : bool
+            whether to plot elemental abundances
         '''
         if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
             plot_property_v_distance(
@@ -5308,7 +5316,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
+        parts : list
+            dictionaries of particles at snapshot
         '''
         if galaxy_radius_limits is None or len(galaxy_radius_limits) == 0:
             galaxy_radius_limits = self.galaxy_radius_limits
@@ -5392,8 +5401,10 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        property_bin_number : int : number of bins along each dimension for histogram
+        parts : list
+            dictionaries of particles at snapshot
+        property_bin_number : int
+            number of bins along each dimension for histogram
         '''
         plot_directory = self.plot_directory + 'property_2d'
 
@@ -5474,10 +5485,14 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        distance_max : float : maximum distance from center to plot
-        distance_bin_width : float : distance bin width (pixel size)
-        align_principal_axes : bool : whether to align plot axes with principal axes
+        parts : list
+            dictionaries of particles at snapshot
+        distance_max : float
+            maximum distance from center to plot
+        distance_bin_width : float
+            distance bin width (pixel size)
+        align_principal_axes : bool
+            whether to align plot axes with principal axes
         '''
         plot_directory = self.plot_directory + 'image'
 

@@ -1586,39 +1586,41 @@ class ReadClass(ut.io.SayClass):
                     else:
                         del part[spec_name].ElementAgeTracer
 
+                    # re-set element dictionary pointers if reading a subset of elements in snapshot
+                    if elements is not None:
+                        # need to read Helium abundance if calculating temperature
+                        if (
+                            'InternalEnergy' in properties
+                            and 'he' not in elements
+                            and 'helium' not in elements
+                        ):
+                            elements.append('he')
+
+                        element_indices_keep = []  # indices of elements to keep
+                        for element_name in elements:
+                            element_indices_keep.append(
+                                part[spec_name]._element_index[element_name]
+                            )
+                        element_indices_keep = np.sort(element_indices_keep)
+
+                        # create temporary pointer to update default pointer index array
+                        element_pointers = np.arange(len(part[spec_name]._element_index) // 2)
+                        for element_i, element_index in enumerate(element_indices_keep):
+                            element_pointers[element_index] = element_i
+
+                        for element_name in list(part[spec_name]._element_index):
+                            element_index = part[spec_name]._element_index[element_name]
+                            if element_index in element_indices_keep:
+                                part[spec_name]._element_index[element_name] = element_pointers[
+                                    element_index
+                                ]
+                            else:
+                                del part[spec_name]._element_index[element_name]
+
                 else:
                     # element index pointers and age-tracers only relevant for stars and gas
                     del part[spec_name]._element_index
                     del part[spec_name].ElementAgeTracer
-
-                # re-set element dictionary pointers if reading a subset of elements in snapshot
-                if elements is not None:
-                    # need to read Helium abundance if calculating temperature
-                    if (
-                        'InternalEnergy' in properties
-                        and 'he' not in elements
-                        and 'helium' not in elements
-                    ):
-                        elements.append('he')
-
-                    element_indices_keep = []  # indices of elements to keep
-                    for element_name in elements:
-                        element_indices_keep.append(part[spec_name]._element_index[element_name])
-                    element_indices_keep = np.sort(element_indices_keep)
-
-                    # create temporary pointer to update default pointer index array
-                    element_pointers = np.arange(len(part[spec_name]._element_index) // 2)
-                    for element_i, element_index in enumerate(element_indices_keep):
-                        element_pointers[element_index] = element_i
-
-                    for element_name in list(part[spec_name]._element_index):
-                        element_index = part[spec_name]._element_index[element_name]
-                        if element_index in element_indices_keep:
-                            part[spec_name]._element_index[element_name] = element_pointers[
-                                element_index
-                            ]
-                        else:
-                            del part[spec_name]._element_index[element_name]
 
                 # check if snapshot file happens not to have particles of this species
                 if part_numbers_in_file[spec_id] > 0:
