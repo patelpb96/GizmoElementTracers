@@ -5192,13 +5192,6 @@ class CompareSimulationsClass(ut.io.SayClass):
                 except Exception:
                     pass
 
-            # if 'velocity' in parts[0][prop]:
-            #    plot_property_v_distance(
-            #        parts, spec, 'host.velocity.rad', 'average', False, True,
-            #        [None, None], self.halo_profile_radius_limits, 0.25,
-            #        plot_file_name=True, plot_directory=self.plot_directory,
-            #    )
-
         spec_name = 'star'
         if spec_name in parts[0]:
             plot_property_v_distance(
@@ -5301,8 +5294,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                     'age',
                     'average',
                     False,
-                    True,
                     [None, None],
+                    'mass',
                     self.galaxy_radius_limits,
                     distance_bin_width * 2,
                     False,
