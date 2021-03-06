@@ -184,10 +184,10 @@ class ParticleDictionaryClass(dict):
         self._element_index['calcium'] = self._element_index['ca'] = 9
         self._element_index['iron'] = self._element_index['fe'] = 10
         # r-process 'toy' models
-        self._element_index['rprocess1'] = self._element_index['rp1'] = 11
-        self._element_index['rprocess2'] = self._element_index['rp2'] = 12
-        self._element_index['rprocess3'] = self._element_index['rp3'] = 13
-        self._element_index['rprocess4'] = self._element_index['rp4'] = 14
+        self._element_index['rprocess1'] = 11
+        self._element_index['rprocess2'] = 12
+        self._element_index['rprocess3'] = 13
+        self._element_index['rprocess4'] = 14
 
         self.info = {}
         self.snapshot = {}
@@ -1586,15 +1586,15 @@ class ReadClass(ut.io.SayClass):
                     else:
                         del part[spec_name].ElementAgeTracer
 
-                    # re-set element dictionary pointers if reading a subset of elements in snapshot
                     if elements is not None:
+                        # re-set element dictionary pointers if reading a subset of elements
                         # need to read Helium abundance if calculating temperature
                         if (
                             'InternalEnergy' in properties
                             and 'he' not in elements
                             and 'helium' not in elements
                         ):
-                            elements.append('he')
+                            elements.append('helium')
 
                         element_indices_keep = []  # indices of elements to keep
                         for element_name in elements:
@@ -1604,7 +1604,7 @@ class ReadClass(ut.io.SayClass):
                         element_indices_keep = np.sort(element_indices_keep)
 
                         # create temporary pointer to update default pointer index array
-                        element_pointers = np.arange(len(part[spec_name]._element_index) // 2)
+                        element_pointers = np.arange(len(part[spec_name]._element_index))
                         for element_i, element_index in enumerate(element_indices_keep):
                             element_pointers[element_index] = element_i
 
