@@ -730,8 +730,7 @@ class StellarWindClass:
         '''
         Get rate of fractional mass loss [Myr ^ -1, fractional wrt formation mass] from stellar
         winds in FIRE-2 or FIRE-3.
-        Input either metallicity (linear, wrt self.solar_metal_mass_fraction) or
-        (raw) metal_mass_fraction.
+        Input either metallicity (linear, wrt Solar) or (raw) metal_mass_fraction.
 
         Includes all non-supernova mass-loss channels, but dominated by O, B, and AGB stars.
 
@@ -890,7 +889,7 @@ class StellarWindClass:
         age_maxs : float or array
             max age[s] of stellar population [Myr]
         metallicity : float
-            total abundance of metals wrt solar_metal_mass_fraction
+            (linear) total abundance of metals wrt Solar
         metal_mass_fraction : float
             mass fraction of all metals (everything not H, He)
         model : str
@@ -1463,7 +1462,7 @@ class MassLossClass(ut.io.SayClass):
         age : float or array
             age[s] of stellar population [Myr]
         metallicity : float
-            total abundance of metals wrt solar_metal_mass_fraction
+            (linear) total abundance of metals wrt Solar
         metal_mass_fraction : float
             mass fration of all metals (everything not H, He)
         model : str
@@ -1496,7 +1495,7 @@ class MassLossClass(ut.io.SayClass):
         age_maxs : float or array
             max (ending) age[s] of stellar population [Myr]
         metallicity : float
-            total abundance of metals wrt solar_metal_mass_fraction
+            (linear) total abundance of metals wrt Solar
         metal_mass_fraction : float
             mass fration of all metals (everything not H, He)
         model : str
@@ -1529,7 +1528,7 @@ class MassLossClass(ut.io.SayClass):
         ages : float or array
             age[s] of stellar population [Myr]
         metallicities : float or array
-            total abundance[s] of metals wrt solar_metal_mass_fraction
+            (linear) total abundance[s] of metals wrt Solar
         metal_mass_fractions : float or array
             mass fration[s] of all metals (everything not H, He)
         model : str
@@ -1544,7 +1543,7 @@ class MassLossClass(ut.io.SayClass):
 
         if metal_mass_fractions is not None:
             # convert mass fraction to metallicity using Solar value assumed in FIRE
-            metallicities = metal_mass_fractions / self.StellarWind.solar_metal_mass_fraction
+            metallicities = metal_mass_fractions / self.StellarWind.sun_massfraction['metals']
 
         assert np.isscalar(ages) or np.isscalar(metallicities) or len(ages) == len(metallicities)
 
@@ -1579,7 +1578,7 @@ class MassLossClass(ut.io.SayClass):
         age_bin_width : float
             log width of age bin [Myr]
         metallicity_limits : list
-            min and max limits of metal abundance wrt solar_metal_mass_fraction
+            min and max limits of (linear) total abundance of all metals wrt Solar
         metallicity_bin_width : float
             width of metallicity bin
         model : str
@@ -1767,7 +1766,7 @@ def plot_mass_loss_v_age(
     element_name : str
         name of element to get yield of (if None, compute total mass loss)
     metallicity : float
-        total abundance of metals wrt solar_metal_mass_fraction
+        (linear) total abundance of metals wrt Solar
     metal_mass_fraction : float
         mass fration of all metals (everything not H, He)
     model : str
