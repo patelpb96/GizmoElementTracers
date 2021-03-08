@@ -947,9 +947,6 @@ def test_stellar_mass_loss(
         metallicity_limits, metallicity_bin_width, include_max=True, log_scale=True
     )
 
-    # MassLoss = gizmo_star.MassLossClass()
-    # MassLoss._make_mass_loss_fraction_spline(age_bin_width=0.2, metallicity_bin_width=0.1)
-
     form_time_limits = [
         part_z.snapshot['time'] * 1000 - form_time_width,
         part_z.snapshot['time'] * 1000,
