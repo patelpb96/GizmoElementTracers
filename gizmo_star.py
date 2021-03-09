@@ -378,7 +378,7 @@ class NucleosyntheticYieldClass:
                 if model != 'fire2.2':
                     yield_nitrogen_orig = np.float(element_yield['nitrogen'])
 
-                    # nitrogen yield increases linearly with progenitor metallicity at Z/Z_sun < 1.65
+                    # nitrogen yield increases linearly with progenitor metallicity @ Z/Z_sun < 1.65
                     if progenitor_metal_mass_fraction < 0.033:
                         element_yield['nitrogen'] *= (
                             progenitor_metal_mass_fraction / self.sun_massfraction['metals']
@@ -1414,7 +1414,7 @@ class SupernovaIaClass(ut.io.SayClass):
             numbers = np.zeros(len(age_maxs))
             for age_i, age in enumerate(age_maxs):
                 numbers[age_i] = integrate.quad(
-                    self.get_rate, age_min, age, (self.modelmodel, ia_age_min)
+                    self.get_rate, age_min, age, (self.model, ia_age_min)
                 )[0]
 
         return numbers
