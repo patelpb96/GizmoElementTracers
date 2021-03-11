@@ -868,17 +868,17 @@ class ParticlePointerClass(ut.io.SayClass):
                     # particle id is redundant - tricky case
                     # loop through particles with this id, use match_property to match
                     # sanity check
-                    match_props = [
-                        part_z0[z0_spec_name].prop(self.match_property, z0_index)
-                        for z0_spec_name, z0_index, z0_total_index in part_z0_list
-                    ]
-                    if np.unique(match_props).size != len(part_z0_list):
-                        match_prop_redundant_number += 1
+                    #match_props = [
+                    #    part_z0[z0_spec_name][self.match_property][z0_index
+                    #    for z0_spec_name, z0_index, z0_total_index in part_z0_list
+                    #]
+                    #if np.unique(match_props).size != len(part_z0_list):
+                    #    match_prop_redundant_number += 1
 
-                    z_match_prop = part_z[spec_name].prop(self.match_property, part_z_index)
+                    z_match_prop = part_z[spec_name][self.match_property][part_z_index]
 
                     for z0_spec_name, z0_index, z0_total_index in part_z0_list:
-                        z0_match_prop = part_z0[z0_spec_name].prop(self.match_property, z0_index)
+                        z0_match_prop = part_z0[z0_spec_name][self.match_property][z0_index]
 
                         if self.match_property == 'id.child':
                             if z0_match_prop == z_match_prop:
@@ -929,7 +929,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 )
             )
         else:
-            # check using test property - only valid for stars!
+            # check using test property - only valid for stars
             if (
                 self.test_property
                 and self.test_property != self.match_property

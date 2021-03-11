@@ -47,7 +47,7 @@ def get_sun_massfraction(model=DEFAULT_MODEL):
     '''
 
     model = model.lower()
-    assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire2.3', 'fire3']
+    assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
     sun_massfraction = {}
 
@@ -93,7 +93,7 @@ def get_ages_critical(model=DEFAULT_MODEL):
         stellar evolution model: 'fire2', 'fire3'
     '''
     model = model.lower()
-    assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire2.3', 'fire3']
+    assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
     if 'fire2' in model:
         ages_critical = np.sort([3.401, 10.37, 37.53, 1, 50, 100, 1000, 13800])  # [Myr]
@@ -235,7 +235,7 @@ class NucleosyntheticYieldClass:
                 element_yield['nitrogen'] = 0.0041
                 element_yield['oxygen'] = 0.0118
 
-                if self.model != 'fire2.2':
+                if self.model == 'fire2':
                     # oxygen yield increases linearly with progenitor metallicity at Z/Z_sun < 1.65
                     if progenitor_metal_mass_fraction < 0.033:
                         element_yield['oxygen'] *= (
@@ -366,16 +366,15 @@ class NucleosyntheticYieldClass:
                 element_yield['carbon'] = 0.0127
                 element_yield['nitrogen'] = 0.00456
                 element_yield['oxygen'] = 0.111
-                element_yield['neon'] = 0.0286
-                if self.model in ['fire2.1', 'fire2.2', 'fire2.3']:
-                    element_yield['neon'] = 0.0381  # used in later simulations
+                # element_yield['neon'] = 0.0286  # used in original FIRE-2
+                element_yield['neon'] = 0.0381  # used in later FIRE-2
                 element_yield['magnesium'] = 0.00940
                 element_yield['silicon'] = 0.00889
                 element_yield['sulphur'] = 0.00378
-                element_yield['calcium'] = 0.000436  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
+                element_yield['calcium'] = 0.000436  # Nomoto et al 2013 sug gest 0.05 - 0.1 M_sun
                 element_yield['iron'] = 0.00706
 
-                if model != 'fire2.2':
+                if model == 'fire2':
                     yield_nitrogen_orig = np.float(element_yield['nitrogen'])
 
                     # nitrogen yield increases linearly with progenitor metallicity @ Z/Z_sun < 1.65
@@ -544,11 +543,13 @@ class NucleosyntheticYieldClass:
         if (
             isinstance(progenitor_massfraction_dict, dict)
             and len(progenitor_massfraction_dict) > 0
-            and (self.model == 'fire2' or (self.model == 'fire2.1' and 'supernova' in event_kind))
+            and (self.model == 'fire2' and 'supernova' in event_kind)
         ):
             # FIRE-2: stellar_evolution.c line 509
             # enforce that yields obey pre-existing surface abundances
             # allow for larger abundances in the progenitor star - usually irrelevant
+            # original FIRE-2 applied this to all mass-loss channels (including stellar winds)
+            # later FIRE-2 applied this only to supernovae
 
             # get pure (non-metal) mass fraction of star
             pure_mass_fraction = 1 - progenitor_metal_mass_fraction
@@ -724,7 +725,7 @@ class StellarWindClass:
         '''
         self.ejecta_mass = 1.0  # for stellar winds, rates are mass fractions wrt formation mass
 
-        self.models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire2.3', 'fire3']
+        self.models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self._parse_model(model)
 
     def _parse_model(self, model):
@@ -793,8 +794,8 @@ class StellarWindClass:
 
         metallicity = np.clip(metallicity, metallicity_min, metallicity_max)
 
-        if self.model == 'fire2.3':
-            metallicity = 1  # force progenitor-metallicity-independent wind rates
+        if self.model == 'fire2.2':
+            metallicity = 1  # force wind rates not to depend on progenitor metallicity
 
         if 'fire2' in self.model:
             # FIRE-2: stellar_evolution.c line 350
@@ -802,9 +803,8 @@ class StellarWindClass:
                 assert ages >= 0 and ages < 14001
                 # FIRE-2: stellar_evolution.c line 352
                 if ages <= 1:
-                    rates = 4.76317  # rate [Gyr^-1]
-                    if self.model == 'fire2.1':
-                        rates = 4.76317 * metallicity  # used (accidentally?) in some simulations
+                    # rates = 4.76317  # rate [Gyr^-1], used (accidentally?) in original FIRE-2
+                    rates = 4.76317 * metallicity  # # rate [Gyr^-1]
                 elif ages <= 3.5:
                     rates = 4.76317 * metallicity * ages ** (1.838 * (0.79 + np.log10(metallicity)))
                 elif ages <= 100:
@@ -817,9 +817,8 @@ class StellarWindClass:
                 rates = np.zeros(ages.size)
 
                 masks = np.where(ages <= 1)[0]
-                rates[masks] = 4.76317  # rate [Gyr^-1]
-                if self.model == 'fire2.1':
-                    rates[masks] = 4.76317 * metallicity  # used (accidentally?) in some simulations
+                # rates[masks] = 4.76317  # rate [Gyr^-1], used (accidentally?) in original FIRE-2
+                rates[masks] = 4.76317 * metallicity  # rate [Gyr^-1]
 
                 masks = np.where((ages > 1) * (ages <= 3.5))[0]
                 rates[masks] = (
@@ -991,7 +990,7 @@ class SupernovaCCClass:
         '''
         self.ejecta_mass = 10.5  # ejecta mass per event, IMF-averaged [M_sun]
 
-        self.models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire2.3', 'fire3']
+        self.models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self._parse_model(model)
 
         if cc_age_min is None:
@@ -1274,7 +1273,6 @@ class SupernovaIaClass(ut.io.SayClass):
             'fire2',
             'fire2.1',
             'fire2.2',
-            'fire2.3',
             'fire3',
             'mannucci',
             'maoz',
@@ -1346,7 +1344,7 @@ class SupernovaIaClass(ut.io.SayClass):
         '''
 
         def get_rate(ages, model):
-            if model in ['mannucci', 'fire2', 'fire2.1']:
+            if 'fire2' in model or model == 'mannucci':
                 # Mannucci, Della Valle, & Panagia 2006
                 rate = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((ages - 50) / 10) ** 2)  # [Myr ^ -1]
             elif model == 'fire3':
@@ -1474,7 +1472,7 @@ class MassLossClass(ut.io.SayClass):
         model : str
             stellar evolution model to use: 'fire2', 'fire3'
         '''
-        self.models_available = ['fire2', 'fire2.1', 'fire3']
+        self.models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self._parse_model(model)
 
         self.SupernovaCC = SupernovaCCClass(self.model)
