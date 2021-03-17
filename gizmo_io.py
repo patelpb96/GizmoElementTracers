@@ -1837,7 +1837,7 @@ class ReadClass(ut.io.SayClass):
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
-            if part[spec_name].info['has.agetracer']:
+            if 'massfraction' in part[spec_name] and part[spec_name].info['has.agetracer']:
                 # convert the mass weights in the age-tracer bins to [M_sun]
                 agetracer_index_start = part[spec_name].ElementAgeTracer['element.index.start']
                 part[spec_name]['massfraction'][:, agetracer_index_start:] *= (

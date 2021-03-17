@@ -570,7 +570,7 @@ class ImageClass(ut.io.SayClass):
         if '3d' in image_kind:
             # calculate maximum local density along projected dimension
             hist_valuess, (hist_xs, hist_ys, hist_zs) = np.histogramdd(
-                positions, position_bin_number, position_limits, weights=weights, normed=False
+                positions, position_bin_number, position_limits, weights=weights
             )
             # convert to 3-d density
             hist_valuess /= np.diff(hist_xs)[0] * np.diff(hist_ys)[0] * np.diff(hist_zs)[0]
@@ -588,7 +588,6 @@ class ImageClass(ut.io.SayClass):
                 position_bin_number,
                 position_limits[dimension_list],
                 weights=weights,
-                normed=False,
             )
 
             # convert to surface density
@@ -1110,7 +1109,7 @@ def plot_property_v_property(
     # valuess, _xs, _ys = np.histogram2d(
     #    x_prop_values, y_prop_values, property_bin_number,
     #    [axis_x_limits, axis_y_limits],
-    #    normed=False, weights=masses)
+    #    weights=masses)
 
     # subplot.imshow(
     #    valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
@@ -1965,25 +1964,56 @@ class ElementAgeTracerClass(ut.io.SayClass):
         if weight_property is not None and len(weight_property):
             weights = part[species_name].prop(weight_property, pindices)
 
-        print(f'offset(x{multiplier}): median, 68%, 95%')
-        for element_name in part[species_name].ElementAgeTracer['yields']:
-            difs = part[species_name].prop(
-                f'metallicity.agetracer.{element_name}', pindices
-            ) - part[species_name].prop(f'metallicity.{element_name}', pindices)
+        self.say('median, dif_pop, dif_pp')
+        self.say('68% width, dif_pop, dif_pp')
+        self.say('95% width, dif_pop, dif_pp')
+        self.say(f'(dif x {multiplier})')
 
-            med = ut.math.percentile_weighted(difs, 50, weights)
+        for element_name in part[species_name].ElementAgeTracer['yields']:
+            values_at = part[species_name].prop(f'metallicity.agetracer.{element_name}', pindices)
+            values_sim = part[species_name].prop(f'metallicity.{element_name}', pindices)
+            difs = values_at - values_sim
+
+            med_at = ut.math.percentile_weighted(values_at, 50, weights)
+            med_sim = ut.math.percentile_weighted(values_sim, 50, weights)
+            med_pp = ut.math.percentile_weighted(difs, 50, weights)
+
+            p84 = ut.math.percentile_weighted(values_at, 84, weights)
+            p16 = ut.math.percentile_weighted(values_at, 16, weights)
+            w68_at = (p84 - p16) / 2
+            p84 = ut.math.percentile_weighted(values_sim, 84, weights)
+            p16 = ut.math.percentile_weighted(values_sim, 16, weights)
+            w68_sim = (p84 - p16) / 2
             p84 = ut.math.percentile_weighted(difs, 84, weights)
             p16 = ut.math.percentile_weighted(difs, 16, weights)
-            w68 = (p84 - p16) / 2
+            w68_pp = (p84 - p16) / 2
+
+            p98 = ut.math.percentile_weighted(values_at, 97.725, weights)
+            p02 = ut.math.percentile_weighted(values_at, 2.275, weights)
+            w95_at = (p98 - p02) / 2
+            p98 = ut.math.percentile_weighted(values_sim, 97.725, weights)
+            p02 = ut.math.percentile_weighted(values_sim, 2.275, weights)
+            w95_sim = (p98 - p02) / 2
             p98 = ut.math.percentile_weighted(difs, 97.725, weights)
             p02 = ut.math.percentile_weighted(difs, 2.275, weights)
-            w95 = (p98 - p02) / 2
+            w95_pp = (p98 - p02) / 2
 
-            print(
-                '{:10}: {:5.1f}  {:4.1f} {:4.1f}'.format(
-                    element_name, med * multiplier, w68 * multiplier, w95 * multiplier
+            self.say(
+                '{:10} {:5.1f} {:5.2f} {:5.2f}'.format(element_name, med_sim, w68_sim, w95_sim,)
+            )
+            self.say(
+                '           {:5.1f} {:5.1f} {:5.1f}'.format(
+                    (med_at - med_sim) * multiplier,
+                    (w68_at - w68_sim) * multiplier,
+                    (w95_at - w95_sim) * multiplier,
                 )
             )
+            self.say(
+                '           {:5.1f} {:5.1f} {:5.1f}'.format(
+                    med_pp * multiplier, w68_pp * multiplier, w95_pp * multiplier
+                )
+            )
+            self.say('')
 
     def test_agetracers_progenitor_metallicity(
         self, part, species_name='star', weight_property=None, pindices=None, model='fire2.1'

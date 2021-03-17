@@ -701,7 +701,7 @@ class ParticlePointerClass(ut.io.SayClass):
 
         # assign pointers at reference snapshot from particle id to index in catalog
         ut.particle.assign_id_to_index(
-            part_z0, self.species_names, self.id_name, store_as_dict=True, verbose=False
+            part_z0, self.species_names, self.id_name, store_as_dict=True, verbose=True
         )
         self.say(f'assigned id->index pointers at snapshot {self.reference_snapshot_index}')
 
@@ -867,12 +867,13 @@ class ParticlePointerClass(ut.io.SayClass):
                 else:
                     # particle id is redundant - tricky case
                     # loop through particles with this id, use match_property to match
+
                     # sanity check
-                    #match_props = [
-                    #    part_z0[z0_spec_name][self.match_property][z0_index
+                    # match_props = [
+                    #    part_z0[z0_spec_name][self.match_property][z0_index]
                     #    for z0_spec_name, z0_index, z0_total_index in part_z0_list
-                    #]
-                    #if np.unique(match_props).size != len(part_z0_list):
+                    # ]
+                    # if np.unique(match_props).size != len(part_z0_list):
                     #    match_prop_redundant_number += 1
 
                     z_match_prop = part_z[spec_name][self.match_property][part_z_index]
@@ -880,10 +881,9 @@ class ParticlePointerClass(ut.io.SayClass):
                     for z0_spec_name, z0_index, z0_total_index in part_z0_list:
                         z0_match_prop = part_z0[z0_spec_name][self.match_property][z0_index]
 
-                        if self.match_property == 'id.child':
-                            if z0_match_prop == z_match_prop:
-                                Pointer[pointer_index_name][z0_total_index] = part_z_total_index
-                                break
+                        if self.match_property == 'id.child' and z0_match_prop == z_match_prop:
+                            Pointer[pointer_index_name][z0_total_index] = part_z_total_index
+                            break
                         else:
                             frac_dif = np.abs((z0_match_prop - z_match_prop) / z_match_prop)
                             if frac_dif < self.match_propery_tolerance:
