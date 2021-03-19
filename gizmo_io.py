@@ -60,14 +60,14 @@ All particle species have the following properties:
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
-Star and gas particles also have additional IDs (because gas can split):
+Star and gas particles have 2 additional IDs:
+(because a gas particle splits if it gets too massive, and a star particle inherits these IDs)
     'id.child' : child ID
     'id.generation' : generation ID
-These are initialized to 0 for all gas particles.
+These 2 IDs are initialized to 0 for all gas particles.
 Each time a gas particle splits into 2, the 'self' particle retains id.child, while the other
 particle gets id.child += 2 ^ id.generation.
 Both particles then get id.generation += 1.
-Star particles inherit these from their progenitor gas particles.
 Caveat: this allows a maximum of 30 generations, then its resets to 0.
 Thus, particles with id.generation > 30 are not unique anymore.
 

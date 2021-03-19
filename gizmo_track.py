@@ -1668,6 +1668,50 @@ class ParticleCoordinateClass(ut.io.SayClass):
 ParticleCoordinate = ParticleCoordinateClass()
 
 
+class TestClass:
+    '''
+    .
+    '''
+
+    def assign_ids_to_indices(self, part):
+        '''
+        .
+        '''
+        pindices = np.where(part['star']['id.child'] == 0)[0]
+        pids = part['star']['id'][pindices]
+        self.id_to_index = np.zeros(pids.max() + 1, np.int32) - pids.max() - 1
+        self.id_to_index[pids] = pindices
+
+        pindices = np.where(part['star']['id.child'] > 0)[0]
+        pids = part['star']['id'][pindices]
+        cids = part['star']['id.child'][pindices]
+        self.ids_to_index = {}
+        for (pindex, pid, cid) in zip(pindices, pids, cids):
+            self.ids_to_index[(pid, cid)] = pindex
+
+    def get_indices(self, part, indices=None):
+        '''
+        .
+        '''
+        if indices is None:
+            indices = np.arange(part['star']['id'].size, dtype=np.int32)
+
+        z0_indices = np.zeros(indices.size, indices.dtype)
+
+        pindices = indices[np.where(part['star']['id.child'][indices] == 0)[0]]
+        pids = part['star']['id'][pindices]
+        z0_indices[pindices] = self.id_to_index[pids]
+
+        pindices = indices[np.where(part['star']['id.child'][indices] > 0)[0]]
+        pids = part['star']['id'][pindices]
+        cids = part['star']['id.child'][pindices]
+        for (pindex, pid, cid) in zip(pindices, pids, cids):
+            if (pid, cid) in self.ids_to_index:
+                z0_indices[pindex] = self.ids_to_index[(pid, cid)]
+
+        return z0_indices
+
+
 # --------------------------------------------------------------------------------------------------
 # run from command line
 # --------------------------------------------------------------------------------------------------
