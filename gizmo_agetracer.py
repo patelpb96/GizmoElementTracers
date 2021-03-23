@@ -501,10 +501,9 @@ class FIREYieldClass:
         ]
         """
 
-        # critical/transition/discontinuous ages [Myr] in this model to be careful around when
-        # integrating across age to get cumulative yields
+        # transition/discontinuous ages [Myr] in this model to be careful around when integrating
+        self.ages_critical = gizmo_star.get_ages_critical(model)
         # self.ages_critical = None
-        self.ages_critical = np.sort([3.401, 10.37, 37.53, 1, 50, 100, 1000, 14000])
 
         # store this (default) progenitor metallicity, including the mass fraction for each element
         # use the latter to compute metallicity-dependent corrections to the yields

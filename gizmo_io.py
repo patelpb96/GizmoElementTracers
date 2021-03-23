@@ -60,14 +60,14 @@ All particle species have the following properties:
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
-Star and gas particles also have additional IDs (because gas can split):
+Star and gas particles have 2 additional IDs:
+(because a gas particle splits if it gets too massive, and a star particle inherits these IDs)
     'id.child' : child ID
     'id.generation' : generation ID
-These are initialized to 0 for all gas particles.
+These 2 IDs are initialized to 0 for all gas particles.
 Each time a gas particle splits into 2, the 'self' particle retains id.child, while the other
 particle gets id.child += 2 ^ id.generation.
 Both particles then get id.generation += 1.
-Star particles inherit these from their progenitor gas particles.
 Caveat: this allows a maximum of 30 generations, then its resets to 0.
 Thus, particles with id.generation > 30 are not unique anymore.
 
@@ -184,10 +184,10 @@ class ParticleDictionaryClass(dict):
         self._element_index['calcium'] = self._element_index['ca'] = 9
         self._element_index['iron'] = self._element_index['fe'] = 10
         # r-process 'toy' models
-        self._element_index['rprocess1'] = self._element_index['rp1'] = 11
-        self._element_index['rprocess2'] = self._element_index['rp2'] = 12
-        self._element_index['rprocess3'] = self._element_index['rp3'] = 13
-        self._element_index['rprocess4'] = self._element_index['rp4'] = 14
+        self._element_index['rprocess1'] = 11
+        self._element_index['rprocess2'] = 12
+        self._element_index['rprocess3'] = 13
+        self._element_index['rprocess4'] = 14
 
         self.info = {}
         self.snapshot = {}
@@ -863,7 +863,7 @@ class ReadClass(ut.io.SayClass):
             )
 
             # read particles from snapshot file[s]
-            part = self.read_particles(
+            part = self._read_particles(
                 simulation_directory,
                 snapshot_directory,
                 'index',
@@ -882,7 +882,7 @@ class ReadClass(ut.io.SayClass):
 
             # read/get (additional) cosmological parameters
             if header['cosmological']:
-                part.Cosmology = self.get_cosmology(
+                part.Cosmology = self._get_cosmology(
                     simulation_directory,
                     header['omega_lambda'],
                     header['omega_matter'],
@@ -1370,7 +1370,7 @@ class ReadClass(ut.io.SayClass):
 
         return header
 
-    def read_particles(
+    def _read_particles(
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
@@ -1586,39 +1586,41 @@ class ReadClass(ut.io.SayClass):
                     else:
                         del part[spec_name].ElementAgeTracer
 
+                    if elements is not None:
+                        # re-set element dictionary pointers if reading a subset of elements
+                        # need to read Helium abundance if calculating temperature
+                        if (
+                            'InternalEnergy' in properties
+                            and 'he' not in elements
+                            and 'helium' not in elements
+                        ):
+                            elements.append('helium')
+
+                        element_indices_keep = []  # indices of elements to keep
+                        for element_name in elements:
+                            element_indices_keep.append(
+                                part[spec_name]._element_index[element_name]
+                            )
+                        element_indices_keep = np.sort(element_indices_keep)
+
+                        # create temporary pointer to update default pointer index array
+                        element_pointers = np.arange(len(part[spec_name]._element_index))
+                        for element_i, element_index in enumerate(element_indices_keep):
+                            element_pointers[element_index] = element_i
+
+                        for element_name in list(part[spec_name]._element_index):
+                            element_index = part[spec_name]._element_index[element_name]
+                            if element_index in element_indices_keep:
+                                part[spec_name]._element_index[element_name] = element_pointers[
+                                    element_index
+                                ]
+                            else:
+                                del part[spec_name]._element_index[element_name]
+
                 else:
                     # element index pointers and age-tracers only relevant for stars and gas
                     del part[spec_name]._element_index
                     del part[spec_name].ElementAgeTracer
-
-                # re-set element dictionary pointers if reading a subset of elements in snapshot
-                if elements is not None:
-                    # need to read Helium abundance if calculating temperature
-                    if (
-                        'InternalEnergy' in properties
-                        and 'he' not in elements
-                        and 'helium' not in elements
-                    ):
-                        elements.append('he')
-
-                    element_indices_keep = []  # indices of elements to keep
-                    for element_name in elements:
-                        element_indices_keep.append(part[spec_name]._element_index[element_name])
-                    element_indices_keep = np.sort(element_indices_keep)
-
-                    # create temporary pointer to update default pointer index array
-                    element_pointers = np.arange(len(part[spec_name]._element_index) // 2)
-                    for element_i, element_index in enumerate(element_indices_keep):
-                        element_pointers[element_index] = element_i
-
-                    for element_name in list(part[spec_name]._element_index):
-                        element_index = part[spec_name]._element_index[element_name]
-                        if element_index in element_indices_keep:
-                            part[spec_name]._element_index[element_name] = element_pointers[
-                                element_index
-                            ]
-                        else:
-                            del part[spec_name]._element_index[element_name]
 
                 # check if snapshot file happens not to have particles of this species
                 if part_numbers_in_file[spec_id] > 0:
@@ -1835,7 +1837,7 @@ class ReadClass(ut.io.SayClass):
                 # convert to [M_sun]
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
-            if part[spec_name].info['has.agetracer']:
+            if 'massfraction' in part[spec_name] and part[spec_name].info['has.agetracer']:
                 # convert the mass weights in the age-tracer bins to [M_sun]
                 agetracer_index_start = part[spec_name].ElementAgeTracer['element.index.start']
                 part[spec_name]['massfraction'][:, agetracer_index_start:] *= (
@@ -1996,7 +1998,7 @@ class ReadClass(ut.io.SayClass):
 
         return path_file_names
 
-    def get_cosmology(
+    def _get_cosmology(
         self,
         simulation_directory=gizmo_default.simulation_directory,
         omega_lambda=None,

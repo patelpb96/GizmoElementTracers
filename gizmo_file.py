@@ -232,13 +232,14 @@ class CompressClass(ut.io.SayClass):
             snapshot_file_names = glob.glob(path_file_names[0] + '/*')
             snapshot_block_number = len(snapshot_file_names)
 
-        if snapshot_indices is not None and snapshot_indices != 'all':
-            # input snapshot indices, so limit to those
+        if snapshot_indices is None or isinstance(snapshot_indices, str):
+            # run on all available snapshots
+            snapshot_indices = file_snapshot_indices
+        else:
+            # input array/list of snapshot indices, so limit to those
             if np.isscalar(snapshot_indices):
                 snapshot_indices = [snapshot_indices]
             snapshot_indices = np.intersect1d(snapshot_indices, file_snapshot_indices)
-        else:
-            snapshot_indices = file_snapshot_indices
 
         for snapshot_index in snapshot_indices:
             for snapshot_block_index in range(snapshot_block_number):

@@ -570,7 +570,7 @@ class ImageClass(ut.io.SayClass):
         if '3d' in image_kind:
             # calculate maximum local density along projected dimension
             hist_valuess, (hist_xs, hist_ys, hist_zs) = np.histogramdd(
-                positions, position_bin_number, position_limits, weights=weights, normed=False
+                positions, position_bin_number, position_limits, weights=weights
             )
             # convert to 3-d density
             hist_valuess /= np.diff(hist_xs)[0] * np.diff(hist_ys)[0] * np.diff(hist_zs)[0]
@@ -588,7 +588,6 @@ class ImageClass(ut.io.SayClass):
                 position_bin_number,
                 position_limits[dimension_list],
                 weights=weights,
-                normed=False,
             )
 
             # convert to surface density
@@ -1110,7 +1109,7 @@ def plot_property_v_property(
     # valuess, _xs, _ys = np.histogram2d(
     #    x_prop_values, y_prop_values, property_bin_number,
     #    [axis_x_limits, axis_y_limits],
-    #    normed=False, weights=masses)
+    #    weights=masses)
 
     # subplot.imshow(
     #    valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
@@ -1965,25 +1964,56 @@ class ElementAgeTracerClass(ut.io.SayClass):
         if weight_property is not None and len(weight_property):
             weights = part[species_name].prop(weight_property, pindices)
 
-        print(f'offset(x{multiplier}): median, 68%, 95%')
-        for element_name in part[species_name].ElementAgeTracer['yields']:
-            difs = part[species_name].prop(
-                f'metallicity.agetracer.{element_name}', pindices
-            ) - part[species_name].prop(f'metallicity.{element_name}', pindices)
+        self.say('median, dif_pop, dif_pp')
+        self.say('68% width, dif_pop, dif_pp')
+        self.say('95% width, dif_pop, dif_pp')
+        self.say(f'(dif x {multiplier})')
 
-            med = ut.math.percentile_weighted(difs, 50, weights)
+        for element_name in part[species_name].ElementAgeTracer['yields']:
+            values_at = part[species_name].prop(f'metallicity.agetracer.{element_name}', pindices)
+            values_sim = part[species_name].prop(f'metallicity.{element_name}', pindices)
+            difs = values_at - values_sim
+
+            med_at = ut.math.percentile_weighted(values_at, 50, weights)
+            med_sim = ut.math.percentile_weighted(values_sim, 50, weights)
+            med_pp = ut.math.percentile_weighted(difs, 50, weights)
+
+            p84 = ut.math.percentile_weighted(values_at, 84, weights)
+            p16 = ut.math.percentile_weighted(values_at, 16, weights)
+            w68_at = (p84 - p16) / 2
+            p84 = ut.math.percentile_weighted(values_sim, 84, weights)
+            p16 = ut.math.percentile_weighted(values_sim, 16, weights)
+            w68_sim = (p84 - p16) / 2
             p84 = ut.math.percentile_weighted(difs, 84, weights)
             p16 = ut.math.percentile_weighted(difs, 16, weights)
-            w68 = (p84 - p16) / 2
+            w68_pp = (p84 - p16) / 2
+
+            p98 = ut.math.percentile_weighted(values_at, 97.725, weights)
+            p02 = ut.math.percentile_weighted(values_at, 2.275, weights)
+            w95_at = (p98 - p02) / 2
+            p98 = ut.math.percentile_weighted(values_sim, 97.725, weights)
+            p02 = ut.math.percentile_weighted(values_sim, 2.275, weights)
+            w95_sim = (p98 - p02) / 2
             p98 = ut.math.percentile_weighted(difs, 97.725, weights)
             p02 = ut.math.percentile_weighted(difs, 2.275, weights)
-            w95 = (p98 - p02) / 2
+            w95_pp = (p98 - p02) / 2
 
-            print(
-                '{:10}: {:5.1f}  {:4.1f} {:4.1f}'.format(
-                    element_name, med * multiplier, w68 * multiplier, w95 * multiplier
+            self.say(
+                '{:10} {:5.1f} {:5.2f} {:5.2f}'.format(element_name, med_sim, w68_sim, w95_sim,)
+            )
+            self.say(
+                '           {:5.1f} {:5.1f} {:5.1f}'.format(
+                    (med_at - med_sim) * multiplier,
+                    (w68_at - w68_sim) * multiplier,
+                    (w95_at - w95_sim) * multiplier,
                 )
             )
+            self.say(
+                '           {:5.1f} {:5.1f} {:5.1f}'.format(
+                    med_pp * multiplier, w68_pp * multiplier, w95_pp * multiplier
+                )
+            )
+            self.say('')
 
     def test_agetracers_progenitor_metallicity(
         self, part, species_name='star', weight_property=None, pindices=None, model='fire2.1'
@@ -3708,7 +3738,7 @@ def get_galaxy_mass_profiles_v_redshift(
             'mass',
             'density',
             True,
-            False,
+            [None, None],
             None,
             [0.05, 20],
             0.1,
@@ -3725,7 +3755,7 @@ def get_galaxy_mass_profiles_v_redshift(
             'mass',
             'density',
             True,
-            False,
+            [None, None],
             None,
             [0.05, 20],
             0.1,
@@ -3744,7 +3774,7 @@ def get_galaxy_mass_profiles_v_redshift(
             'mass',
             'density',
             True,
-            False,
+            [None, None],
             None,
             [0.05, 20],
             0.1,
@@ -3763,7 +3793,7 @@ def get_galaxy_mass_profiles_v_redshift(
             'mass',
             'density',
             True,
-            False,
+            [None, None],
             None,
             [0.05, 20],
             0.1,
@@ -4087,8 +4117,8 @@ class HalosClass(ut.io.SayClass):
             'mass',
             'vel.circ',
             vel_circ_log_scale,
-            False,
             vel_circ_limits,
+            None,
             radius_limits,
             radius_bin_width,
             radius_log_scale,
@@ -4443,7 +4473,7 @@ class HalosClass(ut.io.SayClass):
             'mass',
             'density',
             True,
-            False,
+            [None, None],
             None,
             distance_limits,
             distance_bin_width,
@@ -4497,8 +4527,8 @@ class HalosClass(ut.io.SayClass):
             'mass',
             'density',
             True,
-            False,
             density_limits,
+            None,
             distance_limits,
             distance_bin_width,
             True,
@@ -4650,7 +4680,7 @@ def explore_galaxy(
                 'mass',
                 'density',
                 True,
-                False,
+                [None, None],
                 None,
                 [0.1, distance_max],
                 0.1,
@@ -4678,8 +4708,8 @@ def explore_galaxy(
                 'velocity.total',
                 'std.cum',
                 False,
-                True,
-                None,
+                [None, None],
+                'mass',
                 [0.1, distance_max],
                 0.1,
                 True,
@@ -4699,8 +4729,8 @@ def explore_galaxy(
                 element_name,
                 'median',
                 False,
-                True,
-                None,
+                [None, None],
+                'mass',
                 [0.1, distance_max],
                 0.2,
                 True,
@@ -4782,7 +4812,7 @@ def explore_galaxy(
                 'mass',
                 'density',
                 True,
-                False,
+                [None, None],
                 None,
                 [0.1, distance_max],
                 0.1,
@@ -4810,7 +4840,7 @@ def explore_galaxy(
                 'mass',
                 'vel.circ',
                 False,
-                True,
+                [None, None],
                 None,
                 [0.1, distance_max],
                 0.1,
@@ -4902,8 +4932,10 @@ class CompareSimulationsClass(ut.io.SayClass):
 
     def _parse_inputs(self, parts=None, species=None, redshifts=None):
         '''
-        parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
+        parts : list
+            dictionaries of particles at snapshot
+        species : str or list
+            name[s] of particle species to read and analyze
         redshifts : float or list
         '''
         if parts is not None and isinstance(parts, dict):
@@ -4944,9 +4976,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
-        simulation_directories : list : simulation directories and names/labels for figure
+        parts : list
+            dictionaries of particles at snapshot
+        species : str or list
+            name[s] of particle species to read and analyze
+        simulation_directories : list
+            simulation directories and names/labels for figure
         redshifts : float or list
         '''
         parts, species, redshifts = self._parse_inputs(parts, species, redshifts)
@@ -5058,9 +5093,12 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        distance_bin_width : float : width of distance bin
-        plot_abundances : bool : whether to plot elemental abundances
+        parts : list
+            dictionaries of particles at snapshot
+        distance_bin_width : float
+            width of distance bin
+        plot_abundances : bool
+            whether to plot elemental abundances
         '''
         if 'dark' in parts[0] and 'gas' in parts[0] and 'star' in parts[0]:
             plot_property_v_distance(
@@ -5069,8 +5107,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'vel.circ',
                 False,
-                False,
                 [0, None],
+                None,
                 [0.1, self.halo_profile_radius_limits[1]],
                 distance_bin_width,
                 plot_file_name=True,
@@ -5083,8 +5121,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'sum.cum',
                 True,
-                False,
                 [None, None],
+                None,
                 self.halo_profile_radius_limits,
                 distance_bin_width,
                 plot_file_name=True,
@@ -5097,8 +5135,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'sum.cum.fraction',
                 False,
-                False,
                 [0, 2],
+                None,
                 [10, 2000],
                 distance_bin_width,
                 plot_file_name=True,
@@ -5113,8 +5151,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'sum.cum',
                 True,
-                False,
                 [None, None],
+                None,
                 self.halo_profile_radius_limits,
                 distance_bin_width,
                 plot_file_name=True,
@@ -5127,8 +5165,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'density',
                 True,
-                False,
                 [None, None],
+                None,
                 self.halo_profile_radius_limits,
                 distance_bin_width,
                 plot_file_name=True,
@@ -5143,8 +5181,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'sum.cum',
                 True,
-                False,
                 [None, None],
+                None,
                 self.halo_profile_radius_limits,
                 distance_bin_width,
                 plot_file_name=True,
@@ -5159,8 +5197,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'metallicity.metals',
                         'median',
                         False,
-                        True,
                         [None, None],
+                        'mass',
                         self.halo_profile_radius_limits,
                         distance_bin_width,
                         plot_file_name=True,
@@ -5184,13 +5222,6 @@ class CompareSimulationsClass(ut.io.SayClass):
                 except Exception:
                     pass
 
-            # if 'velocity' in parts[0][prop]:
-            #    plot_property_v_distance(
-            #        parts, spec, 'host.velocity.rad', 'average', False, True,
-            #        [None, None], self.halo_profile_radius_limits, 0.25,
-            #        plot_file_name=True, plot_directory=self.plot_directory,
-            #    )
-
         spec_name = 'star'
         if spec_name in parts[0]:
             plot_property_v_distance(
@@ -5199,8 +5230,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'sum.cum',
                 True,
-                False,
                 [None, None],
+                None,
                 self.halo_profile_radius_limits,
                 distance_bin_width,
                 plot_file_name=True,
@@ -5213,8 +5244,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                 'mass',
                 'density',
                 True,
-                False,
                 [None, None],
+                None,
                 self.galaxy_profile_radius_limits,
                 distance_bin_width,
                 plot_file_name=True,
@@ -5229,8 +5260,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'metallicity.fe',
                         'median',
                         False,
-                        True,
                         [None, None],
+                        'mass',
                         self.galaxy_profile_radius_limits,
                         distance_bin_width,
                         plot_file_name=True,
@@ -5261,8 +5292,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                         'metallicity.mg - metallicity.fe',
                         'median',
                         False,
-                        True,
                         [None, None],
+                        'mass',
                         self.galaxy_profile_radius_limits,
                         distance_bin_width,
                         plot_file_name=True,
@@ -5293,8 +5324,8 @@ class CompareSimulationsClass(ut.io.SayClass):
                     'age',
                     'average',
                     False,
-                    True,
                     [None, None],
+                    'mass',
                     self.galaxy_radius_limits,
                     distance_bin_width * 2,
                     False,
@@ -5308,7 +5339,8 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
+        parts : list
+            dictionaries of particles at snapshot
         '''
         if galaxy_radius_limits is None or len(galaxy_radius_limits) == 0:
             galaxy_radius_limits = self.galaxy_radius_limits
@@ -5392,8 +5424,10 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        property_bin_number : int : number of bins along each dimension for histogram
+        parts : list
+            dictionaries of particles at snapshot
+        property_bin_number : int
+            number of bins along each dimension for histogram
         '''
         plot_directory = self.plot_directory + 'property_2d'
 
@@ -5474,10 +5508,14 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        distance_max : float : maximum distance from center to plot
-        distance_bin_width : float : distance bin width (pixel size)
-        align_principal_axes : bool : whether to align plot axes with principal axes
+        parts : list
+            dictionaries of particles at snapshot
+        distance_max : float
+            maximum distance from center to plot
+        distance_bin_width : float
+            distance bin width (pixel size)
+        align_principal_axes : bool
+            whether to align plot axes with principal axes
         '''
         plot_directory = self.plot_directory + 'image'
 
@@ -5694,8 +5732,8 @@ def compare_resolution(
         'mass',
         'vel.circ',
         True,
-        False,
         [None, None],
+        None,
         distance_limits,
         distance_bin_width,
         plot_file_name=True,
@@ -5707,8 +5745,8 @@ def compare_resolution(
         'mass',
         'density',
         True,
-        False,
         [None, None],
+        None,
         distance_limits,
         distance_bin_width,
         plot_file_name=True,
@@ -5720,8 +5758,8 @@ def compare_resolution(
         'mass',
         'density*r',
         True,
-        False,
         [None, None],
+        None,
         distance_limits,
         distance_bin_width,
         plot_file_name=True,
