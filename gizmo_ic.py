@@ -410,7 +410,7 @@ class InitialConditionClass(ut.io.SayClass):
             if not sort_dark_by_id and snapshot_redshift == self.snapshot_redshifts[-1]:
                 for spec_name in part:
                     self.say(f'assigning id-to-index to species: {spec_name}')
-                    ut.catalog.assign_id_to_index(part[spec_name], 'id', 0)
+                    ut.catalog.assign_id_to_index(part[spec_name])
 
             parts.append(part)
 

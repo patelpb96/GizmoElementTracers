@@ -195,9 +195,16 @@ class ParticleDictionaryClass(dict):
         self.Cosmology = None
         self.host = {'position': [], 'velocity': [], 'rotation': [], 'axis.ratios': []}
 
-        # these classes are relevant only for star and gas particles
-        self.MassLoss = None  # relevant only for star particles
+        # these classes are only for star and gas particles
+        self.MassLoss = None  # relevant for star particles
         self.ElementAgeTracer = None  # relevant for star and gas particles
+
+        # these arrays are relevant for star and gas particles
+        # to convert id and id.child to pointer to array index
+        self._id0_to_index = None  # array of pointer indices for particles with id.child = 0
+        self._ids_to_index = None  # dict of pointer indices for particles with id.child > 0
+        self._id0_to_species = None  # array of pointer species for particles with id.child = 0
+        self._ids_to_species = None  # dict of pointer species for particles with id.child > 0
 
     def prop(self, property_name='', indices=None, _dict_only=False):
         '''
@@ -680,6 +687,110 @@ class ParticleDictionaryClass(dict):
             values = ut.math.get_log(values / ut.constant.sun_massfraction[element_name])
 
         return values
+
+    def get_pointers_from_ids(self, ids, child_ids=None):
+        '''
+        For each input id [and child id], get a pointer to the array index [and species name] of
+        the particle in this dictionary catalog.
+        If running from within dictionary of single particle species (such as part['star']),
+        return only the pointer index.
+        If running from within the meta-dictionary of multiple species (such as part),
+        return the pointer index and species name.
+
+        Parameters
+        ----------
+        ids : array
+            ids of particles
+        child_ids : array
+            child ids of particles
+
+        Returns
+        -------
+        pindices : array
+            for each input id, the array index of the particle in this catalog
+        [species : array]
+            for each input id, the name of the species of the particle in this catalog
+        '''
+        if 'star' in self and 'gas' in self:
+            # running from within meta-dictionary that contains sub-dictionaries for stars and gas
+            assert child_ids is not None and len(child_ids) > 0
+
+            # initialize array to store species names
+            species = np.zeros(ids.size, dtype='<U4')
+
+            # get pointer indices for gas - particles that are stars will return null values
+            pindices = self['gas'].get_pointers_from_ids(ids, child_ids)
+            indices = np.where(pindices >= 0)[0]
+            species[indices] = 'gas'
+
+            # deal with ids that do not have a matched index in gas particle catalog
+            # almost all should be stars, modulo any that do not exist at all in this catalog
+            indices = np.where(pindices < 0)[0]
+            pindices[indices] = self['star'].get_pointers_from_ids(ids[indices], child_ids[indices])
+            # assign species name for ids that matched in the star particle catalog
+            indices = indices[np.where(pindices[indices] >= 0)[0]]
+            species[indices] = 'star'
+
+            return pindices, species
+
+        else:
+            # running from within dictionary of single particle species
+            if self._id0_to_index is None:
+                self._assign_ids_to_indices()
+
+            ids = np.asarray(ids)
+            if child_ids is not None:
+                child_ids = np.asarray(child_ids)
+                assert len(ids) == len(child_ids)
+
+            # get indices of particle input to assign_ids_to_indices()
+            if child_ids is None or len(child_ids) == 0:
+                if self._ids_to_index is not None and len(self._ids_to_index) > 0:
+                    print('! catalog has id.child but you did not input any child ids')
+                    print('  only can get pointer indices for particles with id.child = 0')
+                pindices = self._id0_to_index[ids]
+            else:
+                pindices = ut.array.get_array_null(ids.size)
+                # use simple array pointer indices for (the majority of) particles with id.child = 0
+                indices = np.where(child_ids == 0)[0]
+                pids = ids[indices]
+                pindices[indices] = self._id0_to_index[pids]
+                # use more complect dict pointer indices forparticles with id.child > 0
+                indices = np.where(child_ids > 0)[0]
+                pids = ids[indices]
+                cids = child_ids[indices]
+                for (index, pid, cid) in zip(indices, pids, cids):
+                    if (pid, cid) in self._ids_to_index:
+                        pindices[index] = self._ids_to_index[(pid, cid)]
+
+            return pindices
+
+    def _assign_ids_to_indices(self):
+        '''
+        Assign to self an array [and dictionary] to point from a particle's id [and id.child]
+        to its array index in this dictionary catalog.
+        '''
+        id_name = 'id'
+        id_child_name = 'id.child'
+
+        # simple case: select only particles that have id.child = 0 (should be vast majority)
+        # among this subset, ids are unique, so use simple array of pointer indices
+        pindices = np.where(self[id_child_name] == 0)[0]
+        ids = self[id_name][pindices]
+        # multiplier for combining stars + gas, to ensure that max id encompasses both catalogs
+        id_max = int(1.5 * ids.max())
+        self._id0_to_index = ut.array.get_array_null(id_max)
+        self._id0_to_index[ids] = pindices
+
+        if id_child_name in self and self[id_child_name].max() > 0:
+            # complex case: deal with all particles that have id.child > 0
+            # these have non-unique id, so assign dictionary look-up pointer indices
+            pindices = np.where(self[id_child_name] > 0)[0]
+            pids = self[id_name][pindices]
+            cids = self[id_child_name][pindices]
+            self._ids_to_index = {}
+            for (pindex, pid, cid) in zip(pindices, pids, cids):
+                self._ids_to_index[(pid, cid)] = pindex
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1214,8 +1325,8 @@ class ReadClass(ut.io.SayClass):
             'Omega0': 'omega_matter',  # old name convention
             'OmegaLambda': 'omega_lambda',  # old name convention
             'Omega_Matter': 'omega_matter',
-            'Omega_Lambda': 'omega_lambda',
             'Omega_Baryon': 'omega_baryon',
+            'Omega_Lambda': 'omega_lambda',
             'Omega_Radiation': 'omega_radiation',
             'HubbleParam': 'hubble',
             'ComovingIntegrationOn': 'cosmological',
