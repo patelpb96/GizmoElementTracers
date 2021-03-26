@@ -611,7 +611,7 @@ class ParticlePointerClass(ut.io.SayClass):
                 check_properties=False,
             )
         except (IOError, TypeError):
-            self.say(f'\n!!! can not read snapshot {snapshot_index}')
+            self.say(f'\n! can not read snapshot {snapshot_index}')
             self.say('possibly missing or corrupt snapshot file')
             self.say('skip assigning pointers to this snapshot')
             self.diagnostic['bad.snapshots'].append(snapshot_index)
@@ -658,11 +658,13 @@ class ParticlePointerClass(ut.io.SayClass):
             no_id_match_number = np.sum(part_z0_indices < 0)
             if no_id_match_number > 0:
                 self.say(
-                    '! {} {} particles at snapshot {},'.format(
-                        Pointer[Pointer.z_name + 'particle.number'], species_names_z, snapshot_index
+                    '! {} (of {}) {} particles at snapshot {} do not have id match'.format(
+                        no_id_match_number,
+                        Pointer[Pointer.z_name + 'particle.number'],
+                        species_names_z,
+                        snapshot_index,
                     )
                 )
-                self.say('but {} not have id match'.format(no_id_match_number))
                 self.diagnostic['no.id.match.number'] += no_id_match_number
 
         # write file for this snapshot
