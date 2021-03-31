@@ -25,6 +25,7 @@ from . import gizmo_io
 
 # dictionary key of particle id in catalog
 ID_NAME = 'id'
+ID_CHILD_NAME = 'id.child'
 
 
 # --------------------------------------------------------------------------------------------------
@@ -322,7 +323,7 @@ class ParticlePointerClass(ut.io.SayClass):
             index of reference (later) snapshot to compute particle pointers relative to
         '''
         self.id_name = ID_NAME
-        self.id_child_name = ID_NAME + '.child'
+        self.id_child_name = ID_CHILD_NAME
         self.properties_read = [self.id_name, self.id_child_name]
         if np.isscalar(species_names):
             species_names = [species_names]  # ensure is list
@@ -331,6 +332,8 @@ class ParticlePointerClass(ut.io.SayClass):
         self.track_directory = ut.io.get_path(track_directory)
         self.snapshot_directory = ut.io.get_path(snapshot_directory)
         self.reference_snapshot_index = reference_snapshot_index
+
+        self.diagnostic = {}
 
         self.GizmoRead = gizmo_io.ReadClass()
 
@@ -702,7 +705,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
             index of reference (later) snapshot to compute particle pointers relative to
         '''
         self.id_name = ID_NAME
-        self.id_child_name = ID_NAME + '.child'
+        self.id_child_name = ID_CHILD_NAME
         self.properties_read = [self.id_name, self.id_child_name]
         if np.isscalar(species_names):
             species_names = [species_names]  # ensure is list
@@ -713,6 +716,10 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
         self.reference_snapshot_index = reference_snapshot_index
 
         self.GizmoRead = gizmo_io.ReadClass()
+
+        self.match_property = None
+        self.match_propery_tolerance = None
+        self.test_property = None
 
     def assign_id_to_pointer(
         self, part, id_min=0, store_as_dict=False, verbose=True,
@@ -1069,7 +1076,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
             'match prop no match': 0,
             'match prop redundant': 0,
             'test prop offset': 0,
-            'bad snapshots': [],
+            'bad.snapshots': [],
         }
 
         # initiate threads, if asking for > 1
@@ -1088,8 +1095,8 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
 
         # print cumulative diagnostics
         print()
-        if len(count['bad snapshots']) > 0:
-            self.say('! could not read these snapshots:  {}'.format(count['bad snapshots']))
+        if len(count['bad.snapshots']) > 0:
+            self.say('! could not read these snapshots:  {}'.format(count['bad.snapshots']))
             self.say('they had possibly missing or corrupt snapshot files')
             self.say('could not assign pointers to those snapshots')
         if count['id no match'] > 0:
@@ -1152,7 +1159,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
             self.say(f'\n!!! can not read snapshot {snapshot_index}')
             self.say('possibly missing or corrupt snapshot file')
             self.say('skip assigning pointers to this snapshot')
-            count_tot['bad snapshots'].append(snapshot_index)
+            count_tot['bad.snapshots'].append(snapshot_index)
             return
 
         # diagnostic
@@ -1408,8 +1415,8 @@ def test_particle_pointers(part, part_z1, part_z2):
 class ParticleCoordinateClass(ut.io.SayClass):
     '''
     Select member particles in each host galaxy at the reference snapshot (usually z = 0).
-    Tracking back only these particles, compute the coordinates and principal axes of each host at
-    each previous snapshot.
+    Tracking back only these particles, compute the position, velocity, and principal axes of each
+    host at each previous snapshot.
     Then compute the 3-D distance and 3-D velocity wrt each primary host galaxy for each particle
     at the snapshot after it forms.
     '''
@@ -1442,6 +1449,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             Use only these to compute host coordinates at earlier snapshots.
         '''
         self.id_name = ID_NAME
+        self.id_child_name = ID_CHILD_NAME
         self.species_name = species_name
         assert np.isscalar(self.species_name)
         self.simulation_directory = ut.io.get_path(simulation_directory)
@@ -1457,15 +1465,21 @@ class ParticleCoordinateClass(ut.io.SayClass):
         # names of distances and velocities to write/read
         self.formation_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def io_hosts_and_formation_coordinates(
-        self, part, simulation_directory=None, track_directory=None, write=False
+    def io_hosts(
+        self,
+        part,
+        simulation_directory=None,
+        track_directory=None,
+        assign_formation_coordinates=False,
+        write=False,
+        verbose=False,
     ):
         '''
-        Read or write, for each host galaxy, its position, velocity, and principal axes ratios +
-        rotation tensor at each snapshot.
-        Read or write, for each particle, at the first snapshot after it formed,
-        its 3-D distance and 3-D velocity wrt each host galaxy, aligned with (rotated into) the
-        principal axes of each host galaxy at that time.
+        For each host, read or write its position, velocity, and principal axes at each snapshot,
+        computed tracking back only member particles at the reference snapshot (z = 0).
+        If formation_coordinates is True, or each particle, read or write its 3-D distance and
+        3-D velocity wrt each host galaxy at the first snapshot after it formed,
+        aligned with (rotated into) the principal axes of each host at that time.
         If reading, assign to input particle dictionary.
 
         Parameters
@@ -1476,8 +1490,12 @@ class ParticleCoordinateClass(ut.io.SayClass):
             directory of simulation
         track_directory : str
             directory of files for particle pointers and formation coordinates
+        assign_formation_coordinates : bool
+            whether to read and assign the formation coordinates for each particle
         write : bool
             whether to write to file (instead of read)
+        verbose : bool
+            whether to print diagnostic information
         '''
         if simulation_directory is None:
             simulation_directory = self.simulation_directory
@@ -1503,27 +1521,24 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     dict_out[self.species_name + '.' + prop_name] = part[self.species_name][
                         prop_name
                     ]
-            for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
+            for prop_name in part[self.species_name].hostz:
                 dict_out['host.' + prop_name] = part[self.species_name].hostz[prop_name]
 
             ut.io.file_hdf5(path_file_name, dict_out)
 
         else:
-            # read - backwards compatibility with old file name
-            try:
-                dict_read = ut.io.file_hdf5(path_file_name)
-            except OSError:
-                path_file_name = path_file_name.replace(
-                    gizmo_default.hosts_coordinates_file_name, 'star_form_coordinates_600.hdf5'
-                )
-                dict_read = ut.io.file_hdf5(path_file_name)
+            # read
+            dict_read = ut.io.file_hdf5(path_file_name, verbose=verbose)
 
-            # initialize dictionaries to store host properties across
+            # initialize dictionaries to store host properties across snapshots
             part.hostz = {
                 'position': [],
                 'velocity': [],
                 'rotation': [],
                 'axis.ratios': [],
+                'radius.90': [],
+                'height.90': [],
+                'mass.90': [],
             }
             for spec_name in part:
                 part[spec_name].hostz = {
@@ -1531,71 +1546,78 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     'velocity': [],
                     'rotation': [],
                     'axis.ratios': [],
+                    'radius.90': [],
+                    'height.90': [],
+                    'mass.90': [],
                 }
 
             for prop_name in dict_read:
-                if prop_name == 'snapshot.index':
-                    self.say(
-                        f'reading formation coordinates for {self.species_name} particles'
-                        + f' at snapshot {dict_read[prop_name]}'
-                    )
-                    continue
+                if prop_name.lstrip('host.') in part.hostz:
+                    # assign hosts' coordinates
+                    prop_name_store = prop_name.lstrip('host.')
+                    part.hostz[prop_name_store] = dict_read[prop_name]
+                    part.host[prop_name_store] = part.hostz[prop_name_store][part.snapshot['index']]
+                    for spec_name in part:
+                        part[spec_name].hostz[prop_name_store] = dict_read[prop_name]
+                        part[spec_name].host[prop_name_store] = part.host[prop_name_store]
 
-                if '.id' in prop_name or prop_name == 'id':
-                    mismatch_id_number = np.sum(
-                        part[self.species_name][self.id_name] != dict_read[prop_name]
-                    )
-                    if mismatch_id_number > 0:
-                        self.say(
-                            f'! {mismatch_id_number} {prop_name}s are mis-matched between'
-                            + ' particles read in and input particle dictionary\n'
-                            + '  you may be assigning formation coordinates to the wrong snapshot'
+            host_number = part.hostz['position'].shape[1]
+            host_string = 'host'
+            if host_number > 1:
+                host_string += 's'
+            self.say(
+                f'read {host_number} {host_string} (position, velocity, principal axes) from:'
+                + '  {}'.format(path_file_name.lstrip('./'))
+            )
+
+            for host_i, host_position in enumerate(part.host['position']):
+                self.say(f'host{host_i + 1} position = (', end='')
+                ut.io.print_array(host_position, '{:.2f}', end='')
+                print(') [kpc comoving]')
+
+            for host_i, host_velocity in enumerate(part.host['velocity']):
+                self.say(f'host{host_i + 1} velocity = (', end='')
+                ut.io.print_array(host_velocity, '{:.1f}', end='')
+                print(') [km / s]')
+
+            for host_i, host_axis_ratios in enumerate(part.host['axis.ratios']):
+                self.say(f'host{host_i + 1} axis ratios = (', end='')
+                ut.io.print_array(host_axis_ratios, '{:.2f}', end='')
+                print(')')
+
+            if 'radius.90' in part.host and len(part.host['radius.90']) > 0:
+                for host_i, host_radius90 in enumerate(part.host['radius.90']):
+                    self.say('host{} R_90 = {:.1f} kpc'.format(host_i + 1, host_radius90))
+
+            if 'height.90' in part.host and len(part.host['height.90']) > 0:
+                for host_i, host_height90 in enumerate(part.host['height.90']):
+                    self.say('host{} Z_90 = {:.1f} kpc'.format(host_i + 1, host_height90))
+
+            if 'mass.90' in part.host and len(part.host['mass.90']) > 0:
+                for host_i, host_mass90 in enumerate(part.host['mass.90']):
+                    self.say('host{} M_90 = {:.1e} Msun'.format(host_i + 1, host_mass90))
+
+            if assign_formation_coordinates:
+                self.say(
+                    f'\n  read formation coordinates for {self.species_name} particles'
+                    + ' at snapshot {}'.format(dict_read['snapshot.index'])
+                )
+                for prop_name in dict_read:
+                    if 'form.' in prop_name:
+                        # store coordinates at formation
+                        prop_name_store = prop_name.lstrip(self.species_name + '.')
+                        part[self.species_name][prop_name_store] = dict_read[prop_name]
+
+                    elif '.id' in prop_name:
+                        mismatch_id_number = np.sum(
+                            part[self.species_name][self.id_name] != dict_read[prop_name]
                         )
-                    continue
-
-                elif 'form.' in prop_name:
-                    # store coordinates at formation
-                    prop_name_store = prop_name.lstrip(self.species_name + '.')
-                    part[self.species_name][prop_name_store] = dict_read[prop_name]
-                    continue
-
-                elif 'host.position' in prop_name or 'center.position' in prop_name:
-                    if np.ndim(dict_read[prop_name]) == 2:
-                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
-                            (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
-                        )  # update from old file format
-                    prop_name_store = 'position'
-
-                elif 'host.velocit' in prop_name or 'center.velocit' in prop_name:
-                    if np.ndim(dict_read[prop_name]) == 2:
-                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
-                            (dict_read[prop_name].shape[0], 1, dict_read[prop_name].shape[1])
-                        )  # update from old file format
-                    prop_name_store = 'velocity'
-
-                elif 'host.rotation' in prop_name or prop_name == 'principal.axes.vectors':
-                    # compatible with all naming conventions
-                    if np.ndim(dict_read[prop_name]) == 3:
-                        dict_read[prop_name] = np.array([dict_read[prop_name]]).reshape(
-                            (
-                                dict_read[prop_name].shape[0],
-                                1,
-                                dict_read[prop_name].shape[1],
-                                dict_read[prop_name].shape[2],
+                        if mismatch_id_number > 0:
+                            self.say(
+                                f'! {mismatch_id_number} {prop_name}s are mis-matched between'
+                                + ' particles read in and input particle dictionary\n'
+                                + '  you may be assigning formation coordinates to the wrong snapshot'
                             )
-                        )  # update from old file format
-                    prop_name_store = 'rotation'
-
-                elif 'host.axis.ratios' in prop_name:
-                    prop_name_store = 'axis.ratios'
-
-                else:
-                    self.say(f'! not sure how to parse {prop_name}')
-                    continue
-
-                part.hostz[prop_name_store] = dict_read[prop_name]
-                for spec_name in part:
-                    part[spec_name].hostz[prop_name_store] = dict_read[prop_name]
 
     def read_hosts(self, part, simulation_directory=None, track_directory=None, verbose=True):
         '''
@@ -1628,7 +1650,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
             simulation_directory + track_directory + gizmo_default.hosts_coordinates_file_name
         )
 
-        # backwards compatibility with old file name
         dict_read = ut.io.file_hdf5(path_file_name, verbose=False)
 
         snapshot_index = part.snapshot['index']
@@ -1639,6 +1660,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
             'velocity': [],
             'rotation': [],
             'axis.ratios': [],
+            'radius.90': [],
+            'height.90': [],
+            'mass.90': [],
         }
         for spec_name in part:
             part[spec_name].hostz = {
@@ -1726,13 +1750,12 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 self.snapshot_directory,
                 properties=[
                     self.id_name,
+                    self.id_child_name,
                     'position',
                     'velocity',
                     'mass',
-                    'id.child',
                     'form.scalefactor',
                 ],
-                elements=['metals'],
                 host_number=host_number,
                 assign_hosts='mass',
                 check_properties=False,
@@ -1798,7 +1821,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     + np.nan
                 )
 
-        count = {'id none': 0, 'id wrong': 0, 'bad snapshots': []}
+        count = {'id none': 0, 'id wrong': 0, 'bad.snapshots': []}
 
         # initiate threads, if asking for > 1
         if proc_number > 1:
@@ -1818,8 +1841,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
 
         # print cumulative diagnostics
         print()
-        if len(count['bad snapshots']) > 0:
-            self.say('! could not read these snapshots:  {}'.format(count['bad snapshots']))
+        if len(count['bad.snapshots']) > 0:
+            self.say('! could not read these snapshots:  {}'.format(count['bad.snapshots']))
             self.say('they had possibly missing or corrupt snapshot files')
             self.say('could not assign pointers to those snapshots')
         if count['id none']:
@@ -1889,10 +1912,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     check_properties=False,
                 )
             except (IOError, TypeError):
-                self.say(f'\n!!! can not read snapshot {snapshot_index}')
+                self.say(f'\n! can not read snapshot {snapshot_index}')
                 self.say('possibly missing or corrupt snapshot file')
-                self.say('skip assigning host coordinates at this snapshot')
-                count_tot['bad snapshots'].append(snapshot_index)
+                count_tot['bad.snapshots'].append(snapshot_index)
                 return
 
             # only use the particles that are near each primary host at the reference snapshot
@@ -1902,10 +1924,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 hosts_part_z_indices = part_pointers[hosts_part_z0_indicess[host_i]]
                 hosts_part_z_indices = hosts_part_z_indices[hosts_part_z_indices >= 0]
                 if len(hosts_part_z_indices) == 0:
-                    self.say(
-                        f'\n!!! no particles near host{host_i + 1} at snapshot {snapshot_index}'
-                    )
-                    self.say('skip assigning host coordinates at this snapshot')
+                    self.say(f'\n! no particles near host{host_i + 1} at snapshot {snapshot_index}')
                     return
                 else:
                     hosts_part_z_indicess.append(hosts_part_z_indices)
@@ -1921,13 +1940,11 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 )
             except Exception:
                 # if not enough progenitor star particles near a host galaxy
-                self.say(f'\n!!! cannot compute host at snapshot {snapshot_index}')
-                self.say('skip assigning host coordinates at this snapshot')
+                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
                 return
 
             if np.isnan(part_z.host['position']).max() or np.isnan(part_z.host['velocity']).max():
-                self.say(f'\n!!! cannot compute host at snapshot {snapshot_index}')
-                self.say('skip assigning host coordinates at this snapshot')
+                self.say(f'\n! cannot compute host at snapshot {snapshot_index}')
                 return
 
             part_z_indices = part_pointers[part_z0_indices]
@@ -1956,12 +1973,12 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 part_z_indices = part_z_indices[masks]
                 part_z0_indices = part_z0_indices[masks]
 
-            # compute rotation vectors for principal axes from young stars within R_90
+            # compute rotation vectors for principal axes
             try:
                 self.GizmoRead.assign_hosts_rotation(part_z)
             except ValueError:
                 # this can happen if not enough progenitor star particles near a host galaxy
-                self.say(f'\n!!! cannot compute host at snapshot {snapshot_index}')
+                self.say(f'\n! cannot compute host rotation at snapshot {snapshot_index}')
                 self.say('skip assigning host coordinates at this snapshot')
                 return
 
@@ -2009,7 +2026,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     count_tot[k] += count[k]
 
             # continuously (re)write as go
-            self.io_hosts_and_formation_coordinates(part_z0, write=True)
+            self.io_hosts(part_z0, write=True)
 
 
 ParticleCoordinate = ParticleCoordinateClass()
