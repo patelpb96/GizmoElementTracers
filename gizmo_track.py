@@ -509,7 +509,7 @@ class ParticlePointerClass(ut.io.SayClass):
 
         return pointer_indices
 
-    def write_pointers_to_snapshots(self, snapshot_indices=[], proc_number=1):
+    def generate_pointers(self, snapshot_indices=[], proc_number=1):
         '''
         Assign to each particle a pointer from its index at the reference (later) snapshot
         to its index (and species name) at all other (earlier) snapshots.
@@ -556,10 +556,10 @@ class ParticlePointerClass(ut.io.SayClass):
             with Pool(proc_number) as pool:
                 for snapshot_index in snapshot_indices:
                     # memory errors if try to pass part_z0, so instead re-read part_z0 per thread
-                    pool.apply_async(self._write_pointers_to_snapshot, (None, snapshot_index))
+                    pool.apply_async(self._generate_pointers_to_snapshot, (None, snapshot_index))
         else:
             for snapshot_index in snapshot_indices:
-                self._write_pointers_to_snapshot(part_z0, snapshot_index)
+                self._generate_pointers_to_snapshot(part_z0, snapshot_index)
 
         # print cumulative diagnostics
         print()
@@ -573,7 +573,7 @@ class ParticlePointerClass(ut.io.SayClass):
             self.say('they had possibly missing or corrupt snapshot files')
             self.say('could not assign pointers to those snapshots')
 
-    def _write_pointers_to_snapshot(self, part_z0, snapshot_index):
+    def _generate_pointers_to_snapshot(self, part_z0, snapshot_index):
         '''
         Assign to each particle a pointer from its index at the reference (later, z0) snapshot
         to its index (and species name) at a (earlier, z) snapshot.
@@ -961,7 +961,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
             else:
                 part.Pointer = Pointer
 
-    def write_pointers_to_snapshots(
+    def generate_pointers(
         self,
         match_property='id.child',
         match_propery_tolerance=1e-6,
@@ -1087,11 +1087,11 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
                 for snapshot_index in snapshot_indices:
                     # memory errors if try to pass part_z0, so instead re-read part_z0 per thread
                     pool.apply_async(
-                        self._write_pointers_to_snapshot, (None, snapshot_index, count)
+                        self._generate_pointers_to_snapshot, (None, snapshot_index, count)
                     )
         else:
             for snapshot_index in snapshot_indices:
-                self._write_pointers_to_snapshot(part_z0, snapshot_index, count)
+                self._generate_pointers_to_snapshot(part_z0, snapshot_index, count)
 
         # print cumulative diagnostics
         print()
@@ -1112,7 +1112,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
         if count['test prop offset'] > 0:
             self.say('! {} total have offset {}'.format(count['test prop offset'], test_property))
 
-    def _write_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot={}):
+    def _generate_pointers_to_snapshot(self, part_z0, snapshot_index, count_tot={}):
         '''
         Assign to each particle a pointer from its index at the reference (later, z0) snapshot
         to its index (and species name) at a (earlier, z) snapshot.
@@ -1465,7 +1465,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         # names of distances and velocities to write/read
         self.formation_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
 
-    def io_hosts(
+    def io_hosts_coordinates(
         self,
         part,
         simulation_directory=None,
@@ -1622,7 +1622,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                                 + ' simulation or snapshot'
                             )
 
-    def write_hosts_coordinates(
+    def generate_hosts_coordinates(
         self, part_z0=None, host_number=1, proc_number=1, simulation_directory=None
     ):
         '''
@@ -1743,12 +1743,12 @@ class ParticleCoordinateClass(ut.io.SayClass):
             with Pool(proc_number) as pool:
                 for snapshot_index in snapshot_indices:
                     pool.apply(
-                        self._write_hosts_coordinates_at_snapshot,
+                        self._generate_hosts_coordinates_at_snapshot,
                         (part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count),
                     )
         else:
             for snapshot_index in snapshot_indices:
-                self._write_hosts_coordinates_at_snapshot(
+                self._generate_hosts_coordinates_at_snapshot(
                     part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count
                 )
 
@@ -1763,7 +1763,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         if count['id wrong']:
             self.say('! {} total not have id match'.format(count['id wrong']))
 
-    def _write_hosts_coordinates_at_snapshot(
+    def _generate_hosts_coordinates_at_snapshot(
         self, part_z0, hosts_part_z0_indicess, host_number, snapshot_index, count_tot
     ):
         '''
@@ -1939,7 +1939,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
                     count_tot[k] += count[k]
 
             # continuously (re)write as go
-            self.io_hosts(part_z0, write=True)
+            self.io_hosts_coordinates(part_z0, write=True)
 
 
 ParticleCoordinate = ParticleCoordinateClass()
@@ -1957,7 +1957,7 @@ if __name__ == '__main__':
     assert 'pointer' in function_kind or 'coordinate' in function_kind
 
     if 'pointer' in function_kind:
-        ParticlePointer.write_pointers_to_snapshots()
+        ParticlePointer.generate_pointers()
 
     if 'coordinate' in function_kind:
-        ParticleCoordinate.write_hosts_and_formation_coordinates()
+        ParticleCoordinate.generate_hosts_coordinates()

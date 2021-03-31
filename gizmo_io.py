@@ -2359,7 +2359,7 @@ class ReadClass(ut.io.SayClass):
             try:
                 if method == 'track':
                     # read coordinates of each host across all snapshots
-                    self.gizmo_track.ParticleCoordinate.io_hosts(
+                    self.gizmo_track.ParticleCoordinate.io_hosts_coordinates(
                         part,
                         simulation_directory,
                         track_directory,
