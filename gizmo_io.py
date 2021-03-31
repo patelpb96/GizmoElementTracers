@@ -2490,7 +2490,7 @@ class ReadClass(ut.io.SayClass):
         if verbose:
             for host_i, host_position in enumerate(part.host['position']):
                 self.say(f'host{host_i + 1} position = (', end='')
-                ut.io.print_array(host_position, '{:.3f}', end='')
+                ut.io.print_array(host_position, '{:.2f}', end='')
                 print(') [kpc comoving]')
 
             for host_i, host_velocity in enumerate(part.host['velocity']):
