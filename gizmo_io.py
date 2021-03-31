@@ -1061,6 +1061,7 @@ class ReadClass(ut.io.SayClass):
                     part,
                     method=assign_hosts,
                     host_number=host_number,
+                    assign_formation_coordinates=assign_formation_coordinates,
                     simulation_directory=simulation_directory,
                     track_directory=track_directory,
                 )
@@ -1068,13 +1069,6 @@ class ReadClass(ut.io.SayClass):
                 # check if already read rotation tensors from particle tracking file
                 if assign_hosts_rotation and len(part.host['rotation']) == 0:
                     self.assign_hosts_rotation(part)
-
-            if assign_formation_coordinates:
-                # assign coordinates wrt each host galaxy at formation
-                ParticleCoordinate = self.gizmo_track.ParticleCoordinateClass(
-                    simulation_directory=simulation_directory, track_directory=track_directory
-                )
-                ParticleCoordinate.io_hosts_and_formation_coordinates(part)
 
             if assign_pointers:
                 # assign star and gas particle pointers from z = 0 to this snapshot
@@ -2275,6 +2269,7 @@ class ReadClass(ut.io.SayClass):
         species_name='',
         part_indicess=None,
         method=True,
+        assign_formation_coordinates=False,
         velocity_distance_max=8,
         host_number=1,
         exclusion_distance=300,
@@ -2307,6 +2302,9 @@ class ReadClass(ut.io.SayClass):
             if True (default), will try a few methods in the following order of preference:
                 if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
                 if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
+        assign_formation_coordinates : bool
+            whether to assign to stars their coordindates wrt each host galaxy at formation
+            (if reading hosts coordinates from file)
         velocity_distance_max : float
             maximum distance to keep particles to compute velocity
         host_number : int
@@ -2361,8 +2359,11 @@ class ReadClass(ut.io.SayClass):
             try:
                 if method == 'track':
                     # read coordinates of each host across all snapshots
-                    self.gizmo_track.ParticleCoordinate.read_hosts(
-                        part, simulation_directory, track_directory, verbose
+                    self.gizmo_track.ParticleCoordinate.io_hosts(
+                        part,
+                        simulation_directory,
+                        track_directory,
+                        assign_formation_coordinates=assign_formation_coordinates,
                     )
                     if host_number != len(part.host['position']):
                         self.say(
