@@ -1433,6 +1433,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         snapshot_directory=gizmo_default.snapshot_directory,
         reference_snapshot_index=gizmo_default.snapshot_index,
         host_distance_limits=[0, 30],
+        host_edge_percent=90,
     ):
         '''
         Parameters
@@ -1451,6 +1452,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
             min and max distance [kpc physical] to select particles near each primary host at the
             reference snapshot (usually z = 0).
             use only these particles to compute host coordinates at earlier snapshots.
+        host_edge_percent : float
+            percent of species mass (within initial aperture) to define host galaxy radius + height
         '''
         self.id_name = ID_NAME
         self.id_child_name = ID_CHILD_NAME
@@ -1461,13 +1464,22 @@ class ParticleCoordinateClass(ut.io.SayClass):
         self.snapshot_directory = ut.io.get_path(snapshot_directory)
         self.reference_snapshot_index = reference_snapshot_index
         self.host_distance_limits = host_distance_limits
-
-        self.GizmoRead = gizmo_io.ReadClass()
-
-        # set numpy data type to store coordinates
-        self.formation_coordinate_dtype = np.float32
+        self.host_edge_percent = host_edge_percent
+        self.host_properties = [
+            'position',
+            'velocity',
+            'rotation',
+            'axis.ratios',
+            f'radius.{self.host_edge_percent}',
+            f'height.{self.host_edge_percent}',
+            f'mass.{self.host_edge_percent}',
+        ]
+        # numpy data type to store host and particle coordinates
+        self.coordinate_dtype = np.float32
         # names of distances and velocities to write/read
         self.formation_coordiante_kinds = ['form.host.distance', 'form.host.velocity']
+
+        self.GizmoRead = gizmo_io.ReadClass()
 
     def io_hosts_coordinates(
         self,
@@ -1535,25 +1547,13 @@ class ParticleCoordinateClass(ut.io.SayClass):
             dict_read = ut.io.file_hdf5(path_file_name, verbose=verbose)
 
             # initialize dictionaries to store host properties across snapshots
-            part.hostz = {
-                'position': [],
-                'velocity': [],
-                'rotation': [],
-                'axis.ratios': [],
-                'radius.90': [],
-                'height.90': [],
-                'mass.90': [],
-            }
+            part.hostz = {}
             for spec_name in part:
-                part[spec_name].hostz = {
-                    'position': [],
-                    'velocity': [],
-                    'rotation': [],
-                    'axis.ratios': [],
-                    'radius.90': [],
-                    'height.90': [],
-                    'mass.90': [],
-                }
+                part[spec_name].hostz = {}
+            for prop_name in self.host_properties:
+                part.hostz[prop_name] = []
+                for spec_name in part:
+                    part[spec_name].hostz[prop_name] = []
 
             for prop_name in dict_read:
                 if prop_name.lstrip('host.') in part.hostz:
@@ -1688,32 +1688,26 @@ class ParticleCoordinateClass(ut.io.SayClass):
         # of each primary host galaxy at each snapshot
         part_z0[self.species_name].hostz = {}
 
-        part_z0[self.species_name].hostz['position'] = (
-            np.zeros(
-                [part_z0.Snapshot['index'].size, host_number, 3], self.formation_coordinate_dtype
-            )
-            + np.nan
-        )
-        part_z0[self.species_name].hostz['velocity'] = (
-            np.zeros(
-                [part_z0.Snapshot['index'].size, host_number, 3], self.formation_coordinate_dtype
-            )
-            + np.nan
-        )
-
-        part_z0[self.species_name].hostz['rotation'] = (
-            np.zeros(
-                [part_z0.Snapshot['index'].size, host_number, 3, 3], self.formation_coordinate_dtype
-            )
-            + np.nan
-        )
-
-        part_z0[self.species_name].hostz['axis.ratios'] = (
-            np.zeros(
-                [part_z0.Snapshot['index'].size, host_number, 3], self.formation_coordinate_dtype
-            )
-            + np.nan
-        )
+        for prop_name in self.host_properties:
+            if prop_name in ['position', 'velocity', 'axis.ratios']:
+                part_z0[self.species_name].hostz[prop_name] = (
+                    np.zeros(
+                        [part_z0.Snapshot['index'].size, host_number, 3], self.coordinate_dtype
+                    )
+                    + np.nan
+                )
+            elif prop_name == 'rotation':
+                part_z0[self.species_name].hostz[prop_name] = (
+                    np.zeros(
+                        [part_z0.Snapshot['index'].size, host_number, 3, 3], self.coordinate_dtype
+                    )
+                    + np.nan
+                )
+            elif 'radius' in prop_name or 'height' in prop_name or 'mass' in prop_name:
+                part_z0[self.species_name].hostz[prop_name] = (
+                    np.zeros([part_z0.Snapshot['index'].size, host_number], self.coordinate_dtype)
+                    + np.nan
+                )
 
         # initialize and store indices of particles near all primary hosts at the reference snapshot
         hosts_part_z0_indicess = []
@@ -1731,10 +1725,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             for prop_name in self.formation_coordiante_kinds:
                 prop_name = prop_name.replace('host.', host_name)  # update host name (if necessary)
                 part_z0[self.species_name][prop_name] = (
-                    np.zeros(
-                        part_z0[self.species_name]['position'].shape,
-                        self.formation_coordinate_dtype,
-                    )
+                    np.zeros(part_z0[self.species_name]['position'].shape, self.coordinate_dtype)
                     + np.nan
                 )
 
@@ -1831,8 +1822,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 count_tot['bad.snapshots'].append(snapshot_index)
                 return
 
-            # only use the particles that are near each primary host at the reference snapshot
-            # to compute the coordinates of host progenitors at earlier snapshots
+            # use only particles that are near each primary host at the reference snapshot
+            # to compute the coordinates of each host progenitor at earlier snapshots
             hosts_part_z_indicess = []
             for host_i in range(host_number):
                 hosts_part_z_indices = part_pointers[hosts_part_z0_indicess[host_i]]
@@ -1889,16 +1880,40 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 part_z_indices = part_z_indices[masks]
                 part_z0_indices = part_z0_indices[masks]
 
-            # compute rotation vectors for principal axes
+            # assign hosts principal axes rotation tensor
             try:
                 self.GizmoRead.assign_hosts_rotation(part_z)
             except ValueError:
-                # this can happen if not enough progenitor star particles near a host galaxy
+                # if not enough progenitor star particles near a host galaxy
                 self.say(f'\n! can not compute host (rotation) at snapshot {snapshot_index}')
                 return
 
+            # assign hosts size and mass - use host_edge_percent of species mass within an initial
+            # radius of 20 kpc comoving, to approximate galaxy size growth
+            distance_max = 20 * part_z.snapshot['scalefactor']
+            for prop_name in self.host_properties:
+                if 'radius' in prop_name or 'height' in prop_name or 'mass' in prop_name:
+                    part_z.host[prop_name] = np.zeros(host_number, dtype=self.coordinate_dtype)
+            try:
+                for host_i in range(host_number):
+                    gal = ut.particle.get_galaxy_properties(
+                        part_z,
+                        self.species_name,
+                        edge_value=self.host_edge_percent,
+                        axis_kind='both',
+                        distance_max=distance_max,
+                        host_index=host_i,
+                    )
+                    part_z.host[f'radius.{self.host_edge_percent}'][host_i] = gal['radius.major']
+                    part_z.host[f'height.{self.host_edge_percent}'][host_i] = gal['radius.minor']
+                    part_z.host[f'mass.{self.host_edge_percent}'][host_i] = gal['mass']
+            except ValueError:
+                # if not enough progenitor star particles near a host galaxy
+                self.say(f'\n! can not compute host (size + mass) at snapshot {snapshot_index}')
+                return
+
             # store host galaxy properties
-            for prop_name in ['position', 'velocity', 'rotation', 'axis.ratios']:
+            for prop_name in self.host_properties:
                 part_z0[self.species_name].hostz[prop_name][snapshot_index] = part_z.host[prop_name]
 
             for host_i in range(host_number):
