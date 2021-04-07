@@ -2,6 +2,8 @@
 
 '''
 Track particles across snapshots in Gizmo simulations.
+Using  particles tracked back in time, assign the coordinates and properties of the main
+progenitor of each host galaxy.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 

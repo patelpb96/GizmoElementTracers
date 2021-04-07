@@ -1523,7 +1523,7 @@ class ReadClass(ut.io.SayClass):
             'Masses': 'mass',
             'Potential': 'potential',
             # grav acceleration for dark matter and stars, grav + hydro acceleration for gas
-            'Acceleration': 'accelerdation',
+            'Acceleration': 'acceleration',
             # particles with adaptive smoothing
             #'AGS-Softening': 'kernel.length',  # for gas, this is same as SmoothingLength
             # gas particles ----------
