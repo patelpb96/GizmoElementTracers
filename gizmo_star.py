@@ -366,8 +366,8 @@ class NucleosyntheticYieldClass:
                 element_yield['carbon'] = 0.0127
                 element_yield['nitrogen'] = 0.00456
                 element_yield['oxygen'] = 0.111
-                # element_yield['neon'] = 0.0286  # used in original FIRE-2
-                element_yield['neon'] = 0.0381  # used in later FIRE-2
+                # element_yield['neon'] = 0.0286  # original FIRE-2
+                element_yield['neon'] = 0.0381  # later FIRE-2
                 element_yield['magnesium'] = 0.00940
                 element_yield['silicon'] = 0.00889
                 element_yield['sulphur'] = 0.00378
