@@ -5109,6 +5109,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     redshift,
                     simulation_directories,
                     properties=self.properties,
+                    assign_hosts_rotation=True,
                 )
 
             if 'star' in species:
