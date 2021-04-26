@@ -827,10 +827,8 @@ class ReadClass(ut.io.SayClass):
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
         self.species_dict = collections.OrderedDict()
-        # dark-matter species
         self.species_dict['dark'] = 1  # dark matter at highest resolution
         self.species_dict['dark2'] = 2  # dark matter at all lower resolutions
-        # baryon species
         self.species_dict['gas'] = 0
         self.species_dict['star'] = 4
         self.species_dict['blackhole'] = 5
@@ -1059,7 +1057,7 @@ class ReadClass(ut.io.SayClass):
             if assign_hosts:
                 self.assign_hosts_coordinates(
                     part,
-                    method=assign_hosts,
+                    assign_hosts,
                     host_number=host_number,
                     assign_formation_coordinates=assign_formation_coordinates,
                     simulation_directory=simulation_directory,
@@ -2266,9 +2264,9 @@ class ReadClass(ut.io.SayClass):
     def assign_hosts_coordinates(
         self,
         part,
+        method=True,
         species_name='',
         part_indicess=None,
-        method=True,
         assign_formation_coordinates=False,
         velocity_distance_max=8,
         host_number=1,
@@ -2286,22 +2284,23 @@ class ReadClass(ut.io.SayClass):
         ----------
         part : dictionary class
             catalog of particles at snapshot
-        species_name : str
-            which particle species to use to define center
-        part_indicess : array or list of arrays
-            list of indices of particles to use to define host center coordinates
-            if supply a list of arrays, use each list element for a different host
         method : str
             method to use to get host coordinates.
             if a string, tells the code which method to use:
                 'track' : reads host coordinates from track/host_coordinates.hdf5,
                     compiled during particle tracking using only stars in each host at z = 0
                 'halo' : reads host halo coordinates from halo/rockstar_dm/catalog_hdf5/
-                'mass' or 'potential' : assign coordinates during read in via iterative zoom-in,
-                    weighting each particle by that property
+                'mass' or 'potential' or 'massfraction.metals' : assign coordinates during read in
+                    via iterative zoom-in, weighting each particle by that property
             if True (default), will try a few methods in the following order of preference:
-                if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
-                if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
+                if a baryonic simulation, try 'track' then 'mass'
+                if a DM-only simulations, try 'halo' then 'mass'
+        species_name : str
+            which particle species to use to define center
+            relevant only if method is 'mass' or 'potential' or 'massfraction.metals'
+        part_indicess : array or list of arrays
+            list of indices of particles to use to define host center coordinates
+            if supply a list of arrays, use each list element for a different host
         assign_formation_coordinates : bool
             whether to assign to stars their coordindates wrt each host galaxy at formation
             (if reading hosts coordinates from file)
@@ -2319,12 +2318,11 @@ class ReadClass(ut.io.SayClass):
         track_directory : str
             directory of files for particle pointers, formation coordinates, and host coordinates
         '''
-        if not species_name:
-            species_name = 'star'
-        if species_name == 'star' and species_name not in part:
-            species_name = 'dark'
-
-        assert species_name in ['star', 'dark', 'gas', 'dark2', 'blackhole']
+        if method is True:
+            if part.info['has.baryons']:
+                method = 'track'
+            else:
+                method = 'halo'
         assert method in [
             True,
             'track',
@@ -2332,30 +2330,22 @@ class ReadClass(ut.io.SayClass):
             'mass',
             'potential',
             'massfraction.metals',
-            'metallicity.metals',
         ]
 
-        if method is True:
-            if species_name == 'star':
-                method = 'track'
-            elif species_name == 'dark':
-                method = 'halo'
-            else:
-                method = 'mass'
+        if not species_name:
+            if 'star' in part:
+                species_name = 'star'
+            elif 'dark' in part:
+                species_name = 'dark'
+            elif 'gas' in part:
+                species_name = 'gas'
+            elif 'blackhole' in part:
+                species_name = 'blackhole'
+            elif 'dark2' in part:
+                species_name = 'dark2'
+        assert species_name in ['star', 'dark', 'dark2', 'gas', 'blackhole']
 
-        if method in ['mass', 'potential', 'massfraction.metals', 'metallicity.metals']:
-            self._assign_hosts_coordinates_from_particles(
-                part,
-                species_name,
-                part_indicess,
-                method,
-                velocity_distance_max,
-                host_number,
-                exclusion_distance,
-                verbose,
-            )
-
-        elif method in ['track', 'halo']:
+        if method in ['track', 'halo']:
             try:
                 if method == 'track':
                     # read coordinates of each host across all snapshots
@@ -2392,9 +2382,17 @@ class ReadClass(ut.io.SayClass):
                     exclusion_distance,
                     verbose,
                 )
+
         else:
-            self.say(
-                f'! not recognize coordinate method = {method}, not assigning hosts coordinates'
+            self._assign_hosts_coordinates_from_particles(
+                part,
+                species_name,
+                part_indicess,
+                method,
+                velocity_distance_max,
+                host_number,
+                exclusion_distance,
+                verbose,
             )
 
         print()
