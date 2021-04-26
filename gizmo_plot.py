@@ -5098,8 +5098,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         simulation_directories : list
             simulation directories and names/labels for figure
         redshifts : float or list
-        '''
         parts, species, redshifts = self._parse_inputs(parts, species, redshifts)
+        '''
 
         for redshift in redshifts:
             if len(redshifts) > 1 or parts is None:
