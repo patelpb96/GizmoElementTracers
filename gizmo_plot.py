@@ -158,38 +158,60 @@ class ImageClass(ut.io.SayClass):
 
         Parameters
         ----------
-        part : dict : catalog of particles
-        species_name : str : name of particle species to plot
-        weight_name : str : property to weight positions by
-        image_kind : str : 'histogram', 'histogram.3d', 'points'
-        dimensions_plot : list : which dimensions to plot
-            if length 2, plot one v other, if length 3, plot all via 3 panels
-        dimensions_select : list : which dimensions to use to select particles
-            note : use this to set selection 'depth' of an image
-        distances_max : float or array : distance[s] from center to plot and/or cut
-        distance_bin_width : float : length of pixel
-        distance_bin_number : number of pixels from distance = 0 to max (2x this across image)
-        center_position : array-like : position of center
-        rotation : bool or array : whether to rotate particles - two options:
-          (a) if input array of eigen-vectors, will define rotation axes
-          (b) if True, will rotate to align with principal axes defined by input species
-        host_index : int : index of host halo to get position and rotation of (if not input them)
-        property_select : dict : (other) properties to select on: names as keys and limits as values
-        part_indices : array : input selection indices for particles
-        subsample_factor : int : factor by which periodically to sub-sample particles
-        use_column_units : bool : whether to convert to particle number / cm^2
-        image_limits : list : min and max limits to impose on image dynamic range (exposure)
-        background_color : str : name of color for background: 'white', 'black'
-        hal : dict : catalog of halos at snapshot
-        hal_indices : array : indices of halos to plot
-        hal_position_kind : str : name of position to use for center of halo
-        hal_radius_kind : str : name of radius to use for size of halo
+        part : dict
+            catalog of particles at snapshot
+        species_name : str
+            name of particle species to plot
+        weight_name : str
+            property to weight positions by
+        image_kind : str
+            'histogram', 'histogram.3d', 'points'
+        dimensions_plot : list
+            dimensions to plot - if length 2, plot one v one; if length 3, plot all via 3 panels
+        dimensions_select : list
+            dimensions to use to select particles
+            use this to set selection 'depth' of an image
+        distances_max : float or array
+            distance[s] from center to plot and/or cut [kpc]
+        distance_bin_width : float
+            size of pixel [kpc]
+        distance_bin_number : int
+            number of pixels from distance = 0 to max (2x this across image)
+        center_position : array-like
+            position of center
+        rotation : bool or array
+            whether to rotate particles - two options:
+            (a) if input array of eigen-vectors, will define rotation axes
+            (b) if True, will rotate to align with principal axes defined by input species
+        host_index : int
+            index of host halo to get position and rotation of (if not input them)
+        property_select : dict
+            (other) properties to select on: names as keys and limits as values
+        part_indices : array
+            input selection indices for particles
+        subsample_factor : int
+            factor by which periodically to sub-sample particles
+        use_column_units : bool
+            whether to convert to particle number / cm^2
+        image_limits : list
+            min and max limits to impose on image dynamic range (exposure)
+        background_color : str
+            name of color for background: 'white', 'black'
+        hal : dict
+            catalog of halos at snapshot
+        hal_indices : array
+            indices of halos to plot
+        hal_position_kind : str
+            name of position to use for center of halo
+        hal_radius_kind : str
+            name of radius to use for size of halo
         plot_file_name : str
             whether to write figure to file and its name. True = use default naming convention
-        plot_directory : str : path + directory where to write file
+        plot_directory : str
+            path + directory where to write file
             if ends in '.pdf', override default file naming convention and use input name
-        add_simulation_name : bool : whether to add name of simulation to figure name
-        figure_index : int : index of figure for matplotlib
+        figure_index : int
+            index of figure for matplotlib
         '''
         dimen_label = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -531,10 +553,10 @@ class ImageClass(ut.io.SayClass):
                 weight_name, prop, species_name, 'redshift', part.snapshot, prefix=prefix
             )
 
-            if 'histogram' in image_kind:
-                plot_file_name += '_i.{:.1f}-{:.1f}'.format(
-                    np.log10(image_limits_use[0]), np.log10(image_limits_use[1])
-                )
+            # if 'histogram' in image_kind:
+            #    plot_file_name += '_i.{:.1f}-{:.1f}'.format(
+            #        np.log10(image_limits_use[0]), np.log10(image_limits_use[1])
+            #    )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
         self.histogram_valuess = hist_valuess
@@ -2579,7 +2601,7 @@ class DiskClass(ut.io.SayClass):
     .
     '''
 
-    def plot_disk_orientation_v_property(
+    def plot_orientation_v_property(
         self,
         parts,
         species_names=['star', 'star.25', 'star.young'],
@@ -2761,7 +2783,7 @@ class DiskClass(ut.io.SayClass):
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
-    def plot_disk_orientation_v_time(
+    def plot_orientation_v_time(
         self,
         parts,
         time_kind='time.lookback',
@@ -2776,7 +2798,8 @@ class DiskClass(ut.io.SayClass):
         figure_index=1,
     ):
         '''
-        Plot orientation angle of the disk versus time_kind, wrt
+        Plot orientation angle[s] of the principal axes of the disk (wrt their orientations at
+        refrence_snapshot_index) versus time_kind.
         Requires that you have read pre-compiled host rotation tensors in host_coordinates.hdf5.
 
         Parameters
@@ -2795,6 +2818,7 @@ class DiskClass(ut.io.SayClass):
             index of reference snapshot, that defines angle zero point
         axis_indices : list
             which principal axes to plot the orientation angles of
+            0 = minor, 1 = intermediate, 2 = major
         host_index : int
             index of host galaxy/halo to get stored position of (if not input it)
         plot_file_name : str
@@ -2804,10 +2828,11 @@ class DiskClass(ut.io.SayClass):
         figure_index : int
             index of figure for matplotlib
         '''
-        # Say = ut.io.SayClass(plot_disk_orientation_v_time)
 
         if isinstance(parts, dict):
             parts = [parts]
+        if np.isscalar(axis_indices):
+            axis_indices = [axis_indices]
 
         angles = (
             np.zeros((len(parts), len(axis_indices), parts[0].hostz['rotation'].shape[0])) * np.nan
@@ -2836,7 +2861,7 @@ class DiskClass(ut.io.SayClass):
             subplot, time_log_scale, time_limits, times, False, angle_limits, angles
         )
 
-        subplot.set_xlabel(time_kind)
+        subplot.set_xlabel(ut.plot.Label.get_label(time_kind, get_words=True))
         subplot.set_ylabel('disk offset angle $\\left[ {{\\rm deg}} \\right]$')
 
         if len(parts) > len(axis_indices):
@@ -2858,13 +2883,103 @@ class DiskClass(ut.io.SayClass):
         ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 
         if plot_file_name is True or plot_file_name == '':
-            plot_file_name = f'disk.orientation_v_{time_kind}'
-            if len(parts) == 1:
-                property_y = parts[0].info['simulation.name'] + '_' + plot_file_name
             plot_file_name = ut.plot.get_file_name(
-                property_y, plot_file_name, snapshot_dict=part.snapshot
+                'disk.orientation', time_kind, snapshot_dict=part.snapshot
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
+
+    def plot_axis_ratio_v_time(
+        self,
+        parts,
+        time_kind='time.lookback',
+        time_limits=[0, 13],
+        time_log_scale=False,
+        axis_index_numerator=2,
+        axis_index_denominator=0,
+        axis_ratio_limits=[1, 10],
+        host_index=0,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        Plot minor / major axis ratio of the disk versus time_kind.
+        Requires that you have read pre-compiled host rotation tensors in host_coordinates.hdf5.
+
+        Parameters
+        ----------
+        parts : dict or list
+            catalog[s] of particles (can be different simulations or snapshots)
+        time_kind : str
+            time kind to plot: 'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
+        time_limits : list
+            min and max limits of time_kind to impose
+        time_width : float
+            width of time_kind bin
+        time_log_scale : bool
+            whether to use logarithmic scaling for time bins
+        axis_index_numerator : int
+            which principal axix to use in numerator of ratio
+            0 = minor, 1 = intermediate, 2 = major
+        axis_index_denominator : int
+            which principal axix to use in denominator of ratio
+        host_index : int
+            index of host galaxy/halo to get stored position of (if not input it)
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        # Say = ut.io.SayClass(plot_disk_orientation_v_time)
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        axis_ratios = np.zeros((len(parts), parts[0].hostz['axis.ratios'].shape[0])) * np.nan
+
+        for part_i, part in enumerate(parts):
+            rs = part.hostz['axis.ratios']
+            axis_ratios[part_i] = (
+                rs[:, host_index, axis_index_numerator] / rs[:, host_index, axis_index_denominator]
+            )
+
+        if time_kind in ['time.lookback', 'age']:
+            times = parts[0].Snapshot['time'][-1] - parts[0].Snapshot['time']
+        else:
+            times = parts[0].Snapshot[time_kind]
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+            subplot, time_log_scale, time_limits, times, False, axis_ratio_limits, axis_ratios
+        )
+
+        subplot.set_xlabel(ut.plot.Label.get_label(time_kind, get_words=True))
+        subplot.set_ylabel('disk axis ratio')
+
+        colors = ut.plot.get_colors(len(parts))
+
+        for part_i, part in enumerate(parts):
+            color = colors[part_i]
+            label = None
+            if len(parts) > 1:
+                label = part.info['simulation.name']
+
+            subplot.plot(times, axis_ratios[part_i], color=color, alpha=0.8, label=label)
+
+        ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+        if plot_file_name is True or plot_file_name == '':
+            plot_file_name = ut.plot.get_file_name(
+                'disk.axis.ratio', time_kind, snapshot_dict=part.snapshot
+            )
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+
+Disk = DiskClass()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -4983,8 +5098,8 @@ class CompareSimulationsClass(ut.io.SayClass):
         simulation_directories : list
             simulation directories and names/labels for figure
         redshifts : float or list
-        '''
         parts, species, redshifts = self._parse_inputs(parts, species, redshifts)
+        '''
 
         for redshift in redshifts:
             if len(redshifts) > 1 or parts is None:
@@ -4994,6 +5109,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     redshift,
                     simulation_directories,
                     properties=self.properties,
+                    assign_hosts_rotation=True,
                 )
 
             if 'star' in species:

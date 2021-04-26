@@ -1839,9 +1839,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
             try:
                 self.GizmoRead.assign_hosts_coordinates(
                     part_z,
+                    'mass',
                     self.species_name,
                     hosts_part_z_indicess,
-                    method='mass',
                     host_number=host_number,
                     exclusion_distance=None,
                 )

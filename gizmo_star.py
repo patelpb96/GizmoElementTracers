@@ -528,7 +528,7 @@ class NucleosyntheticYieldClass:
                 # yields[2]=1.31e-2; yields[3]=7.59e-10; yields[4]=9.29e-2; yields[5]=1.79e-3;
                 # yields[6]=2.82e-3; yields[7]=1.06e-1; yields[8]=5.30e-2; yields[9]=6.27e-3;
                 # yields[10]=5.77e-1
-                # Seitenzahl et al. 2013, model N100 [favored]
+                # Seitenzahl et al 2013, model N100 [favored]
                 # high Si, seems bit less plausible vs other models here
                 # yields[2]=2.17e-3; yields[3]=2.29e-06; yields[4]=7.21e-2; yields[5]=2.55e-3;
                 # yields[6]=1.10e-2; yields[7]=2.05e-1; yields[8]=8.22e-2; yields[9]=1.05e-2;
