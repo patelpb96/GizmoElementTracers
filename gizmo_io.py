@@ -302,7 +302,7 @@ class ParticleDictionaryClass(dict):
                 self.MassLoss = gizmo_star.MassLossClass()
 
             # fractional mass loss since formation
-            values = self.MassLoss.get_mass_loss_fraction_from_spline(
+            values = self.MassLoss.get_mass_loss_from_spline(
                 self.prop('age', indices) * 1000,
                 metal_mass_fractions=self.prop('massfraction.metals', indices),
             )
@@ -2435,7 +2435,7 @@ class ReadClass(ut.io.SayClass):
                 method,
                 host_number,
                 exclusion_distance,
-                return_array=False,
+                return_single_array=False,
                 verbose=verbose,
             )
 
@@ -2448,7 +2448,7 @@ class ReadClass(ut.io.SayClass):
                 method,
                 velocity_distance_max,
                 part.host['position'],
-                return_array=False,
+                return_single_array=False,
                 verbose=verbose,
             )
 
@@ -2524,7 +2524,7 @@ class ReadClass(ut.io.SayClass):
             mass_percent,
             age_percent,
             center_positions=part.host['position'],
-            return_array=False,
+            return_single_array=False,
             verbose=True,
         )
 

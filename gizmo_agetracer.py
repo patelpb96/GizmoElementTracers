@@ -544,7 +544,7 @@ class FIREYieldClass:
             should have N_age-bins + 1 values: left edges plus right edge of final bin
         element_names : list
             names of elements to generate, if only generating a subset
-            if input None, assign all elements in this model
+        if input None, assign all elements in this model
 
         Returns
         -------
@@ -584,7 +584,7 @@ class FIREYieldClass:
                     self._get_element_yield_rate,
                     age_min,
                     age_max,
-                    args=(element_name,),
+                    (element_name,),
                     points=self.ages_critical,
                 )[0]
 

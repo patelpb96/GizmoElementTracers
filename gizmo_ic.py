@@ -135,7 +135,7 @@ class InitialConditionClass(ut.io.SayClass):
             # no input halo to use, so assume that this is an existing zoom-in simulation
             # find primary host halo center position and radius
             center_position = ut.particle.get_center_positions(
-                part_fin, 'dark', center_number=host_index + 1, return_array=False
+                part_fin, 'dark', center_number=host_index + 1, return_single_array=False
             )[host_index]
 
             halo_prop = ut.particle.get_halo_properties(

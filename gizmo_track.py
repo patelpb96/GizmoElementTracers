@@ -105,7 +105,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
         part_indices=None,
         forward=False,
         intermediate_snapshot=False,
-        return_array=True,
+        return_single_array=True,
     ):
         '''
         Get pointer indices (and species) from species_name_from particles at the
@@ -127,9 +127,9 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
         intermediate_snapshot : bool
             whether to get pointers between z and an intermediate snapshot (at z > 0)
             default (intermediate_snapshot=False) is to get pointers to/from z0
-        return_array : bool
-            if tracking single species at both snapshots, return just array of pointer indices
-            (and not a pointer dictionary that includes species names)
+        return_single_array : bool
+            if tracking single species at both snapshots, whether to return single array of
+            pointer indices (instead of dictionary of pointers that includes species names)
 
         Returns
         -------
@@ -214,7 +214,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
                 pointer['index'][pis] = -pointer['index'].max() - 1
 
         # if tracking single species, can return just array of pointer indices
-        if len(species_names_to) == 1 and return_array:
+        if len(species_names_to) == 1 and return_single_array:
             pointer = pointer['index']
 
         return pointer
@@ -473,7 +473,7 @@ class ParticlePointerClass(ut.io.SayClass):
 
         if self.reference_snapshot_index in [snapshot_index_to, snapshot_index_from]:
             pointer_indices = PointerTo.get_pointers(
-                species_name, species_name, forward=forward, return_array=True
+                species_name, species_name, forward=forward, return_single_array=True
             )
         else:
             PointerFrom = self.io_pointers(
@@ -483,11 +483,11 @@ class ParticlePointerClass(ut.io.SayClass):
             if species_name == 'star':
                 # pointers from z_from to the reference (later, z0) snapshot
                 pointer_indices_from = PointerFrom.get_pointers(
-                    species_name, species_name, forward=True, return_array=True
+                    species_name, species_name, forward=True, return_single_array=True
                 )
                 # pointers from the reference (later, z0) snapshot to z_to
                 pointer_indices_to = PointerTo.get_pointers(
-                    species_name, species_name, return_array=True
+                    species_name, species_name, return_single_array=True
                 )
                 # pointers from z_from to z_to
                 pointer_indices = pointer_indices_to[pointer_indices_from]
@@ -506,7 +506,7 @@ class ParticlePointerClass(ut.io.SayClass):
                     species_name,
                     forward=forward,
                     intermediate_snapshot=True,
-                    return_array=True,
+                    return_single_array=True,
                 )
 
         return pointer_indices
@@ -1300,7 +1300,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
                 and count['id no match'] == count['match prop no match'] == 0
             ):
 
-                z_star_indices = Pointer.get_pointers('star', 'star', return_array=True)
+                z_star_indices = Pointer.get_pointers('star', 'star', return_single_array=True)
                 z0_star_indices = np.where(z_star_indices >= 0)[0]
                 z_star_indices = z_star_indices[z0_star_indices]
 
@@ -1794,7 +1794,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
             try:
                 Pointer = ParticlePointer.io_pointers(snapshot_index=snapshot_index)
                 part_pointers = Pointer.get_pointers(
-                    self.species_name, self.species_name, return_array=True
+                    self.species_name, self.species_name, return_single_array=True
                 )
             except IOError:
                 self.say(f'\n! can not read pointers to snapshot {snapshot_index}')

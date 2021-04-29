@@ -347,7 +347,7 @@ class ContaminationClass(ut.io.SayClass):
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
         verbose=False,
-        plot_file_name=None,
+        file_name=None,
     ):
         '''
         Print [and plot] contamination from low-resolution dark-matter particles around halo/galaxy
@@ -367,7 +367,7 @@ class ContaminationClass(ut.io.SayClass):
             directory of files for particle pointers, formation coordinates, and host coordinates
         verbose : bool
             verbosity flag
-        plot_file_name : str
+        file_name : str
             whether to write figure to file and its name. True = use default naming convention
         '''
         distance_bin_width = 0.01
@@ -397,8 +397,8 @@ class ContaminationClass(ut.io.SayClass):
             scale_to_halo_radius=False,
             virial_kind=virial_kind,
             verbose=verbose,
-            plot_file_name=plot_file_name,
-            plot_directory='plot',
+            file_name=file_name,
+            directory='plot',
         )
 
         self.print_contamination_v_distance(
@@ -409,8 +409,8 @@ class ContaminationClass(ut.io.SayClass):
             scale_to_halo_radius=True,
             virial_kind=virial_kind,
             verbose=verbose,
-            plot_file_name=plot_file_name,
-            plot_directory='plot',
+            file_name=file_name,
+            directory='plot',
         )
 
     def print_contamination_v_distance(
@@ -427,8 +427,8 @@ class ContaminationClass(ut.io.SayClass):
         axis_y_limits=[0.0001, 1],
         axis_y_log_scale=True,
         verbose=False,
-        plot_file_name=None,
-        plot_directory='.',
+        file_name=None,
+        directory='.',
         figure_index=1,
     ):
         '''
@@ -460,9 +460,9 @@ class ContaminationClass(ut.io.SayClass):
             whether to use logarithmic scaling for y axis
         verbose : bool
             verbosity flag
-        plot_file_name : str
+        file_name : str
             whether to write figure to file and its name. True = use default naming convention
-        plot_directory : str
+        directory : str
             directory in which to write figure file
         figure_index : int
             index of figure for matplotlib
@@ -629,7 +629,7 @@ class ContaminationClass(ut.io.SayClass):
                 )
         print()
 
-        if plot_file_name is None or plot_file_name is False:
+        if file_name is None or file_name is False:
             return
 
         # plot ----------
@@ -665,14 +665,14 @@ class ContaminationClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, 'best')
 
-        if plot_file_name is True or plot_file_name == '':
+        if file_name is True or file_name == '':
             distance_name = 'dist'
             if scale_to_halo_radius:
                 distance_name += '.' + virial_kind
-            plot_file_name = ut.plot.get_file_name(
+            file_name = ut.plot.get_file_name(
                 'mass.frac', distance_name, snapshot_dict=part.snapshot
             )
-        ut.plot.parse_output(plot_file_name, plot_directory)
+        ut.plot.parse_output(file_name, directory)
 
 
 Contamination = ContaminationClass()
@@ -1019,8 +1019,8 @@ def plot_scaling(
     time_kind='core',
     axis_x_log_scale=True,
     axis_y_log_scale=True,
-    plot_file_name=False,
-    plot_directory='.',
+    file_name=False,
+    directory='.',
 ):
     '''
     Print simulation run times (wall or core).
@@ -1037,9 +1037,9 @@ def plot_scaling(
         whether to use logarithmic scaling for x axis
     axis_y_log_scale : bool
         whether to use logarithmic scaling for y axis
-    plot_file_name : str
+    file_name : str
         whether to write figure to file and its name. True = use default naming convention
-    plot_directory : str
+    directory : str
         directory to write figure file
     '''
     # weak_dark = {
@@ -1295,9 +1295,9 @@ def plot_scaling(
         #             alpha=0.7)
         subplot.plot(baryon_particle_numbers, baryon_times, '*-', linewidth=2.0, color='blue')
 
-    if plot_file_name is True or plot_file_name == '':
-        plot_file_name = 'scaling'
-    ut.plot.parse_output(plot_file_name, plot_directory)
+    if file_name is True or file_name == '':
+        file_name = 'scaling'
+    ut.plot.parse_output(file_name, directory)
 
 
 # --------------------------------------------------------------------------------------------------
