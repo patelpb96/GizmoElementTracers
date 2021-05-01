@@ -111,14 +111,14 @@ class NucleosyntheticYieldClass:
     '''
     Nucleosynthetic yields in the FIRE-2 or FIRE-3 models.
 
-    Progenitor metallicity-dependent yields:
+    Yields that depend on Progenitor metallicity:
         FIRE-2
             for stellar winds: oxygen
             for core-collpase supernova: nitgrogen
         FIRE-3
             for stellar winds: He, C, N, O
 
-    Model variants for FIRE-2:
+    Model variants for FIRE-2
          'fire2.1' = remove progenitor metallicity dependence to all yields
             (via setting progenitor to Solar)
          'fire2.2' = above + turn of progenitor metallicity dependence to stellar wind rate
@@ -168,7 +168,7 @@ class NucleosyntheticYieldClass:
         assert self.model in self._models_available
 
         if reset_parameters:
-            self.sun_massfraction = get_sun_massfraction(self.model)  # reset solar abundances
+            self.sun_massfraction = get_sun_massfraction(self.model)  # reset Solar abundances
 
     def get_yields(
         self,
@@ -193,8 +193,7 @@ class NucleosyntheticYieldClass:
         event_kind : str
             stellar event: 'wind', 'supernova.cc' or 'supernova.ii', 'supernova.ia'
         progenitor_metallicity : float
-            total metallicity of progenitor stellar population
-            [linear mass fraction relative to sun_mass_fraction['metals']]
+            total metallicity of progenitor [linear mass fraction wrt sun_mass_fraction['metals']]
         progenitor_massfraction_dict : dict or bool [optional]
             optional: dictionary that contains the mass fraction of each element in the progenitor
             if True, then assume Solar abundance ratios and use progenitor_metallicity to normalize
@@ -224,22 +223,19 @@ class NucleosyntheticYieldClass:
 
         # determine progenitor abundance[s]
         if isinstance(progenitor_massfraction_dict, dict) and len(progenitor_massfraction_dict) > 0:
-            # input mass fraction for each element, use to compute higher-order corrections
+            # input mass fraction for each element
+            # for FIRE-2, use to compute higher-order corrections to surface abundances
+            # for FIRE-3, use to compute stellar winds yields
             for element_name in element_yield:
                 assert element_name in progenitor_massfraction_dict
-            progenitor_metal_mass_fraction = progenitor_massfraction_dict['metals']
         else:
             assert progenitor_metallicity >= 0
-            progenitor_metal_mass_fraction = (
-                progenitor_metallicity * self.sun_massfraction['metals']
-            )
-            if progenitor_massfraction_dict is True:
-                progenitor_massfraction_dict = {}
-                # assume Solar abundance ratios and use progenitor_metallicity to normalize
-                for element_name in self.sun_massfraction:
-                    progenitor_massfraction_dict[element_name] = (
-                        progenitor_metallicity * self.sun_massfraction[element_name]
-                    )
+            # assume Solar abundance ratios and use progenitor_metallicity to normalize
+            progenitor_massfraction_dict = {}
+            for element_name in self.sun_massfraction:
+                progenitor_massfraction_dict[element_name] = (
+                    progenitor_metallicity * self.sun_massfraction[element_name]
+                )
 
         if event_kind == 'wind':
             ejecta_mass = 1  # stellar wind yields are intrinsically mass fractions
@@ -255,9 +251,9 @@ class NucleosyntheticYieldClass:
 
                 if self.model == 'fire2':
                     # oxygen yield increases linearly with progenitor metallicity at Z/Z_sun < 1.65
-                    if progenitor_metal_mass_fraction < 0.033:
+                    if progenitor_massfraction_dict['metals'] < 0.033:
                         element_yield['oxygen'] *= (
-                            progenitor_metal_mass_fraction / self.sun_massfraction['metals']
+                            progenitor_massfraction_dict['metals'] / self.sun_massfraction['metals']
                         )
                     else:
                         element_yield['oxygen'] *= 1.65
@@ -267,9 +263,9 @@ class NucleosyntheticYieldClass:
             elif self.model == 'fire3':
                 # FIRE-3: stellar_evolution.c line 563
                 # use surface abundance for all elements except He, C, N, O, S-process
-                # CNO is conserved to high accuracy in sum for secondary production
+                # C, N, O conserved to high accuracy in sum for secondary production
 
-                # define initial H, He, CNO fraction
+                # define initial fractions of H, He, C, N, O
                 f_H_0 = (
                     1
                     - progenitor_massfraction_dict['metals']
@@ -280,19 +276,19 @@ class NucleosyntheticYieldClass:
                 f_N_0 = progenitor_massfraction_dict['nitrogen']
                 f_O_0 = progenitor_massfraction_dict['oxygen']
                 f_CNO_0 = f_C_0 + f_N_0 + f_O_0 + 1e-10
-                # solar-scaled CNO abundance
-                z_sol = f_CNO_0 / (
+                # CNO abundance scaled to Solar
+                Z_CNO = f_CNO_0 / (
                     self.sun_massfraction['carbon']
                     + self.sun_massfraction['nitrogen']
-                    + self.sun_massfraction['oxygen ']
+                    + self.sun_massfraction['oxygen']
                 )
-                # He production : this scales off of the fraction of H in IC:
+                # He production scales off of the fraction of H in IC
                 # y represents the yield of He produced by burning H, scales off availability
                 t1 = 2.8  # [Myr]
                 t2 = 10
                 t3 = 2300
                 t4 = 3000
-                y1 = 0.4 * np.min((z_sol + 1e-3) ** 0.6, 2)
+                y1 = 0.4 * min((Z_CNO + 1e-3) ** 0.6, 2)
                 y2 = 0.08
                 y3 = 0.07
                 y4 = 0.042
@@ -310,14 +306,14 @@ class NucleosyntheticYieldClass:
                 element_yield['helium'] = f_He_0 + y * f_H_0
 
                 # secondary N production in CNO cycle: scales off of initial fraction of CNO:
-                # y here represents fraction of CO mass converted to -additional- N
+                # y here represents fraction of CO mass converted to additional N
                 t1 = 1
                 t2 = 2.8
                 t3 = 50
                 t4 = 1900
                 t5 = 14000
-                y1 = 0.2 * np.max(1e-4, np.min(z_sol * z_sol, 0.9))
-                y2 = 0.68 * np.min((z_sol + 1e-3) ** 0.1, 0.9)
+                y1 = 0.2 * max(1e-4, min(Z_CNO ** 2, 0.9))
+                y2 = 0.68 * min((Z_CNO + 1e-3) ** 0.1, 0.9)
                 y3 = 0.4
                 y4 = 0.23
                 y5 = 0.065
@@ -333,15 +329,15 @@ class NucleosyntheticYieldClass:
                     y = y4 * (age / t4) ** (np.log(y5 / y4) / np.log(t5 / t4))
                 else:
                     y = y5
-                y = np.max(0, np.min(1, y))
+                y = max(0, min(1, y))
                 frac_loss_from_C = 0.5
-                floss_CO = y * (f_C_0 + f_O_0)
-                floss_C = np.min(frac_loss_from_C * floss_CO, 0.99 * f_C_0)
-                floss_O = floss_CO - floss_C
+                f_loss_CO = y * (f_C_0 + f_O_0)
+                f_loss_C = min(frac_loss_from_C * f_loss_CO, 0.99 * f_C_0)
+                f_loss_O = f_loss_CO - f_loss_C
                 # convert mass from CO to N, conserving total CNO mass
-                element_yield['nitrogen'] = f_N_0 + floss_CO
-                element_yield['carbon'] = f_C_0 - floss_C
-                element_yield['oxygen'] = f_O_0 - floss_O
+                element_yield['nitrogen'] = f_N_0 + f_loss_CO
+                element_yield['carbon'] = f_C_0 - f_loss_C
+                element_yield['oxygen'] = f_O_0 - f_loss_O
 
                 # primary C production: scales off initial H+He, generally small compared to loss
                 # fraction above in SB99, large in some other models, small for early OB winds
@@ -399,9 +395,9 @@ class NucleosyntheticYieldClass:
                     yield_nitrogen_orig = np.float(element_yield['nitrogen'])
 
                     # nitrogen yield increases linearly with progenitor metallicity @ Z/Z_sun < 1.65
-                    if progenitor_metal_mass_fraction < 0.033:
+                    if progenitor_massfraction_dict['metals'] < 0.033:
                         element_yield['nitrogen'] *= (
-                            progenitor_metal_mass_fraction / self.sun_massfraction['metals']
+                            progenitor_massfraction_dict['metals'] / self.sun_massfraction['metals']
                         )
                     else:
                         element_yield['nitrogen'] *= 1.65
@@ -412,7 +408,7 @@ class NucleosyntheticYieldClass:
 
             elif self.model == 'fire3':
                 # FIRE-3: stellar_evolution.c line 471 (or so)
-                ejecta_mass = 8.72  # IMF-averaged value [M_sun], but FIRE-3 does not use it
+                # ejecta_mass = 8.72  # IMF-averaged value [M_sun], but FIRE-3 does not use it
 
                 # numbers for interpolation of ejecta masses
                 # [must be careful here that this integrates to the correct -total- ejecta mass]
@@ -420,7 +416,7 @@ class NucleosyntheticYieldClass:
                 # (Eddington-limited lifetime of the most massive stars), tbrk=6.5 Myr to the end of
                 # this early phase, stars with ZAMS mass ~30+ Msun here. curve flattens both from
                 # IMF but also b/c mass-loss less efficient. tmax = 44 Myr to the last explosion
-                # determined by lifetime of 8 Msun stars
+                # determined by lifetime of stars at 8 Msun
                 cc_age_min = 3.7
                 cc_age_break = 6.5
                 cc_age_max = 44
@@ -585,7 +581,7 @@ class NucleosyntheticYieldClass:
             # later FIRE-2 applied this only to supernovae
 
             # get pure (non-metal) mass fraction of star
-            pure_mass_fraction = 1 - progenitor_metal_mass_fraction
+            pure_mass_fraction = 1 - progenitor_massfraction_dict['metals']
 
             for element_name in element_yield:
                 if element_yield[element_name] > 0:
@@ -760,7 +756,7 @@ def plot_nucleosynthetic_yields(
 # --------------------------------------------------------------------------------------------------
 class StellarWindClass:
     '''
-    Compute mass-loss rates and cumulative mass-loss fractions (with respect to formation mass)
+    Compute mass-loss rates and cumulative mass-loss fractions (with respect to mass at formation))
     for stellar winds in the FIRE-2 or FIRE-3 model.
 
     Note on model variants for FIRE-2:
@@ -2056,9 +2052,6 @@ def plot_supernova_number_v_age(
 
 
 def plot_mass_loss_v_age(
-    age_limits=[1, 10000],
-    age_bin_width=0.01,
-    age_log_scale=True,
     mass_loss_kind='rate',
     mass_loss_limits=None,
     mass_loss_log_scale=True,
@@ -2066,6 +2059,9 @@ def plot_mass_loss_v_age(
     metallicity=1,
     metal_mass_fraction=None,
     model=DEFAULT_MODEL,
+    age_limits=[1, 13700],
+    age_bin_width=0.01,
+    age_log_scale=True,
     file_name=False,
     directory='.',
     figure_index=1,
@@ -2076,14 +2072,8 @@ def plot_mass_loss_v_age(
 
     Parameters
     ----------
-    age_limits : list
-        min and max limits of age of stellar population [Myr]
-    age_bin_width : float
-        width of stellar age bin [Myr]
-    age_log_scale : bool
-        whether to use logarithmic scaling for age bins
     mass_loss_kind : str
-        'rate' or 'cumulative'
+        'rate' or 'mass'
     mass_loss_limits : list
         min and max limits to impose on y-axis
     mass_loss_log_scale : bool
@@ -2096,6 +2086,12 @@ def plot_mass_loss_v_age(
         mass fration of all metals (everything not H, He)
     model : str
         model for rates: 'fire2', 'fire3'
+    age_limits : list
+        min and max limits of age of stellar population [Myr]
+    age_bin_width : float
+        width of stellar age bin [Myr]
+    age_log_scale : bool
+        whether to use logarithmic scaling for age bins
     file_name : str
         whether to write figure to file and its name. True = use default naming convention
     directory : str
@@ -2104,33 +2100,33 @@ def plot_mass_loss_v_age(
         index for matplotlib window
     '''
     mass_loss_kind = mass_loss_kind.lower()
-    assert mass_loss_kind in ['rate', 'cumulative']
+    assert mass_loss_kind in ['rate', 'mass']
 
     AgeBin = ut.binning.BinClass(
         age_limits, age_bin_width, include_max=True, log_scale=age_log_scale
     )
 
+    StellarWind = StellarWindClass(model)
     SupernovaCC = SupernovaCCClass(model)
     SupernovaIa = SupernovaIaClass(model)
-    StellarWind = StellarWindClass(model)
 
     if mass_loss_kind == 'rate':
+        wind = StellarWind.get_mass_loss_rate(
+            AgeBin.mins, metallicity, metal_mass_fraction, element_name=element_name
+        )
         supernova_cc = SupernovaCC.get_mass_loss_rate(
             AgeBin.mins, element_name=element_name, metallicity=metallicity
         )
         supernova_Ia = SupernovaIa.get_mass_loss_rate(AgeBin.mins, element_name=element_name)
-        wind = StellarWind.get_mass_loss_rate(
-            AgeBin.mins, metallicity, metal_mass_fraction, element_name=element_name
-        )
     else:
         age_min = 0
+        wind = StellarWind.get_mass_loss(
+            age_min, AgeBin.mins, metallicity, metal_mass_fraction, element_name=element_name
+        )
         supernova_cc = SupernovaCC.get_mass_loss(
             age_min, AgeBin.mins, element_name=element_name, metallicity=metallicity
         )
         supernova_Ia = SupernovaIa.get_mass_loss(age_min, AgeBin.mins, element_name=element_name)
-        wind = StellarWind.get_mass_loss(
-            age_min, AgeBin.mins, metallicity, metal_mass_fraction, element_name=element_name
-        )
 
     total = supernova_cc + supernova_Ia + wind
 
@@ -2166,9 +2162,8 @@ def plot_mass_loss_v_age(
     ut.plot.make_legends(subplot, 'best')
 
     if file_name is True or file_name == '':
-        mass_loss_kind = mass_loss_kind.replace('cumulative', 'cum')
         if element_name is not None and len(element_name) > 0:
-            file_name = f'{element_name}.yield.{mass_loss_kind}_v_time'
+            file_name = f'{element_name}.yield_v_time'
         else:
             file_name = f'star.mass.loss.{mass_loss_kind}_v_time'
         file_name += '_Z.{}'.format(
