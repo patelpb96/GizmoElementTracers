@@ -1780,10 +1780,6 @@ class ReadClass(ut.io.SayClass):
                         else:
                             properties_to_print.append(prop_read_name)
 
-                if file_read_i is not None:
-                    # close, if had to open another snapshot file to find particles of this species
-                    file_read_i.close()
-
                 if len(properties_to_print) != len(part_read.keys()):
                     # read only a sub-set of properties in snapshot
                     properties_to_print.sort()
@@ -1794,8 +1790,12 @@ class ReadClass(ut.io.SayClass):
                     prop_name = property_dict['Masses']
                     part[spec_name][prop_name] = np.zeros(part_number_tot, dtype=np.float32)
 
+                if file_read_i is not None:
+                    # close, if had to open another snapshot file to find particles of this species
+                    file_read_i.close()
+
         # read properties for each species ----------
-        # initial particle indices to assign to each species from each file
+        # initialize particle indices to assign to each species from each file
         part_indices_lo = np.zeros(len(self._species_read), dtype=np.int64)
 
         if header['file.number.per.snapshot'] == 1:
