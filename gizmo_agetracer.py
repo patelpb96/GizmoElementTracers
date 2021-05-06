@@ -502,7 +502,7 @@ class FIREYieldClass:
         """
 
         # transition/discontinuous ages [Myr] in this model to be careful around when integrating
-        self.ages_critical = gizmo_star.get_ages_critical(model)
+        self.ages_transition = gizmo_star.get_ages_transition(model)
         # self.ages_critical = None
 
         # store this (default) progenitor metallicity, including the mass fraction for each element
@@ -544,7 +544,7 @@ class FIREYieldClass:
             should have N_age-bins + 1 values: left edges plus right edge of final bin
         element_names : list
             names of elements to generate, if only generating a subset
-            if input None, assign all elements in this model
+        if input None, assign all elements in this model
 
         Returns
         -------
@@ -567,7 +567,7 @@ class FIREYieldClass:
 
         # ages to be careful around during integration
         if not hasattr(self, 'ages_critical'):
-            self.ages_critical = None
+            self.ages_transition = None
 
         # compile yields within each age bin by integrating over the underlying rates
         for ai in np.arange(np.size(age_bins) - 1):
@@ -584,8 +584,8 @@ class FIREYieldClass:
                     self._get_element_yield_rate,
                     age_min,
                     age_max,
-                    args=(element_name,),
-                    points=self.ages_critical,
+                    (element_name,),
+                    points=self.ages_transition,
                 )[0]
 
         return element_yield_dict
@@ -618,13 +618,13 @@ class FIREYieldClass:
 
         # stellar wind rate[s] at input age[s] [M_sun / Myr per M_sun of stars formed]
         # this is the only rate in FIRE-2 that depends on metallicity
-        wind_rate = self.StellarWind.get_rate(age, metallicity=progenitor_metallicity)
+        wind_rate = self.StellarWind.get_mass_loss_rate(age, metallicity=progenitor_metallicity)
 
         # core-collapse supernova rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
-        sncc_rate = self.SupernovaCC.get_rate(age)
+        sncc_rate = self.SupernovaCC.get_mass_loss_rate(age)
 
         # supernova Ia rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
-        snia_rate = self.SupernovaIa.get_rate(age)
+        snia_rate = self.SupernovaIa.get_mass_loss_rate(age)
 
         element_yield_rate = (
             self.NucleosyntheticYield.wind_yield[element_name] * wind_rate

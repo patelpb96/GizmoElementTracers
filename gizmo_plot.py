@@ -820,9 +820,15 @@ def plot_property_distribution(
 
     y_values = np.array([Stat.distr[property_statistic][part_i] for part_i in range(len(parts))])
 
-    ut.plot.set_axes_scaling_limits(subplot, property_log_scale, property_limits, prop_values)
+    # ut.plot.set_axes_scaling_limits(subplot, )
     ut.plot.set_axes_scaling_limits(
-        subplot, None, None, None, axis_y_log_scale, axis_y_limits, y_values
+        subplot,
+        property_log_scale,
+        property_limits,
+        prop_values,
+        axis_y_log_scale,
+        axis_y_limits,
+        y_values,
     )
 
     axis_x_label = ut.plot.Label.get_label(property_name, species_name=species_name, get_words=True)
