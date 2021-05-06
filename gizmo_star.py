@@ -1958,12 +1958,12 @@ MassLoss = MassLossClass()
 
 
 def plot_supernova_number_v_age(
-    age_limits=[1, 9000],
-    age_bin_width=0.1,
-    age_log_scale=True,
     axis_y_kind='rate',
     axis_y_limits=None,
     axis_y_log_scale=True,
+    age_limits=[1, 13700],
+    age_bin_width=0.1,
+    age_log_scale=True,
     file_name=False,
     directory='.',
     figure_index=1,
@@ -1974,18 +1974,18 @@ def plot_supernova_number_v_age(
 
     Parameters
     ----------
-    age_limits : list
-        min and max limits of age of stellar population [Myr]
-    age_bin_width : float
-        width of stellar age bin [Myr]
-    age_log_scale : bool
-        whether to use logarithmic scaling for age bins
     axis_y_kind : str
         'rate' or 'number'
     axis_y_limits : list
         min and max limits to impose on y axis
     axis_y_log_scale : bool
         whether to use logarithmic scaling for y axis
+    age_limits : list
+        min and max limits of age of stellar population [Myr]
+    age_bin_width : float
+        width of stellar age bin [Myr]
+    age_log_scale : bool
+        whether to use logarithmic scaling for age bins
     file_name : str
         whether to write figure to file and its name. True = use default naming convention
     directory : str
@@ -1997,20 +1997,20 @@ def plot_supernova_number_v_age(
 
     AgeBin = ut.binning.BinClass(age_limits, age_bin_width, include_max=True)
 
-    SupernovaCC2 = SupernovaCCClass(model='fire2')
-    SupernovaCC3 = SupernovaCCClass(model='fire3')
-    SupernovaIa2 = SupernovaIaClass(model='fire2')
+    CC_FIRE2 = SupernovaCCClass(model='fire2')
+    CC_FIRE3 = SupernovaCCClass(model='fire3')
+    Ia_FIRE2 = SupernovaIaClass(model='fire2')
     SupernovaIa3 = SupernovaIaClass(model='fire3')
 
     if axis_y_kind == 'rate':
-        cc_fire2 = SupernovaCC2.get_rate(AgeBin.mins)
-        cc_fire3 = SupernovaCC3.get_rate(AgeBin.mins)
-        ia_fire2 = SupernovaIa2.get_rate(AgeBin.mins)
+        cc_fire2 = CC_FIRE2.get_rate(AgeBin.mins)
+        cc_fire3 = CC_FIRE3.get_rate(AgeBin.mins)
+        ia_fire2 = Ia_FIRE2.get_rate(AgeBin.mins)
         ia_fire3 = SupernovaIa3.get_rate(AgeBin.mins)
     elif axis_y_kind == 'number':
-        cc_fire2 = SupernovaCC2.get_number(min(age_limits), AgeBin.maxs)
-        cc_fire3 = SupernovaCC3.get_number(min(age_limits), AgeBin.maxs)
-        ia_fire2 = SupernovaIa2.get_number(min(age_limits), AgeBin.maxs)
+        cc_fire2 = CC_FIRE2.get_number(min(age_limits), AgeBin.maxs)
+        cc_fire3 = CC_FIRE3.get_number(min(age_limits), AgeBin.maxs)
+        ia_fire2 = Ia_FIRE2.get_number(min(age_limits), AgeBin.maxs)
         ia_fire3 = SupernovaIa3.get_number(min(age_limits), AgeBin.maxs)
         if axis_y_limits is None or len(axis_y_limits) == 0:
             axis_y_limits = [5e-5, 2e-2]
@@ -2036,10 +2036,19 @@ def plot_supernova_number_v_age(
 
     colors = ut.plot.get_colors(4, use_black=False)
 
-    subplot.plot(AgeBin.mins, cc_fire2, color=colors[0], label='CC (FIRE-2)')
-    subplot.plot(AgeBin.mins, cc_fire3, color=colors[1], label='CC (FIRE-3)')
-    subplot.plot(AgeBin.mins, ia_fire2, color=colors[2], label='Ia (FIRE-2)')
-    subplot.plot(AgeBin.mins, ia_fire3, color=colors[3], label='Ia (FIRE-3)')
+    subplot.plot(AgeBin.mins, cc_fire2, color=colors[0], alpha=0.8, label='CC (FIRE-2)')
+    subplot.plot(AgeBin.mins, ia_fire2, color=colors[1], alpha=0.8, label='Ia (FIRE-2)')
+    subplot.plot(AgeBin.mins, cc_fire3, color=colors[2], alpha=0.8, label='CC (FIRE-3)')
+    subplot.plot(AgeBin.mins, ia_fire3, color=colors[3], alpha=0.8, label='Ia (FIRE-3)')
+
+    print('CC FIRE-2')
+    print(cc_fire2[-1])
+    print('Ia FIRE-2')
+    print(ia_fire2[-1])
+    print('CC FIRE-3')
+    print(cc_fire3[-1])
+    print('Ia FIRE-3')
+    print(ia_fire3[-1])
 
     ut.plot.make_legends(subplot, 'best')
 
@@ -2154,18 +2163,31 @@ def plot_mass_loss_v_age(
 
     colors = ut.plot.get_colors(3, use_black=False)
 
-    subplot.plot(AgeBin.mins, supernova_cc, color=colors[0], label='supernova cc')
-    subplot.plot(AgeBin.mins, supernova_Ia, color=colors[1], label='supernova Ia')
-    subplot.plot(AgeBin.mins, wind, color=colors[2], label='stellar winds')
-    subplot.plot(AgeBin.mins, total, color='black', linestyle=':', label='total')
+    subplot.plot(AgeBin.mins, wind, color=colors[0], alpha=0.7, label='stellar winds')
+    subplot.plot(AgeBin.mins, supernova_cc, color=colors[1], alpha=0.7, label='supernova cc')
+    subplot.plot(AgeBin.mins, supernova_Ia, color=colors[2], alpha=0.7, label='supernova Ia')
+    subplot.plot(AgeBin.mins, total, color='black', alpha=0.8, label='total')
+
+    print('wind')
+    print(wind[-1])
+    print('CC')
+    print(supernova_cc[-1])
+    print('Ia')
+    print(supernova_Ia[-1])
+    print('total')
+    print(total[-1])
 
     ut.plot.make_legends(subplot, 'best')
 
     if file_name is True or file_name == '':
         if element_name is not None and len(element_name) > 0:
             file_name = f'{element_name}.yield_v_time'
+            if 'rate' in mass_loss_kind:
+                file_name = file_name.repace('.yield', '.yield.rate')
         else:
-            file_name = f'star.mass.loss.{mass_loss_kind}_v_time'
+            file_name = 'star.mass.loss_v_time'
+            if 'rate' in mass_loss_kind:
+                file_name = file_name.replace('.loss', '.loss.rate')
         file_name += '_Z.{}'.format(
             ut.io.get_string_from_numbers(metallicity, digits=4, exponential=False, strip=True)
         )

@@ -833,7 +833,7 @@ class ParticlePointerArchiveClass(ut.io.SayClass):
             # store pointers as arrays
             # this will mess up if different particles share the same id
             part.id_to_pointer['species'] = np.zeros(ids_all.max() + 1, dtype='<U4')
-            dtype = ut.array.parse_data_type(ids_all.max() + 1)
+            dtype = ut.array.parse_int_dtype(ids_all.max() + 1)
             part.id_to_pointer['index'] = ut.array.get_array_null(ids_all.max() + 1, dtype=dtype)
 
             for spec_name in self.species_names:
