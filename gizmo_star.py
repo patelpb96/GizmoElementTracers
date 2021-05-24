@@ -925,6 +925,7 @@ class StellarWindClass:
             # metallicity (that shifts slightly when the 'bump' occurs, but not the overall loss
             # rate), so this term is effectively metallicity-independent
             f_agb = 0.01
+            f_agb2 = 0.01
             t_agb = 1000  # [Myr]
 
             if np.isscalar(ages):
@@ -940,7 +941,7 @@ class StellarWindClass:
                     rates = f3 * (ages / t3) ** -3.1
 
                 # add AGB
-                rates += f_agb / ((1 + (ages / t_agb) ** 1.1) * (1 + 0.01 / (ages / t_agb)))
+                rates += f_agb / ((1 + (ages / t_agb) ** 1.1) * (1 + f_agb2 / (ages / t_agb)))
 
             else:
                 assert np.min(ages) >= age_min and np.max(ages) < age_max
@@ -960,7 +961,7 @@ class StellarWindClass:
                 rates[masks] = f3 * (ages[masks] / t3) ** -3.1
 
                 # add AGB
-                rates += f_agb / ((1 + (ages / t_agb) ** 1.1) * (1 + 0.01 / (ages / t_agb)))
+                rates += f_agb / ((1 + (ages / t_agb) ** 1.1) * (1 + f_agb2 / (ages / t_agb)))
 
         rates *= 1e-3  # convert fractional mass loss rate to [Myr ^ -1]
         # rates *= 1.4 * 0.291175  # old: expected return fraction from stellar winds alone (~17%)
