@@ -580,14 +580,21 @@ class ImageClass(ut.io.SayClass):
 
         Parameters
         ----------
-        image_kind : str : 'histogram', 'histogram.3d'
-        dimension_list : list : indices of dimensions to plot
+        image_kind : str
+            'histogram', 'histogram.3d'
+        dimension_list : list
+            indices of dimensions to plot
             if length 2, plot one v other, if length 3, plot all via 3 panels
-        position_bin_number : number of pixels/bins across image
-        position_limits : list or list of lists : min and max values of position to compute
-        positions : array : 3-D positions
-        weights : array : weight for each position
-        use_column_units : bool : whether to convert to [number / cm^2]
+        position_bin_number : int
+            number of pixels/bins across image
+        position_limits : list or list of lists
+            min and max values of position to compute
+        positions : array
+            3-D positions
+        weights : array
+            weight for each position
+        use_column_units : bool
+            whether to convert to [number / cm^2]
         '''
         if '3d' in image_kind:
             # calculate maximum local density along projected dimension
@@ -820,7 +827,6 @@ def plot_property_distribution(
 
     y_values = np.array([Stat.distr[property_statistic][part_i] for part_i in range(len(parts))])
 
-    # ut.plot.set_axes_scaling_limits(subplot, )
     ut.plot.set_axes_scaling_limits(
         subplot,
         property_log_scale,
@@ -846,6 +852,147 @@ def plot_property_distribution(
             alpha=0.8,
             label=part.info['simulation.name'],
         )
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = ut.plot.get_file_name(
+            property_name, 'distribution', species_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
+
+
+def plot_density_distribution(
+    parts,
+    species_name='gas',
+    property_name='number.density',
+    property_limits=[0.1, 1e4],
+    property_bin_width=0.1,
+    property_log_scale=True,
+    property_statistic='probability',
+    weight_properties=['mass', 'sfr'],
+    property_select={
+        'host.distance.principal.cylindrical.rad': [0, 15],
+        'host.distance.principal.cylindrical.vert': [-2, 2],
+    },
+    part_indicess=None,
+    axis_y_limits=[],
+    axis_y_log_scale=True,
+    plot_file_name=None,
+    plot_directory='.',
+    figure_index=1,
+):
+    '''
+    Plot distribution of gas density.
+
+    Parameters
+    ----------
+    part : dict
+        catalog of particles at snapshot
+    species_name : str
+        name of particle species
+    property_name : str
+        property name
+    property_limits : list
+        min and max limits of property
+    property_bin_width : float
+        width of property bin (use this or property_bin_number)
+    property_log_scale : bool
+        whether to use logarithmic scaling for property bins
+    property_statistic : str
+        statistic to plot: 'probability', 'probability.cum', 'probability.norm', 'histogram',
+        'histogram.cum'
+    weight_property : str or list
+        property[s] to weight each particle by
+    property_select : dict
+        (other) properties to select on: names as keys and limits as values
+    part_indicess : array or list of arrays
+        indices of particles from which to select
+    axis_y_limits : list
+        min and max limits for y axis
+    axis_y_log_scale : bool
+        whether to use logarithmic scaling for y axis
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory to write plot file
+    figure_index : int
+        index of figure for matplotlib
+    '''
+    Say = ut.io.SayClass(plot_property_distribution)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+    if np.isscalar(weight_properties):
+        weight_properties = [weight_properties]
+
+    part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
+
+    Stat = ut.statistic.StatisticClass()
+
+    for part_i, part in enumerate(parts):
+        if part_indicess[part_i] is not None and len(part_indicess[part_i]) > 0:
+            part_indices = part_indicess[part_i]
+        else:
+            part_indices = ut.array.get_arange(part[species_name]['position'].shape[0])
+
+        if property_select:
+            part_indices = ut.catalog.get_indices_catalog(
+                part[species_name], property_select, part_indices
+            )
+
+        prop_values = part[species_name].prop(property_name, part_indices)
+
+        Say.say(f'keeping {prop_values.size} {species_name} particles')
+
+        for weight_property in weight_properties:
+            weights = part[species_name].prop(weight_property, part_indices)
+
+            Stat.append_to_dictionary(
+                prop_values, property_limits, property_bin_width, None, property_log_scale, weights,
+            )
+
+            # Stat.print_statistics(-1)
+            # print()
+
+    colors = ut.plot.get_colors(len(parts))
+    line_styles = ut.plot.get_line_styles(len(weight_properties))
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    y_values = np.array(
+        [Stat.distr[property_statistic][i] for i in range(len(parts) * len(weight_properties))]
+    )
+
+    ut.plot.set_axes_scaling_limits(
+        subplot,
+        property_log_scale,
+        property_limits,
+        prop_values,
+        axis_y_log_scale,
+        axis_y_limits,
+        y_values,
+    )
+
+    axis_x_label = ut.plot.Label.get_label(property_name, species_name=species_name, get_words=True)
+    subplot.set_xlabel(axis_x_label)
+    axis_y_label = ut.plot.Label.get_label(
+        property_name, property_statistic, species_name, property_log_scale, get_units=False
+    )
+    subplot.set_ylabel(axis_y_label)
+
+    for part_i, part in enumerate(parts):
+        for weight_i, weight_property in enumerate(weight_properties):
+            i = part_i * 2 + weight_i
+            subplot.plot(
+                Stat.distr['bin.mid'][i],
+                Stat.distr[property_statistic][i],
+                color=colors[part_i],
+                linestyle=line_styles[weight_i],
+                alpha=0.8,
+                label=part.info['simulation.name'],
+            )
 
     ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
 

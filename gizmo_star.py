@@ -277,7 +277,7 @@ class NucleosyntheticYieldClass:
                 f_O_0 = progenitor_massfraction_dict['oxygen']
                 f_CNO_0 = f_C_0 + f_N_0 + f_O_0 + 1e-10
                 # CNO abundance scaled to Solar
-                Z_CNO = f_CNO_0 / (
+                Z_CNO_0 = f_CNO_0 / (
                     self.sun_massfraction['carbon']
                     + self.sun_massfraction['nitrogen']
                     + self.sun_massfraction['oxygen']
@@ -288,7 +288,7 @@ class NucleosyntheticYieldClass:
                 t2 = 10
                 t3 = 2300
                 t4 = 3000
-                y1 = 0.4 * min((Z_CNO + 1e-3) ** 0.6, 2)
+                y1 = 0.4 * min((Z_CNO_0 + 1e-3) ** 0.6, 2)
                 y2 = 0.08
                 y3 = 0.07
                 y4 = 0.042
@@ -312,8 +312,8 @@ class NucleosyntheticYieldClass:
                 t3 = 50
                 t4 = 1900
                 t5 = 14000
-                y1 = 0.2 * max(1e-4, min(Z_CNO ** 2, 0.9))
-                y2 = 0.68 * min((Z_CNO + 1e-3) ** 0.1, 0.9)
+                y1 = 0.2 * max(1e-4, min(Z_CNO_0 ** 2, 0.9))
+                y2 = 0.68 * min((Z_CNO_0 + 1e-3) ** 0.1, 0.9)
                 y3 = 0.4
                 y4 = 0.23
                 y5 = 0.065
@@ -413,24 +413,24 @@ class NucleosyntheticYieldClass:
                 # numbers for interpolation of ejecta masses
                 # [must be careful here that this integrates to the correct -total- ejecta mass]
                 # these break times: tmin = 3.7 Myr corresponds to the first explosions
-                # (Eddington-limited lifetime of the most massive stars), tbrk=6.5 Myr to the end of
-                # this early phase, stars with ZAMS mass ~30+ Msun here. curve flattens both from
+                # (Eddington-limited lifetime of the most massive stars), tbrk = 6.5 Myr to the end
+                # of this early phase, stars with ZAMS mass ~30+ Msun here. curve flattens both from
                 # IMF but also b/c mass-loss less efficient. tmax = 44 Myr to the last explosion
                 # determined by lifetime of stars at 8 Msun
                 cc_age_min = 3.7
-                cc_age_break = 6.5
+                cc_age_brk = 6.5
                 cc_age_max = 44
                 cc_mass_max = 35
                 cc_mass_brk = 10
                 cc_mass_min = 6
                 # power-law interpolation of ejecta mass
-                if age <= cc_age_break:
+                if age <= cc_age_brk:
                     ejecta_mass = cc_mass_max * (age / cc_age_min) ** (
-                        np.log(cc_mass_brk / cc_mass_max) / np.log(cc_age_break / cc_age_min)
+                        np.log(cc_mass_brk / cc_mass_max) / np.log(cc_age_brk / cc_age_min)
                     )
                 else:
-                    ejecta_mass = cc_mass_brk * (age / cc_age_break) ** (
-                        np.log(cc_mass_min / cc_mass_brk) / np.log(cc_age_max / cc_age_break)
+                    ejecta_mass = cc_mass_brk * (age / cc_age_brk) ** (
+                        np.log(cc_mass_min / cc_mass_brk) / np.log(cc_age_max / cc_age_brk)
                     )
                 cc_ages = np.array([3.7, 8, 18, 30, 44])  # [Myr]
                 cc_yields_v_age = {
