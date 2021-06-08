@@ -180,7 +180,7 @@ class ParticleDictionaryClass(dict):
         self._element_index['neon'] = self._element_index['ne'] = 5
         self._element_index['magnesium'] = self._element_index['mg'] = 6
         self._element_index['silicon'] = self._element_index['si'] = 7
-        self._element_index['sulphur'] = self._element_index['s'] = 8
+        self._element_index['sulfur'] = self._element_index['s'] = 8
         self._element_index['calcium'] = self._element_index['ca'] = 9
         self._element_index['iron'] = self._element_index['fe'] = 10
         # r-process 'toy' models

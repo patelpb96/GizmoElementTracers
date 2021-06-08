@@ -48,7 +48,7 @@ def get_sun_massfraction(model=DEFAULT_MODEL):
     model = model.lower()
     assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
-    sun_massfraction = {}
+    sun_massfraction = collections.OrderedDict()
 
     if 'fire2' in model:
         # FIRE-2 uses Anders & Grevesse 1989 for Solar
@@ -60,7 +60,7 @@ def get_sun_massfraction(model=DEFAULT_MODEL):
         sun_massfraction['neon'] = 2.22e-3
         sun_massfraction['magnesium'] = 9.31e-4
         sun_massfraction['silicon'] = 1.08e-3
-        sun_massfraction['sulphur'] = 6.44e-4
+        sun_massfraction['sulfur'] = 6.44e-4
         sun_massfraction['calcium'] = 1.01e-4
         sun_massfraction['iron'] = 1.73e-3
 
@@ -74,7 +74,7 @@ def get_sun_massfraction(model=DEFAULT_MODEL):
         sun_massfraction['neon'] = 1.34e-3
         sun_massfraction['magnesium'] = 7.57e-4
         sun_massfraction['silicon'] = 7.12e-4
-        sun_massfraction['sulphur'] = 3.31e-4
+        sun_massfraction['sulfur'] = 3.31e-4
         sun_massfraction['calcium'] = 6.87e-5
         sun_massfraction['iron'] = 1.38e-3
 
@@ -387,7 +387,7 @@ class NucleosyntheticYieldClass:
                 element_yield['neon'] = 0.0381  # later FIRE-2
                 element_yield['magnesium'] = 0.00940
                 element_yield['silicon'] = 0.00889
-                element_yield['sulphur'] = 0.00378
+                element_yield['sulfur'] = 0.00378
                 element_yield['calcium'] = 0.000436  # Nomoto et al 2013 suggest 0.05 - 0.1 M_sun
                 element_yield['iron'] = 0.00706
 
@@ -517,7 +517,7 @@ class NucleosyntheticYieldClass:
                 element_yield['neon'] = 0.00321
                 element_yield['magnesium'] = 0.00614
                 element_yield['silicon'] = 0.111
-                element_yield['sulphur'] = 0.0621
+                element_yield['sulfur'] = 0.0621
                 element_yield['calcium'] = 0.00857
                 element_yield['iron'] = 0.531
 
@@ -535,7 +535,7 @@ class NucleosyntheticYieldClass:
                 element_yield['neon'] = 2.02e-3
                 element_yield['magnesium'] = 6.21e-3
                 element_yield['silicon'] = 1.46e-1
-                element_yield['sulphur'] = 7.62e-2
+                element_yield['sulfur'] = 7.62e-2
                 element_yield['calcium'] = 1.29e-2
                 element_yield['iron'] = 5.58e-1
                 # updated W7 in Nomoto + Leung 18 review - not significantly different from updated
@@ -570,9 +570,9 @@ class NucleosyntheticYieldClass:
                 # yields[10]=6.14e-1
 
         if (
-            isinstance(progenitor_massfraction_dict, dict)
+            (self.model == 'fire2' and 'supernova' in event_kind)
+            and isinstance(progenitor_massfraction_dict, dict)
             and len(progenitor_massfraction_dict) > 0
-            and (self.model == 'fire2' and 'supernova' in event_kind)
         ):
             # FIRE-2: stellar_evolution.c line 509
             # enforce that yields obey pre-existing surface abundances
@@ -636,119 +636,11 @@ class NucleosyntheticYieldClass:
         )
 
         self.snia_yield = self.get_yields(
-            'supernova.ia',
-            progenitor_metallicity,
-            progenitor_massfraction_dict,
-            age=age,
-            normalize=False,
+            'supernova.ia', progenitor_metallicity, progenitor_massfraction_dict, normalize=False,
         )
 
 
 NucleosyntheticYield = NucleosyntheticYieldClass()
-
-
-def plot_nucleosynthetic_yields(
-    event_kind='wind',
-    star_metallicity=0.1,
-    star_massfraction={},
-    model=DEFAULT_MODEL,
-    age=None,
-    normalize=False,
-    axis_y_limits=[1e-3, None],
-    axis_y_log_scale=True,
-    file_name=False,
-    directory='.',
-    figure_index=1,
-):
-    '''
-    Plot nucleosynthetic element yields, according to input event_kind.
-
-    Parameters
-    ----------
-    event_kind : str
-        stellar event: 'wind', 'supernova.cc' or supernova.ii', 'supernova.ia'
-    star_metallicity : float
-        total metallicity of star, fraction wrt to solar
-    star_massfraction : dict
-        dictionary of elemental mass fractions in star
-        need to input this to get higher-order correction of yields
-    model : str
-        stellar evolution model for yields: 'fire2', 'fire3'
-    age : float
-        stellar age [Myr], relevant for FIRE-3
-    normalize : bool
-        whether to normalize yields to be mass fractions (instead of masses)
-    axis_y_limits : list
-        min and max limits of y axis
-    axis_y_log_scale: bool
-        whether to use logarithmic scaling for y axis
-    file_name : str
-        whether to write figure to file and its name. True = use default naming convention
-    directory : str
-        directory to write figure file
-    figure_index : int
-        index of figure for matplotlib
-    '''
-    title_dict = {
-        'wind': 'stellar wind',
-        'supernova.cc': 'supernova CC',
-        'supernova.ii': 'supernova CC',
-        'supernova.ia': 'supernova Ia',
-    }
-    NucleosyntheticYield = NucleosyntheticYieldClass(model)
-    element_yield = NucleosyntheticYield.get_yields(
-        event_kind, star_metallicity, star_massfraction, age=age, normalize=normalize
-    )
-
-    yield_indices = np.arange(1, len(element_yield))
-    yield_names = np.array([k for k in element_yield])[yield_indices]
-    yield_values = np.array([element_yield[k] for k in element_yield])[yield_indices]
-    yield_labels = [str.capitalize(ut.constant.element_symbol_from_name[k]) for k in yield_names]
-    yield_indices = np.arange(yield_indices.size)
-
-    # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index, top=0.92)
-    subplots = [subplot]
-
-    colors = ut.plot.get_colors(yield_indices.size, use_black=False)
-
-    for si in range(1):
-        ut.plot.set_axes_scaling_limits(
-            subplots[si],
-            x_limits=[yield_indices.min() - 0.5, yield_indices.max() + 0.5],
-            y_log_scale=axis_y_log_scale,
-            y_limits=axis_y_limits,
-            y_values=yield_values,
-        )
-
-        subplots[si].set_xticks(yield_indices)
-        subplots[si].set_xticklabels(yield_labels)
-
-        if normalize:
-            y_label = 'yield (mass fraction)'
-        else:
-            y_label = 'yield $\\left[ {\\rm M}_\odot \\right]$'
-        subplots[si].set_ylabel(y_label)
-        subplots[si].set_xlabel('element')
-
-        for yi in yield_indices:
-            if yield_values[yi] > 0:
-                subplot.plot(
-                    yield_indices[yi], yield_values[yi], 'o', markersize=10, color=colors[yi]
-                )
-                # add element symbols near points
-                subplots[si].text(
-                    yield_indices[yi] * 0.98, yield_values[yi] * 0.5, yield_labels[yi]
-                )
-
-        subplots[si].set_title(title_dict[event_kind])
-
-        metal_label = ut.io.get_string_from_numbers(star_metallicity, exponential=None, strip=True)
-        ut.plot.make_label_legend(subplots[si], f'$Z / Z_\odot={metal_label}$')
-
-    if file_name is True or file_name == '':
-        file_name = f'{event_kind}.yields_Z.{metal_label}'
-    ut.plot.parse_output(file_name, directory)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1298,7 +1190,7 @@ class SupernovaCCClass:
         cc_age_min=None,
         cc_age_break=None,
         cc_age_max=None,
-        element_name='',
+        element_name=None,
         metallicity=1.0,
     ):
         '''
@@ -1319,7 +1211,7 @@ class SupernovaCCClass:
             maximum age for core-collapse supernova to occur [Myr]
         element_name : str [optional]
             name of element to get fraction mass loss rate of
-            if None or '', get fractional mass loss rate from all elements
+            if element_name = None or '', get fractional mass loss rate from all elements
         metallicity : float
             metallicity (wrt Solar) of progenitor (for Nitrogen yield in FIRE-2)
 
@@ -1393,7 +1285,7 @@ class SupernovaCCClass:
         cc_age_min=None,
         cc_age_break=None,
         cc_age_max=None,
-        element_name='',
+        element_name=None,
         metallicity=1.0,
     ):
         '''
@@ -1416,7 +1308,7 @@ class SupernovaCCClass:
             maximum age for core-collapse supernova to occur [Myr]
         element_name : str [optional]
             name of element to get fractional mass loss of
-            if None or '', get mass loss fraction from all elements
+            if element_name = None or '', get mass loss fraction from all elements
         metallicity : float
             metallicity (wrt Solar) of progenitor stars (for Nitrogen yield in FIRE-2)
 
@@ -2193,3 +2085,143 @@ def plot_mass_loss_v_age(
             ut.io.get_string_from_numbers(metallicity, digits=4, exponential=False, strip=True)
         )
     ut.plot.parse_output(file_name, directory)
+
+
+def plot_nucleosynthetic_yields(
+    event_kinds='wind',
+    metallicity=1,
+    model=DEFAULT_MODEL,
+    normalize=False,
+    axis_y_limits=[1e-3, 5],
+    axis_y_log_scale=True,
+    file_name=False,
+    directory='.',
+    figure_index=1,
+):
+    '''
+    Plot nucleosynthetic element yields, according to input event_kind.
+
+    Parameters
+    ----------
+    event_kinds : str or list
+        stellar event: 'wind', 'supernova.cc', 'supernova.ia', 'all'
+    metallicity : float
+        total metallicity of progenitor, fraction wrt to solar
+    model : str
+        stellar evolution model for yields: 'fire2', 'fire3'
+    normalize : bool
+        whether to normalize yields to be mass fractions (instead of masses)
+    axis_y_limits : list
+        min and max limits of y axis
+    axis_y_log_scale: bool
+        whether to use logarithmic scaling for y axis
+    file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    directory : str
+        directory to write figure file
+    figure_index : int
+        index of figure for matplotlib
+    '''
+    title_dict = {
+        'wind': 'winds',
+        'supernova.cc': 'SN CC',
+        'supernova.ia': 'SN Ia',
+    }
+
+    if event_kinds == 'all':
+        event_kinds = ['wind', 'supernova.cc', 'supernova.ia']
+    elif np.isscalar(event_kinds):
+        event_kinds = [event_kinds]
+
+    NucleosyntheticYield = NucleosyntheticYieldClass(model)
+    element_yield_dict = collections.OrderedDict()
+    for element_name in NucleosyntheticYield.sun_massfraction.keys():
+        if element_name != 'metals':
+            element_yield_dict[element_name] = 0
+
+    # plot ----------
+    _fig, subplots = ut.plot.make_figure(
+        figure_index, panel_numbers=[1, len(event_kinds)], top=0.92
+    )
+
+    colors = ut.plot.get_colors(len(element_yield_dict), use_black=False)
+
+    for ei, event_kind in enumerate(event_kinds):
+        subplot = subplots[ei]
+
+        if 'fire2' in model:
+            element_yield_t = NucleosyntheticYield.get_yields(
+                event_kind, metallicity, normalize=normalize
+            )
+            for element_name in element_yield_dict:
+                element_yield_dict[element_name] = element_yield_t[element_name]
+
+        elif 'fire3' in model:
+            age_min = 0
+            age_max = 13700
+            if event_kind == 'wind':
+                StellarWind = StellarWindClass(model)
+                for element_name in element_yield_dict:
+                    element_yield_dict[element_name] = StellarWind.get_mass_loss(
+                        age_min, age_max, metallicity=metallicity, element_name=element_name,
+                    )
+            elif event_kind == 'supernova.cc':
+                SupernovaCC = SupernovaCCClass(model)
+                for element_name in element_yield_dict:
+                    element_yield_dict[element_name] = SupernovaCC.get_mass_loss(
+                        age_min, age_max, metallicity=metallicity, element_name=element_name,
+                    )
+            elif event_kind == 'supernova.ia':
+                SupernovaIa = SupernovaIaClass(model)
+                for element_name in element_yield_dict:
+                    element_yield_dict[element_name] = SupernovaIa.get_mass_loss(
+                        age_min, age_max, element_name=element_name,
+                    )
+
+        element_yields = [element_yield_dict[e] for e in element_yield_dict]
+        element_labels = [
+            str.capitalize(ut.constant.element_symbol_from_name[e]) for e in element_yield_dict
+        ]
+        element_indices = np.arange(len(element_yield_dict))
+
+        ut.plot.set_axes_scaling_limits(
+            subplot,
+            x_limits=[element_indices.min() - 0.5, element_indices.max() + 0.5],
+            y_log_scale=axis_y_log_scale,
+            y_limits=axis_y_limits,
+            y_values=element_yields,
+        )
+
+        # subplot.set_xticks(element_indices)
+        # subplot.set_xticklabels(element_labels)
+        subplot.tick_params(top=False)
+        subplot.tick_params(bottom=False)
+        subplot.tick_params(right=False)
+
+        if normalize:
+            y_label = 'yield (mass fraction)'
+        else:
+            y_label = 'yield $\\left[ {\\rm M}_\odot \\right]$'
+        if ei == 0:
+            subplot.set_ylabel(y_label)
+        if ei == 1:
+            subplot.set_xlabel('element')
+
+        for i in element_indices:
+            if element_yields[i] > 0:
+                subplot.plot(
+                    element_indices[i], element_yields[i], 'o', markersize=10, color=colors[i]
+                )
+                # add element symbols near points
+                subplot.text(element_indices[i] * 0.98, element_yields[i] * 0.5, element_labels[i])
+
+        if ei == 0:
+            metal_label = ut.io.get_string_from_numbers(metallicity, exponential=None, strip=True)
+            ut.plot.make_label_legend(subplot, f'$Z / Z_\odot={metal_label}$')
+
+        subplot.set_title(title_dict[event_kind])
+
+    if file_name is True or file_name == '':
+        file_name = f'{event_kind}.yields_Z.{metal_label}'
+    ut.plot.parse_output(file_name, directory)
+

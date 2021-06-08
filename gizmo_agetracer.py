@@ -495,7 +495,7 @@ class FIREYieldClass:
             'neon',
             'magnesium',
             'silicon',
-            'sulphur',
+            'sulfur',
             'calcium',
             'iron',
         ]
