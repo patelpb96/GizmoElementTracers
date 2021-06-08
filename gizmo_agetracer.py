@@ -495,7 +495,7 @@ class FIREYieldClass:
             'neon',
             'magnesium',
             'silicon',
-            'sulphur',
+            'sulfur',
             'calcium',
             'iron',
         ]
@@ -503,7 +503,7 @@ class FIREYieldClass:
 
         # transition/discontinuous ages [Myr] in this model to be careful around when integrating
         self.ages_transition = gizmo_star.get_ages_transition(model)
-        # self.ages_critical = None
+        # self.ages_transition = None
 
         # store this (default) progenitor metallicity, including the mass fraction for each element
         # use the latter to compute metallicity-dependent corrections to the yields
@@ -566,7 +566,7 @@ class FIREYieldClass:
             element_yield_dict[element_name] = np.zeros(np.size(age_bins) - 1)
 
         # ages to be careful around during integration
-        if not hasattr(self, 'ages_critical'):
+        if not hasattr(self, 'ages_transition'):
             self.ages_transition = None
 
         # compile yields within each age bin by integrating over the underlying rates

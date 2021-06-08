@@ -180,7 +180,7 @@ class ParticleDictionaryClass(dict):
         self._element_index['neon'] = self._element_index['ne'] = 5
         self._element_index['magnesium'] = self._element_index['mg'] = 6
         self._element_index['silicon'] = self._element_index['si'] = 7
-        self._element_index['sulphur'] = self._element_index['s'] = 8
+        self._element_index['sulfur'] = self._element_index['s'] = 8
         self._element_index['calcium'] = self._element_index['ca'] = 9
         self._element_index['iron'] = self._element_index['fe'] = 10
         # r-process 'toy' models
@@ -568,9 +568,13 @@ class ParticleDictionaryClass(dict):
                         values, distance_vectors, 'cartesian', coordinate_system
                     )
 
-            # compute total (scalar) quantity
-            if '.total' in property_name:
+                if '.rad' in property_name:
+                    values = values[:, 0]
+                elif '.vert' in property_name:
+                    values = values[:, 2]
 
+            # compute total (scalar) of distance
+            if '.total' in property_name:
                 if len(values.shape) == 1:
                     shape_pos = 0
                 else:
@@ -579,8 +583,9 @@ class ParticleDictionaryClass(dict):
 
             return values
 
+        # compute total (scalar) value from 3-D for some other property
+        # such as velocity, acceleration, magnetic field
         if '.total' in property_name:
-            # compute total (scalar) value from 3-D (for velocity, acceleration, magnetic field)
             prop_name = property_name.replace('.total', '')
             try:
                 values = self.prop(prop_name, indices)
