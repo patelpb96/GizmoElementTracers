@@ -295,16 +295,22 @@ class ParticleDictionaryClass(dict):
         # parsing specific to this catalog ----------
         # stellar mass loss
         if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
+            fire_model = 'fire2'
+
             if 'MassLoss' not in self.__dict__ or self.MassLoss is None:
                 from . import gizmo_star
 
+                # TODO: input FIRE version here
                 # create class to compute/store stellar mass loss as a function of age, metallicity
-                self.MassLoss = gizmo_star.MassLossClass()
+                self.MassLoss = gizmo_star.MassLossClass(model=fire_model)
 
             # fractional mass loss since formation
+            if 'fire2' in fire_model:
+                metal_mass_fractions = self.prop('massfraction.metals', indices)
+            elif 'fire3' in fire_model:
+                metal_mass_fractions = self.prop('massfraction.iron', indices)
             values = self.MassLoss.get_mass_loss_from_spline(
-                self.prop('age', indices) * 1000,
-                metal_mass_fractions=self.prop('massfraction.metals', indices),
+                self.prop('age', indices) * 1000, metal_mass_fractions=metal_mass_fractions,
             )
 
             if 'mass.loss' in property_name:
