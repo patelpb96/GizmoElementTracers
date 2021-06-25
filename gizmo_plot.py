@@ -866,7 +866,7 @@ def plot_density_distribution(
     parts,
     species_name='gas',
     property_name='number.density',
-    property_limits=[0.1, 1e4],
+    property_limits=[0.1, 1e5],
     property_bin_width=0.1,
     property_log_scale=True,
     property_statistic='probability',
@@ -1811,6 +1811,141 @@ def plot_velocity_distribution(
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
+def plot_neighbors_v_distance(
+    parts,
+    species_name='star',
+    distance_limits=[0.01, 1],
+    distance_bin_width=0.1,
+    distance_log_scale=True,
+    neighbor_number_max=5000,
+    dimension_indices=None,
+    host_index=0,
+    property_select={'host.distance.total': [3, 20], 'age': [0, 0.2]},
+    neighbor_statistic='density.norm',
+    axis_y_limits=[],
+    axis_y_log_scale=True,
+    plot_file_name=False,
+    plot_directory='.',
+    figure_index=1,
+):
+    '''
+    Plot number of neighbors (spatial correlation) v separation/distance.
+
+    Parameters
+    ----------
+    parts : dict or list
+        catalog of particles at snapshot
+    species_name : str
+        name of particle species
+    property_name : str
+        property name
+    property_limits : list
+        min and max limits of property
+    property_bin_width : float
+        width of property bin (use this or property_bin_number)
+    property_bin_number : int
+        number of bins within limits (use this or property_bin_width)
+    property_log_scale : bool
+        whether to use logarithmic scaling for property bins
+    property_statistic : str :
+        statistic to plot: 'probability', 'probability.cum', 'histogram', 'histogram.cum'
+    distance_limits : list
+        min and max limits for distance from galaxy
+    center_positions : array or list of arrays
+        position[s] of galaxy center[s]
+    center_velocities : array or list of arrays
+        velocity[s] of galaxy center[s]
+    host_index : int
+        index of host galaxy/halo to get position and/or velocity of (if not input them)
+    property_select : dict
+        (other) properties to select on: names as keys and limits as values
+    part_indicess : array or list of arrays
+        indices of particles from which to select
+    axis_y_limits : list
+        min and max limits for y axis
+    axis_y_log_scale : bool
+        whether to use logarithmic scaling for y axis
+    plot_file_name : str
+        whether to write figure to file and its name. True = use default naming convention
+    plot_directory : str
+        directory to write figure file
+    figure_index : int
+        index of figure for matplotlib
+    '''
+    # Say = ut.io.SayClass(plot_neighbors_v_distance)
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    if dimension_indices is not None:
+        dimension_number = len(dimension_indices)
+    else:
+        dimension_number = parts[0][species_name]['position'].shape[1]
+
+    DistanceBin = ut.binning.DistanceBinClass(
+        distance_limits,
+        distance_bin_width,
+        log_scale=distance_log_scale,
+        dimension_number=dimension_number,
+    )
+
+    pros = []
+    for part_i, part in enumerate(parts):
+        neig_distancess = ut.particle.get_neighbors(
+            part,
+            species_name,
+            max(distance_limits),
+            neighbor_number_max,
+            dimension_indices,
+            host_index,
+            property_select,
+        )
+        neig_distances = neig_distancess[(neig_distancess > 0) * (neig_distancess < np.Inf)]
+        pro = DistanceBin.get_sum_profile(neig_distances)
+        pros.append(pro)
+
+    colors = ut.plot.get_colors(len(parts))
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    y_values = np.array([pros[part_i][neighbor_statistic] for part_i in range(len(parts))])
+
+    ut.plot.set_axes_scaling_limits(
+        subplot,
+        distance_log_scale,
+        distance_limits,
+        None,
+        axis_y_log_scale,
+        axis_y_limits,
+        y_values,
+    )
+
+    subplot.set_xlabel('distance [kpc]')
+    # axis_y_label = ut.plot.Label.get_label(
+    #    property_name, property_statistic, species_name, get_units=False
+    # )
+    subplot.set_ylabel('correlation ($\\xi + 1$)')
+
+    for part_i, part in enumerate(parts):
+        pro = pros[part_i]
+        subplot.plot(
+            pro['distance.mid'],
+            pro[neighbor_statistic],
+            color=colors[part_i],
+            alpha=0.8,
+            label=part.info['simulation.name'],
+        )
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    if plot_file_name is True or plot_file_name == '':
+        plot_file_name = ut.plot.get_file_name(
+            'neighbor', 'distance', species_name, snapshot_dict=part.snapshot
+        )
+    ut.plot.parse_output(plot_file_name, plot_directory)
+
+
 def print_densities(
     parts,
     species_names=['star', 'dark', 'gas'],
@@ -1981,7 +2116,7 @@ def plot_metal_v_distance(
         metal_mass_kind = metal_name.replace('massfraction.', 'mass.')
         metal_masses = part[species_name].prop(metal_mass_kind)
 
-        pro_metal = DistanceBin.get_sum_profile(distances, metal_masses, get_fraction=True)
+        pro_metal = DistanceBin.get_sum_profile(distances, metal_masses)
 
         if 'massfraction' in metal_name:
             pro_mass = DistanceBin.get_sum_profile(distances, part[species_name]['mass'])
