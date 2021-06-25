@@ -1,6 +1,6 @@
 # Description
 
-Python package for reading and analyzing Gizmo simulations.
+Python package for reading and analyzing simulations generating using the Gizmo code, in particular, the FIRE cosmological simulations.
 
 
 ---
@@ -10,7 +10,7 @@ python 3, numpy, scipy, h5py, matplotlib.
 
 This package also requires the [utilities/](https://bitbucket.org/awetzel/utilities) Python package for low-level utility functions.
 
-We develop and test this package using the latest version of Python (3.8).
+We develop this package using python 3.9 and recommend that you use it with this package.
 
 
 ---
@@ -132,11 +132,11 @@ gizmo.io
 ---
 # License
 
-Copyright 2014-2021 by Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>, and Andrew Emerick <aemerick11@gmail.com>.
+Copyright 2014-2021 by Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>, Andrew Emerick <aemerick11@gmail.com>.
 
 If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), which first was used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
 
-You are free to use, edit, share, and do whatever you want. But please keep us informed and report bugs. Have fun!
+You are free to use, edit, share, and do whatever you want. But please cite it and report bugs!
 
 Less succinctly, this software is governed by the MIT License:
 
