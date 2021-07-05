@@ -78,7 +78,7 @@ def print_properties_statistics(part, species='all'):
         'massfraction.metals',
     ]
 
-    # Statistic = ut.statistic.StatisticClass()
+    # Statistic = ut.math.StatisticClass()
 
     Say.say('printing minimum, median, maximum')
     for spec_name in species_print:
@@ -764,7 +764,7 @@ def plot_property_distribution(
             parts, 'velocity', center_velocities, host_index
         )
 
-    Stat = ut.statistic.StatisticClass()
+    Stat = ut.math.StatisticClass()
 
     for part_i, part in enumerate(parts):
         if part_indicess[part_i] is not None and len(part_indicess[part_i]) > 0:
@@ -928,7 +928,7 @@ def plot_density_distribution(
 
     part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
 
-    Stat = ut.statistic.StatisticClass()
+    Stat = ut.math.StatisticClass()
 
     for part_i, part in enumerate(parts):
         if part_indicess[part_i] is not None and len(part_indicess[part_i]) > 0:
@@ -1724,7 +1724,7 @@ def plot_velocity_distribution(
             parts, 'velocity', center_velocities, host_index
         )
 
-    Stat = ut.statistic.StatisticClass()
+    Stat = ut.math.StatisticClass()
 
     for part_i, part in enumerate(parts):
         if part_indicess[part_i] is not None and len(part_indicess[part_i]) > 0:
@@ -1814,10 +1814,10 @@ def plot_velocity_distribution(
 def plot_neighbors_v_distance(
     parts,
     species_name='star',
-    distance_limits=[0.01, 1],
+    distance_limits=[0.001, 1],
     distance_bin_width=0.1,
     distance_log_scale=True,
-    neighbor_number_max=5000,
+    neig_number_max=5000,
     dimension_indices=None,
     host_index=0,
     property_select={'host.distance.total': [3, 20], 'age': [0, 0.2]},
@@ -1891,11 +1891,11 @@ def plot_neighbors_v_distance(
 
     pros = []
     for part_i, part in enumerate(parts):
-        neig_distancess = ut.particle.get_neighbors(
+        neig_distancess, _neig_indicess = ut.particle.get_neighbors(
             part,
             species_name,
             max(distance_limits),
-            neighbor_number_max,
+            neig_number_max,
             dimension_indices,
             host_index,
             property_select,
@@ -2218,7 +2218,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         if species[0] in parts:
             parts = [parts]
 
-        Statistic = ut.statistic.StatisticClass()
+        Statistic = ut.math.StatisticClass()
 
         for element_name in element_names:
             self.say(
@@ -2449,7 +2449,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         model_number = 2
         at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
 
-        Stat = ut.statistic.StatisticClass()
+        Stat = ut.math.StatisticClass()
 
         property_values = part[species_name].prop(property_name, part_indices)
         at_property_values = part[species_name].prop(at_property_name, part_indices)
@@ -2465,7 +2465,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         )
 
         property_difs = at_property_values[masks] - property_values[masks]
-        ut.statistic.print_statistics(property_difs, weights[masks])
+        ut.math.print_statistics(property_difs, weights[masks])
 
         distr_sim = Stat.get_distribution_dict(
             property_values,
@@ -4313,7 +4313,7 @@ def plot_gas_neutral_fraction_v_redshift(
         snapshot_indices = np.array([part.snapshot['index'] for part in parts], np.int32)
         redshifts = parts[0].Snapshot['redshift'][snapshot_indices]
 
-    # Statistic = ut.statistic.StatisticClass()
+    # Statistic = ut.math.StatisticClass()
 
     neutral_fraction_by_mass = {}
     neutral_fraction_by_volume = {}
