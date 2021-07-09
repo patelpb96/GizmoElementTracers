@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 '''
-Generate file of positions for zoom-in initial conditions by selecting particles at final time and
-tracking them back to initial time.
+Generate file of positions for zoom-in initial conditions by selecting particles at a final snapshot
+and tracking them back to an initial snapshot.
 
 @author: Andrew Wetzel
 
@@ -27,9 +27,9 @@ from . import gizmo_default
 # --------------------------------------------------------------------------------------------------
 class InitialConditionClass(ut.io.SayClass):
     '''
-    Read particles from final and initial snapshots [and halos from catalog at final snapshot].
-    Generate text file of positions of particles at the initial snapshot that are within the
-    selection region at the final snapshot.
+    Read particles from a final and an initial snapshot, and a halo catalog at the final snapshot.
+    Generate text file of positions at the initial snapshot that are within the selection region at
+    the final snapshot.
     '''
 
     def __init__(
@@ -38,8 +38,10 @@ class InitialConditionClass(ut.io.SayClass):
         '''
         Parameters
         ----------
-        snapshot_redshifts : list : redshifts of initial and final snapshots
-        simulation_directory : str : root directory of simulation
+        snapshot_redshifts : list
+            redshifts of initial and final snapshots
+        simulation_directory : str
+            base directory of simulation
         '''
         # ensure lowest-redshift snapshot is first
         self.snapshot_redshifts = np.sort(snapshot_redshifts)
@@ -61,13 +63,13 @@ class InitialConditionClass(ut.io.SayClass):
         Select dark-matter particles at the final snapshot, write a file of their positions at
         the initial snapshot.
 
-        If input halo catalog hal and halo index hal_index, select zoom-in volume around that halo,
-        typically for a uniform-resolution DM-only simulation.
+        If input a halo catalog (hal) and halo index (hal_index), select zoom-in volume around that
+        halo, typically from a uniform-resolution DM-only simulation.
 
-        Else, assume am working from an existing zoom-in simulation, re-select spherical volume
-        around center.
+        Else, assume that working from an existing zoom-in simulation, re-select spherical volume
+        around its center.
 
-        If not supply particle catalogs parts, read them at the fiducial snapshots.
+        If you do not supply particle catalogs (parts), read them at the fiducial snapshots.
 
         Rule of thumb from Onorbe et al:
             given distance_pure
@@ -78,18 +80,26 @@ class InitialConditionClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list of dicts : catalogs of particles at final and initial snapshots
-        host_index : int : index of primary host halo to use to get position and radius
+        parts : list of dicts
+            catalogs of particles at final and initial snapshots
+        host_index : int
+            index of primary host halo in the particle catalog to use to get position and radius
             (if not input halo catalog)
-        hal : dict : catalog of halos at final snapshot
-        hal_index : int : index of halo
-        distance_max : float : distance from center to select particles at final time
-            [kpc physical or in units of R_halo]
-        scale_to_halo_radius : bool : whether to scale distance to halo radius
-        virial_kind : str : virial overdensity to define halo radius
-        region_kind : str : method to identify zoom-in regon at initial time:
-            'particles', 'convex-hull', 'cube'
-        dark_mass : float : DM particle mass (if simulation has only DM, at single resolution)
+        hal : dict
+            catalog of halos at the final snapshot
+        hal_index : int
+            index of primary host halo
+        distance_max : float
+            distance from center to select particles at the final snapshot
+            [kpc physical, or in units of R_halo]
+        scale_to_halo_radius : bool
+            whether to scale distance to halo radius
+        virial_kind : str
+            virial overdensity to define halo radius
+        region_kind : str
+            method to identify zoom-in regon at initial time: 'particles', 'convex-hull', 'cube'
+        dark_mass : float
+            DM particle mass (if simulation has only DM, at single resolution)
         '''
 
         file_name = 'ic_LX_mX_rad{:.1f}_points.txt'.format(distance_max)
@@ -100,7 +110,7 @@ class InitialConditionClass(ut.io.SayClass):
         assert region_kind in ['particles', 'convex-hull', 'cube']
 
         if parts is None or len(parts) == 0:
-            parts = self.read_particles()
+            parts = self._read_particles()
 
         # ensure final catalog is at lowest redshift
         part_fin, part_ini = parts
@@ -322,23 +332,26 @@ class InitialConditionClass(ut.io.SayClass):
                     )
                 )
 
-    def read_halos_particles(self, mass_limits=[1e11, np.Inf]):
+    def read_halos_and_particles(self, mass_limits=[1e11, np.Inf]):
         '''
-        Read halos at final snapshot and particles at final and initial snapshots.
+        Read halos at the final snapshot and particles at the final and the initial snapshot.
 
         Parameters
         ----------
-        mass_limits : list : min and max halo mass to assign low-res DM mass
+        mass_limits : list
+            min and max halo mass to assign low-res DM mass
 
         Returns
         -------
-        hal : dictionary class : catalog of halos at final snapshot
-        parts : list of dictionaries : catalogs of particles at initial and final snapshots
+        hal : dictionary class
+            catalog of halos at final snapshot
+        parts : list of dictionaries
+            catalogs of particles at initial and final snapshots
         '''
         from halo_analysis import halo_io
 
-        hal = self.read_halos(mass_limits)
-        parts = self.read_particles()
+        hal = self._read_halos(mass_limits)
+        parts = self._read_particles()
 
         if (
             'dark2' in parts[0]
@@ -349,19 +362,25 @@ class InitialConditionClass(ut.io.SayClass):
 
         return hal, parts
 
-    def read_halos(self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=True):
+    def _read_halos(
+        self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=True
+    ):
         '''
-        Read halos at final snapshot.
+        Read catalog of halos at the final snapshot.
 
         Parameters
         ----------
-        mass_limits : list : min and max halo mass to assign low-res DM mass
-        file_kind : str : kind of halo file: 'hdf5', 'out', 'ascii', 'hlist'
-        assign_nearest_neighbor : bool : whether to assign nearest neighboring halo
+        mass_limits : list
+            min and max halo mass to assign low-res DM mass
+        file_kind : str
+            kind of halo file: 'hdf5', 'out', 'ascii', 'hlist'
+        assign_nearest_neighbor : bool
+            whether to assign nearest neighboring halo
 
         Returns
         -------
-        hal : dictionary class : catalog of halos at final snapshot
+        hal : dictionary class
+            catalog of halos at the final snapshot
         '''
         from halo_analysis import halo_io
 
@@ -374,18 +393,21 @@ class InitialConditionClass(ut.io.SayClass):
 
         return hal
 
-    def read_particles(self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
+    def _read_particles(self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
         '''
-        Read particles at final and initial snapshots.
+        Read particles at the final and the initial snapshot.
 
         Parameters
         ----------
-        properties : str or list : name[s] of particle properties to read
-        sort_dark_by_id : bool : whether to sort dark-matter particles by id
+        properties : str or list
+            name[s] of particle properties to read
+        sort_dark_by_id : bool
+            whether to sort dark-matter particles by id
 
         Returns
         -------
-        parts : list : catalogs of particles at initial and final snapshots
+        parts : list
+            catalogs of particles at initial and final snapshots
         '''
         from . import gizmo_io
 

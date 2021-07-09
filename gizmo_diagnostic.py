@@ -866,7 +866,7 @@ def print_particle_property_extrema_all_snapshots(
                 + f' {simulation_directory + snapshot_directory}'
             )
 
-    Statistic = ut.statistic.StatisticClass()
+    Statistic = ut.math.StatisticClass()
 
     for spec_name in species_property_dict:
         for prop_name in species_property_dict[prop_name]:

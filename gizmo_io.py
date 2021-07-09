@@ -1301,6 +1301,7 @@ class ReadClass(ut.io.SayClass):
         '''
         # convert name in snapshot's header dictionary to custom name
         header_name_dict = {
+            'GIZMO_version': 'gizmo.version',
             # 6-element array of number of particles of each type in file
             'NumPart_ThisFile': 'particle.numbers.in.file',
             # 6-element array of total number of particles of each type (across all files)
@@ -1317,6 +1318,7 @@ class ReadClass(ut.io.SayClass):
             'Kernel_Function_ID': 'kernel.id',
             'TurbDiffusion_Coefficient': 'diffusion.coefficient',
             'Solar_Abundances_Adopted': 'sun.massfractions',
+            'Metals_Atomic_Number_Or_Key': 'atomic.numbers',
             # mass of each particle species, if all particles are same
             # (= 0 if they are different, which is usually true)
             'MassTable': 'particle.masses',
@@ -1336,6 +1338,7 @@ class ReadClass(ut.io.SayClass):
             # physics flags
             'Flag_DoublePrecision': 'has.double.precision',
             'Flag_Sfr': 'has.star.formation',
+            'Density_Threshold_For_SF_CodeUnits': 'sf.density.threshold',
             'Flag_Cooling': 'has.cooling',
             'Flag_StellarAge': 'has.star.age',
             'Flag_Feedback': 'has.feedback',
@@ -1538,11 +1541,15 @@ class ReadClass(ut.io.SayClass):
             # gas particles ----------
             'InternalEnergy': 'temperature',
             'Density': 'density',
+            'Pressure': 'pressure',
+            'SoundSpeed': 'sound.speed',
             'SmoothingLength': 'size',  # size of kernel (smoothing) length
             # average free-electron number per proton, averaged over mass of gas particle
             'ElectronAbundance': 'electron.fraction',
             # fraction of hydrogen that is neutral (not ionized)
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
+            'MolecularMassFraction': 'molecule.fraction',  # molecular mass fraction
+            'CoolingRate': 'cool.rate',  #
             'StarFormationRate': 'sfr',  # [M_sun / yr]
             'MagneticField': 'magnetic.field',  # 3-D magnetic field [Gauss]
             # divergence of magnetic field (for testing)
@@ -2225,7 +2232,7 @@ class ReadClass(ut.io.SayClass):
             'velocity': [-1e5, 1e5],  # [km / s]
             'mass': [9, 1e11],  # [M_sun]
             'potential': [-1e9, 1e9],  # [km^2 / s^2]
-            'temperature': [3, 1e9],  # [K]
+            'temperature': [0.1, 1e9],  # [K]
             'density': [0, 1e14],  # [M_sun / kpc^3]
             'size': [0, 1e9],  # [kpc]
             'hydrogen.neutral.fraction': [0, 1],
