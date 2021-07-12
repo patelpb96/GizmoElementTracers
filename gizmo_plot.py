@@ -16,7 +16,7 @@ import numpy as np
 from numpy import Inf
 import matplotlib
 from matplotlib import pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
+from matplotlib import ticker
 from matplotlib import colors
 
 import utilities as ut
@@ -3579,7 +3579,7 @@ class StarFormHistoryClass(ut.io.SayClass):
             subplot, time_log_scale, time_limits, None, sfh_log_scale, sfh_limits, y_values
         )
 
-        subplot.xaxis.set_minor_locator(AutoMinorLocator(2))
+        subplot.xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
 
         axis_x_label = ut.plot.Label.get_label(time_kind, get_words=True)
         subplot.set_xlabel(axis_x_label)
@@ -3801,169 +3801,6 @@ class StarFormHistoryClass(ut.io.SayClass):
 
 
 StarFormHistory = StarFormHistoryClass()
-
-
-def plot_quiescent_fraction_v_mass(
-    gal,
-    mass_kind='star.mass',
-    mass_limits=[1e5, 1e10],
-    mass_width=1.0,
-    qufrac_limits=[0, 1],
-    distance_max=300,
-    gas_mass_ratio_qu=0.1,
-    plot_file_name=False,
-    plot_directory='.',
-):
-    '''
-    Plot quiescent fraction v mass_kind.
-
-    Parameters
-    ----------
-    gal : dict
-        catalog of galaxies in the Local Group
-    mass_kind : str
-        galaxy mass kind
-    mass_limits : list
-        min and max limits for mass_kind
-    mass_width : float
-        width of mass bin
-    qufrac_limits : list
-        min and max limits for quiescent fraction
-    distance_max : float
-        maximum distance from host [kpc physical]
-    gas_mass_ratio_qu : float
-        maximum ratio of gas.mass / star.mass to be quiescent
-    file_name : str
-        name of plot file to write
-    plot_file_name : str
-        whether to write figure to file and its name. True = use default naming convention
-    plot_directory : str
-        directory to write figure file
-    '''
-    mass_log_scale = True
-
-    # get quiescent fraction in Local Group
-    MassBin = ut.binning.BinClass(mass_limits, mass_width, log_scale=mass_log_scale)
-    QuFracLG = ut.math.FractionClass(MassBin.number, error_kind='beta')
-
-    gis = ut.array.get_indices(gal[mass_kind], mass_limits)
-    gis = ut.array.get_indices(gal['host.distance.total'], [0, distance_max], gis)
-
-    for mi in range(MassBin.number):
-        mass_bin_limits = MassBin.get_bin_limits(mi)
-        gis_m = ut.array.get_indices(gal[mass_kind], mass_bin_limits, gis)
-        gis_m_qu = ut.array.get_indices(gal.prop('gas.mass.ratio'), [0, gas_mass_ratio_qu], gis_m)
-        QuFracLG.assign_to_dict(mi, gis_m_qu.size, gis_m.size)
-
-    print(QuFracLG['denom'])
-    print(QuFracLG['numer'])
-    print(QuFracLG['value'])
-
-    #    if np.max(mass_limits) == 10:
-    #        MassBin.mids[-1] = 9.18  # LMC is the only galaxy at this mass
-
-    # simulations
-    qufrac_saga = {
-        'star.mass': 10 ** np.array([6.78, 7.39, 7.73, 7.97, 8.14, 8.57, 9.11]),
-        'mean': [0.05, 0.22, 0.22, 0.22, 0.17, 0.06, 0.05],
-        '84': [0.13, 0.32, 0.32, 0.32, 0.26, 0.13, 0.12],
-        '16': [0, 0.12, 0.12, 0.12, 0.07, 0, 0],
-        '100': [0.65, 0.49, 0.43, 0.36, 0.29, 0.15, 0.13],
-    }
-
-    # simulations
-    qufrac_sim = {}
-
-    qufrac_sim['fire'] = {
-        'star.mass': 10 ** np.array([5.34, 5.85, 6.34, 6.85, 7.34, 7.85, 8.34, 8.85, 9.34]),
-        'mean': [1.0, 1.0, 1.0, 1.0, 0.74, 0.5, 0.28, 0.0, 0.0],
-        'median': [1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0, 0.0, 0.0],
-        '84': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.0, 0.0],
-        '16': [1.0, 1.0, 1.0, 1.0, 0.38, 0.0, 0.0, 0.0, 0.0],
-        'min': [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        'max': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0],
-    }
-
-    qufrac_sim['changa'] = {
-        'star.mass': np.array([3.16e5, 3.16e6, 3.16e7, 3.16e8, 3.16e9]),
-        'mean': [1.0, 0.899, 0.697, 0.125, 0.002],
-        '84': [1, 1, 0.697, 0.398, 0.335],
-        '16': [0.867, 0.79, 0.26, 0, 0],
-    }
-
-    qufrac_sim['auriga'] = {
-        'star.mass': 10 ** np.array([6.47, 7.41, 8.34, 9.28, 10.22]),
-        'mean': [0.907, 0.573, 0.132, 0],
-        '84': [0.945, 0.659, 0.227, 0.033, 0.100],
-        '16': [0.929, 0.617, 0.174, 0, 0],
-    }
-
-    qufrac_sim['apostle'] = {
-        'star.mass': 10 ** np.array([6.47, 7.41, 8.34, 9.28, 10.22]),
-        'mean': [0.978, 0.688, 0.304, 0.063, 0],
-        '84': [0.987, 0.750, 0.407, 0.152, 0.167],
-        '16': [0.961, 0.617, 0.218, 0.024, 0],
-    }
-
-    for sim_name in qufrac_sim:
-        for prop_name in qufrac_sim[sim_name]:
-            qufrac_sim[sim_name][prop_name] = np.asarray(qufrac_sim[sim_name][prop_name])
-
-    # plot ----------
-    _fig, subplot = ut.plot.make_figure()
-
-    ut.plot.set_axes_scaling_limits(subplot, True, mass_limits, y_limits=qufrac_limits)
-
-    subplot.set_xlabel('stellar mass [$M_\odot$]')
-    subplot.set_ylabel('satellite quiescent fraction')
-
-    # colors = ut.plot.get_colors(2)
-
-    print(QuFracLG['error'])
-    subplot.plot(MassBin.mids, QuFracLG['value'], label='Local Group')
-    subplot.errorbar(
-        MassBin.mids,
-        QuFracLG['value'],
-        QuFracLG['error'].transpose(),
-        # [[gal['vel.circ.50.err.lo'][gal_i]], [gal['vel.circ.50.err.hi'][gal_i]]],
-        color='black',
-        marker='s',
-        markersize=10,
-        alpha=0.7,
-        capthick=2.5,
-    )
-    subplot.plot(qufrac_saga[mass_kind], qufrac_saga['mean'], label='SAGA')
-
-    """"
-    subplot.fill_between(
-        redshifts,
-        neutral_fraction_by_mass[name_lo],
-        neutral_fraction_by_mass[name_hi],
-        alpha=0.4,
-        color=colors[0],
-    )
-    subplot.plot(MassBin.mids, neutral_fraction_by_mass[name_mid], label='Local Group')
-
-    plt.figure()
-    plt.fill_between(
-        df['left.star.mass.bin'][data_set_mask],
-        df['low_percentile'][data_set_mask],
-        df['high_percentile'][data_set_mask],
-        color='k',
-        alpha=0.2,
-        edgecolor='none',
-    )
-    plt.plot(df['left.star.mass.bin'][data_set_mask], df['median'][data_set_mask], color='k')
-    plt.xscale('log')
-    plt.xlim(1e5, 1e10)
-    plt.show()
-    """
-
-    ut.plot.make_legends(subplot)
-
-    if plot_file_name is True or plot_file_name == '':
-        plot_file_name = f'qu.frac_v_{mass_kind}'
-    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -4861,9 +4698,9 @@ class HalosClass(ut.io.SayClass):
             subplot.xaxis.set_ticks([0.1, 0.2, 0.3, 0.5, 1, 2])
             subplot.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
         else:
-            subplot.xaxis.set_minor_locator(AutoMinorLocator(2))
+            subplot.xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
 
-        # subplot.yaxis.set_minor_locator(AutoMinorLocator(5))
+        # subplot.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
 
         axis_x_label = ut.plot.Label.get_label('radius', get_words=True)
         subplot.set_xlabel(axis_x_label)
@@ -5587,6 +5424,9 @@ class CompareSimulationsClass(ut.io.SayClass):
         '''
         if species is not None and np.isscalar(species):
             species = [species]
+
+        if isinstance(parts, dict):
+            parts = [parts]
 
         gals = []
         for spec_name in ut.array.get_list_combined(species, parts[0], 'intersect'):
