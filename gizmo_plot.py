@@ -2113,8 +2113,8 @@ def plot_metal_v_distance(
             total_distance=True,
         )  # [kpc physical]
 
-        metal_mass_kind = metal_name.replace('massfraction.', 'mass.')
-        metal_masses = part[species_name].prop(metal_mass_kind)
+        metal_mass_name = metal_name.replace('massfraction.', 'mass.')
+        metal_masses = part[species_name].prop(metal_mass_name)
 
         pro_metal = DistanceBin.get_sum_profile(distances, metal_masses)
 
@@ -3074,7 +3074,7 @@ class DiskClass(ut.io.SayClass):
     def plot_orientation_v_time(
         self,
         parts,
-        time_kind='time.lookback',
+        time_name='time.lookback',
         time_limits=[0, 13],
         time_log_scale=False,
         refrence_snapshot_index=gizmo_default.snapshot_index,
@@ -3087,19 +3087,19 @@ class DiskClass(ut.io.SayClass):
     ):
         '''
         Plot orientation angle[s] of the principal axes of the disk (wrt their orientations at
-        refrence_snapshot_index) versus time_kind.
+        refrence_snapshot_index) versus time_name.
         Requires that you have read pre-compiled host rotation tensors in host_coordinates.hdf5.
 
         Parameters
         ----------
         parts : dict or list
             catalog[s] of particles (can be different simulations or snapshots)
-        time_kind : str
+        time_name : str
             time kind to plot: 'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
         time_limits : list
-            min and max limits of time_kind to impose
+            min and max limits of time_name to impose
         time_width : float
-            width of time_kind bin
+            width of time_name bin
         time_log_scale : bool
             whether to use logarithmic scaling for time bins
         refrence_snapshot_index : int
@@ -3137,10 +3137,10 @@ class DiskClass(ut.io.SayClass):
         masks = np.isfinite(angles)
         angles[masks] = np.arccos(angles[masks]) * 180 / np.pi  # [degree]
 
-        if time_kind in ['time.lookback', 'age']:
+        if time_name in ['time.lookback', 'age']:
             times = parts[0].Snapshot['time'][-1] - parts[0].Snapshot['time']
         else:
-            times = parts[0].Snapshot[time_kind]
+            times = parts[0].Snapshot[time_name]
 
         # plot ----------
         _fig, subplot = ut.plot.make_figure(figure_index)
@@ -3149,7 +3149,7 @@ class DiskClass(ut.io.SayClass):
             subplot, time_log_scale, time_limits, times, False, angle_limits, angles
         )
 
-        subplot.set_xlabel(ut.plot.Label.get_label(time_kind, get_words=True))
+        subplot.set_xlabel(ut.plot.Label.get_label(time_name, get_words=True))
         subplot.set_ylabel('disk offset angle $\\left[ {{\\rm deg}} \\right]$')
 
         if len(parts) > len(axis_indices):
@@ -3172,14 +3172,14 @@ class DiskClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
-                'disk.orientation', time_kind, snapshot_dict=part.snapshot
+                'disk.orientation', time_name, snapshot_dict=part.snapshot
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
     def plot_axis_ratio_v_time(
         self,
         parts,
-        time_kind='time.lookback',
+        time_name='time.lookback',
         time_limits=[0, 13],
         time_log_scale=False,
         axis_index_numerator=2,
@@ -3191,19 +3191,19 @@ class DiskClass(ut.io.SayClass):
         figure_index=1,
     ):
         '''
-        Plot minor / major axis ratio of the disk versus time_kind.
+        Plot minor / major axis ratio of the disk versus time_name.
         Requires that you have read pre-compiled host rotation tensors in host_coordinates.hdf5.
 
         Parameters
         ----------
         parts : dict or list
             catalog[s] of particles (can be different simulations or snapshots)
-        time_kind : str
+        time_name : str
             time kind to plot: 'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
         time_limits : list
-            min and max limits of time_kind to impose
+            min and max limits of time_name to impose
         time_width : float
-            width of time_kind bin
+            width of time_name bin
         time_log_scale : bool
             whether to use logarithmic scaling for time bins
         axis_index_numerator : int
@@ -3233,10 +3233,10 @@ class DiskClass(ut.io.SayClass):
                 rs[:, host_index, axis_index_numerator] / rs[:, host_index, axis_index_denominator]
             )
 
-        if time_kind in ['time.lookback', 'age']:
+        if time_name in ['time.lookback', 'age']:
             times = parts[0].Snapshot['time'][-1] - parts[0].Snapshot['time']
         else:
-            times = parts[0].Snapshot[time_kind]
+            times = parts[0].Snapshot[time_name]
 
         # plot ----------
         _fig, subplot = ut.plot.make_figure(figure_index)
@@ -3245,7 +3245,7 @@ class DiskClass(ut.io.SayClass):
             subplot, time_log_scale, time_limits, times, False, axis_ratio_limits, axis_ratios
         )
 
-        subplot.set_xlabel(ut.plot.Label.get_label(time_kind, get_words=True))
+        subplot.set_xlabel(ut.plot.Label.get_label(time_name, get_words=True))
         subplot.set_ylabel('disk axis ratio')
 
         colors = ut.plot.get_colors(len(parts))
@@ -3262,7 +3262,7 @@ class DiskClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
-                'disk.axis.ratio', time_kind, snapshot_dict=part.snapshot
+                'disk.axis.ratio', time_name, snapshot_dict=part.snapshot
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -3281,8 +3281,8 @@ class StarFormHistoryClass(ut.io.SayClass):
     def plot_star_form_history(
         self,
         parts=None,
-        sfh_kind='form.rate',
-        time_kind='time.lookback',
+        sfh_name='form.rate',
+        time_name='time.lookback',
         time_limits=[0, 13],
         time_width=0.2,
         time_log_scale=False,
@@ -3299,20 +3299,20 @@ class StarFormHistoryClass(ut.io.SayClass):
         figure_index=1,
     ):
         '''
-        Plot star-formation history v time_kind.
+        Plot star-formation history v time_name.
 
         Parameters
         ----------
         parts : dict or list
             catalog[s] of particles
-        sfh_kind : str
+        sfh_name : str
             star form kind to plot: 'form.rate', 'form.rate.specific', 'mass', 'mass.normalized'
-        time_kind : str
+        time_name : str
             time kind to use: 'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
         time_limits : list
-            min and max limits of time_kind to impose
+            min and max limits of time_name to impose
         time_width : float
-            width of time_kind bin
+            width of time_name bin
         time_log_scale : bool
             whether to use logarithmic scaling for time bins
         distance_limits : list
@@ -3346,17 +3346,17 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         time_limits = np.array(time_limits)
         if None in time_limits:
-            if time_kind == 'redshift':
+            if time_name == 'redshift':
                 if time_limits[0] is None:
-                    time_limits[0] = np.floor(parts[0].snapshot[time_kind])
+                    time_limits[0] = np.floor(parts[0].snapshot[time_name])
                 if time_limits[1] is None:
                     time_limits[1] = 7
-            elif time_kind == 'time':
+            elif time_name == 'time':
                 if time_limits[0] is None:
                     time_limits[0] = 0
                 elif time_limits[1] is None:
-                    time_limits[1] = parts[0].snapshot[time_kind]
-            elif time_kind == 'time.lookback':
+                    time_limits[1] = parts[0].snapshot[time_name]
+            elif time_name == 'time.lookback':
                 if time_limits[0] is None:
                     time_limits[0] = 0
                 elif time_limits[1] is None:
@@ -3368,7 +3368,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         for part_i, part in enumerate(parts):
             sfh_p = self._get_star_form_history(
                 part,
-                time_kind,
+                time_name,
                 time_limits,
                 time_width,
                 time_log_scale,
@@ -3392,45 +3392,45 @@ class StarFormHistoryClass(ut.io.SayClass):
                     )
                 )
 
-        if time_kind == 'redshift' and time_log_scale:
+        if time_name == 'redshift' and time_log_scale:
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
         left = None
-        if 'specific' in sfh_kind:
+        if 'specific' in sfh_name:
             left = 0.215
         _fig, subplot = ut.plot.make_figure(figure_index, left=left, axis_secondary='x')
 
         y_values = None
         if sfh is not None:
-            y_values = sfh[sfh_kind]
+            y_values = sfh[sfh_name]
 
         ut.plot.set_axes_scaling_limits(
             subplot, time_log_scale, time_limits, None, sfh_log_scale, sfh_limits, y_values
         )
 
-        axis_x_label = ut.plot.Label.get_label(time_kind, get_words=True)
+        axis_x_label = ut.plot.Label.get_label(time_name, get_words=True)
         subplot.set_xlabel(axis_x_label)
 
-        if sfh_kind == 'mass.normalized':
+        if sfh_name == 'mass.normalized':
             axis_y_label = '$M_{\\rm star}(z) \, / \, M_{\\rm star}(z=0)$'
         else:
-            axis_y_label = ut.plot.Label.get_label('star.' + sfh_kind)
+            axis_y_label = ut.plot.Label.get_label('star.' + sfh_name)
         subplot.set_ylabel(axis_y_label)
 
-        ut.plot.make_axis_secondary_time(subplot, time_kind, time_limits, parts[0].Cosmology)
+        ut.plot.make_axis_secondary_time(subplot, time_name, time_limits, parts[0].Cosmology)
 
         colors = ut.plot.get_colors(len(parts))
 
         for part_i, part in enumerate(parts):
-            tis = sfh[sfh_kind][part_i] > 0
-            if time_kind in ['redshift', 'time.lookback', 'age']:
-                tis *= sfh[time_kind][part_i] >= parts[0].snapshot[time_kind] * 0.99
+            tis = sfh[sfh_name][part_i] > 0
+            if time_name in ['redshift', 'time.lookback', 'age']:
+                tis *= sfh[time_name][part_i] >= parts[0].snapshot[time_name] * 0.99
             else:
-                tis *= sfh[time_kind][part_i] <= parts[0].snapshot[time_kind] * 1.01
+                tis *= sfh[time_name][part_i] <= parts[0].snapshot[time_name] * 1.01
             subplot.plot(
-                sfh[time_kind][part_i][tis],
-                sfh[sfh_kind][part_i][tis],
+                sfh[time_name][part_i][tis],
+                sfh[sfh_name][part_i][tis],
                 color=colors[part_i],
                 alpha=0.8,
                 label=part.info['simulation.name'],
@@ -3440,10 +3440,10 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             time_value = None
-            if time_kind == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
+            if time_name == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
                 time_value = min(time_limits)
             plot_file_name = ut.plot.get_file_name(
-                sfh_kind + '.history', time_kind, 'star', 'redshift', parts[0].snapshot, time_value,
+                sfh_name + '.history', time_name, 'star', 'redshift', parts[0].snapshot, time_value,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -3452,14 +3452,14 @@ class StarFormHistoryClass(ut.io.SayClass):
         part=None,
         hal=None,
         gal=None,
-        mass_kind='star.mass',
+        mass_name='star.mass',
         mass_limits=[1e5, 1e9],
         property_select={},
         hal_indices=None,
-        sfh_kind='mass.normalized',
+        sfh_name='mass.normalized',
         sfh_limits=[],
         sfh_log_scale=False,
-        time_kind='time.lookback',
+        time_name='time.lookback',
         time_limits=[13.7, 0],
         time_width=0.2,
         time_log_scale=False,
@@ -3468,7 +3468,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         figure_index=1,
     ):
         '''
-        Plot star-formation history v time_kind for multiple galaxies in a halo catalog.
+        Plot star-formation history v time_name for multiple galaxies in a halo catalog.
 
         Parameters
         ----------
@@ -3478,26 +3478,26 @@ class StarFormHistoryClass(ut.io.SayClass):
             catalog of halos at snapshot
         gal : dict
             catalog of galaxies in the Local Group with SFHs
-        mass_kind : str
+        mass_name : str
             mass kind by which to select halos
         mass_limits : list
-            min and max limits to impose on mass_kind
+            min and max limits to impose on mass_name
         property_select : dict
             properties to select on: names as keys and limits as values
         hal_indices : index or array
             index[s] of halo[s] whose particles to plot
-        sfh_kind : str
+        sfh_name : str
             star form kind to plot: 'rate', 'rate.specific', 'mass', 'mass.normalized'
         sfh_limits : list
             min and max limits for y axis
         sfh_log_scale : bool
             whether to use logarithmic scaling for y axis
-        time_kind : str
+        time_name : str
             time kind to plot: 'time', 'time.lookback', 'age', 'redshift'
         time_limits : list
-            min and max limits of time_kind to plot
+            min and max limits of time_name to plot
         time_width : float
-            width of time_kind bin
+            width of time_name bin
         time_log_scale : bool
             whether to use logarithmic scaling for time bins
         plot_file_name : str
@@ -3510,9 +3510,9 @@ class StarFormHistoryClass(ut.io.SayClass):
         time_limits = np.array(time_limits)
         if part is not None:
             if time_limits[0] is None:
-                time_limits[0] = part.snapshot[time_kind]
+                time_limits[0] = part.snapshot[time_name]
             if time_limits[1] is None:
-                time_limits[1] = part.snapshot[time_kind]
+                time_limits[1] = part.snapshot[time_name]
 
         sfh = None
         if hal is not None:
@@ -3520,12 +3520,12 @@ class StarFormHistoryClass(ut.io.SayClass):
                 hal_indices = ut.array.get_indices(hal.prop('star.number'), [2, Inf])
 
             if mass_limits is not None and len(mass_limits) > 0:
-                hal_indices = ut.array.get_indices(hal.prop(mass_kind), mass_limits, hal_indices)
+                hal_indices = ut.array.get_indices(hal.prop(mass_name), mass_limits, hal_indices)
 
             if property_select:
                 hal_indices = ut.catalog.get_indices_catalog(hal, property_select, hal_indices)
 
-            hal_indices = hal_indices[np.argsort(hal.prop(mass_kind, hal_indices))]
+            hal_indices = hal_indices[np.argsort(hal.prop(mass_name, hal_indices))]
 
             print(f'halo number = {hal_indices.size}')
 
@@ -3535,7 +3535,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 part_indices = hal.prop('star.indices', hal_i)
                 sfh_h = self._get_star_form_history(
                     part,
-                    time_kind,
+                    time_name,
                     time_limits,
                     time_width,
                     time_log_scale,
@@ -3565,7 +3565,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
             sfh['mass.normalized.median'] = np.median(sfh['mass.normalized'], 0)
 
-        if time_kind == 'redshift' and time_log_scale:
+        if time_name == 'redshift' and time_log_scale:
             time_limits += 1  # convert to z + 1 so log is well-defined
 
         # plot ----------
@@ -3573,7 +3573,7 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         y_values = None
         if sfh is not None:
-            y_values = sfh[sfh_kind]
+            y_values = sfh[sfh_name]
 
         ut.plot.set_axes_scaling_limits(
             subplot, time_log_scale, time_limits, None, sfh_log_scale, sfh_limits, y_values
@@ -3581,16 +3581,16 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         subplot.xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
 
-        axis_x_label = ut.plot.Label.get_label(time_kind, get_words=True)
+        axis_x_label = ut.plot.Label.get_label(time_name, get_words=True)
         subplot.set_xlabel(axis_x_label)
 
-        if sfh_kind == 'mass.normalized':
+        if sfh_name == 'mass.normalized':
             axis_y_label = '$M_{\\rm star}(z)\, / \, M_{\\rm star}(z=0)$'
         else:
-            axis_y_label = ut.plot.Label.get_label('star.' + sfh_kind)
+            axis_y_label = ut.plot.Label.get_label('star.' + sfh_name)
         subplot.set_ylabel(axis_y_label)
 
-        ut.plot.make_axis_secondary_time(subplot, time_kind, time_limits, part.Cosmology)
+        ut.plot.make_axis_secondary_time(subplot, time_name, time_limits, part.Cosmology)
 
         if hal is not None:
             colors = ut.plot.get_colors(len(hal_indices))
@@ -3623,8 +3623,8 @@ class StarFormHistoryClass(ut.io.SayClass):
 
                     print(label)
                 subplot.plot(
-                    gal.sfh[gal_name][time_kind],
-                    gal.sfh[gal_name][sfh_kind],
+                    gal.sfh[gal_name][time_name],
+                    gal.sfh[gal_name][sfh_name],
                     linewidth=linewidth,
                     linestyle=linestyle,
                     alpha=alpha,
@@ -3642,8 +3642,8 @@ class StarFormHistoryClass(ut.io.SayClass):
                 mass = ut.io.get_string_from_numbers(sfh['mass'][hal_ii][-1], 1, exponential=True)
                 label = f'${mass}\,{{\\rm M}}_\odot$'
                 subplot.plot(
-                    sfh[time_kind][hal_ii],
-                    sfh[sfh_kind][hal_ii],
+                    sfh[time_name][hal_ii],
+                    sfh[sfh_name][hal_ii],
                     linewidth=linewidth,
                     color=colors[hal_ii],
                     alpha=0.55,
@@ -3659,18 +3659,18 @@ class StarFormHistoryClass(ut.io.SayClass):
             snapshot_dict = None
             if part is not None:
                 snapshot_dict = part.snapshot
-            time_kind_file_name = 'redshift'
+            time_name_file_name = 'redshift'
             if hal is None:
-                time_kind_file_name = None
+                time_name_file_name = None
             host_distance_limits = None
             if 'host.distance' in property_select:
                 host_distance_limits = property_select['host.distance']
 
             plot_file_name = ut.plot.get_file_name(
-                sfh_kind,
-                time_kind,
+                sfh_name,
+                time_name,
                 'star',
-                time_kind_file_name,
+                time_name_file_name,
                 snapshot_dict,
                 host_distance_limits=host_distance_limits,
             )
@@ -3681,7 +3681,7 @@ class StarFormHistoryClass(ut.io.SayClass):
     def _get_star_form_history(
         self,
         part,
-        time_kind='redshift',
+        time_name='redshift',
         time_limits=[0, 8],
         time_width=0.1,
         time_log_scale=False,
@@ -3698,12 +3698,12 @@ class StarFormHistoryClass(ut.io.SayClass):
         ----------
         part : dict
             catalog of particles
-        time_kind : str
+        time_name : str
             time metric to use: 'time', 'time.lookback', 'age', 'redshift', 'scalefactor'
         time_limits : list
-            min and max limits of time_kind to impose
+            min and max limits of time_name to impose
         time_width : float
-            width of time_kind bin (in units set by time_scaling)
+            width of time_name bin (in units set by time_scaling)
         time_log_scale : bool
             whether to use logarithmic scaling for time bins
         distance_limits : list
@@ -3758,7 +3758,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
         # get time bins, ensure are ordered from earliest
-        time_dict = part.Cosmology.get_time_bins(time_kind, time_limits, time_width, time_log_scale)
+        time_dict = part.Cosmology.get_time_bins(time_name, time_limits, time_width, time_log_scale)
         time_bins = np.sort(time_dict['time'])
         time_difs = np.diff(time_bins)
 
@@ -3890,7 +3890,7 @@ def plot_galaxy_property_v_time(
     sfhs=None,
     Cosmology=None,
     property_name='star.mass',
-    time_kind='redshift',
+    time_name='redshift',
     time_limits=[0, 8],
     time_log_scale=False,
     snapshot_subsample_factor=1,
@@ -3901,7 +3901,7 @@ def plot_galaxy_property_v_time(
     figure_index=1,
 ):
     '''
-    Plot host galaxy property v time_kind, using tabulated dictionary of properties of progenitor
+    Plot host galaxy property v time_name, using tabulated dictionary of properties of progenitor
     across snapshots.
 
     Parameters
@@ -3913,10 +3913,10 @@ def plot_galaxy_property_v_time(
     property_name : str
         name of star formation history property to plot:
             'rate', 'rate.specific', 'mass', 'mass.normalized'
-    time_kind : str
+    time_name : str
         time kind to use: 'time', 'time.lookback', 'redshift'
     time_limits : list
-        min and max limits of time_kind to get
+        min and max limits of time_name to get
     time_log_scale : bool
         whether to use logarithmic scaling for time bins
     snapshot_subsample_factor : int
@@ -3942,11 +3942,11 @@ def plot_galaxy_property_v_time(
 
     time_limits = np.array(time_limits)
     if time_limits[0] is None:
-        time_limits[0] = gals[0][time_kind].min()
+        time_limits[0] = gals[0][time_name].min()
     if time_limits[1] is None:
-        time_limits[1] = gals[0][time_kind].max()
+        time_limits[1] = gals[0][time_name].max()
 
-    if time_kind == 'redshift' and time_log_scale:
+    if time_name == 'redshift' and time_log_scale:
         time_limits += 1  # convert to z + 1 so log is well-defined
 
     # plot ----------
@@ -3956,20 +3956,20 @@ def plot_galaxy_property_v_time(
     if gals is not None:
         y_values.append(gals[0][property_name])
     if sfhs is not None:
-        y_values.append(sfhs[0][time_kind])
+        y_values.append(sfhs[0][time_name])
     subplot.set_ylim(ut.plot.get_axis_limits(y_values, axis_y_log_scale, axis_y_limits))
 
     axis_y_label = ut.plot.Label.get_label('star.mass')
     subplot.set_ylabel(axis_y_label)
 
-    ut.plot.make_axis_secondary_time(subplot, time_kind, time_limits, Cosmology)
+    ut.plot.make_axis_secondary_time(subplot, time_name, time_limits, Cosmology)
 
     # colors = ut.plot.get_colors(len(gals))
 
     if gals is not None:
         for _gal_i, gal in enumerate(gals):
             subplot.plot(
-                gal[time_kind][::snapshot_subsample_factor],
+                gal[time_name][::snapshot_subsample_factor],
                 gal[property_name][::snapshot_subsample_factor],
                 linewidth=3.0,
                 alpha=0.9,
@@ -3981,7 +3981,7 @@ def plot_galaxy_property_v_time(
     if sfhs is not None:
         for _sfh_i, sfh in enumerate(sfhs):
             subplot.plot(
-                sfh[time_kind],
+                sfh[time_name],
                 sfh['mass'],
                 '--',
                 linewidth=3.0,
@@ -3994,7 +3994,7 @@ def plot_galaxy_property_v_time(
     ut.plot.make_legends(subplot)
 
     if plot_file_name is True or plot_file_name == '':
-        plot_file_name = f'galaxy_{property_name}_v_{time_kind}'
+        plot_file_name = f'galaxy_{property_name}_v_{time_name}'
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
@@ -4639,16 +4639,16 @@ class HalosClass(ut.io.SayClass):
                     hal_indices = hal_indicess[cat_i]
 
                     if species_name == 'star' and hal['star.position'].max() > 0:
-                        position_kind = 'star.position'
-                        velocity_kind = 'star.velocity'
+                        position_name = 'star.position'
+                        velocity_name = 'star.velocity'
                     elif species_name == 'dark' and hal['dark.position'].max() > 0:
-                        position_kind = 'dark.position'
-                        velocity_kind = 'dark.velocity'
+                        position_name = 'dark.position'
+                        velocity_name = 'dark.velocity'
                     else:
-                        # position_kind = 'position'
-                        # velocity_kind = 'velocity'
-                        position_kind = 'dark.position'
-                        velocity_kind = 'dark.velocity'
+                        # position_name = 'position'
+                        # velocity_name = 'velocity'
+                        position_name = 'dark.position'
+                        velocity_name = 'dark.velocity'
 
                     pros_cat = []
 
@@ -4668,8 +4668,8 @@ class HalosClass(ut.io.SayClass):
                             property_name,
                             property_statistic,
                             weight_property,
-                            center_position=hal[position_kind][hal_i],
-                            center_velocity=hal[velocity_kind][hal_i],
+                            center_position=hal[position_name][hal_i],
+                            center_velocity=hal[velocity_name][hal_i],
                             part_indicess=part_indices,
                         )
 
