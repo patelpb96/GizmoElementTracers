@@ -360,7 +360,7 @@ class InitialConditionClass(ut.io.SayClass):
         return hal, parts
 
     def _read_halos(
-        self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=True
+        self, mass_limits=[1e11, np.Inf], file_kind='hdf5', assign_nearest_neighbor=True
     ):
         '''
         Read catalog of halos at the final snapshot.
