@@ -45,7 +45,7 @@ class InitialConditionClass(ut.io.SayClass):
         '''
         # ensure lowest-redshift snapshot is first
         self.snapshot_redshifts = np.sort(snapshot_redshifts)
-        self.simulation_directory = simulation_directory
+        self.simulation_directory = ut.io.get_path(simulation_directory)
 
     def write_positions_at_initial_snapshot(
         self,
@@ -63,19 +63,16 @@ class InitialConditionClass(ut.io.SayClass):
         Select dark-matter particles at the final snapshot, write a file of their positions at
         the initial snapshot.
 
-        If input a halo catalog (hal) and halo index (hal_index), select zoom-in volume around that
-        halo, typically from a uniform-resolution DM-only simulation.
+        If input a halo catalog (hal) and halo index (hal_index) (typically from a
+        uniform-resolution DM-only simulation), select volume around that halo.
 
         Else, assume that working from an existing zoom-in simulation, re-select spherical volume
-        around its center.
+        around its host center.
 
         If you do not supply particle catalogs (parts), read them at the fiducial snapshots.
 
         Rule of thumb from Onorbe et al:
-            given distance_pure
-            if region_kind == 'cube':
-                distance_max = (1.5 * refinement_number + 1) * distance_pure
-            elif region_kind in ['particles', 'convex-hull']:
+            given distance_pure, if region_kind in ['particles', 'convex-hull']:
                 distance_max = (1.5 * refinement_number + 7) * distance_pure
 
         Parameters
@@ -318,7 +315,7 @@ class InitialConditionClass(ut.io.SayClass):
 
             if region_kind == 'convex-hull':
                 # use convex hull to define initial region to reduce memory
-                ConvexHull = spatial.ConvexHull(positions_ini)
+                ConvexHull = spatial.ConvexHull(positions_ini)  # pylint: disable=no-member
                 positions_ini = positions_ini[ConvexHull.vertices]
                 Write.write(
                     f'# using convex hull with {positions_ini.shape[0]} vertices for initial volume'
@@ -363,7 +360,7 @@ class InitialConditionClass(ut.io.SayClass):
         return hal, parts
 
     def _read_halos(
-        self, mass_limits=[1e11, np.Inf], file_kind='out', assign_nearest_neighbor=True
+        self, mass_limits=[1e11, np.Inf], file_kind='hdf5', assign_nearest_neighbor=True
     ):
         '''
         Read catalog of halos at the final snapshot.

@@ -206,7 +206,7 @@ class ParticleDictionaryClass(dict):
         self._id0_to_species = None  # array of pointer species for particles with id.child = 0
         self._ids_to_species = None  # dict of pointer species for particles with id.child > 0
 
-    def prop(self, property_name='', indices=None, _dict_only=False):
+    def prop(self, property_name, indices=None, _dict_only=False):
         '''
         Get property, either as stored in self's dictionary or derive it on the fly from stored
         properties. Can compute basic mathematical manipulations/combinations, for example:
@@ -2630,6 +2630,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory : str
             directory of snapshot files within simulation_directory
         '''
+        # pylint: disable=unsupported-assignment-operation
+
         if np.isscalar(species):
             species = [species]  # ensure is list
 
@@ -2673,7 +2675,7 @@ class ReadClass(ut.io.SayClass):
 
                         # zero numbers in header
                         part_number_in_file[spec_id] = 0
-                        part_number[spec_id] = 0
+                        part_number[spec_id] = 0  # pylint: disable=unsupported-assignment-operation
 
                         # delete properties
                         # for prop_name in file_in[spec_read]:
