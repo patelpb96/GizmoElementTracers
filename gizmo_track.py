@@ -1649,7 +1649,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         proc_number : int
             number of parallel processes to run
         simulation_directory : str
-            directory of simulation
+            base directory of simulation
         '''
         # if 'elvis' is in simulation directory name, force 2 hosts
         host_number = ut.catalog.get_host_number_from_directory(host_number, './', os)

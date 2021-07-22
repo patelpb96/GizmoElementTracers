@@ -45,7 +45,7 @@ class InitialConditionClass(ut.io.SayClass):
         '''
         # ensure lowest-redshift snapshot is first
         self.snapshot_redshifts = np.sort(snapshot_redshifts)
-        self.simulation_directory = simulation_directory
+        self.simulation_directory = ut.io.get_path(simulation_directory)
 
     def write_positions_at_initial_snapshot(
         self,
