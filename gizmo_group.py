@@ -376,6 +376,9 @@ class IOClass(ut.io.SayClass):
             part_indices,
         )
 
+        if grp_dict is None:
+            return
+
         part_spec = part[species_name]
 
         # transfer group to dictionary class
@@ -814,13 +817,14 @@ class IOClass(ut.io.SayClass):
             part, species_name, linking_length, particle_number_min, property_select,
         )
 
-        # write group catalog to HDF5 file
-        self._io_group_catalog(
-            grp=grp,
-            simulation_directory=simulation_directory,
-            group_directory=group_directory,
-            verbose=verbose,
-        )
+        if grp is not None:
+            # write group catalog to HDF5 file
+            self._io_group_catalog(
+                grp=grp,
+                simulation_directory=simulation_directory,
+                group_directory=group_directory,
+                verbose=verbose,
+            )
 
     def _get_group_file_names_and_indices(
         self, species_name, linking_length, simulation_and_group_directory, snapshot_indices
