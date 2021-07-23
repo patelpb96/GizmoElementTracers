@@ -524,7 +524,7 @@ class IOClass(ut.io.SayClass):
         verbose=True,
     ):
         '''
-        Read/write a group catalog at a snapshot to/from HDF5 file.
+        Read/write a catalog of groups at a snapshot to/from HDF5 file.
         If reading, return as dictionary.
 
         Parameters
@@ -547,7 +547,7 @@ class IOClass(ut.io.SayClass):
         Returns
         -------
         grp : class
-            catalog of groups at snapshot
+            catalog of groups at a snapshot
         '''
         # parse inputs
         if grp is None:
@@ -768,7 +768,7 @@ class IOClass(ut.io.SayClass):
         verbose,
     ):
         '''
-        Utility function
+        Utility function.
 
         Parameters
         ----------
@@ -812,19 +812,30 @@ class IOClass(ut.io.SayClass):
             check_properties=False,
         )
 
+        if (
+            part is None
+            or species_name not in part
+            or self.property_name_default not in part[species_name]
+            or len(part[species_name][self.property_name_default]) == 0
+        ):
+            self.say(f'! no snapshot or no {species_name} particles at snapshot {snapshot_index}')
+            return
+
         # generate FoF group catalog of species
         grp = self.generate_group_catalog(
             part, species_name, linking_length, particle_number_min, property_select,
         )
 
-        if grp is not None:
-            # write group catalog to HDF5 file
-            self._io_group_catalog(
-                grp=grp,
-                simulation_directory=simulation_directory,
-                group_directory=group_directory,
-                verbose=verbose,
-            )
+        if grp is None:
+            return
+
+        # write group catalog to HDF5 file
+        self._io_group_catalog(
+            grp=grp,
+            simulation_directory=simulation_directory,
+            group_directory=group_directory,
+            verbose=verbose,
+        )
 
     def _get_group_file_names_and_indices(
         self, species_name, linking_length, simulation_and_group_directory, snapshot_indices
@@ -965,12 +976,12 @@ def plot_number_v_mass(
     figure_index=1,
 ):
     '''
-    Plot number (cumulative or differential) v mass_name.
+    Plot number (cumulative or differential) of groups v mass_name.
 
     Parameters
     ----------
     grps : dict or list
-        catalog[s] of groups at snapshot
+        catalog[s] of groups at a snapshot
     mass_name : str or list
         mass kind[s] to plot
     mass_limits : list
@@ -982,7 +993,7 @@ def plot_number_v_mass(
     host_distance_limitss : list or list of lists
         min and max limits of distance to host [kpc physical]
     grp_indicess : array or list of arrays
-        halo indices to plot
+        group indices to plot
     number_kind : str
         mass function kind to plot: 'number',  'number.dif', 'number.cum'
     number_limits : list
@@ -1022,7 +1033,7 @@ def plot_number_v_mass(
         [2, len(grps), host_distance_bin_number, MassBin.number]
     )
 
-    # get counts for halos
+    # get counts for groups
     for grp_i, grp in enumerate(grps):
 
         if grp_indicess[grp_i] is None or len(grp_indicess[grp_i]) == 0:
@@ -1096,7 +1107,7 @@ def plot_number_v_mass(
             subplot.plot(
                 x_values,
                 y_values,
-                # hal_number_uncs[hal_i],
+                # grp_number_uncs[hal_i],
                 color=color,
                 linestyle=line_styles[dist_i],
                 linewidth=linewidth,
@@ -1124,7 +1135,6 @@ def plot_number_v_distance(
     distance_limits=[1, 1000],
     distance_bin_width=0.1,
     distance_log_scale=True,
-    object_kind='halo',
     hal_indicess=None,
     gal_indices=None,
     gal_host_names=['MW', 'M31'],
@@ -1154,8 +1164,6 @@ def plot_number_v_distance(
         width of distance bin
     distance_log_scale : bool
         whether to use logarithmic scaling for distance bins
-    object_kind : str
-        shortcut for halo kind to plot: 'halo', 'galaxy', 'cluster' and/or 'satellite', 'isolated'
     hal_indicess : array or list of arrays
         indices of halos to plot
     gal_indices : array
