@@ -1111,10 +1111,10 @@ def plot_velocity_v_age(
 def plot_property_v_property(
     part,
     species_name='gas',
-    x_property_name='log number.density',
+    x_property_name='number.density',
     x_property_limits=[],
     x_property_log_scale=True,
-    y_property_name='log temperature',
+    y_property_name='temperature',
     y_property_limits=[],
     y_property_log_scale=True,
     property_bin_number=150,
