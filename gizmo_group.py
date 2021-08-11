@@ -35,13 +35,14 @@ Default/stored properties in group catalog
     'number' : total number of member particles [M_sun]
     'mass' : total mass of members particles [M_sun]
     'position' or 'host.distance.principal' :
-        3-D cartesian distance wrt center of primary host along its principal axes [kpc physical]
+        3-D COM artesian distance wrt center of primary host along its principal axes [kpc physical]
     'velocity' or 'host.velocity.principal' :
-        3-D velocity wrt center of primary host along its principal axes [km / s]
-    'radius' : maximum distance of member particles [pc physical]
+        3-D COM velocity wrt center of primary host along its principal axes [km / s]
+    'radius.100' : maximum distance of member particles [pc physical]
     'radius.90' : distance that encloses 90% of member mass [pc physical]
     'radius.50' : istance that encloses 50% of member mass [pc physical]
-    'vel.std' : standard deviation of the velocity of member particles [km / s]
+    'vel.std' : 68% width of the mass-weighted velocity distribution of members [km / s]
+    'temperature' : mass-weighted temperature of members [K]
 
 ----------
 Derived properties
@@ -50,7 +51,7 @@ grp is a GroupDictionaryClass that can compute derived properties on the fly.
 Call derived (or stored) properties via:
     grp.prop(property_name)
 Examples:
-    grp.prop('star.density.50')
+    grp.prop('density.50')
 
 You also can call stored properties via grp.prop(property_name).
 The package will know that it is a stored property and return it as is.
@@ -167,32 +168,37 @@ class GroupDictionaryClass(dict,):
             return np.abs(self.prop(property_name.replace('abs', ''), indices))
 
         # parsing specific to FoF group catalog ----------
-        # average mass density
-        if 'density' in property_name:
-            if property_name == 'density':
-                property_name += '.50'  # use R_50 as default radius to measure mass density
+        # default radius
+        if property_name == 'radius':
+            return self.prop('radius.100', indices, _dict_only=True)
 
-            radius_percent = float(property_name.split('.')[-1])
-            radius_name = 'radius.' + property_name.split('.')[-1]
+        # mass density or virial parameter (alpha_vir)
+        if 'density' in property_name or 'virial.parameter' in property_name:
+            if property_name == 'density' or property_name == 'virial.parameter':
+                property_name += '.90'  # use R_90 as default radius if not input
 
-            values = self.prop(radius_name, indices, _dict_only=True)
-            # masks = np.isfinite(values)
-            # masks[masks] *= (values[masks] > 0)
-            # values[masks] = (
-            #    radius_percent / 100 * self.prop('star.mass', indices, _dict_only=True)[masks] /
-            #    (4 / 3 * np.pi * self.prop(radius_name, indices)[masks] ** 3))
-            values = (
-                radius_percent
-                / 100
-                * self.prop('mass', indices, _dict_only=True)
-                / (4 / 3 * np.pi * self.prop(radius_name, indices) ** 3)
-            )
-            # if values.size == 1:
-            #    values = np.asscalar(values)
+            radius_percent = property_name.split('.')[-1]
+            radiuss = self.prop('radius.' + radius_percent, indices, _dict_only=True)
+            masses = float(radius_percent) / 100 * self.prop('mass', indices, _dict_only=True)
+
+            if 'density' in property_name:
+                # mean mass density [Msun / pc ^ 2]
+                values = masses / (4 / 3 * np.pi * radiuss ** 3)
+            elif 'virial.parameter' in property_name:
+                # alpha_vir := 5 R sigma_vel,1D ^ 2 / GM [dimensionless]
+                # convert to 1-D dispersion, by convention
+                vel_stds = self.prop('vel.std', indices, _dict_only=True) / np.sqrt(3)
+                values = (
+                    5
+                    * (radiuss * ut.constant.km_per_pc)
+                    * vel_stds ** 2
+                    / ut.constant.grav_km_msun_sec
+                    / masses
+                )
 
             return values
 
-        # velocity (dispersion) along 1 dimension
+        # velocity dispersion along 1 dimension
         if 'vel.' in property_name and '.1d' in property_name:
             values = self.prop(property_name.replace('.1d', ''), indices) / np.sqrt(3)
 
@@ -495,7 +501,7 @@ class IOClass(ut.io.SayClass):
             )
 
             if simulation_name:
-                grp['simulation.name'] = simulation_name
+                grp.info['simulation.name'] = simulation_name
 
             # assign information about all snapshots
             grp.Snapshot = Snapshot
@@ -874,7 +880,7 @@ class IOClass(ut.io.SayClass):
             path_file_names = []
             file_indices = []
             for file_i, file_index in enumerate(file_indices_all):
-                if file_index in file_indices_all:
+                if file_index in snapshot_indices:
                     path_file_names.append(path_file_names_all[file_i])
                     file_indices.append(file_index)
 
@@ -945,7 +951,9 @@ def print_properties(grp, grp_indices, properties=None, digits=3):
                 )
             )
             Say.say(
-                '* R_max = {} kpc'.format(ut.io.get_string_from_numbers(grp.prop('radius', gi), 1))
+                '* R_max = {} kpc'.format(
+                    ut.io.get_string_from_numbers(grp.prop('radius.100', gi), 1)
+                )
             )
             Say.say(
                 '* R_50 = {}, R_90 = {} kpc'.format(
@@ -1107,7 +1115,7 @@ def plot_number_v_mass(
             subplot.plot(
                 x_values,
                 y_values,
-                # grp_number_uncs[hal_i],
+                # grp_number_uncs[grp_i],
                 color=color,
                 linestyle=line_styles[dist_i],
                 linewidth=linewidth,
@@ -1122,22 +1130,19 @@ def plot_number_v_mass(
     if plot_file_name is True or plot_file_name == '':
         redshift_label = ''
         if len(grps) > 0:
-            redshift_label = ut.plot.get_time_name('redshift', grps[0].snapshot)
+            redshift_label = ut.plot.get_time_label('redshift', grps[0].snapshot)
         plot_file_name = f'{number_kind}_v_{mass_name}{redshift_label}'
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_number_v_distance(
-    hals=None,
-    gal=None,
+    grps=None,
     mass_name='mass',
     mass_limitss=[[]],
     distance_limits=[1, 1000],
     distance_bin_width=0.1,
     distance_log_scale=True,
-    hal_indicess=None,
-    gal_indices=None,
-    gal_host_names=['MW', 'M31'],
+    grp_indicess=None,
     number_kind='sum',
     number_limits=None,
     number_log_scale=True,
@@ -1146,30 +1151,24 @@ def plot_number_v_distance(
     figure_index=1,
 ):
     '''
-    Plot mass function, that is, number (cumulative or differential) v mass_name.
+    Plot number (cumulative or differential) of groups v host distance.
 
     Parameters
     ----------
-    hals : dict or list
-        catalog[s] of halos at snapshot
-    gal : dict
-        catalog of galaxies to compare against
+    grps : dict or list
+        catalog[s] of groups at a snapshot
     mass_name : str
-        halo mass kind to plot
+        group mass kind to plot
     mass_limitss : list or list of lists
-        min and max limits of halo mass
+        min and max limits of mass_name
     distance_limits : list
         min and max distance from host [kpc physical]
     distance_bin_width : float
         width of distance bin
     distance_log_scale : bool
         whether to use logarithmic scaling for distance bins
-    hal_indicess : array or list of arrays
-        indices of halos to plot
-    gal_indices : array
-        indices of galaxies to plot
-    gal_host_names : list
-        names of hosts for observed galaxy catalog
+    grp_indicess : array or list of arrays
+        prior indices of groups
     number_kind : str
          number kind to plot: 'sum', 'sum.cum', 'fraction', 'fraction.cum', 'density'
     number_limits : list
@@ -1185,10 +1184,8 @@ def plot_number_v_distance(
     '''
     dimension_number = 3
 
-    if hals is None:
-        hals = []
-    if isinstance(hals, dict):
-        hals = [hals]
+    if isinstance(grps, dict):
+        grps = [grps]
 
     if mass_limitss is not None:
         mass_limitss = np.array(mass_limitss)
@@ -1196,8 +1193,8 @@ def plot_number_v_distance(
             mass_limitss = np.array([mass_limitss])
         mass_number = mass_limitss.shape[0]
 
-    if not isinstance(hal_indicess, list):
-        hal_indicess = [hal_indicess for _ in hals]
+    if not isinstance(grp_indicess, list):
+        grp_indicess = [grp_indicess for _ in grps]
 
     DistanceBin = ut.binning.DistanceBinClass(
         distance_limits,
@@ -1207,48 +1204,25 @@ def plot_number_v_distance(
         dimension_number=dimension_number,
     )
 
-    hal_number = {}
+    grp_number = {}
 
-    # get numbers for halos
-    if hals is not None and len(hals) > 0:
-        for hal_i, hal in enumerate(hals):
-            if hal_indicess[hal_i] is None or len(hal_indicess[hal_i]) == 0:
-                hal_indices = ut.array.get_arange(hal.prop(mass_name))
-            else:
-                hal_indices = hal_indicess[hal_i]
+    for grp_i, grp in enumerate(grps):
+        if grp_indicess[grp_i] is None or len(grp_indicess[grp_i]) == 0:
+            grp_indices = ut.array.get_arange(grp.prop(mass_name))
+        else:
+            grp_indices = grp_indicess[grp_i]
 
-            hal_number_h = {}
+        grp_number_h = {}
 
-            for _m_i, mass_limits in enumerate(mass_limitss):
-                his_m = ut.array.get_indices(hal.prop(mass_name), mass_limits, hal_indices)
-                his_m = hal.get_indices(object_kind=object_kind, prior_indices=his_m)
-
-                hal_number_m = DistanceBin.get_sum_profile(hal.prop('host.distance.total', his_m))
-                ut.array.append_dictionary(hal_number_h, hal_number_m)
-            ut.array.append_dictionary(hal_number, hal_number_h)
-        ut.array.arrayize_dictionary(hal_number)
-
-    # get numbers for observed galaxies
-    if gal is not None and mass_name in gal:
-        gal_number = {}
-        for gal_host_name in gal_host_names:
-            # gis_h = gis[gal['host.name'][gis] == host_name.encode()]
-            gis_h = ut.array.get_indices(gal['host.name'], gal_host_name.encode(), gal_indices)
-            gal_number_h = {}
-            for m_i, mass_limits in enumerate(mass_limitss):
-                gis_m = ut.array.get_indices(gal[mass_name], mass_limits, gis_h)
-                gal_number_m = DistanceBin.get_sum_profile(gal['host.distance.total'][gis_m])
-                ut.array.append_dictionary(gal_number_h, gal_number_m)
-            ut.array.append_dictionary(gal_number, gal_number_h)
-        ut.array.arrayize_dictionary(gal_number)
+        for _m_i, mass_limits in enumerate(mass_limitss):
+            gis_m = ut.array.get_indices(grp.prop(mass_name), mass_limits, grp_indices)
+            grp_number_m = DistanceBin.get_sum_profile(grp.prop('host.distance.total', gis_m))
+            ut.array.append_dictionary(grp_number_h, grp_number_m)
+        ut.array.append_dictionary(grp_number, grp_number_h)
+    ut.array.arrayize_dictionary(grp_number)
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
-
-    if hals is not None and len(hals) > 0:
-        numbers_all = hal_number[number_kind]
-    elif gal is not None:
-        numbers_all = gal_number[number_kind]
 
     ut.plot.set_axes_scaling_limits(
         subplot,
@@ -1257,16 +1231,22 @@ def plot_number_v_distance(
         None,
         number_log_scale,
         number_limits,
-        numbers_all,
+        grp_number[number_kind],
     )
 
     # if distance_log_scale:
     #    subplot.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.0f'))
 
-    subplot.set_xlabel('distance $\\left[ {\\rm kpc} \\right]$')
+    species_name = grps[0].info['fof.species']
+    if 'gas' in species_name:
+        object_kind = 'GMC'
+    elif 'star' in species_name:
+        object_kind = 'cluster'
+
+    subplot.set_xlabel('host distance $\\left[ {\\rm kpc} \\right]$')
 
     if '.cum' in number_kind:
-        axis_y_label = '$N_{{\\rm satellite}}(< d)$'
+        axis_y_label = f'$N_{{\\rm {object_kind}}}(< d)$'
     else:
         if distance_log_scale:
             axis_y_label = '${\\rm d}n/{\\rm d}log(d) \, \\left[ {\\rm kpc^{-3}} \\right]$'
@@ -1274,71 +1254,29 @@ def plot_number_v_distance(
             axis_y_label = '${\\rm d}n/{\\rm d}d \, \\left[ {\\rm kpc^{-2}} \\right]$'
     subplot.set_ylabel(axis_y_label)
 
-    colors = ut.plot.get_colors(len(hals))
+    colors = ut.plot.get_colors(len(grps))
     line_styles = ut.plot.get_line_styles(mass_number)
 
     distance_kind = 'distance.mid'
     if '.cum' in number_kind:
         distance_kind = 'distance.cum'
 
-    # plot observed galaxies
-    host_label_dict = {
-        'MW': {'color': 'black', 'linestyle': '--'},
-        'M31': {'color': 'black', 'linestyle': ':'},
-    }
-    if gal is not None and mass_name in gal:
-        for m_i, mass_limits in enumerate(mass_limitss):
-            for host_i, host_name in enumerate(gal_host_names):
-                label = host_name  # .replace('MW', 'Milky Way').replace('M31', 'M31 (Andromeda)')
-
-                y_values = gal_number[number_kind][host_i, m_i]
-                # ensure n = 1 is clear on log plot
-                if 'sum' in number_kind and number_log_scale:
-                    y_values = np.clip(y_values, 0.5, np.Inf)
-                masks = np.where(y_values > -1)[0]
-
-                subplot.plot(
-                    gal_number[distance_kind][host_i, m_i][masks],
-                    y_values[masks],
-                    color=host_label_dict[host_name]['color'],
-                    linestyle=host_label_dict[host_name]['linestyle'],
-                    linewidth=3.0,
-                    alpha=0.8,
-                    label=label,
-                )
-
-    # plot halos
-    if hals is not None and len(hals) > 0:
-        for hal_i, hal in enumerate(hals):
+    if grp is not None and len(grps) > 0:
+        for grp_i, grp in enumerate(grps):
             for m_i, _mass_limits in enumerate(mass_limitss):
                 linewidth = 3.0
                 alpha = 0.9
-                color = colors[hal_i]
+                color = colors[grp_i]
 
-                label = None
-                if m_i == 0:
-                    label = hal.info['simulation.name']
-                    # label = 'Latte simulation'
-
-                y_values = hal_number[number_kind][hal_i, m_i]
+                label = grp.info['simulation.name']
+                y_values = grp_number[number_kind][grp_i, m_i]
                 # ensure n = 1 is clear on log plot
                 if 'sum' in number_kind and number_log_scale:
                     y_values = np.clip(y_values, 0.5, np.Inf)
 
-                # if '57000' in hal.info['simulation.name']:
-                #    #label = 'Latte low-res'
-                #    label = None
-                #    linewidth = 1.5
-                #    #if 'star.mass' in mass_name_default:
-                #    #    y_values[x_values < 3e7] = np.nan
-                #    #elif 'star.vel.std' in mass_name_default:
-                #    #    y_values[x_values < 9] = np.nan
-                #    #color = colors[0]
-                #    color = ut.plot.get_color('blue.lite')
-
                 masks = np.where(y_values > -1)[0]
                 subplot.plot(
-                    hal_number[distance_kind][hal_i, m_i][masks],
+                    grp_number[distance_kind][grp_i, m_i][masks],
                     y_values[masks],
                     color=color,
                     linestyle=line_styles[m_i],
@@ -1347,18 +1285,15 @@ def plot_number_v_distance(
                     label=label,
                 )
 
-    if len(hals) > 1 or gal is not None:
+    if len(grps) > 1:
         legend = subplot.legend(loc='best')
         legend.get_frame()
 
     if plot_file_name is True or plot_file_name == '':
-        galaxy_label = ''
-        if gal is not None:
-            galaxy_label = '_lg'
         redshift_label = ''
-        if len(hals) > 0:
-            redshift_label = ut.plot.get_time_name('redshift', hals[0].snapshot)
-        plot_file_name = f'number.{number_kind}_v_distance{galaxy_label}{redshift_label}'
+        if len(grps) > 0:
+            redshift_label = ut.plot.get_time_label('redshift', grps[0].snapshot)
+        plot_file_name = f'{species_name}.group.number.{number_kind}_v_distance{redshift_label}'
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
@@ -1366,19 +1301,18 @@ def plot_number_v_distance(
 # group property versus property or distance
 # --------------------------------------------------------------------------------------------------
 def plot_property_v_property(
-    hals=None,
-    gal=None,
-    x_property_name='mass.bound',
+    grps=None,
+    x_property_name='mass',
     x_property_limits=[],
     x_property_log_scale=True,
-    y_property_name='star.mass',
+    y_property_name='vel.std',
     y_property_limits=[],
     y_property_log_scale=True,
     host_distance_limitss=None,
-    near_halo_distance_limits=None,
-    hal_indicess=None,
-    plot_histogram=False,
-    property_bin_number=200,
+    grp_indicess=None,
+    plot_kind='point',
+    histogram_bin_number=100,
+    statistic_bin_width=0.1,
     plot_file_name=False,
     plot_directory='.',
     figure_index=1,
@@ -1388,10 +1322,8 @@ def plot_property_v_property(
 
     Parameters
     ----------
-    hals : dict
-        catalog[s] of halos at snapshot
-    gal : dict
-        catalog of galaxies
+    grps : dict
+        catalog[s] of groups at snapshot
     x_property_name : str
         name of property for x-axis
     x_property_limits : list
@@ -1406,13 +1338,14 @@ def plot_property_v_property(
         whether to use logarithmic scaling for y axis
     host_distance_limitss : list
         min and max limits for distance from galaxy
-    near_halo_distance_limits : list
-        distance to nearest halo [d / R_neig]
-    hal_indicess : array or list of arrays
-    plot_histogram : bool
-        whether to plot 2-D histogram instead of individual points
-    property_bin_number : int
+    grp_indicess : array or list of arrays
+        prior indices of groups to select
+    plot_kind : str
+        what kind of plot to make (can include multiple): 'point', 'histogram', 'statistic'
+    histogram_bin_number : int
         number of bins along each axis (if histogram)
+    statistic_bin_width : float
+        width of x_property_name bin for computing statistics
     plot_file_name : str
         whether to write figure to file and its name. True = use default naming convention
     plot_directory : str
@@ -1420,31 +1353,12 @@ def plot_property_v_property(
     figure_index : int
         ndex of figure for matplotlib
     '''
-
-    def _get_label_distance(cat, distance_limits):
-        '''
-        .
-        '''
-        if 'halo' in cat.info['catalog.kind']:
-            label = 'simulated'
-        elif 'galaxy' in cat.info['catalog.kind']:
-            label = 'observed'
-        elif 'group' in cat.info['catalog.kind']:
-            return None
-
-        if np.max(distance_limits) < 400:
-            label += ' satellite'
-        elif np.min(distance_limits) > 100:
-            label += ' isolated'
-
-        return label
-
     Say = ut.io.SayClass(plot_property_v_property)
 
-    if hals is None:
-        hals = []
-    elif isinstance(hals, dict):
-        hals = [hals]
+    assert 'point' in plot_kind or 'histogram' in plot_kind or 'statistic' in plot_kind
+
+    if isinstance(grps, dict):
+        grps = [grps]
 
     if host_distance_limitss is not None:
         host_distance_limitss = np.array(host_distance_limitss)
@@ -1455,109 +1369,83 @@ def plot_property_v_property(
         host_distance_bin_number = 1
         host_distance_limitss = [None]
 
-    if not isinstance(hal_indicess, list):
-        hal_indicess = [hal_indicess]
+    if not isinstance(grp_indicess, list):
+        grp_indicess = [grp_indicess for _ in grps]
+
+    if 'statistic' in plot_kind:
+        Bin = ut.binning.BinClass(
+            x_property_limits, statistic_bin_width, log_scale=x_property_log_scale
+        )
 
     x_property_values = []
     y_property_values = []
+    y_property_statistics = []
 
-    for hal_i, hal in enumerate(hals):
-        his = hal_indicess[hal_i]
-        if his is None:
-            his = ut.array.get_arange(hal['mass'])
+    for grp_i, grp in enumerate(grps):
+        gis = grp_indicess[grp_i]
+        if gis is None:
+            gis = ut.array.get_arange(grp['mass'])
 
-        if near_halo_distance_limits is not None:
-            his = ut.array.get_indices(
-                hal['nearest.distance/Rneig'], near_halo_distance_limits, his
-            )
-
-        x_prop_vals_h = []
-        y_prop_vals_h = []
+        x_props_g = []
+        y_props_g = []
+        y_stats_g = []
 
         for host_distance_limits in host_distance_limitss:
             if host_distance_limits is not None and len(host_distance_limits) > 0:
-                his_d = ut.array.get_indices(
-                    hal.prop('host.distance.total'), host_distance_limits, his
+                gis_d = ut.array.get_indices(
+                    grp.prop('host.distance.total'), host_distance_limits, gis
                 )
             else:
-                his_d = his
+                gis_d = gis
 
-            x_prop_vals_d = hal.prop(x_property_name, his_d)
-            y_prop_vals_d = hal.prop(y_property_name, his_d)
-            # if 'metallicity' in y_property_name:
-            #    y_prop_vals_d = ut.math.get_log(y_prop_vals_d)
+            x_props_d = grp.prop(x_property_name, gis_d)
+            y_props_d = grp.prop(y_property_name, gis_d)
 
             Say.say(
                 '{} range = [{:.3e}, {:.3e}], med = {:.3e}'.format(
-                    x_property_name,
-                    x_prop_vals_d.min(),
-                    x_prop_vals_d.max(),
-                    np.median(x_prop_vals_d),
+                    x_property_name, x_props_d.min(), x_props_d.max(), np.median(x_props_d),
                 )
             )
             Say.say(
                 '{} range = [{:.3e}, {:.3e}], med = {:.3e}'.format(
-                    y_property_name,
-                    y_prop_vals_d.min(),
-                    y_prop_vals_d.max(),
-                    np.median(y_prop_vals_d),
+                    y_property_name, y_props_d.min(), y_props_d.max(), np.median(y_props_d),
                 )
             )
-
-            # if ('gas.mass' in y_property_name and 'star.mass' in y_property_name and
-            #'/' in y_property_name):
-            #    y_prop_vals_d = y_prop_vals_d.clip(1.2e-4, Inf)
 
             if x_property_limits:
-                indices = ut.array.get_indices(x_prop_vals_d, x_property_limits)
-                x_prop_vals_d = x_prop_vals_d[indices]
-                y_prop_vals_d = y_prop_vals_d[indices]
+                indices = ut.array.get_indices(x_props_d, x_property_limits)
+                x_props_d = x_props_d[indices]
+                y_props_d = y_props_d[indices]
+
+            if 'statistic' in plot_kind and len(x_props_d) > 0:
+                y_stat_d = Bin.get_statistics_of_array(x_props_d, y_props_d)
 
             if y_property_limits:
-                indices = ut.array.get_indices(y_prop_vals_d, y_property_limits)
-                x_prop_vals_d = x_prop_vals_d[indices]
-                y_prop_vals_d = y_prop_vals_d[indices]
+                indices = ut.array.get_indices(y_props_d, y_property_limits)
+                x_props_d = x_props_d[indices]
+                y_props_d = y_props_d[indices]
 
-            if len(x_prop_vals_d) == 0 or len(y_prop_vals_d) == 0:
-                Say.say('! no halos in bin')
-                return
+            if len(y_props_d) == 0:
+                Say.say('! no groups within limits')
 
-            # print(his_d[indices])
+            x_props_g.append(x_props_d)
+            y_props_g.append(y_props_d)
+            y_stats_g.append(y_stat_d)
 
-            x_prop_vals_h.append(x_prop_vals_d)
-            y_prop_vals_h.append(y_prop_vals_d)
+        x_property_values.append(x_props_g)
+        y_property_values.append(y_props_g)
+        y_property_statistics.append(y_stats_g)
 
-        x_property_values.append(x_prop_vals_h)
-        y_property_values.append(y_prop_vals_h)
+    x_property_values = np.array(x_property_values, dtype=object)
+    y_property_values = np.array(y_property_values, dtype=object)
 
-    x_property_values = np.array(x_property_values)
-    y_property_values = np.array(y_property_values)
-
-    gal_x_property_values = []
-    gal_y_property_values = []
-
-    if gal is not None:
-        # compile observed galaxies
-        gal_x_property_name = x_property_name.replace('.part', '')
-        gal_y_property_name = y_property_name.replace('.part', '')
-        gis_m = ut.array.get_indices(gal[gal_x_property_name], x_property_limits)
-        for dist_i, host_distance_limits in enumerate(host_distance_limitss):
-            gis_d = ut.array.get_indices(gal['host.distance.total'], host_distance_limits, gis_m)
-            # gis_d = gis[gal['host.name'][gis] == b'MW']
-
-            gal_x_property_values.append(gal.prop(gal_x_property_name, gis_d))
-            gal_y_property_values.append(gal.prop(gal_y_property_name, gis_d))
-
-        gal_x_property_values = np.array(gal_x_property_values)
-        gal_y_property_values = np.array(gal_y_property_values)
-
-    if len(hals) > 1:
-        colors = ut.plot.get_colors(len(hals))
+    if len(grps) > 1:
+        colors = ut.plot.get_colors(len(grps))
     else:
         colors = ut.plot.get_colors(max(host_distance_bin_number, 2))
 
     # plot ----------
-    _fig, subplot = ut.plot.make_figure(figure_index)
+    _fig, subplot = ut.plot.make_figure(figure_index)  # , figure_sizes=[12.8, 9.6])
 
     axis_x_limits, axis_y_limits = ut.plot.set_axes_scaling_limits(
         subplot,
@@ -1572,33 +1460,60 @@ def plot_property_v_property(
     axis_x_label = ut.plot.Label.get_label(x_property_name)
     subplot.set_xlabel(axis_x_label)
     axis_y_label = ut.plot.Label.get_label(y_property_name)
-    subplot.set_ylabel(axis_y_label, fontsize=30)
+    subplot.set_ylabel(axis_y_label)  # , fontsize=30)
 
     label = None
 
-    if plot_histogram:
+    if 'point' in plot_kind:
+        # plot as individual points
+
+        for grp_i, grp in enumerate(grps):
+            if len(grps) > 1:
+                label = grp.info['simulation.name']
+                color = colors[grp_i]
+
+            for dist_i, host_distance_limits in enumerate(host_distance_limitss):
+                if (
+                    len(grps) == 1
+                    and host_distance_limits is not None
+                    and len(host_distance_limits) > 1
+                ):
+                    label = ut.plot.get_label('host.distance.total', host_distance_limits)
+                    color = colors[dist_i]
+
+                subplot.plot(
+                    x_property_values[grp_i, dist_i],
+                    y_property_values[grp_i, dist_i],
+                    marker='.',
+                    color=color,
+                    markersize=3,
+                    alpha=0.8,
+                    label=label,
+                )
+
+    elif 'histogram' in plot_kind:
         # plot histogram
-        for hal_i, hal in enumerate(hals):
+        for grp_i, grp in enumerate(grps):
             for dist_i, host_distance_limits in enumerate(host_distance_limitss):
                 if x_property_log_scale:
-                    x_property_values[hal_i, dist_i] = ut.math.get_log(
-                        x_property_values[hal_i, dist_i]
+                    x_property_values[grp_i, dist_i] = ut.math.get_log(
+                        x_property_values[grp_i, dist_i]
                     )
 
                 if y_property_log_scale:
-                    y_property_values[hal_i, dist_i] = ut.math.get_log(
-                        y_property_values[hal_i, dist_i]
+                    y_property_values[grp_i, dist_i] = ut.math.get_log(
+                        y_property_values[grp_i, dist_i]
                     )
 
                 if host_distance_limits is not None and len(host_distance_limits) > 0:
                     label = ut.plot.Label.get_label('host.distance.total', host_distance_limits)
 
             valuess, _xs, _ys = np.histogram2d(
-                x_property_values[hal_i, dist_i],
-                y_property_values[hal_i, dist_i],
-                property_bin_number,
+                x_property_values[grp_i, dist_i],
+                y_property_values[grp_i, dist_i],
+                histogram_bin_number,
+                range=[axis_x_limits, axis_y_limits],
             )
-            # norm=LogNorm()
 
             subplot.imshow(
                 valuess.transpose(),
@@ -1615,70 +1530,41 @@ def plot_property_v_property(
 
         # plt.colorbar()
 
-    else:
-        # plot galaxies as individual points
+    if 'statistic' in plot_kind:
+        # plot statistics
+        statistic_name = 'median'
 
-        # plot observed galaxies
-        if gal is not None:
-            alpha = 0.5
-            if hals is None or len(hals) == 0:
-                alpha = 0.7
-            for dist_i, host_distance_limits in enumerate(host_distance_limitss):
-                if host_distance_limits is not None and len(host_distance_limits) > 0:
-                    # label = ut.plot.get_label_distance(
-                    #       'host.distance.total', host_distance_limits)
-                    label = _get_label_distance(gal, host_distance_limits)
-
-                subplot.plot(
-                    gal_x_property_values[dist_i],
-                    gal_y_property_values[dist_i],
-                    '*',
-                    color=colors[dist_i],
-                    markersize=12,
-                    alpha=alpha,
-                    label=label,
-                )
-
-        if (
-            'mass' in x_property_name
-            and 'star.mass' in y_property_name
-            and '/' not in y_property_name
-        ):
-            # subplot.plot([1e1, 1e14], [1e1, 1e14], ':', color='black', linewidth=2, alpha=0.3)
-            # subplot.plot([1e1, 1e14], [1e-1, 1e12], '--', color='black', linewidth=2, alpha=0.2)
-            mass_peaks = 10 ** np.arange(1, 12, 0.1)
-            mstars_from_mpeaks = 3e6 * (mass_peaks / 1e10) ** 1.92
-            subplot.plot(
-                mass_peaks, mstars_from_mpeaks, '--', color='black', linewidth=2, alpha=0.3
-            )
-
-        # plot simulations
-        markers = ['.', '.']
-        # marker_sizes = [22, 7]
-        marker_sizes = [3, 3]
-        for hal_i, hal in enumerate(hals):
-            if len(hals) > 1:
-                label = hal.info['simulation.name']
-                color = colors[hal_i]
+        for grp_i, grp in enumerate(grps):
+            if len(grps) > 1:
+                label = grp.info['simulation.name']
+                color = colors[grp_i]
 
             for dist_i, host_distance_limits in enumerate(host_distance_limitss):
                 if (
-                    len(hals) == 1
+                    len(grps) == 1
                     and host_distance_limits is not None
                     and len(host_distance_limits) > 1
                 ):
-                    # label = ut.plot.get_label_distance(
-                    #       'host.distance.total', host_distance_limits)
-                    label = _get_label_distance(hal, host_distance_limits)
+                    label = ut.plot.get_label('host.distance.total', host_distance_limits)
                     color = colors[dist_i]
 
-                subplot.plot(
-                    x_property_values[hal_i, dist_i],
-                    y_property_values[hal_i, dist_i],
-                    markers[hal_i],
+                masks = y_property_statistics[grp_i][dist_i][statistic_name] > 0
+
+                subplot.fill_between(
+                    y_property_statistics[grp_i][dist_i]['bin.mid'][masks],
+                    y_property_statistics[grp_i][dist_i]['percent.16'][masks],
+                    y_property_statistics[grp_i][dist_i]['percent.84'][masks],
                     color=color,
-                    markersize=marker_sizes[hal_i],
-                    alpha=0.8,
+                    edgecolor=None,
+                    alpha=0.4,
+                )
+
+                subplot.plot(
+                    y_property_statistics[grp_i][dist_i]['bin.mid'][masks],
+                    y_property_statistics[grp_i][dist_i][statistic_name][masks],
+                    color=color,
+                    linestyle='-',
+                    alpha=0.5,
                     label=label,
                 )
 
@@ -1688,28 +1574,25 @@ def plot_property_v_property(
 
     if plot_file_name is True or plot_file_name == '':
         plot_file_name = y_property_name + '_v_' + x_property_name
-        if hals is None and gal is not None:
-            plot_file_name += '_lg'
-        if hals is not None and len(hals) > 0:
-            plot_file_name += ut.plot.get_time_name('redshift', hals[0].snapshot)
+        if grps is not None and len(grps) > 0:
+            plot_file_name += ut.plot.get_time_label('redshift', grps[0].snapshot)
         else:
             plot_file_name = plot_file_name.replace('.part', '')
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_property_v_distance(
-    hals=None,
+    grps=None,
     mass_name='mass',
     mass_limitss=[[]],
     distance_limits=[0, 300],
     distance_bin_width=1,
     distance_log_scale=False,
     property_name='host.velocity.tan',
-    statistic='median',
+    property_statistic='median',
     property_limits=None,
     property_log_scale=False,
-    object_kind='halo',
-    hal_indicess=None,
+    grp_indicess=None,
     plot_file_name=False,
     plot_directory='.',
     figure_index=1,
@@ -1719,28 +1602,28 @@ def plot_property_v_distance(
 
     Parameters
     ----------
-    hals : dict or list
-        catalog[s] of halos at snapshot
+    grps : dict or list
+        catalog[s] of groups at snapshot
     mass_name : str
-        halo mass kind to plot
+        mass kind to plot
     mass_limitss : list or list of lists
-        min and max limits of halo mass
+        min and max limits of group mass
     distance_limits : list
         min and max distance from host [kpc physical]
     distance_bin_width : float
         width of distance bin
     distance_log_scale : bool
         whether to use logarithmic scaling for distance bins
-    property : str
+    property_name : str
+        name of property to plot
     statistic : str
+        statistic of property to plot
     property_limits : list
         min and max limits to impose on y-axis
     property_log_scale : bool
         whether to use logarithmic scaling for y axis
-    object_kind : str
-        shortcut for halo kind to plot: 'halo', 'galaxy', 'cluster' and/or 'satellite', 'isolated'
-    hal_indicess : array or list of arrays
-        indices of halos to plot
+    grp_indicess : array or list of arrays
+        prior indices of groups to include
     plot_file_name : str
         whether to write figure to file and its name. True = use default naming convention
     plot_directory : str
@@ -1750,10 +1633,8 @@ def plot_property_v_distance(
     '''
     dimension_number = 3
 
-    if hals is None:
-        hals = []
-    if isinstance(hals, dict):
-        hals = [hals]
+    if isinstance(grps, dict):
+        grps = [grps]
 
     if mass_limitss is not None:
         mass_limitss = np.array(mass_limitss)
@@ -1761,8 +1642,8 @@ def plot_property_v_distance(
             mass_limitss = np.array([mass_limitss])
         mass_number = mass_limitss.shape[0]
 
-    if not isinstance(hal_indicess, list):
-        hal_indicess = [hal_indicess for _ in hals]
+    if not isinstance(grp_indicess, list):
+        grp_indicess = [grp_indicess for _ in grps]
 
     DistanceBin = ut.binning.DistanceBinClass(
         distance_limits,
@@ -1772,28 +1653,26 @@ def plot_property_v_distance(
         dimension_number=dimension_number,
     )
 
-    hal_stat = {}
+    grp_stat = {}
 
-    # get statistics for halos
-    if hals is not None and len(hals) > 0:
-        for hal_i, hal in enumerate(hals):
-            if hal_indicess[hal_i] is None or len(hal_indicess[hal_i]) == 0:
-                hal_indices = ut.array.get_arange(hal.prop(mass_name))
+    # get statistics
+    if grps is not None and len(grps) > 0:
+        for grp_i, grp in enumerate(grps):
+            if grp_indicess[grp_i] is None or len(grp_indicess[grp_i]) == 0:
+                grp_indices = ut.array.get_arange(grp.prop(mass_name))
             else:
-                hal_indices = hal_indicess[hal_i]
+                grp_indices = grp_indicess[grp_i]
 
-            hal_stat_h = {}
+            grp_stat_h = {}
 
             for _m_i, mass_limits in enumerate(mass_limitss):
-                his_m = ut.array.get_indices(hal.prop(mass_name), mass_limits, hal_indices)
-                his_m = hal.get_indices(object_kind=object_kind, prior_indices=his_m)
-
-                hal_stat_m = DistanceBin.get_statistics_profile(
-                    hal.prop('host.distance.total', his_m), hal.prop(property_name, his_m)
+                gis_m = ut.array.get_indices(grp.prop(mass_name), mass_limits, grp_indices)
+                grp_stat_m = DistanceBin.get_statistics_profile(
+                    grp.prop('host.distance.total', gis_m), grp.prop(property_name, gis_m)
                 )
-                ut.array.append_dictionary(hal_stat_h, hal_stat_m)
-            ut.array.append_dictionary(hal_stat, hal_stat_h)
-        # ut.array.arrayize_dictionary(hal_stat)
+                ut.array.append_dictionary(grp_stat_h, grp_stat_m)
+            ut.array.append_dictionary(grp_stat, grp_stat_h)
+        # ut.array.arrayize_dictionary(grp_stat)
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
@@ -1806,23 +1685,22 @@ def plot_property_v_distance(
     subplot.set_ylabel(property_name)
     # subplot.set_ylabel('$V_{tan} / ( \sqrt{2} V_{rad} )$')
 
-    colors = ut.plot.get_colors(len(hals))
+    colors = ut.plot.get_colors(len(grps))
     line_styles = ut.plot.get_line_styles(mass_number)
 
-    # plot halos
-    if hals is not None and len(hals) > 0:
-        for hal_i, hal in enumerate(hals):
+    # plot
+    if grps is not None and len(grps) > 0:
+        for grp_i, grp in enumerate(grps):
             for m_i, _mass_limits in enumerate(mass_limitss):
                 linewidth = 3.0
                 alpha = 0.9
-                color = colors[hal_i]
+                color = colors[grp_i]
 
-                label = hal.info['simulation.name']
-                print(label)
+                label = grp.info['simulation.name']
 
                 subplot.plot(
-                    hal_stat['distance.mid'][hal_i][m_i],
-                    hal_stat[statistic][hal_i][m_i],
+                    grp_stat['distance.mid'][grp_i][m_i],
+                    grp_stat[property_statistic][grp_i][m_i],
                     color=color,
                     linestyle=line_styles[m_i],
                     linewidth=linewidth,
@@ -1830,13 +1708,13 @@ def plot_property_v_distance(
                     label=label,
                 )
 
-    if len(hals) > 1:
+    if len(grps) > 1:
         legend = subplot.legend(loc='best')
         legend.get_frame()
 
     if plot_file_name is True or plot_file_name == '':
         redshift_label = ''
-        if len(hals) > 0:
-            redshift_label = ut.plot.get_time_name('redshift', hals[0].snapshot)
-        plot_file_name = f'{property_name}.{statistic}_v_distance{redshift_label}'
+        if len(grps) > 0:
+            redshift_label = ut.plot.get_time_label('redshift', grps[0].snapshot)
+        plot_file_name = f'{property_name}.{property_statistic}_v_distance{redshift_label}'
     ut.plot.parse_output(plot_file_name, plot_directory)
