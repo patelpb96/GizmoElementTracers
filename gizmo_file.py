@@ -13,6 +13,7 @@ import numpy as np
 
 import utilities as ut
 from . import gizmo_default
+from . import gizmo_io
 
 # default subset of snapshots (65 snapshots)
 snapshot_indices_keep = [
@@ -89,21 +90,33 @@ snapshot_indices_keep = [
 # --------------------------------------------------------------------------------------------------
 class CompressClass(ut.io.SayClass):
     '''
-    Compress snapshot files, losslessly, using Robert Feldmann's compression package.
+    Compress snapshot files, losslessly, using Robert Feldmann's manipulate_hdf5 package.
     '''
+
+    def __init__(
+        self, manipulate_hdf5_directory='~/analysis/manipulate_hdf5', python_executable='python3',
+    ):
+        '''
+        Parameters
+        ----------
+        analysis_directory : str
+            directory of manipulate_hdf5 package
+        manipulate_hdf5_directory : str
+            python executable to use to run compression script
+        '''
+        self.executable = f'{python_executable} {manipulate_hdf5_directory}/compactify_hdf5.py -L 0'
 
     def compress_snapshots(
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        snapshot_directory_out='',
-        snapshot_index_limits=[0, gizmo_default.snapshot_index],
-        analysis_directory='~/analysis',
-        python_executable='python3',
+        write_directory=gizmo_default.snapshot_directory + '_comp',
+        snapshot_indices=None,
         proc_number=1,
     ):
         '''
-        Compress all snapshots in input directory.
+        Read snapshots in input snapshot_directory, compress them,
+        write compressed snapshots to snapshot_directory + write_directory_modifier.
 
         Parameters
         ----------
@@ -111,111 +124,111 @@ class CompressClass(ut.io.SayClass):
             directory of simulation
         snapshot_directory : str
             directory of snapshots
-        snapshot_directory_out : str
+        write_directory : str
             directory to write compressed snapshots
-        snapshot_index_limits : list
-            min and max snapshot indices to compress
-        analysis_directory : str
-            directory of analysis code
-        python_executable : str
-            python executable to use to run compression script
+            if same as snapshot_directory or '', over-write existing snapshots
+        snapshot_indices : list
+            indices of snapshots to compress. If None or 'all', compress all in snapshot_directory.
         proc_number : int
             number of parallel processes to use
         '''
-        snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
+        simulation_directory = ut.io.get_path(simulation_directory)
+        snapshot_directory = ut.io.get_path(snapshot_directory)
+        if not write_directory:
+            write_directory = snapshot_directory
+        else:
+            write_directory = ut.io.get_path(write_directory, create_path=True)
+
+        Read = gizmo_io.ReadClass()
+
+        # get all snapshot file names and indices in directory
+        snapshot_names_all, snapshot_indices_all = Read.get_snapshot_file_names_indices(
+            simulation_directory + snapshot_directory
+        )
+
+        if np.isscalar(snapshot_indices) and isinstance(snapshot_indices, int):
+            snapshot_indices = [snapshot_indices]
+
+        if (
+            snapshot_indices is None
+            or isinstance(snapshot_indices, str)
+            or len(snapshot_indices) == 0
+        ):
+            # run on all available snapshots
+            snapshot_names = snapshot_names_all
+        else:
+            # limit to input list of snapshot indices
+            snapshot_names = []
+            for snapshot_name, snapshot_index in zip(snapshot_names_all, snapshot_indices_all):
+                if snapshot_index in snapshot_indices:
+                    snapshot_names.append(snapshot_name)
 
         args_list = [
-            (
-                simulation_directory,
-                snapshot_directory,
-                snapshot_directory_out,
-                analysis_directory,
-                python_executable,
-                snapshot_index,
-            )
-            for snapshot_index in snapshot_indices
+            (snapshot_name, snapshot_directory, write_directory) for snapshot_name in snapshot_names
         ]
 
-        ut.io.run_in_parallel(self.compress_snapshot, args_list, proc_number=proc_number)
+        ut.io.run_in_parallel(self._compress_snapshot, args_list, proc_number=proc_number)
 
-    def compress_snapshot(
+    def _compress_snapshot(self, snapshot_name, snapshot_directory, write_directory):
+        '''
+        Compress a single snapshot (a single file or a directory with multiple files) named
+        snapshot_name in snapshot_directory, write to write_directory.
+
+        Parameters
+        ----------
+        snapshot_name : str
+            name of snapshot (file or directory)
+        snapshot_directory : str
+            directory to read existing snapshot files
+        write_directory : str
+            directory to write compressed snapshots
+            if same as snapshot_directory, over-write existing snapshots
+        '''
+        if 'snapdir' in snapshot_name:
+            path_file_names = glob.glob(snapshot_name + '/*')
+            path_file_names.sort()
+        else:
+            path_file_names = [snapshot_name]
+
+        for file_name in path_file_names:
+            if write_directory != snapshot_directory:
+                file_name_write = file_name.replace(snapshot_directory, write_directory)
+            else:
+                file_name_write = file_name
+
+            executable_i = f'{self.executable} -o {file_name_write} {file_name}'
+            self.say(f'executing:  {executable_i}')
+            os.system(executable_i)
+
+    def test_compression(
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        snapshot_directory_out='',
-        code_directory='~/analysis',
-        python_executable='python3',
-        snapshot_index=gizmo_default.snapshot_index,
+        snapshot_indices=None,
+        compression_level=0,
+        verbose=False,
     ):
         '''
-        Compress single snapshot (which may be multiple files) in input directory.
+        Read headers from all snapshot files in simulation_directory + snapshot_directory to check
+        if files have been compressed.
 
         Parameters
         ----------
         simulation_directory : str
             directory of simulation
         snapshot_directory : str
-            directory of snapshot files
-        snapshot_directory_out : str
-            directory to write compressed snapshot files
-        code_directory : str
-            directory of code that contains the manipulate_hdf5/ package
-        python_executable : str
-            python executable to use to run compression script
-        snapshot_index : int
-            index of snapshot
+            directory of compressed snapshot files
+        snapshot_indices : list
+            indices of snapshots to test. If None or 'all', test all in snapshot_directory.
+        compression_level : int
+        verbose : bool
         '''
-        executable = f'{python_executable} {code_directory}/manipulate_hdf5/compactify_hdf5.py -L 0'
-
-        snapshot_name_base = 'snap*_{:03d}*'
-
-        simulation_directory = ut.io.get_path(simulation_directory)
-        snapshot_directory = ut.io.get_path(snapshot_directory)
-        if snapshot_directory_out and snapshot_directory_out[-1] != '/':
-            snapshot_directory_out += '/'
-
-        path_file_names = glob.glob(
-            simulation_directory + snapshot_directory + snapshot_name_base.format(snapshot_index)
-        )
-
-        if len(path_file_names) > 0:
-            if 'snapdir' in path_file_names[0]:
-                path_file_names = glob.glob(path_file_names[0] + '/*')
-
-            path_file_names.sort()
-
-            for path_file_name in path_file_names:
-                if snapshot_directory_out:
-                    path_file_name_out = path_file_name.replace(
-                        snapshot_directory, snapshot_directory_out
-                    )
-                else:
-                    path_file_name_out = path_file_name
-
-                executable_i = f'{executable} -o {path_file_name_out} {path_file_name}'
-                self.say(f'executing:  {executable_i}')
-                os.system(executable_i)
-
-    def test_compression(
-        self,
-        simulation_directory=gizmo_default.simulation_directory,
-        snapshot_directory=gizmo_default.snapshot_directory,
-        snapshot_indices='all',
-        compression_level=0,
-        verbose=False,
-    ):
-        '''
-        Read headers from all snapshot files in simulation_directory to check whether files have
-        been compressed.
-        '''
-        from . import gizmo_io
-
-        Read = gizmo_io.ReadClass()
-
         header_compression_name = 'compression.level'
 
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = ut.io.get_path(snapshot_directory)
+
+        Read = gizmo_io.ReadClass()
 
         compression_wrong_snapshots = []
         compression_none_snapshots = []
@@ -223,7 +236,7 @@ class CompressClass(ut.io.SayClass):
         snapshot_block_number = 1
 
         # get all snapshot file names and indices in directory
-        path_file_names, file_snapshot_indices = Read._get_snapshot_file_names_indices(
+        path_file_names, file_indices = Read.get_snapshot_file_names_indices(
             simulation_directory + snapshot_directory
         )
 
@@ -232,14 +245,19 @@ class CompressClass(ut.io.SayClass):
             snapshot_file_names = glob.glob(path_file_names[0] + '/*')
             snapshot_block_number = len(snapshot_file_names)
 
-        if snapshot_indices is None or isinstance(snapshot_indices, str):
+        if np.isscalar(snapshot_indices) and isinstance(snapshot_indices, int):
+            snapshot_indices = [snapshot_indices]
+
+        if (
+            snapshot_indices is None
+            or isinstance(snapshot_indices, str)
+            or len(snapshot_indices) == 0
+        ):
             # run on all available snapshots
-            snapshot_indices = file_snapshot_indices
+            snapshot_indices = file_indices
         else:
-            # input array/list of snapshot indices, so limit to those
-            if np.isscalar(snapshot_indices):
-                snapshot_indices = [snapshot_indices]
-            snapshot_indices = np.intersect1d(snapshot_indices, file_snapshot_indices)
+            # limit to input list of snapshot indices
+            snapshot_indices = np.intersect1d(snapshot_indices, file_indices)
 
         for snapshot_index in snapshot_indices:
             for snapshot_block_index in range(snapshot_block_number):
@@ -268,14 +286,11 @@ class CompressClass(ut.io.SayClass):
         )
         self.say(f'* {len(compression_none_snapshots)} are uncompressed')
         if len(compression_none_snapshots) > 0:
-            self.say(f'{compression_none_snapshots}')
-        self.say(
-            '* {} have wrong compression (level != {})'.format(
-                len(compression_wrong_snapshots), compression_level
-            )
-        )
+            self.say(f'{compression_none_snapshots}')  # list uncompressed snapshots
+        n = len(compression_wrong_snapshots)
+        self.say(f'* {n} have wrong compression (level != {compression_level})')
         if len(compression_wrong_snapshots) > 0:
-            self.say(f'{compression_wrong_snapshots}')
+            self.say(f'{compression_wrong_snapshots}')  # list wrong-compressed snapshots
 
 
 Compress = CompressClass()
