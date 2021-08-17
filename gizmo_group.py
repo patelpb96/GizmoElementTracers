@@ -1478,7 +1478,7 @@ def plot_property_v_property(
                     and host_distance_limits is not None
                     and len(host_distance_limits) > 1
                 ):
-                    label = ut.plot.get_label('host.distance.total', host_distance_limits)
+                    label = ut.plot.Label.get_label('host.distance.total', host_distance_limits)
                     color = colors[dist_i]
 
                 subplot.plot(
@@ -1545,7 +1545,7 @@ def plot_property_v_property(
                     and host_distance_limits is not None
                     and len(host_distance_limits) > 1
                 ):
-                    label = ut.plot.get_label('host.distance.total', host_distance_limits)
+                    label = ut.plot.Label.get_label('host.distance.total', host_distance_limits)
                     color = colors[dist_i]
 
                 masks = y_property_statistics[grp_i][dist_i][statistic_name] > 0

@@ -1372,7 +1372,7 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self._get_snapshot_file_names_indices(
+        path_file_name = self.get_snapshot_file_names_indices(
             snapshot_directory, snapshot_index, snapshot_block_index
         )
 
@@ -1605,7 +1605,7 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self._get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         # check if need to read snapshot header information
         if not header:
@@ -2050,7 +2050,7 @@ class ReadClass(ut.io.SayClass):
                         ::particle_subsample_factor
                     ]
 
-    def _get_snapshot_file_names_indices(
+    def get_snapshot_file_names_indices(
         self, directory, snapshot_index=None, snapshot_block_index=0
     ):
         '''
@@ -2644,7 +2644,7 @@ class ReadClass(ut.io.SayClass):
             snapshot_value_kind, snapshot_value, self._verbose
         )
 
-        path_file_name = self._get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(path_file_name.lstrip('./')), end='\n\n')
 
         # read header ----------

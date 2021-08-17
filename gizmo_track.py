@@ -815,7 +815,7 @@ class ParticleCoordinateClass(ut.io.SayClass):
         host_distance_limits : list
             min and max distance [kpc physical] to select particles near each primary host at the
             reference snapshot (usually z = 0).
-            use only these particles to compute host coordinates at earlier snapshots.
+            Use only these particles to compute host coordinates at earlier snapshots.
         host_edge_percent : float
             percent of species mass (within initial aperture) to define host galaxy radius + height
         '''
