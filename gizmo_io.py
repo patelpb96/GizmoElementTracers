@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 '''
 Read Gizmo snapshots, intended for use with FIRE simulations.
 
@@ -9,7 +7,9 @@ Read Gizmo snapshots, intended for use with FIRE simulations.
     Andrew Emerick <aemerick11@gmail.com>
 
 ----------
-Units: unless otherwise noted, this package converts all quantities to (combinations of):
+Units
+
+Unless otherwise noted, this package converts all quantities to (combinations of)
     mass [M_sun]
     position [kpc comoving]
     distance, radius [kpc physical]
