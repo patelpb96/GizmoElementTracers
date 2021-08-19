@@ -185,6 +185,7 @@ class CompressClass(ut.io.SayClass):
             if same as snapshot_directory, over-write existing snapshots
         '''
         if 'snapdir' in snapshot_name:
+            ut.io.get_path(snapshot_name, create_path=True)
             path_file_names = glob.glob(snapshot_name + '/*')
             path_file_names.sort()
         else:
@@ -288,7 +289,7 @@ class CompressClass(ut.io.SayClass):
         if len(compression_none_snapshots) > 0:
             self.say(f'{compression_none_snapshots}')  # list uncompressed snapshots
         n = len(compression_wrong_snapshots)
-        self.say(f'* {n} have wrong compression (level != {compression_level})')
+        self.say(f'* {n} have (wrong) compression level != {compression_level}')
         if len(compression_wrong_snapshots) > 0:
             self.say(f'{compression_wrong_snapshots}')  # list wrong-compressed snapshots
 
