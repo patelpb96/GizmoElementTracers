@@ -185,19 +185,22 @@ class CompressClass(ut.io.SayClass):
             if same as snapshot_directory, over-write existing snapshots
         '''
         if 'snapdir' in snapshot_name:
-            ut.io.get_path(snapshot_name, create_path=True)
+            # ensure this snapdir directory exists in write directory
+            path_name_write = snapshot_name.replace(snapshot_directory, write_directory)
+            ut.io.get_path(path_name_write, create_path=True)
+            # get name of each snapshot block file
             path_file_names = glob.glob(snapshot_name + '/*')
             path_file_names.sort()
         else:
             path_file_names = [snapshot_name]
 
-        for file_name in path_file_names:
+        for path_file_name in path_file_names:
             if write_directory != snapshot_directory:
-                file_name_write = file_name.replace(snapshot_directory, write_directory)
+                path_file_name_write = path_file_name.replace(snapshot_directory, write_directory)
             else:
-                file_name_write = file_name
+                path_file_name_write = path_file_name
 
-            executable_i = f'{self.executable} -o {file_name_write} {file_name}'
+            executable_i = f'{self.executable} -o {path_file_name_write} {path_file_name}'
             self.say(f'executing:  {executable_i}')
             os.system(executable_i)
 

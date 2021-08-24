@@ -1,28 +1,28 @@
-#!/usr/bin/env python3
-
 '''
 Assign elemental abundances to star and gas particles in post-processing using age-tracer
 weights stored in Gizmo simulation snapshots.
 
-If the age-tracer model was enabled when running a Gizmo simulation (by defining
-GALSF_FB_FIRE_AGE_TRACERS, to set the number of age bins, in Gizmo's Config.sh),
-each gas particle stored an array of weights in bins of stellar age, assigned to the gas particle
-from any neighboring star particles as the simulation ran, to record the mass (fraction) of
-ejecta/winds that would have been deposited into the gas particle had there been a metal enrichment
-event at that timestep. Thus, a star particle of a given age deposited weights into its
-corresponding stellar age bin into its neighboring gas particles.
+If age-tracers were enabled when running a Gizmo simulation (by defining GALSF_FB_FIRE_AGE_TRACERS
+in Config.sh), each gas particle stores an array of weights in bins of stellar age, assigned to the
+gas particle from any neighboring star particles as the simulation ran, to record the
+mass (fraction) of ejecta/winds that would have been deposited into the gas particle had there been
+an enrichment event at that timestep.
+In other words, a star particle of a given age deposits a weight into a corresponding stellar age
+bin in all of its neighboring gas particles.
 A star particle then inherits the array of age-tracer mass weights from its progenitor gas particle.
 
 Assigning elemental abundances to particles at z = 0 (or any snapshot) then requires you to
-set/compute the total nucleosynthetic yields from all stellar processes within/across each
+set and compute the total nucleosynthetic yields from all stellar processes within/across each
 age-tracer stellar age bin for each element.
-Pass this to ElementAgeTracerClass as a dictionary of 1-D arrays, which contain the total mass
-(fraction) of each element that a stellar population produces within each age bin.
-You can construct this dictionary using a default rate + yield model below,
-or you can define your own custom rate and yield model that accepts stellar age[s] and an element
-name as inputs and returns the instantaneous mass-loss rate of that element at that stellar age.
+Compute and store this as a dictionary of 1-D arrays, where each array contain the total mass
+(fraction) that a stellar population produces within/across each age bin, and where each dictionary
+key corresponds to an element.
+You can construct this dictionary using a default rate + yield model below, or you can define your
+own custom rate and yield model that accepts stellar age[s] and an element name as inputs and
+returns the instantaneous mass-loss rate of that element at that stellar age.
+Then supply this dictionary to ElementAgeTracerClass below.
 
-For reference, these are the relevant age-tracer settings in Gizmo configuation and parameter files:
+For reference, these are the relevant age-tracer settings in Gizmo configuation and parameter files
     in Config.sh
         GALSF_FB_FIRE_AGE_TRACERS - master switch that turns on age-tracers and sets the number
             of age bins, which by default are equally spaced in log age
@@ -34,20 +34,55 @@ For reference, these are the relevant age-tracer settings in Gizmo configuation 
         AgeTracerActiveTimestepFraction - targeted number of deposition events per age bin,
             if <= 0, deposit age-tracer weights at each timestep
 
+----------
 @author:
     Andrew Wetzel <arwetzel@gmail.com>
     Andrew Emerick <aemerick11@gmail.com>
 
-Units: unless otherwise noted, all quantities are in (combinations of):
+----------
+Units
+
+Unless otherwise noted, all quantities are in (combinations of)
     mass [M_sun]
-    time [Myr] (different than most other modules in this package, which default to Gyr)
-    elemental abundance [(linear) mass fraction]
+    time [Myr] (note: most other modules in this GizmoAnalysis package default to Gyr)
+    elemental abundance [linear mass fraction]
 '''
 
 import numpy as np
 from scipy import integrate
 
 from utilities import constant
+
+
+# --------------------------------------------------------------------------------------------------
+# utility
+# --------------------------------------------------------------------------------------------------
+def parse_element_names(element_names_possible, element_names=None, scalarize=False):
+    '''
+    .
+    '''
+    if element_names is None:
+        element_names_safe = element_names_possible  # use all elements in this model
+    else:
+        if np.isscalar(element_names):
+            element_names = [element_names]
+
+        element_names_safe = []
+        for element_name in element_names:
+            if element_name not in element_names_possible:
+                if element_name in constant.element_name_from_symbol:
+                    element_name = constant.element_name_from_symbol[element_name]
+                else:
+                    raise KeyError(
+                        f'cannot parse input element_name = {element_name}\n'
+                        + f'only these elements are valid inputs:  {element_names_possible}'
+                    )
+            element_names_safe.append(element_name.lower())
+
+    if scalarize and len(element_names_safe) == 1:
+        element_names_safe = element_names_safe[0]
+
+    return element_names_safe
 
 
 # --------------------------------------------------------------------------------------------------
@@ -61,21 +96,21 @@ class ElementAgeTracerClass(dict):
 
     def __init__(self, header_dict=None, element_index_start=11):
         '''
-        Initialize self dictionary to store all age-tracer information.
+        Initialize self's dictionary to store all age-tracer information.
 
         Parameters
         ----------
         header_dict : dict
             dictionary that contains header information from a Gizmo snapshot file, as tabulated in
-            gizmo_io.py, to assign all age-tracer age bin information. [optional]
-            if you do not input header_dict, you need to assign age bins via assign_age_bins()
+            gizmo_io.py, to assign all age-tracer age bin information.
+            If you do not input header_dict, you need to assign age bins via assign_age_bins().
         element_index_start : int
             index of first age-tracer field in Gizmo's particle element mass fraction array.
-            if input header_dict, it will over-ride any value here.
+            If you input header_dict, it will over-ride any value here.
         '''
         # min and max ages [Myr] to impose on age bins
         # impose this *after* defining the bins, so it does not affect bin spacing
-        # it only affect the integration of the yield rates into time-averaged age bins
+        # this only affect the integration of the yield rates into age-bin yields
         self._age_min_impose = 0
         self._age_max_impose = 138000
 
@@ -111,7 +146,7 @@ class ElementAgeTracerClass(dict):
         '''
         Assign to self the age bins used by the age-tracer module in a Gizmo simulation.
         You can do this 3 ways:
-            (1) input a dictionary that contains the header information from a Gizmo simulation,
+            (1) input a dictionary of the header information from a Gizmo simulation snapshot,
                 as tabulated in gizmo_io.py, which contains the age-tracer age bin information
             (2) input an array of (custom) age bins
             (3) input the number of age bins and the min and max age,
@@ -127,11 +162,12 @@ class ElementAgeTracerClass(dict):
         age_bin_number : int
             number of age bins
         age_min : float
-            minimum age (left edge of first bin), though over-ride this to be age_min_impose
+            minimum age (left edge of first bin) [Myr] (over-ride this to be age_min_impose)
         age_max : float
-            maximum age (right edge of final bin), though over-ride this to be age_max_impose
+            maximum age (right edge of final bin) [Myr] (over-ride this to be age_max_impose)
         '''
         if header_dict is not None:
+            # use header dictionary to get age bins
             if 'agetracer.number' not in header_dict:
                 print('! input header dict, but it has no age-tracer information')
                 print('  assuming age-tracers were not enabled in this Gizmo simulation')
@@ -166,7 +202,7 @@ class ElementAgeTracerClass(dict):
                 return
 
         elif age_bins is not None:
-            # assume input custom age bins
+            # input custom age bins
             assert len(age_bins) > 1
             self['age.bins'] = age_bins
             self['age.bin.number'] = len(age_bins) - 1
@@ -185,50 +221,23 @@ class ElementAgeTracerClass(dict):
                 + f' age_bin_number = {age_bin_number}, age_min = {age_min}, age_max = {age_max}'
             )
 
-        # ensure minimum and maximum age of
+        # ensure sane minimum and maximum of age bins [Myr]
         self['age.bins'][0] = self._age_min_impose
         if self['age.bins'][-1] > self._age_max_impose:
             self['age.bins'][-1] = self._age_max_impose
 
-    def _read_age_bins(self, directory='.', file_name='agetracer_bins.txt'):
-        '''
-        Read file that contains (custom) age bins for age-tracer model.
-        Relevant if defined GALSF_FB_FIRE_AGE_TRACERS_CUSTOM in Gizmo's Config.sh.
-        Gizmo sets file_name via AgeTracerListFilename in gizmo_parameters.txt.
-
-        Gizmo now stores this information in its header, but retain this method for debugging.
-
-        Parameters
-        ----------
-        directory : str
-            base directory of simulation
-        file_name : str
-            name of file that contains custom age bins for the age-tracer model
-            this should be a single column of bin left edges plus the right edge of the final bin,
-            so the number of lines should be number of age bins + 1
-        '''
-        if directory[-1] != '/':
-            directory += '/'
-        path_file_name = directory + file_name
-
-        try:
-            self['age.bins'] = np.genfromtxt(path_file_name)
-            self['age.bin.number'] = len(self['age.bins']) - 1
-        except OSError as exc:
-            raise OSError(
-                f'cannot read file of custom age-tracer age bins:  {path_file_name}'
-            ) from exc
-
-    def assign_element_yields(self, element_yield_dict=None):
+    def assign_element_yields(self, element_yield_dict, _progenitor_metal_massfractions=None):
         '''
         Assign to self a dictionary of stellar nucleosynthetic yields within stellar age bins.
+        Use to map the age-tracer mass weights in each age bin into actual element yields.
 
         Parameters
         -----------
         element_yield_dict : dict of 1-D arrays
             nucleosynthetic yield fractional mass [M_sun per M_sun of stars formed] of each element
-            produced within/across each age bin, to map the age-tracer mass weights in each age bin
-            into actual element yields
+            produced within each age bin
+        _progenitor_metal_massfractions : array
+            (for future development)
         '''
         for element_name in element_yield_dict:
             assert len(element_yield_dict[element_name]) == self['age.bin.number']
@@ -240,15 +249,17 @@ class ElementAgeTracerClass(dict):
         '''
         Set the initial conditions for the elemental abundances (mass fractions),
         to add to the age-tracer nucleosynthetic yields.
+        If you do not run this, will assume that all particles started with initial mass fraction
+        of metals of 0.
 
         Parameters
         ----------
         massfraction_initial_dict : dict
-            Keys are element names and values are (linear) absolute mass fractions for each element,
+            Keys are element names and values are the linear mass fraction for each element,
             to use as initial conditions (at arbitrarily early cosmic times) for each particle.
-            Default to 0 for any element not in this input massfraction_initial_dict.
+            Default to 0 for any element that is not in input massfraction_initial_dict.
         metallicity : float
-            (linear) metallity relative to Solar.
+            Linear total metallity relative to Solar.
             If defined, assume that input massfraction_initial_dict mass fractions are relative to
             Solar, and scale them by this value.
         helium_massfraction : float
@@ -284,16 +295,19 @@ class ElementAgeTracerClass(dict):
                 + f' = {massfraction_initial_dict}'
             )
 
-    def get_element_massfractions(self, element_name, agetracer_mass_weights, _metallicities=None):
+    def get_element_massfractions(
+        self, element_name, agetracer_mass_weights, _metal_massfractions=None
+    ):
         '''
         Get the elemental abundances (mass fractions) for input element_name[s],
-        using the the input 2-D array of age-tracer weights.
+        using the the input 2-D array of age-tracer mass weights.
 
-        Before you call this method, you must:
-            set up the age bins via:  assign_age_bins()
-            assign the nucleosynthetic yield within each age bin for each element via:
+        Before you call this method, you must
+            (1) set up the age bins via
+                assign_age_bins()
+            (2) assign the nucleosynthetic yield within each age bin for each element via
                 assign_element_yields()
-            (optinally) assign the initial abundance (mass fraction) for each element via:
+            (3) (optinally) assign the initial abundance (mass fraction) for each element via
                 assign_element_massfraction_initial()
 
         Parameters
@@ -304,26 +318,20 @@ class ElementAgeTracerClass(dict):
             age-tracer mass weights for particles - should be values from
                 part[species_name]['massfraction'][:, self['element.index.start']:],
                 where species_name = 'star' or 'gas'
+        _metal_massfractions : 1-D array
+            placeholder for future development
 
         Returns
         -------
         element_mass_fractions : 1-D array
             mass fraction of element_name for each particle
         '''
-        # sanity check, if input element symbol or other alais, convert to default name
-        if element_name not in self['yields']:
-            if element_name in constant.element_name_from_symbol:
-                element_name = constant.element_name_from_symbol[element_name]
-            else:
-                raise KeyError(
-                    f'cannot compute mass fraction for element_name = {element_name}\n'
-                    + 'element age-tracer dictionary has these elements available:  {}'.format(
-                        self['yields'].keys()
-                    )
-                )
+        # check that input valid element name
+        assert element_name
+        element_name = parse_element_names(self['yields'].keys(), element_name, scalarize=True)
 
         # weight the yield within each age bin by the age-tracer mass weights
-        # and sum all age bins to get the total enrichment
+        # and sum across all age bins to get the total abundance
         element_mass_fractions = np.sum(
             agetracer_mass_weights * self['yields'][element_name], axis=1
         )
@@ -349,17 +357,18 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
     Store and assign yields in bins of progenitor metallicity.
     '''
 
-    def assign_element_yields(self, element_yield_dicts=None, progenitor_metal_massfractions=None):
+    def assign_element_yields(self, element_yield_dict=None, progenitor_metal_massfractions=None):
         '''
         Assign to self a dictionary of stellar nucleosynthetic yields within stellar age bins.
 
         Parameters
         -----------
-        element_yield_dicts : list of dicts of 1-D arrays
+        element_yield_dict : list of dicts of 1-D arrays
             nucleosynthetic yield fractional mass [M_sun per M_sun of stars formed] of each element
             produced within/across each age bin, to map the age-tracer mass weights in each age bin
             into actual element yields
         '''
+        element_yield_dicts = element_yield_dict
         element_yield_dict = element_yield_dicts[0]
         element_name = tuple(element_yield_dict.keys())[0]
         for element_name in element_yield_dict:
@@ -371,13 +380,8 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
         for zi, _progenitor_metal_massfractions in enumerate(progenitor_metal_massfractions):
             element_yield_dict = element_yield_dicts[zi]
             for element_name in element_yield_dict:
-                if element_name == 'metals':
-                    continue
                 assert len(element_yield_dict[element_name]) == self['age.bin.number']
                 self['yields'][element_name][zi] = np.array(element_yield_dict[element_name])
-                # assign element symbol name as dictionary key as well, for convenience later
-                element_symbol = constant.element_symbol_from_name[element_name]
-                self['yields'][element_symbol][zi] = np.array(element_yield_dict[element_name])
 
         self['progenitor.metal.massfractions'] = progenitor_metal_massfractions
 
@@ -410,14 +414,9 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
         element_mass_fractions : 1-D array
             mass fraction of element_name for each particle
         '''
-        # sanity check
-        if element_name not in self['yields']:
-            raise KeyError(
-                f'cannot compute mass fraction for element_name = {element_name}\n'
-                + 'element age-tracer dictionary has these elements available:  {}'.format(
-                    self['yields'].keys()
-                )
-            )
+        # check that input valid element name
+        assert element_name
+        element_name = parse_element_names(self['yields'].keys(), element_name, scalarize=True)
 
         if metal_massfractions is not None:
             # prog_metal_massfractions = 10 ** 0.45 * metal_massfractions
@@ -457,7 +456,7 @@ class FIREYieldClass:
     '''
     Provide the stellar nucleosynthetic yields in the FIRE-2 or FIRE-3 model.
 
-    In FIRE-2, the following yields and mass-loss rates depend on progenitor metallicity:
+    In FIRE-2, the following yields and mass-loss rates depend on progenitor metallicity
         stellar winds: overall mass-loss rate and oxygen yield
         core-collapse supernovae: nitrogen yield
     '''
@@ -467,23 +466,28 @@ class FIREYieldClass:
         Parameters
         -----------
         model : str
-            name for this rate + yield model
+            name for this rate + yield model: 'fire2', 'fire3'
         progenitor_metallicity : float
-            metallicity [(linear) mass fraction relative to Solar]
-            for yields that depend on progenitor metallicity
+            metallicity [linear mass fraction relative to Solar]
+            for rates + yields that depend on progenitor metallicity
         '''
         from . import gizmo_star
 
         self.model = model.lower()
-        assert self.model in ['fire2', 'fire2.1', 'fire3']
+        assert self.model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
+        # this class computes the yields
         self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+
+        # these classes compute the rates
         self.SupernovaCC = gizmo_star.SupernovaCCClass(model)
         self.SupernovaIa = gizmo_star.SupernovaIaClass(model)
         self.StellarWind = gizmo_star.StellarWindClass(model)
+
+        # store the Solar abundances
         self.sun_massfraction = self.NucleosyntheticYield.sun_massfraction
 
-        # names of elements tracked in this model
+        # store list of names of elements tracked in this model
         self.element_names = [element_name.lower() for element_name in self.sun_massfraction]
         """
         self.element_names = [
@@ -501,14 +505,13 @@ class FIREYieldClass:
         ]
         """
 
-        # transition/discontinuous ages [Myr] in this model to be careful around when integrating
+        # transition/discontinuous ages [Myr] in this model to be careful near integrating
         self.ages_transition = gizmo_star.get_ages_transition(model)
         # self.ages_transition = None
 
         # store this (default) progenitor metallicity, including the mass fraction for each element
-        # use the latter to compute metallicity-dependent corrections to the yields
         # scale all progenitor abundances to Solar ratios - this is not accurate in detail,
-        # but it provides better agreement between post-processed yields and native yields in FIRE-2
+        # but it is a reasonable approximation
         self.progenitor_metallicity = progenitor_metallicity
         self.progenitor_massfraction_dict = {}
         for element_name in self.element_names:
@@ -517,7 +520,7 @@ class FIREYieldClass:
                 progenitor_metallicity * self.sun_massfraction[element_name]
             )
 
-        # store all yields, because in FIRE-2 they are independent of both stellar age and
+        # store all yields, because in FIRE-2 they are independent of stellar age and
         # ejecta/mass-loss rates
         self.NucleosyntheticYield.assign_yields(
             # match FIRE-2
@@ -529,22 +532,22 @@ class FIREYieldClass:
 
     def get_element_yields(self, age_bins, element_names=None):
         '''
-        Construct and return a dictionary of stellar nucleosynthetic yields:
-            Each key is an element name.
-            Each value is a 1-D array of yields within each input age bin,
-            constructed by integrating the total yield for each element across each age bin.
+        Construct and return a dictionary of stellar nucleosynthetic yields.
+        * Each key is an element name.
+        * Each key value is a 1-D array of yields within each input age bin,
+          constructed by integrating the total yield for each element across each age bin.
 
-        Supply this element_yield_dict to ElementAgeTracerClass.assign_element_yields(),
+        Supply the returned element_yield_dict to ElementAgeTracerClass.assign_element_yields()
         to assign elemental abundances to particles via age-tracer weights in a Gizmo simulation.
 
         Parameters
         -----------
         age_bins : array
             stellar age bins used in Gizmo for the age-tracer model [Myr]
-            should have N_age-bins + 1 values: left edges plus right edge of final bin
+            Should have N_age-bins + 1 values: left edges plus right edge of final bin.
         element_names : list
             names of elements to generate, if only generating a subset
-        if input None, assign all elements in this model
+            If input None, assign all elements in this model.
 
         Returns
         -------
@@ -552,14 +555,8 @@ class FIREYieldClass:
             fractional mass of each element [M_sun per M_sun of stars formed] produced within
             each age bin
         '''
-        if element_names is None:
-            element_names = self.element_names  # generate yields for all elements in this model
-        else:
-            element_names_safe = []
-            for element_name in element_names:
-                assert element_name in self.element_names
-                element_names_safe = element_name.lower()
-            element_names = element_names_safe
+        # if input element_names is None, generate yields for all elements in this model
+        element_names = parse_element_names(self.element_names, element_names, scalarize=False)
 
         element_yield_dict = {}
         for element_name in element_names:
@@ -571,11 +568,9 @@ class FIREYieldClass:
 
         # compile yields within each age bin by integrating over the underlying rates
         for ai in np.arange(np.size(age_bins) - 1):
+            age_min = age_bins[ai]
             if ai == 0:
                 age_min = 0  # ensure min age starts at 0 Myr
-            else:
-                age_min = age_bins[ai]
-
             age_max = age_bins[ai + 1]
 
             for element_name in element_names:
@@ -598,17 +593,18 @@ class FIREYieldClass:
 
         Parameters
         ----------
-        ages : float or array
+        age : float or array
             stellar age[s] at which to compute the nucleosynthetic yield rate[s] [Myr]
         element_name : str
             name of element, must be in self.element_names
         progenitor_metallicity : float
-            metallicity [(linear) mass fraction, relative to Solar], for the stellar wind rate
+            metallicity [linear mass fraction, relative to Solar]
+            In FIRE-3 and FIRE-3, this determines the mass-loss rate of stellar winds
 
         Returns
         -------
         element_yield_rate : float or array
-            specific rate[s] of nucleosynthetic yield[s] at input age[s] for input element_name
+            specific rate[s] of nucleosynthetic yield at input age[s] for input element_name
             [M_sun / Myr per M_sun of star formation]
         '''
         assert element_name in self.element_names
@@ -617,7 +613,7 @@ class FIREYieldClass:
             progenitor_metallicity = self.progenitor_metallicity
 
         # stellar wind rate[s] at input age[s] [M_sun / Myr per M_sun of stars formed]
-        # this is the only rate in FIRE-2 that depends on metallicity
+        # this is the only rate in FIRE-2 and FIRE-3 that depends on metallicity
         wind_rate = self.StellarWind.get_mass_loss_rate(age, metallicity=progenitor_metallicity)
 
         # core-collapse supernova rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
