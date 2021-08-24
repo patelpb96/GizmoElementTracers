@@ -1,6 +1,7 @@
 '''
 Read Gizmo snapshots, intended for use with FIRE simulations.
 
+----------
 @author:
     Andrew Wetzel <arwetzel@gmail.com>
     Shea Garrison-Kimmel <sheagk@gmail.com>
@@ -165,8 +166,8 @@ class ParticleDictionaryClass(dict):
     '''
     Dictionary class to store particle data.
     This functions like a normal dictionary in terms of storing default properties of particles,
-    but it also allows greater flexibility, storing additional meta-data (such as snapshot
-    information and cosmological parameters) and calling derived quantities via .prop().
+    but it also allows greater flexibility for storing meta-data (such as snapshot
+    information and cosmological parameters) and for calling derived properties via .prop().
     '''
 
     def __init__(self):
@@ -208,8 +209,8 @@ class ParticleDictionaryClass(dict):
 
     def prop(self, property_name, indices=None, _dict_only=False):
         '''
-        Get property, either as stored in self's dictionary or derive it on the fly from stored
-        properties. Can compute basic mathematical manipulations/combinations, for example:
+        Get property, either stored in self's dictionary or derive it from stored properties.
+        Can compute basic mathematical manipulations/combinations, for example:
             'log temperature', 'temperature / density', 'abs position'
 
         Parameters
@@ -217,10 +218,10 @@ class ParticleDictionaryClass(dict):
         property_name : str
             name of property
         indices : array
-            indices of particles to select
+            indices of particles to get properties of
         _dict_only : bool
             require property_name to be in self's dict - avoids endless recursion
-            primarily for internal/recursive usage within this function
+            primarily for internal/recursive usage of this function
 
         Returns
         -------
@@ -605,15 +606,15 @@ class ParticleDictionaryClass(dict):
 
     def _get_abundances(self, property_name, indices=None):
         '''
-        Get element mass fraction[s] or metallicity[s],
-        either as stored in dictionary or via post-processing via age-tracers.
+        Get element mass fraction[s] or metallicity[s], either stored in dictionary or via
+        post-processing stored age-tracer mass weights.
 
         Parameters
         ----------
         property_name : str
             name of property to get
         indices : array [optional]
-            indices of particles to select
+            indices of particles to get property of
 
         Returns
         -------
@@ -661,7 +662,7 @@ class ParticleDictionaryClass(dict):
             else:
                 values = self['massfraction'][indices, element_index]
 
-        # compute elemental abundances in post-processing using age-tracer weights
+        # compute elemental abundances using age-tracer weights
         elif 'agetracer' in property_name:
             assert 'ElementAgeTracer' in self.__dict__ and self.ElementAgeTracer is not None
             assert len(self.ElementAgeTracer['yields']) > 0
@@ -670,10 +671,10 @@ class ParticleDictionaryClass(dict):
                 if element_name in ut.constant.element_name_from_symbol:
                     element_name = ut.constant.element_name_from_symbol[element_name]
                 if element_name in self.ElementAgeTracer['yields']:
-                    break
+                    break  # found a match
             else:
                 raise KeyError(
-                    f'not sure how to parse property = {property_name}.'
+                    f'not sure how to parse element = {property_name}.'
                     + ' element age-tracer dictionary has these elements available:  {}'.format(
                         self.ElementAgeTracer['yields'].keys()
                     )
@@ -684,13 +685,15 @@ class ParticleDictionaryClass(dict):
             agetracer_index_start = self.ElementAgeTracer['element.index.start']
             if indices is None:
                 agetracer_mass_weights = self['massfraction'][:, agetracer_index_start:]
-                metallicities = self['massfraction'][:, 0]
+                metal_massfractions = self['massfraction'][:, 0]
             else:
                 agetracer_mass_weights = self['massfraction'][indices, agetracer_index_start:]
-                metallicities = self['massfraction'][indices, 0]
+                metal_massfractions = self['massfraction'][indices, 0]
+
+            breakpoint()
 
             values = self.ElementAgeTracer.get_element_massfractions(
-                element_name, agetracer_mass_weights, metallicities
+                element_name, agetracer_mass_weights, metal_massfractions
             )
 
         # convert to metallicity := log10(mass_fraction / mass_fraction_solar)

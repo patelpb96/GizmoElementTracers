@@ -1,26 +1,32 @@
 '''
-This module contains the models for stellar evolution implemented in Gizmo for the
-FIRE-2 and FIRE-3 models, specifically, nucleosynthetic yields and mass-loss rates for
+Contains the models for stellar evolution as implemented in Gizmo for the FIRE-2 and FIRE-3 models,
+specifically, nucleosynthetic yields and mass-loss rates for
     (1) core-collapse supernovae
     (2) Ia supernovae
     (3) stellar winds
 
-@author: Andrew Wetzel <arwetzel@gmail.com>
-
-These nucleosynthetic yields and mass-loss rates depend on progenitor metallicity:
+The following nucleosynthetic yields and mass-loss rates depend on progenitor metallicity
     FIRE-2
         stellar wind: overall mass-loss rate, oxygen yield
         core-collapse supernova: nitrogen yield
     FIRE-3
         stellar wind: overall mass-loss rate, yields for He, C, N, O
 
-Units: unless otherwise noted, all quantities are in (combinations of):
+----------
+@author: Andrew Wetzel <arwetzel@gmail.com>
+
+----------
+Units
+
+Unless otherwise noted, all quantities are in (combinations of)
     mass [M_sun]
-    time [Myr] (different than most other modules in this package, which default to Gyr)
-    elemental abundance [(linear) mass fraction]
+    time [Myr] (note: most other modules in this GizmoAnalysis package default to Gyr)
+    elemental abundance [linear mass fraction]
 '''
 
+import os
 import collections
+import pickle
 import numpy as np
 from scipy import integrate
 
@@ -35,9 +41,9 @@ DEFAULT_MODEL = 'fire2'
 # --------------------------------------------------------------------------------------------------
 def get_sun_massfraction(model=DEFAULT_MODEL):
     '''
-    Get dictionary of Solar abundances (mass fractions).
-    These mass fractions may differ by up to a percent from the values in utilities.constant,
-    given choices of mean atomic mass.
+    Get dictionary of Solar abundances (mass fractions) for the elements that Gizmo tracks.
+    (These mass fractions may differ by up to a percent from the values in utilities.constant,
+    given choices of mean atomic mass.)
 
     Parameters
     ----------
@@ -83,7 +89,7 @@ def get_sun_massfraction(model=DEFAULT_MODEL):
 
 def get_ages_transition(model=DEFAULT_MODEL):
     '''
-    Get array of ages [Myr] that mark transitions in given model for stellar evolution.
+    Get array of ages [Myr] that mark transitions in stellar evolution for a given model.
     Use to supply to numerical integrators.
 
     Parameters
@@ -95,11 +101,9 @@ def get_ages_transition(model=DEFAULT_MODEL):
     assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
     if 'fire2' in model:
-        # core-collapse and stellar wind transitions
-        ages_transition = np.sort([3.401, 10.37, 37.53, 1, 50, 100, 1000])  # [Myr]
+        ages_transition = np.sort([1.0, 3.4, 3.5, 10.37, 37.53, 50, 100, 1000])  # [Myr]
     elif 'fire3' in model:
-        # core-collapse and stellar wind transitions
-        ages_transition = np.sort([3.7, 6.5, 8, 18, 30, 44, 1.7, 4, 20, 1000])  # [Myr]
+        ages_transition = np.sort([1.7, 3.7, 4.0, 6.5, 8, 18, 20, 30, 44, 1000])  # [Myr]
 
     return ages_transition
 
@@ -113,31 +117,31 @@ class NucleosyntheticYieldClass:
 
     Yields that depend on Progenitor metallicity:
         FIRE-2
-            for stellar winds: oxygen
-            for core-collpase supernova: nitgrogen
+            stellar winds: oxygen
+            core-collpase supernova: nitgrogen
         FIRE-3
-            for stellar winds: He, C, N, O
+            stellar winds: He, C, N, O
 
     Model variants for FIRE-2
-         'fire2.1' = remove progenitor metallicity dependence to all yields
-            (via setting progenitor to Solar)
-         'fire2.2' = above + turn of progenitor metallicity dependence to stellar wind rate
-            (via setting progenitor to Solar)
+         'fire2.1' = remove dependence on progenitor metallicity for all yields
+            (via setting all progenitors to Solar)
+         'fire2.2' = above + turn off dependence on progenitor metallicity for stellar wind rate
+            (via setting all progenitors to Solar)
     '''
 
     def __init__(self, model=DEFAULT_MODEL):
         '''
         Store Solar elemental abundances, as linear mass fractions.
 
-        FIRE-2 uses values from Anders & Grevesse 1989.
-        FIRE-3 uses proto-solar values from Asplund et al 2009.
+        FIRE-2 uses Solar values from Anders & Grevesse 1989.
+        FIRE-3 uses proto-Solar values from Asplund et al 2009.
 
         Parameters
         ----------
         model : str
             stellar evolution model for yields: 'fire2', 'fire3'
         '''
-        self._models_available = ['fire2', 'fire2.1', 'fire.2.2', 'fire3']
+        self._models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self.sun_massfraction = None
         self.wind_yield = None
         self.sncc_yield = None
@@ -183,7 +187,7 @@ class NucleosyntheticYieldClass:
         Get stellar nucleosynthetic yields for input event_kind in the FIRE-2 or FIRE-3 model.
 
         This computes the *additional* nucleosynthetic yields that Gizmo adds to the star's
-        existing metallicity, so these are not the actual yields that get deposited to gas.
+        existing abuances, so these are not the total yields that get deposited to gas.
         The total mass fraction (wrt total mass of star) returned for each element is:
             (1 - ejecta_total_mass_fraction) * star_element_mass_fraction
                 + ejecta_total_mass_fraction * ejecta_element_mass_fraction
@@ -196,21 +200,21 @@ class NucleosyntheticYieldClass:
             total metallicity of progenitor [linear mass fraction wrt sun_mass_fraction['metals']]
         progenitor_massfraction_dict : dict or bool [optional]
             optional: dictionary that contains the mass fraction of each element in the progenitor
-            if True, then assume Solar abundance ratios and use progenitor_metallicity to normalize
-            use this to calculate higher-order correction of yields as used in FIRE
+            if blank, then assume Solar abundance ratios and use progenitor_metallicity to normalize
+            for FIRE-2, use to compute higher-order corrections to surface abundances
+            for FIRE-3, use to compute stellar winds yields
         age : float
             stellar age [Myr]
         model : str
-            stellar evolution model for yields: 'fire2', 'fire3'
+            stellar evolution model for yields: 'fire2', 'fire2.1', 'fire2.2', 'fire3'
         normalize : bool
             whether to normalize yields to be mass fractions (wrt formation mass), instead of masses
-
 
         Returns
         -------
         element_yield : ordered dict
-            stellar nucleosynthetic yield for each element,
-            in mass [M_sun] or mass fraction (wrt formation mass)
+            stellar nucleosynthetic yield for each element, in mass [M_sun] or mass fraction
+            (wrt formation mass)
         '''
         element_yield = collections.OrderedDict()
         for element_name in self.sun_massfraction:
@@ -224,8 +228,6 @@ class NucleosyntheticYieldClass:
         # determine progenitor abundance[s]
         if isinstance(progenitor_massfraction_dict, dict) and len(progenitor_massfraction_dict) > 0:
             # input mass fraction for each element
-            # for FIRE-2, use to compute higher-order corrections to surface abundances
-            # for FIRE-3, use to compute stellar winds yields
             for element_name in element_yield:
                 assert element_name in progenitor_massfraction_dict
         else:
@@ -243,7 +245,7 @@ class NucleosyntheticYieldClass:
             if 'fire2' in self.model:
                 # FIRE-2: stellar_evolution.c line 583
                 # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
-                # mass fractions
+                # below are mass fractions
                 element_yield['helium'] = 0.36
                 element_yield['carbon'] = 0.016
                 element_yield['nitrogen'] = 0.0041
@@ -257,8 +259,8 @@ class NucleosyntheticYieldClass:
                         )
                     else:
                         element_yield['oxygen'] *= 1.65
-                elif self.model == 'fire2.1':
-                    pass  # force no progenitor metallicity dependence
+                elif self.model in ['fire2.1', 'fire2.2']:
+                    pass  # no dependence on progenitor metallicity
 
             elif self.model == 'fire3':
                 # FIRE-3: stellar_evolution.c line 563
@@ -377,7 +379,7 @@ class NucleosyntheticYieldClass:
                 # y = [He: 3.69e-1, C: 1.27e-2, N: 4.56e-3, O: 1.11e-1, Ne: 3.81e-2, Mg: 9.40e-3,
                 # Si: 8.89e-3, S: 3.78e-3, Ca: 4.36e-4, Fe: 7.06e-3]
                 ejecta_mass = 10.5  # [M_sun]
-                # mass fractions
+                # below are mass fractions
                 element_yield['metals'] = 0.19
                 element_yield['helium'] = 0.369
                 element_yield['carbon'] = 0.0127
@@ -403,8 +405,8 @@ class NucleosyntheticYieldClass:
                         element_yield['nitrogen'] *= 1.65
                     # correct total metal mass for nitrogen
                     element_yield['metals'] += element_yield['nitrogen'] - yield_nitrogen_orig
-                elif model == 'fire2.1':
-                    pass  # force no progenitor metallicity dependence
+                elif model in ['fire2.1', 'fire2.2']:
+                    pass  # no dependence on progenitor metallicity
 
             elif self.model == 'fire3':
                 # FIRE-3: stellar_evolution.c line 471 (or so)
@@ -508,7 +510,7 @@ class NucleosyntheticYieldClass:
             if 'fire2' in self.model:
                 # FIRE-2: stellar_evolution.c line 498 (or so)
                 # yields from Iwamoto et al 1999, W7 model, IMF averaged
-                # mass fractions
+                # below are mass fractions
                 element_yield['metals'] = 1
                 element_yield['helium'] = 0
                 element_yield['carbon'] = 0.035
@@ -577,8 +579,8 @@ class NucleosyntheticYieldClass:
             # FIRE-2: stellar_evolution.c line 509
             # enforce that yields obey pre-existing surface abundances
             # allow for larger abundances in the progenitor star - usually irrelevant
-            # original FIRE-2 applied this to all mass-loss channels (including stellar winds)
-            # later FIRE-2 applied this only to supernovae
+            # original FIRE-2 version applied this to all mass-loss channels (including winds)
+            # later FIRE-2 version applies this only to supernovae
 
             # get pure (non-metal) mass fraction of star
             pure_mass_fraction = 1 - progenitor_massfraction_dict['metals']
@@ -613,11 +615,12 @@ class NucleosyntheticYieldClass:
         Parameters
         -----------
         progenitor_metallicity : float
-            metallicity [wrt Solar] for yields that depend on progenitor metallicity
-        progenitor_massfraction_dict : dict or bool
+            total metallicity of progenitor [linear mass fraction wrt sun_mass_fraction['metals']]
+        progenitor_massfraction_dict : dict or bool [optional]
             optional: dictionary that contains the mass fraction of each element in the progenitor
-            if True, then assume Solar abundance ratios and use progenitor_metallicity to normalize
-            use this to calculate higher-order correction of yields as used in FIRE
+            if blank, then assume Solar abundance ratios and use progenitor_metallicity to normalize
+            for FIRE-2, use to compute higher-order corrections to surface abundances
+            for FIRE-3, use to compute stellar winds yields
         age : float
             stellar age [Myr]
         '''
@@ -626,7 +629,7 @@ class NucleosyntheticYieldClass:
             'wind', progenitor_metallicity, progenitor_massfraction_dict, age=age
         )
 
-        # store yields from supernova as masses [M_sun]
+        # store yields from supernovae as masses [M_sun]
         self.sncc_yield = self.get_yields(
             'supernova.cc',
             progenitor_metallicity,
@@ -648,14 +651,14 @@ NucleosyntheticYield = NucleosyntheticYieldClass()
 # --------------------------------------------------------------------------------------------------
 class StellarWindClass:
     '''
-    Compute mass-loss rates and cumulative mass-loss fractions (with respect to mass at formation))
+    Compute mass-loss rates and cumulative mass-loss fractions (with respect to mass at formation)
     for stellar winds in the FIRE-2 or FIRE-3 model.
 
-    Note on model variants for FIRE-2:
-         'fire2.1' = remove progenitor metallicity dependence to all yields
-            (via setting progenitor to Solar)
-         'fire2.2' = above + turn of progenitor metallicity dependence to stellar wind rate
-            (via setting progenitor to Solar)
+    Model variants for FIRE-2
+         'fire2.1' = remove dependence on progenitor metallicity for all yields
+            (via setting all progenitors to Solar)
+         'fire2.2' = above + turn off dependence on progenitor metallicity for stellar wind rate
+            (via setting all progenitors to Solar)
     '''
 
     def __init__(self, model=DEFAULT_MODEL):
@@ -663,7 +666,7 @@ class StellarWindClass:
         Parameters
         ----------
         model : str
-             model for wind rate: 'fire2', 'fire3'
+             model for wind rate: 'fire2', 'fire2.1', 'fire2.2', 'fire3'
         '''
         # stellar wind mass loss is intrinsically mass fraction wrt formation mass
         self.ejecta_mass = 1.0
@@ -702,7 +705,7 @@ class StellarWindClass:
 
             # set transition ages [Myr]
             if 'fire2' in self.model:
-                self.ages_transition = np.array([1, 3.5, 100])  # [Myr]
+                self.ages_transition = np.array([1.0, 3.5, 100])  # [Myr]
             elif 'fire3' in self.model:
                 self.ages_transition = np.array([1.7, 4, 20, 1000])  # [Myr]
 
@@ -714,24 +717,24 @@ class StellarWindClass:
         winds in FIRE-2 or FIRE-3.
         Input either metallicity (linear, wrt Solar) or (raw) metal_mass_fraction.
 
-        Includes all non-supernova mass-loss channels, but dominated by O, B, and AGB stars.
+        Includes all non-supernova mass-loss channels, dominated by O, B, and AGB stars.
 
         Parameters
         ----------
         age : float or array
             age[s] of stellar population [Myr]
         metallicity : float
-            metallicity [(linear) wrt Sun] of progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+            metallicity [(linear) wrt Sun] of progenitor, for scaling the wind rates
+            input either this or metal_mass_fraction (below)
             For FIRE-2, this should be *total* metallicity [scaled to Solar := 0.02]
             For FIRE-3, this should be Iron abundance [scaled to Solar := 1.38e-3]
-        metal_mass_fraction : float [optional]
-            mass fraction of all metals in progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+        metal_mass_fraction : float
+            optional: mass fraction of given metal in progenitor stars
+            input either this or metallicity (above)
             For FIRE-2, this should be *total* metals (everything not H, He)
-            For FIRE-3, this should be Iron
+            For FIRE-3, this should be iron
         model : str
-            model for wind rate: 'fire2', 'fire3'
+            model for wind rate: 'fire2', 'fire2.1', 'fire2.2', 'fire3'
         element_name : str
             name of element to get fractional mass loss of
             if None or '', get total fractional mass loss
@@ -895,17 +898,17 @@ class StellarWindClass:
         age_maxs : float or array
             max age[s] of stellar population [Myr]
         metallicity : float
-            metallicity [(linear) wrt Sun] of progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+            metallicity [(linear) wrt Sun] of progenitor, for scaling the wind rates
+            input either this or metal_mass_fraction (below)
             For FIRE-2, this should be *total* metallicity [scaled to Solar := 0.02]
             For FIRE-3, this should be Iron abundance [scaled to Solar := 1.38e-3]
-        metal_mass_fraction : float [optional]
-            mass fraction of all metals in progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+        metal_mass_fraction : float
+            optional: mass fraction of given metal in progenitor stars
+            input either this or metallicity (above)
             For FIRE-2, this should be *total* metals (everything not H, He)
-            For FIRE-3, this should be Iron
+            For FIRE-3, this should be iron
         model : str
-            model for wind rate: 'fire2', 'fire3'
+            model for wind rate: 'fire2', 'fire2.1', 'fire2.2', 'fire3'
         element_name : str
             name of element to get fractional mass loss of
             if None or '', get total fractional mass loss
@@ -1018,7 +1021,7 @@ class SupernovaCCClass:
             # reset transition ages
             if cc_age_min is None:
                 if 'fire2' in self.model:
-                    cc_age_min = 3.401  # [Myr]
+                    cc_age_min = 3.4  # [Myr]
                 elif 'fire3' in self.model:
                     cc_age_min = 3.7  # [Myr]
             assert cc_age_min >= 0
@@ -1050,8 +1053,8 @@ class SupernovaCCClass:
             Rates are from Starburst99 energetics: get rate from overall energetics assuming each
             core-collapse supernova is 10^51 erg.
             Core-collapse supernovae occur from 3.4 to 37.53 Myr after formation:
-                3.4 to 10.37 Myr: rate / M_sun = 5.408e-10 yr ^ -1
-                10.37 to 37.53 Myr: rate / M_sun = 2.516e-10 yr ^ -1
+                3.4 to 10.37 Myr:    rate / M_sun = 5.408e-10 yr ^ -1
+                10.37 to 37.53 Myr:  rate / M_sun = 2.516e-10 yr ^ -1
 
         Parameters
         ----------
@@ -1604,7 +1607,7 @@ class MassLossClass(ut.io.SayClass):
         Parameters
         ----------
         model : str
-            stellar evolution model to use: 'fire2', 'fire3'
+            stellar evolution model to use: 'fire2', 'fire2.1', 'fire2.2', 'fire3'
         '''
         self._models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self.sun_massfraction = None
@@ -1619,9 +1622,7 @@ class MassLossClass(ut.io.SayClass):
         self.MetalBin = None
         self.mass_loss_fractions = None
 
-        from os.path import expanduser
-
-        self.file_name = expanduser('~') + '/.gizmo_mass_loss_spline.pkl'
+        self._file_name = os.environ['HOME'] + '/.gizmo_star_mass_loss_spline.pkl'
 
     def _parse_model(self, model):
         '''
@@ -1659,15 +1660,15 @@ class MassLossClass(ut.io.SayClass):
         age : float or array
             age[s] of stellar population [Myr]
         metallicity : float
-            metallicity [(linear) wrt Sun] of progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+            metallicity [(linear) wrt Sun] of progenitor, for scaling the wind rates
+            input either this or metal_mass_fraction (below)
             For FIRE-2, this should be *total* metallicity [scaled to Solar := 0.02]
             For FIRE-3, this should be Iron abundance [scaled to Solar := 1.38e-3]
-        metal_mass_fraction : float [optional]
-            mass fraction of all metals in progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+        metal_mass_fraction : float
+            optional: mass fraction of given metal in progenitor stars
+            input either this or metallicity (above)
             For FIRE-2, this should be *total* metals (everything not H, He)
-            For FIRE-3, this should be Iron
+            For FIRE-3, this should be iron
         element_name : str [optional]
             name of element to get fractional mass loss of
             if None or '', get mass loss from all elements
@@ -1701,15 +1702,15 @@ class MassLossClass(ut.io.SayClass):
         age_maxs : float or array
             max (ending) age[s] of stellar population [Myr]
         metallicity : float
-            metallicity [(linear) wrt Sun] of progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+            metallicity [(linear) wrt Sun] of progenitor, for scaling the wind rates
+            input either this or metal_mass_fraction (below)
             For FIRE-2, this should be *total* metallicity [scaled to Solar := 0.02]
             For FIRE-3, this should be Iron abundance [scaled to Solar := 1.38e-3]
-        metal_mass_fraction : float [optional]
-            mass fraction of all metals in progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+        metal_mass_fraction : float
+            optional: mass fraction of given metal in progenitor stars
+            input either this or metallicity (above)
             For FIRE-2, this should be *total* metals (everything not H, He)
-            For FIRE-3, this should be Iron
+            For FIRE-3, this should be iron
         element_name : str [optional]
             name of element to get fractional mass loss of
             if None or '', get mass loss from all elements
@@ -1739,15 +1740,15 @@ class MassLossClass(ut.io.SayClass):
         ages : float or array
             age[s] of stellar population [Myr]
         metallicity : float
-            metallicity [(linear) wrt Sun] of progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+            metallicity [(linear) wrt Sun] of progenitor, for scaling the wind rates
+            input either this or metal_mass_fraction (below)
             For FIRE-2, this should be *total* metallicity [scaled to Solar := 0.02]
             For FIRE-3, this should be Iron abundance [scaled to Solar := 1.38e-3]
-        metal_mass_fraction : float [optional]
-            mass fraction of all metals in progenitor stars, for scaling the wind rates
-            input either metallicity or metal_mass_fraction
+        metal_mass_fraction : float
+            optional: mass fraction of given metal in progenitor stars
+            input either this or metallicity (above)
             For FIRE-2, this should be *total* metals (everything not H, He)
-            For FIRE-3, this should be Iron
+            For FIRE-3, this should be iron
 
         Returns
         -------
@@ -1780,7 +1781,7 @@ class MassLossClass(ut.io.SayClass):
         metallicity_limits=[0.01, 3],
         metallicity_bin_number=25,
         force_remake=False,
-        save_spline=False,
+        write_spline=False,
     ):
         '''
         Create 2-D bivariate spline (in age and metallicity) for fractional mass loss
@@ -1804,8 +1805,8 @@ class MassLossClass(ut.io.SayClass):
         from os.path import isfile
         from scipy import interpolate
 
-        if not force_remake and isfile(self.file_name):
-            self._load_mass_fraction_spline()
+        if not force_remake and isfile(self._file_name):
+            self._read_mass_loss_spline()
             return
 
         age_min = 0
@@ -1829,22 +1830,18 @@ class MassLossClass(ut.io.SayClass):
             self.AgeBin.mins, self.MetalBin.mins, self.mass_loss_fractions
         )
 
-        if save_spline:
-            self._save_mass_fraction_spline()
+        if write_spline:
+            self._write_mass_loss_spline()
 
-    def _save_mass_fraction_spline(self):
-        import pickle
-
-        with open(self.file_name, 'wb') as f:
+    def _write_mass_loss_spline(self):
+        with open(self._file_name, 'wb') as f:
             pickle.dump(self.Spline, f)
-        print(f'saved spline as {self.file_name}')
+        self.say(f'wrote mass-loss spline to:  {self._file_name}')
 
-    def _load_mass_fraction_spline(self):
-        import pickle
-
-        with open(self.file_name, 'rb') as f:
+    def _read_mass_loss_spline(self):
+        with open(self._file_name, 'rb') as f:
             self.Spline = pickle.load(f)
-            print(f'loaded spline from {self.file_name}')
+            self.say(f'read mass-loss spline from:  {self._file_name}')
 
 
 MassLoss = MassLossClass()
@@ -1862,8 +1859,8 @@ def plot_supernova_number_v_age(
     figure_index=1,
 ):
     '''
-    Plot specific rates or cumulative numbers of supernovae (core-collapse + Ia) [per M_sun]
-    versus stellar age.
+    Plot specific rates or cumulative numbers [per M_sun] of supernovae (core-collapse + Ia)
+    versus stellar age [Myr].
 
     Parameters
     ----------
@@ -1872,7 +1869,7 @@ def plot_supernova_number_v_age(
     axis_y_limits : list
         min and max limits to impose on y axis
     axis_y_log_scale : bool
-        whether to use logarithmic scaling for y axis
+        whether to duse logarithmic scaling for y axis
     age_limits : list
         min and max limits of age of stellar population [Myr]
     age_bin_width : float
@@ -1880,7 +1877,7 @@ def plot_supernova_number_v_age(
     age_log_scale : bool
         whether to use logarithmic scaling for age bins
     file_name : str
-        whether to write figure to file and its name. True = use default naming convention
+        whether to write figure to file, and set its name: True = use default naming convention
     directory : str
         where to write figure file
     figure_index : int
@@ -1935,13 +1932,13 @@ def plot_supernova_number_v_age(
     subplot.plot(AgeBin.mins, ia_fire3, color=colors[3], alpha=0.8, label='Ia (FIRE-3)')
 
     print('CC FIRE-2')
-    print(cc_fire2[-1])
+    print('{:.4f}'.format(cc_fire2[-1]))
     print('Ia FIRE-2')
-    print(ia_fire2[-1])
+    print('{:.4f}'.format(ia_fire2[-1]))
     print('CC FIRE-3')
-    print(cc_fire3[-1])
+    print('{:.4f}'.format(cc_fire3[-1]))
     print('Ia FIRE-3')
-    print(ia_fire3[-1])
+    print('{:.4f}'.format(ia_fire3[-1]))
 
     ut.plot.make_legends(subplot, 'best')
 
@@ -1969,8 +1966,8 @@ def plot_mass_loss_v_age(
     figure_index=1,
 ):
     '''
-    Plot fractional mass loss from all stellar evolution channels
-    (core-collapse supernovae, supernovae Ia, stellar winds) versus stellar age.
+    Plot fractional mass loss [wrt formation mass] from all stellar evolution channels
+    (core-collapse supernovae, supernovae Ia, stellar winds) versus stellar age [Myr].
 
     Parameters
     ----------
@@ -2062,13 +2059,13 @@ def plot_mass_loss_v_age(
     subplot.plot(AgeBin.mins, total, color='black', alpha=0.8, label='total')
 
     print('wind')
-    print(wind[-1])
+    print('{:.4f}'.format(wind[-1]))
     print('CC')
-    print(supernova_cc[-1])
+    print('{:.4f}'.format(supernova_cc[-1]))
     print('Ia')
-    print(supernova_Ia[-1])
+    print('{:.4f}'.format(supernova_Ia[-1]))
     print('total')
-    print(total[-1])
+    print('{:.4f}'.format(total[-1]))
 
     ut.plot.make_legends(subplot, 'best')
 
@@ -2099,7 +2096,7 @@ def plot_nucleosynthetic_yields(
     figure_index=1,
 ):
     '''
-    Plot nucleosynthetic element yields, according to input event_kind.
+    Plot nucleosynthetic yields versus element name, for input event_kind.
 
     Parameters
     ----------
@@ -2224,4 +2221,3 @@ def plot_nucleosynthetic_yields(
     if file_name is True or file_name == '':
         file_name = f'{event_kind}.yields_Z.{metal_label}'
     ut.plot.parse_output(file_name, directory)
-
