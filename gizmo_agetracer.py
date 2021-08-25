@@ -1,14 +1,14 @@
 '''
 Assign elemental abundances to star and gas particles in post-processing using age-tracer
-weights stored in Gizmo simulation snapshots.
+mass weights stored in Gizmo simulation snapshots.
 
 If age-tracers were enabled when running a Gizmo simulation (by defining GALSF_FB_FIRE_AGE_TRACERS
-in Config.sh), each gas particle stores an array of weights in bins of stellar age, assigned to the
-gas particle from any neighboring star particles as the simulation ran, to record the
-mass (fraction) of ejecta/winds that would have been deposited into the gas particle had there been
-an enrichment event at that timestep.
-In other words, a star particle of a given age deposits a weight into a corresponding stellar age
-bin in all of its neighboring gas particles.
+in Config.sh), each gas particle stores an array of mass weights in bins of stellar age,
+assigned to the gas particle from any neighboring star particles as the simulation ran,
+to record the mass (fraction) of ejecta/winds that would have been deposited into the gas particle
+had there been an enrichment event at that timestep.
+In other words, a star particle of a given age deposits a mass weight into a corresponding stellar
+age bin in all of its neighboring gas particles.
 A star particle then inherits the array of age-tracer mass weights from its progenitor gas particle.
 
 Assigning elemental abundances to particles at z = 0 (or any snapshot) then requires you to
@@ -112,7 +112,7 @@ class ElementAgeTracerClass(dict):
         # impose this *after* defining the bins, so it does not affect bin spacing
         # this only affect the integration of the yield rates into age-bin yields
         self._age_min_impose = 0
-        self._age_max_impose = 138000
+        self._age_max_impose = 13700
 
         # whether using custom stellar age bins
         # default (non-custom) is equally spaced in log age
@@ -135,7 +135,7 @@ class ElementAgeTracerClass(dict):
             self.assign_age_bins(header_dict)
             # assign from header
             self['element.index.start'] = (
-                header_dict['element.number'] - header_dict['agetracer.number']
+                header_dict['element.number'] - header_dict['agetracer.age.bin.number']
             )
         elif element_index_start is not None:
             self['element.index.start'] = element_index_start
@@ -168,34 +168,37 @@ class ElementAgeTracerClass(dict):
         '''
         if header_dict is not None:
             # use header dictionary to get age bins
-            if 'agetracer.number' not in header_dict:
+            if 'agetracer.age.bin.number' not in header_dict:
                 print('! input header dict, but it has no age-tracer information')
                 print('  assuming age-tracers were not enabled in this Gizmo simulation')
                 return
-            elif header_dict['agetracer.number'] < 1:
+            elif header_dict['agetracer.age.bin.number'] < 1:
                 print(
                     '! header dict indicates only {} age-tracer bins, which is non-sensical'.format(
-                        header_dict['agetracer.number']
+                        header_dict['agetracer.age.bin.number']
                     )
                 )
                 return
 
-            self['age.bin.number'] = header_dict['agetracer.number']
+            self['age.bin.number'] = header_dict['agetracer.age.bin.number']
 
-            if 'agetracer.events.per.bin' in header_dict:
-                self['events.per.age.bin'] = header_dict['agetracer.events.per.bin']
+            if 'agetracer.event.number.per.age.bin' in header_dict:
+                self['event.number.per.age.bin'] = header_dict['agetracer.event.number.per.age.bin']
 
-            if 'agetracer.min' in header_dict and 'agetracer.max' in header_dict:
-                assert header_dict['agetracer.min'] > 0 and header_dict['agetracer.max'] > 0
+            if 'agetracer.age.min' in header_dict and 'agetracer.age.max' in header_dict:
+                assert header_dict['agetracer.age.min'] > 0 and header_dict['agetracer.age.max'] > 0
                 self['age.bins'] = np.logspace(
-                    np.log10(header_dict['agetracer.min']),
-                    np.log10(header_dict['agetracer.max']),
-                    header_dict['agetracer.number'] + 1,
+                    np.log10(header_dict['agetracer.age.min']),
+                    np.log10(header_dict['agetracer.age.max']),
+                    header_dict['agetracer.age.bin.number'] + 1,
                 )
-            elif 'agetracer.bins' in header_dict:
-                assert len(header_dict['agetracer.bins']) > 1
-                assert header_dict['agetracer.number'] == len(header_dict['agetracer.bins']) - 1
-                self['age.bins'] = header_dict['agetracer.bins']
+            elif 'agetracer.age.bins' in header_dict:
+                assert len(header_dict['agetracer.age.bins']) > 1
+                assert (
+                    header_dict['agetracer.age.bin.number']
+                    == len(header_dict['agetracer.age.bins']) - 1
+                )
+                self['age.bins'] = header_dict['agetracer.age.bins']
                 self['has.custom.age.bin'] = True
             else:
                 print('! input header dict, but cannot make sense of age-tracer information')
@@ -454,7 +457,7 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
 # --------------------------------------------------------------------------------------------------
 class FIREYieldClass:
     '''
-    Provide the stellar nucleosynthetic yields in the FIRE-2 or FIRE-3 model.
+    Provide stellar nucleosynthetic yields in the FIRE-2 or FIRE-3 model.
 
     In FIRE-2, the following yields and mass-loss rates depend on progenitor metallicity
         stellar winds: overall mass-loss rate and oxygen yield
@@ -469,7 +472,7 @@ class FIREYieldClass:
             name for this rate + yield model: 'fire2', 'fire3'
         progenitor_metallicity : float
             metallicity [linear mass fraction relative to Solar]
-            for rates + yields that depend on progenitor metallicity
+            for nucleosynthetic rates and yields that depend on progenitor metallicity
         '''
         from . import gizmo_star
 
@@ -520,9 +523,9 @@ class FIREYieldClass:
                 progenitor_metallicity * self.sun_massfraction[element_name]
             )
 
-        # store all yields, because in FIRE-2 they are independent of stellar age and
-        # ejecta/mass-loss rates
-        self.NucleosyntheticYield.assign_yields(
+        # store all yields as mass fraction relative to mass of stars at formation
+        # store because in FIRE-2 yields are independent of stellar age and ejecta/mass-loss rates
+        self.NucleosyntheticYield.assign_element_yields(
             # match FIRE-2
             progenitor_massfraction_dict=self.progenitor_massfraction_dict,
             # test: do not model correction of yields from pre-existing surface abundances
@@ -552,12 +555,13 @@ class FIREYieldClass:
         Returns
         -------
         element_yield_dict : dict of 1-D arrays
-            fractional mass of each element [M_sun per M_sun of stars formed] produced within
-            each age bin
+            fractional mass (relative to mass of stars at formation) of each element produced
+            within each age bin
         '''
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
 
+        # initialize main dictionary
         element_yield_dict = {}
         for element_name in element_names:
             element_yield_dict[element_name] = np.zeros(np.size(age_bins) - 1)
@@ -566,15 +570,15 @@ class FIREYieldClass:
         if not hasattr(self, 'ages_transition'):
             self.ages_transition = None
 
-        # compile yields within each age bin by integrating over the underlying rates
+        # compile yields within/across each age bin by integrating over the assumed rates
         for ai in np.arange(np.size(age_bins) - 1):
             age_min = age_bins[ai]
             if ai == 0:
-                age_min = 0  # ensure min age starts at 0 Myr
+                age_min = 0  # ensure min age starts at 0
             age_max = age_bins[ai + 1]
 
             for element_name in element_names:
-                # get integrated total yield within the age bin
+                # get the integrated yield mass within/across the age bin
                 element_yield_dict[element_name][ai] = integrate.quad(
                     self._get_element_yield_rate,
                     age_min,
@@ -587,46 +591,41 @@ class FIREYieldClass:
 
     def _get_element_yield_rate(self, age, element_name, progenitor_metallicity=None):
         '''
-        Return the specific rate[s] [M_sun / Myr per M_sun of star formation] of nucleosynthetic
-        yield[s] at input stellar age[s] [Myr] for input element_name, from all stellar processes.
-        get_element_yields() uses this method to integrate across age within each age bin.
+        Return the specific rate of nucleosynthetic yield (yield mass relative to mass of stars at
+        formation) [Myr ^ -1] at input stellar age [Myr] for input element_name,
+        from all stellar processes.
+        get_element_yields() uses this to integrate across age within each age bin.
 
         Parameters
         ----------
-        age : float or array
-            stellar age[s] at which to compute the nucleosynthetic yield rate[s] [Myr]
+        age : float
+            stellar age [Myr] at which to compute the nucleosynthetic yield rate
         element_name : str
             name of element, must be in self.element_names
         progenitor_metallicity : float
-            metallicity [linear mass fraction, relative to Solar]
-            In FIRE-3 and FIRE-3, this determines the mass-loss rate of stellar winds
+            metallicity [linear mass fraction relative to Solar]
+            In FIRE-3 and FIRE-3, this determines the mass-loss rate of stellar winds.
 
         Returns
         -------
-        element_yield_rate : float or array
-            specific rate[s] of nucleosynthetic yield at input age[s] for input element_name
-            [M_sun / Myr per M_sun of star formation]
+        element_yield_rate : float
+            specific rate (yield mass relative to mass of stars at formation) [Myr ^ -1] at input
+            age for input element_name
         '''
-        assert element_name in self.element_names
-
         if progenitor_metallicity is None:
             progenitor_metallicity = self.progenitor_metallicity
 
-        # stellar wind rate[s] at input age[s] [M_sun / Myr per M_sun of stars formed]
-        # this is the only rate in FIRE-2 and FIRE-3 that depends on metallicity
+        # rates below are fractional mass rate relative to mass of stars at formation [Myr ^ -1]
+        # wind is the only mass loss rate in FIRE-2 and FIRE-3 that depends on metallicity
         wind_rate = self.StellarWind.get_mass_loss_rate(age, metallicity=progenitor_metallicity)
-
-        # core-collapse supernova rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
         sncc_rate = self.SupernovaCC.get_mass_loss_rate(age)
-
-        # supernova Ia rate[s] at input age[s] [Myr^-1 per M_sun of stars formed]
         snia_rate = self.SupernovaIa.get_mass_loss_rate(age)
 
         element_yield_rate = (
-            self.NucleosyntheticYield.wind_yield[element_name] * wind_rate
-            + self.NucleosyntheticYield.snia_yield[element_name] * snia_rate
-            + self.NucleosyntheticYield.sncc_yield[element_name] * sncc_rate
-        )  # [M_sun / Myr]
+            self.NucleosyntheticYield['wind'][element_name] * wind_rate
+            + self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate
+            + self.NucleosyntheticYield['supernova.ia'][element_name] * snia_rate
+        )
 
         return element_yield_rate
 
@@ -726,7 +725,7 @@ class NuGridYieldClass:
         self._model_yield_rate = (np.diff(self._model_yields, axis=0).transpose() / dt).transpose()
         self._model_total_metal_rate = (np.diff(self._total_metals) / dt).transpose()
 
-    def get_yields(self, t, element):
+    def get_element_yields(self, t, element):
         '''
 
         Returns the total yields for all yield channels in NuGrid.
