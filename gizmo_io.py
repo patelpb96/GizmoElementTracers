@@ -690,8 +690,6 @@ class ParticleDictionaryClass(dict):
                 agetracer_mass_weights = self['massfraction'][indices, agetracer_index_start:]
                 metal_massfractions = self['massfraction'][indices, 0]
 
-            breakpoint()
-
             values = self.ElementAgeTracer.get_element_massfractions(
                 element_name, agetracer_mass_weights, metal_massfractions
             )
@@ -1349,12 +1347,12 @@ class ReadClass(ut.io.SayClass):
             'Flag_Metals': 'element.number',
             'Flag_AgeTracers': 'has.agetracer',  # not in newer headers
             # age-tracers to assign elemental abundances in post-processing
-            # will have either agetracer.min + agetracer.max or agetracer.bins
-            'AgeTracer_NumberOfBins': 'agetracer.number',
-            'AgeTracerBinStart': 'agetracer.min',
-            'AgeTracerBinEnd': 'agetracer.max',
-            'AgeTracer_CustomTimeBins': 'agetracer.bins',  # or this array
-            'AgeTracerEventsPerTimeBin': 'agetracer.events.per.bin',
+            # will have either agetracer.age.min + agetracer.age.max or agetracer.age.bins
+            'AgeTracer_NumberOfBins': 'agetracer.age.bin.number',
+            'AgeTracerBinStart': 'agetracer.age.min',
+            'AgeTracerBinEnd': 'agetracer.age.max',
+            'AgeTracer_CustomTimeBins': 'agetracer.age.bins',  # or this array
+            'AgeTracerEventsPerTimeBin': 'agetracer.event.number.per.age.bin',
             # level of compression of snapshot file
             'CompactLevel': 'compression.level',
             'Compactify_Version': 'compression.version',
@@ -1428,12 +1426,12 @@ class ReadClass(ut.io.SayClass):
                     break
 
         # check if simulation contains age-tracers to assign elemental abundances in post-processing
-        if 'agetracer.number' in header and header['agetracer.number'] > 0:
+        if 'agetracer.age.bin.number' in header and header['agetracer.age.bin.number'] > 0:
             header['has.agetracer'] = True
             header['has.rprocess'] = False
-            if 'agetracer.bins' in header:
+            if 'agetracer.age.bins' in header:
                 header['has.agetracer.custom'] = True
-            elif 'agetracer.min' in header:
+            elif 'agetracer.age.min' in header:
                 header['has.agetracer.custom'] = False
             else:
                 raise ValueError('not sure how to parse age-tracer model in snapshot header')
