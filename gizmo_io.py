@@ -159,6 +159,10 @@ import utilities as ut
 from . import gizmo_default
 
 
+# default FIRE model for stellar evolution to assume throughout
+FIRE_MODEL_DEFAULT = 'fire2'
+
+
 # --------------------------------------------------------------------------------------------------
 # particle dictionary class
 # --------------------------------------------------------------------------------------------------
@@ -296,12 +300,18 @@ class ParticleDictionaryClass(dict):
         # parsing specific to this catalog ----------
         # stellar mass loss
         if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
-            fire_model = 'fire2'
+            if (
+                'fire.model' in self.info
+                and isinstance(self.info['fire.model'], str)
+                and len(self.info['fire.model']) > 0
+            ):
+                fire_model = self.info['fire.model']
+            else:
+                fire_model = FIRE_MODEL_DEFAULT
 
             if 'MassLoss' not in self.__dict__ or self.MassLoss is None:
                 from . import gizmo_star
 
-                # TODO: input FIRE version here
                 # create class to compute/store stellar mass loss as a function of age, metallicity
                 self.MassLoss = gizmo_star.MassLossClass(model=fire_model)
 
@@ -665,18 +675,18 @@ class ParticleDictionaryClass(dict):
         # compute elemental abundances using age-tracer weights
         elif 'agetracer' in property_name:
             assert 'ElementAgeTracer' in self.__dict__ and self.ElementAgeTracer is not None
-            assert len(self.ElementAgeTracer['yields']) > 0
+            assert len(self.ElementAgeTracer['yield.massfractions']) > 0
 
             for element_name in property_name.split('.'):
                 if element_name in ut.constant.element_name_from_symbol:
                     element_name = ut.constant.element_name_from_symbol[element_name]
-                if element_name in self.ElementAgeTracer['yields']:
+                if element_name in self.ElementAgeTracer['yield.massfractions']:
                     break  # found a match
             else:
                 raise KeyError(
                     f'not sure how to parse element = {property_name}.'
                     + ' element age-tracer dictionary has these elements available:  {}'.format(
-                        self.ElementAgeTracer['yields'].keys()
+                        self.ElementAgeTracer['yield.massfractions'].keys()
                     )
                 )
 
@@ -1690,21 +1700,34 @@ class ReadClass(ut.io.SayClass):
                             header
                         )
 
-                        # generate nucleosynthetic yields for this stellar evolution model
+                        """
+                        if 'fire.model' in header and isinstance(header['fire.model'], str)
+                            and len(header['fire.model']) > 0:
+                            fire_model = header['fire.model']
+                        else:
+                            fire_model = FIRE_MODEL_DEFAULT
+                        if 'fire3' in fire_model:
+                            metallicity_initial = 0
+                        else:
+                            metallicity_initial = 10 ** -5
+                        progenitor_metallicity = 0.6
+
+                        # generate nucleosynthetic yield mass fractions for this model
                         FIREYield = gizmo_agetracer.FIREYieldClass(
-                            'fire2', progenitor_metallicity=0.7
+                            fire_model, progenitor_metallicity
                         )
-                        yield_dict = FIREYield.get_element_yields(
+                        element_yield_dict = FIREYield.get_element_yields(
                             part[spec_name].ElementAgeTracer['age.bins']
                         )
                         # assign yields to age-tracer dictionary class
-                        part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
-
-                        # set initial conditions for elemental mass fractions
-                        metallicity_initial = 10 ** -5
-                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
+                        part[spec_name].ElementAgeTracer.assign_element_yield_massfractions(
+                            element_yield_dict
+                        )
+                        # set initial conditions for mass fractions for each element
+                        part[spec_name].ElementAgeTracer.assign_element_initial_massfraction(
                             FIREYield.sun_massfraction, metallicity_initial
                         )
+                        """
                     else:
                         del part[spec_name].ElementAgeTracer
 
@@ -1963,7 +1986,11 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
             if 'massfraction' in part[spec_name] and part[spec_name].info['has.agetracer']:
-                # convert the mass weights in the age-tracer bins to [M_sun]
+                # convert the age-tracer mass weights into dimensionless units of:
+                # mass fraction (relative to my own mass) of winds/ejecta deposited into me
+                # (as a gas particle) during each age-tracer age bin
+                # age-tracer weight value of 1 therefore means that a particle received
+                # winds/ejecta from its own mass of stars across the entire age bin
                 agetracer_index_start = part[spec_name].ElementAgeTracer['element.index.start']
                 part[spec_name]['massfraction'][:, agetracer_index_start:] *= (
                     header['hubble'] / 1e10

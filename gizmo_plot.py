@@ -1823,7 +1823,7 @@ def plot_neighbors_v_distance(
     neig_number_max=5000,
     dimension_indices=None,
     host_index=0,
-    property_select={'host.distance.total': [3, 20], 'age': [0, 0.2]},
+    property_select={'host.distance.total': [1, 20], 'age': [0, 0.2]},
     neighbor_statistic='density.norm',
     axis_y_limits=[],
     axis_y_log_scale=True,
@@ -1840,30 +1840,23 @@ def plot_neighbors_v_distance(
         catalog of particles at snapshot
     species_name : str
         name of particle species
-    property_name : str
-        property name
-    property_limits : list
-        min and max limits of property
-    property_bin_width : float
-        width of property bin (use this or property_bin_number)
-    property_bin_number : int
-        number of bins within limits (use this or property_bin_width)
-    property_log_scale : bool
-        whether to use logarithmic scaling for property bins
-    property_statistic : str :
-        statistic to plot: 'probability', 'probability.cum', 'histogram', 'histogram.cum'
     distance_limits : list
-        min and max limits for distance from galaxy
-    center_positions : array or list of arrays
-        position[s] of galaxy center[s]
-    center_velocities : array or list of arrays
-        velocity[s] of galaxy center[s]
+        min and max limits for particle neighbor separation distances to measure
+    distance_bin_width : float
+        width of separation distance bin
+    distance_log_scale : bool
+        whether to use logarithmic scaling for separation distance bins
+    neig_number_max : int
+        maximum number of neighbors to find per particle
+    dimension_indices : list
+        which dimensions to get coordinates of
     host_index : int
         index of host galaxy/halo to get position and/or velocity of (if not input them)
     property_select : dict
         (other) properties to select on: names as keys and limits as values
-    part_indicess : array or list of arrays
-        indices of particles from which to select
+    property_statistic : str
+        statistic to plot: 'probability', 'probability.cum', 'histogram', 'histogram.cum',
+        'density.norm'
     axis_y_limits : list
         min and max limits for y axis
     axis_y_log_scale : bool
@@ -1875,8 +1868,6 @@ def plot_neighbors_v_distance(
     figure_index : int
         index of figure for matplotlib
     '''
-    # Say = ut.io.SayClass(plot_neighbors_v_distance)
-
     if isinstance(parts, dict):
         parts = [parts]
 
@@ -2292,11 +2283,11 @@ class ElementAgeTracerClass(ut.io.SayClass):
             weights = part[species_name].prop(weight_property, pindices)
 
         self.say('{}'.format(part.info['simulation.name']))
-        self.say('atr-sim pop:  median, 68%, 95%')
+        self.say('atr-sim popu: median, 68%, 95%')
         self.say('atr-sim part: median, 68%, 95%')
         self.say('')
 
-        for element_name in part[species_name].ElementAgeTracer['yields']:
+        for element_name in part[species_name].ElementAgeTracer['yield.massfractions']:
             atr_values = part[species_name].prop(f'metallicity.agetracer.{element_name}', pindices)
             sim_values = part[species_name].prop(f'metallicity.{element_name}', pindices)
             pdifs = atr_values - sim_values
@@ -2365,7 +2356,6 @@ class ElementAgeTracerClass(ut.io.SayClass):
             massfraction_initial[element_name] = (
                 10 ** metallicity_initial * FIREYield.sun_massfraction[element_name]
             )
-        massfraction_initial['helium'] = 0.24
 
         med_old = -Inf
 
@@ -2375,11 +2365,13 @@ class ElementAgeTracerClass(ut.io.SayClass):
                 FIREYield = gizmo_agetracer.FIREYieldClass(
                     model, progenitor_metallicity=progenitor_metallicity
                 )
-                yield_dict = FIREYield.get_element_yields(
+                element_yield_dict = FIREYield.get_element_yields(
                     part[species_name].ElementAgeTracer['age.bins']
                 )
-                part[species_name].ElementAgeTracer.assign_element_yields(yield_dict)
-                part[species_name].ElementAgeTracer.assign_element_massfraction_initial(
+                part[species_name].ElementAgeTracer.assign_element_yield_massfractions(
+                    element_yield_dict
+                )
+                part[species_name].ElementAgeTracer.assign_element_initial_massfraction(
                     massfraction_initial
                 )
 
