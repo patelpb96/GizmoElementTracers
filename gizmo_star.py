@@ -32,14 +32,14 @@ from scipy import integrate
 
 import utilities as ut
 
-# default rate + yield model to assume throughout
-DEFAULT_MODEL = 'fire2'
+# default model for stellar evolution rates and yields to assume throughout
+FIRE_MODEL_DEFAULT = 'fire2'
 
 
 # --------------------------------------------------------------------------------------------------
 # utility
 # --------------------------------------------------------------------------------------------------
-def get_sun_massfraction(model=DEFAULT_MODEL):
+def get_sun_massfraction(model=FIRE_MODEL_DEFAULT):
     '''
     Get dictionary of Solar abundances (mass fractions) for the elements that Gizmo tracks.
     (These mass fractions may differ by up to a percent from the values in utilities.constant,
@@ -87,7 +87,7 @@ def get_sun_massfraction(model=DEFAULT_MODEL):
     return sun_massfraction
 
 
-def get_ages_transition(model=DEFAULT_MODEL):
+def get_ages_transition(model=FIRE_MODEL_DEFAULT):
     '''
     Get array of ages [Myr] that mark transitions in stellar evolution for a given model.
     Use to supply to numerical integrators.
@@ -129,7 +129,7 @@ class NucleosyntheticYieldClass(dict):
             (via setting all progenitors to Solar)
     '''
 
-    def __init__(self, model=DEFAULT_MODEL):
+    def __init__(self, model=FIRE_MODEL_DEFAULT):
         '''
         Store Solar elemental abundances, as linear mass fractions.
 
@@ -184,15 +184,12 @@ class NucleosyntheticYieldClass(dict):
         '''
         Get dictionary of stellar nucleosynthetic yields for a single event_kind event
         in the FIRE-2 or FIRE-3 model.
-        Return yields as mass fraction [wrt total ejecta mass] if normalize is True,
-        else mass [Msun] if normalize if False.
-        Stellar wind yields are intrinsically/always mass fractions [wrt wind mass].
+        Return each yield as a mass fraction [mass of element / total ejecta mass] if return_mass
+        is False (default), else return mass of element [Msun] if return_mass is True.
+        Stellar wind yields are always intrinsically mass fractions [wrt wind mass].
 
-        This computes the *additional* nucleosynthetic yields that Gizmo adds to the star's
-        existing abuances, so these are not the total yields that get deposited to gas.
-        The total mass fraction (wrt mass of star particle) returned for each element is:
-            (1 - ejecta_total_mass_fraction) * progenitor_element_mass_fraction
-                + ejecta_total_mass_fraction * ejecta_element_mass_fraction
+        For stellar winds, Gizmo adds the existing surface abundances in the progenitor
+        for elements not included in its yield.
 
         Parameters
         ----------
@@ -203,8 +200,8 @@ class NucleosyntheticYieldClass(dict):
         progenitor_massfraction_dict : dict or bool [optional]
             optional: dictionary that contains the mass fraction of each element in the progenitor
             if blank, then assume Solar abundance ratios and use progenitor_metallicity to normalize
-            for FIRE-2, use to compute higher-order corrections to surface abundances
-            for FIRE-3, use to compute stellar winds yields
+            For FIRE-2, use to compute higher-order corrections to surface abundances.
+            For FIRE-3, use to compute stellar winds yields.
         age : float
             stellar age [Myr]
         model : str
@@ -248,6 +245,8 @@ class NucleosyntheticYieldClass(dict):
             if 'fire2' in self.model:
                 # FIRE-2: stellar_evolution.c line 583
                 # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
+                # assume the total wind abundances for He, C, N, and O as below
+                # for all other elements, simply return progenitor surface abundance
                 # below are mass fractions
                 element_yield['helium'] = 0.36
                 element_yield['carbon'] = 0.016
@@ -590,13 +589,12 @@ class NucleosyntheticYieldClass(dict):
 
             for element_name in element_yield:
                 if element_yield[element_name] > 0:
-
                     # apply (new) yield only to pure (non-metal) mass of star
                     element_yield[element_name] *= pure_mass_fraction
                     # correction relative to solar abundance
                     element_yield[element_name] += (
                         progenitor_massfraction_dict[element_name]
-                        - self.sun_massfraction[element_name]
+                        - self.sun_massfraction[element_name]  # I do not understand this term
                     )
                     element_yield[element_name] = np.clip(element_yield[element_name], 0, 1)
 
@@ -653,7 +651,7 @@ class StellarWindClass:
             (via setting all progenitors to Solar)
     '''
 
-    def __init__(self, model=DEFAULT_MODEL):
+    def __init__(self, model=FIRE_MODEL_DEFAULT):
         '''
         Parameters
         ----------
@@ -946,7 +944,9 @@ class SupernovaCCClass:
     in the FIRE-2 or FIRE-3 model.
     '''
 
-    def __init__(self, model=DEFAULT_MODEL, cc_age_min=None, cc_age_break=None, cc_age_max=None):
+    def __init__(
+        self, model=FIRE_MODEL_DEFAULT, cc_age_min=None, cc_age_break=None, cc_age_max=None
+    ):
         '''
         Parameters
         ----------
@@ -1343,7 +1343,7 @@ class SupernovaIaClass(ut.io.SayClass):
     in the FIRE-2 or FIRE-3 model.
     '''
 
-    def __init__(self, model=DEFAULT_MODEL, ia_age_min=None):
+    def __init__(self, model=FIRE_MODEL_DEFAULT, ia_age_min=None):
         '''
         Parameters
         ----------
@@ -1598,7 +1598,7 @@ class MassLossClass(ut.io.SayClass):
     implemented in the FIRE-2 or FIRE-3 model.
     '''
 
-    def __init__(self, model=DEFAULT_MODEL):
+    def __init__(self, model=FIRE_MODEL_DEFAULT):
         '''
         Parameters
         ----------
@@ -1726,7 +1726,7 @@ class MassLossClass(ut.io.SayClass):
             + self.SupernovaIa.get_mass_loss(age_min, age_maxs, element_name=element_name)
         )
 
-    def get_mass_loss_from_spline(self, ages, metallicities, metal_mass_fractions=None):
+    def get_mass_loss_from_spline(self, ages, metallicities=None, metal_mass_fractions=None):
         '''
         Get fractional mass loss relative to mass of stars at formation via all stellar evolution
         channels at ages and metallicities (or metal mass fractions) via 2-D (bivariate) spline.
@@ -1953,7 +1953,7 @@ def plot_mass_loss_v_age(
     element_name=None,
     metallicity=1,
     metal_mass_fraction=None,
-    model=DEFAULT_MODEL,
+    model=FIRE_MODEL_DEFAULT,
     age_limits=[1, 13700],
     age_bin_width=0.01,
     age_log_scale=True,
@@ -2083,7 +2083,7 @@ def plot_mass_loss_v_age(
 def plot_nucleosynthetic_yields(
     event_kinds='wind',
     metallicity=1,
-    model=DEFAULT_MODEL,
+    model=FIRE_MODEL_DEFAULT,
     axis_y_limits=[1e-3, 5],
     axis_y_log_scale=True,
     file_name=False,
