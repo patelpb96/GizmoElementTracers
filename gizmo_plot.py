@@ -3,7 +3,10 @@ Plotting analysis of particle data from Gizmo simulations.
 
 @author: Andrew Wetzel <arwetzel@gmail.com>
 
-Units: unless otherwise noted, all quantities are in (combinations of):
+----------
+Units
+
+Unless otherwise noted, all quantities are in (combinations of)
     mass [M_sun]
     position [kpc comoving]
     distance, radius [kpc physical]
@@ -1111,10 +1114,10 @@ def plot_velocity_v_age(
 def plot_property_v_property(
     part,
     species_name='gas',
-    x_property_name='log number.density',
+    x_property_name='number.density',
     x_property_limits=[],
     x_property_log_scale=True,
-    y_property_name='log temperature',
+    y_property_name='temperature',
     y_property_limits=[],
     y_property_log_scale=True,
     property_bin_number=150,
@@ -1820,7 +1823,7 @@ def plot_neighbors_v_distance(
     neig_number_max=5000,
     dimension_indices=None,
     host_index=0,
-    property_select={'host.distance.total': [3, 20], 'age': [0, 0.2]},
+    property_select={'host.distance.total': [1, 20], 'age': [0, 0.2]},
     neighbor_statistic='density.norm',
     axis_y_limits=[],
     axis_y_log_scale=True,
@@ -1837,30 +1840,23 @@ def plot_neighbors_v_distance(
         catalog of particles at snapshot
     species_name : str
         name of particle species
-    property_name : str
-        property name
-    property_limits : list
-        min and max limits of property
-    property_bin_width : float
-        width of property bin (use this or property_bin_number)
-    property_bin_number : int
-        number of bins within limits (use this or property_bin_width)
-    property_log_scale : bool
-        whether to use logarithmic scaling for property bins
-    property_statistic : str :
-        statistic to plot: 'probability', 'probability.cum', 'histogram', 'histogram.cum'
     distance_limits : list
-        min and max limits for distance from galaxy
-    center_positions : array or list of arrays
-        position[s] of galaxy center[s]
-    center_velocities : array or list of arrays
-        velocity[s] of galaxy center[s]
+        min and max limits for particle neighbor separation distances to measure
+    distance_bin_width : float
+        width of separation distance bin
+    distance_log_scale : bool
+        whether to use logarithmic scaling for separation distance bins
+    neig_number_max : int
+        maximum number of neighbors to find per particle
+    dimension_indices : list
+        which dimensions to get coordinates of
     host_index : int
         index of host galaxy/halo to get position and/or velocity of (if not input them)
     property_select : dict
         (other) properties to select on: names as keys and limits as values
-    part_indicess : array or list of arrays
-        indices of particles from which to select
+    property_statistic : str
+        statistic to plot: 'probability', 'probability.cum', 'histogram', 'histogram.cum',
+        'density.norm'
     axis_y_limits : list
         min and max limits for y axis
     axis_y_log_scale : bool
@@ -1872,8 +1868,6 @@ def plot_neighbors_v_distance(
     figure_index : int
         index of figure for matplotlib
     '''
-    # Say = ut.io.SayClass(plot_neighbors_v_distance)
-
     if isinstance(parts, dict):
         parts = [parts]
 
@@ -2037,10 +2031,11 @@ def print_densities(
 # --------------------------------------------------------------------------------------------------
 # elemental abundances, age-tracer model
 # --------------------------------------------------------------------------------------------------
-def plot_metal_v_distance(
+def plot_element_v_distance(
     parts,
     species_name='gas',
-    metal_name='massfraction.metals',
+    property_name='massfraction.metals',
+    property_statistic='sum',
     axis_y_log_scale=True,
     axis_y_limits=[None, None],
     distance_limits=[10, 3000],
@@ -2055,7 +2050,7 @@ def plot_metal_v_distance(
     figure_index=1,
 ):
     '''
-    Plot metallicity (in distance bin or cumulative) of gas or stars v distance from galaxy.
+    Plot elemental mass or mass fraction for gas or stars v distance (in bin or cumulative).
 
     Parameters
     ----------
@@ -2063,8 +2058,10 @@ def plot_metal_v_distance(
         catalog[s] of particles at snapshot
     species_name : str
         name of particle species
-    metal_name : str
-        'massfraction.X' or 'mass.X'
+    property_name : str
+        'massfraction.<element_name>' or 'mass.<element_name>'
+    property_statistic : str
+        'sum', 'sum.cum'
     axis_y_log_scale : bool
         whether to use logarithmic scaling for y axis
     distance_limits : list
@@ -2103,7 +2100,7 @@ def plot_metal_v_distance(
         distance_limits_use, distance_bin_width, log_scale=distance_log_scale
     )
 
-    metal_values = []
+    property_values = []
     for part_i, part in enumerate(parts):
         distances = ut.coordinate.get_distances(
             part[species_name]['position'],
@@ -2113,22 +2110,18 @@ def plot_metal_v_distance(
             total_distance=True,
         )  # [kpc physical]
 
-        metal_mass_name = metal_name.replace('massfraction.', 'mass.')
-        metal_masses = part[species_name].prop(metal_mass_name)
+        # get profile of total mass of element
+        element_mass_name = property_name.replace('massfraction.', 'mass.')
+        element_masses = part[species_name].prop(element_mass_name)
+        pro_element = DistanceBin.get_sum_profile(distances, element_masses)
+        property_vals = pro_element[property_statistic]
 
-        pro_metal = DistanceBin.get_sum_profile(distances, metal_masses)
-
-        if 'massfraction' in metal_name:
+        if 'mass' in property_name:
+            property_values.append(property_vals)
+        elif 'massfraction' in property_name:
+            # get profile of total mass
             pro_mass = DistanceBin.get_sum_profile(distances, part[species_name]['mass'])
-            if '.cum' in metal_name:
-                metal_values.append(pro_metal['sum.cum'] / pro_mass['sum.cum'])
-            else:
-                metal_values.append(pro_metal['sum'] / pro_mass['sum'])
-        elif 'mass' in metal_name:
-            if '.cum' in metal_name:
-                metal_values.append(pro_metal['sum.cum'])
-            else:
-                metal_values.append(pro_metal['sum'])
+            property_values.append(property_vals / pro_mass[property_statistic])
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
@@ -2140,21 +2133,21 @@ def plot_metal_v_distance(
         None,
         axis_y_log_scale,
         axis_y_limits,
-        metal_values,
+        property_values,
     )
 
-    metal_mass_label = f'M_{{\\rm Z,{species_name}}}'
+    element_mass_label = f'M_{{\\rm Z,{species_name}}}'
     radius_label = '(r)'
-    if '.cum' in metal_name:
+    if '.cum' in property_statistic:
         radius_label = '(< r)'
-    if 'massfraction' in metal_name:
+    if 'massfraction' in property_name:
         axis_y_label = (
-            f'${metal_mass_label}{radius_label} \, / \,'
+            f'${element_mass_label}{radius_label} \, / \,'
             + ' M_{{\\rm {species_name}}}{radius_label}$'
         )
-    elif 'mass' in metal_name:
+    elif 'mass' in property_name:
         # axis_y_label = f'${metal_mass_label}(< r) \, / \, M_{{\\rm Z,tot}}$'
-        axis_y_label = f'${metal_mass_label}{radius_label} \, [M_\odot]$'
+        axis_y_label = f'${element_mass_label}{radius_label} \, [M_\odot]$'
     # axis_y_label = '$Z \, / \, Z_\odot$'
     subplot.set_ylabel(axis_y_label)
 
@@ -2180,7 +2173,7 @@ def plot_metal_v_distance(
     for part_i, part in enumerate(parts):
         subplot.plot(
             xs,
-            metal_values[part_i],
+            property_values[part_i],
             color=colors[part_i],
             alpha=0.8,
             label=part.info['simulation.name'],
@@ -2198,134 +2191,148 @@ def plot_metal_v_distance(
     ut.plot.parse_output(plot_file_name, plot_directory)
 
 
+def test_element_to_element_ratio(
+    parts, species=['star', 'gas'], element_reference='o', log_ratio=True
+):
+    '''
+    Test element-to-element variations in abundance ratios (normalizing out the median ratio)
+    for metals that FIRE tracks directly.
+
+    Parameters
+    ----------
+    parts : dict or list
+        catalog[s] of particles at snapshot
+    species_name : str or list
+        name[s] of particle species
+    element_reference : str
+        name of element to use as reference, to get scatter of other elements relative to it
+    log_ratio : bool
+        whether to compute the log ratio of elemental abundances
+    '''
+    Say = ut.io.SayClass(test_element_to_element_ratio)
+
+    element_names = ['c', 'n', 'o', 'ne', 'mg', 'si', 's', 'ca', 'fe']
+    element_names = [_ for _ in element_names if _ != element_reference]
+    if np.isscalar(species):
+        species = [species]
+    if species[0] in parts:
+        parts = [parts]
+
+    Statistic = ut.math.StatisticClass()
+
+    for element_name in element_names:
+        Say.say(
+            f'\n[{element_name.capitalize()}/{element_reference.capitalize()}] dex scatter'
+            + ' (1-sigma, 2-sigma, 3-sigma)'
+        )
+
+        for spec_name in species:
+            for part_i, part in enumerate(parts):
+                element_ratios_p = part[spec_name].prop(f'massfraction.{element_name}') / part[
+                    spec_name
+                ].prop(f'massfraction.{element_reference}')
+                if part_i == 0:
+                    element_ratios = element_ratios_p
+                else:
+                    element_ratios = np.concatenate((element_ratios, element_ratios_p))
+
+            # we do not care about the absolute ratio of abundances, we care about its scatter
+            element_ratios /= np.median(element_ratios)
+            if log_ratio:
+                element_ratios = np.log10(element_ratios)
+
+            stat = Statistic.get_statistic_dict(element_ratios)
+            Say.say(
+                '* {:4}: {:.2f}, {:.2f}, {:.2f}'.format(
+                    spec_name,
+                    0.5 * (stat['percent.84'] - stat['percent.16']),
+                    0.5 * (stat['percent.98'] - stat['percent.2']),
+                    0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
+                )
+            )
+
+
 class ElementAgeTracerClass(ut.io.SayClass):
     '''
-    .
+    Class to analyze elemental abundances from age-tracers and compare to elemental abundances
+    tracked directly in FIRE.
     '''
-
-    def test_metal_variation(
-        self, parts, species=['star', 'gas'], element_reference='o', log_ratio=True
-    ):
-        '''
-        .
-        '''
-        element_names = ['he', 'c', 'n', 'o', 'ne', 'mg', 'si', 's', 'ca', 'fe']
-        element_names = [
-            element_name for element_name in element_names if element_name != element_reference
-        ]
-        if np.isscalar(species):
-            species = [species]
-        if species[0] in parts:
-            parts = [parts]
-
-        Statistic = ut.math.StatisticClass()
-
-        for element_name in element_names:
-            self.say(
-                f'\ndex scatter in [{element_name.capitalize()}/{element_reference.capitalize()}]'
-            )
-            for spec_name in species:
-                for part_i, part in enumerate(parts):
-                    element_ratios_p = part[spec_name].prop(f'massfraction.{element_name}') / part[
-                        spec_name
-                    ].prop(f'massfraction.{element_reference}')
-                    if part_i == 0:
-                        element_ratios = element_ratios_p
-                    else:
-                        element_ratios = np.concatenate((element_ratios, element_ratios_p))
-
-                element_ratios /= np.median(element_ratios)
-                if log_ratio:
-                    element_ratios = np.log10(element_ratios)
-
-                stat = Statistic.get_statistic_dict(element_ratios)
-                self.say(
-                    '* {:4}: 2-sigma {:.2f}, 3-sigma {:.2f}'.format(
-                        spec_name,
-                        0.5 * (stat['percent.98'] - stat['percent.2']),
-                        0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
-                    )
-                )
-                # self.say(f'* {spec_name}')
-                # self.say(
-                #    '  95%: {:.2f} {:.2f} | {:.2f}'.format(
-                #        stat['percent.2'],
-                #        stat['percent.98'],
-                #        0.5 * (stat['percent.98'] - stat['percent.2']),
-                #    )
-                # )
-                # self.say(
-                #    '99.7%: {:.2f} {:.2f} | {:.2f}'.format(
-                #        stat['percent.0.1'],
-                #        stat['percent.99.9'],
-                #        0.5 * (stat['percent.99.9'] - stat['percent.0.1']),
-                #    )
-                # )
 
     def test_agetracers(
         self, part, species_name='star', weight_property=None, pindices=None,
     ):
         '''
-        .
+        Test element-to-element variations in abundance ratios (normalizing out the median ratio)
+        for metals that FIRE tracks directly.
+
+        Parameters
+        ----------
+        part : dict
+            catalog of particles at snapshot
+        species_name : str or list
+            name of particle species
+        weight_property : str
+            property to weight each abundance by. If None, do not weight.
+        pindices : array
+            prior indices of particles to select
         '''
-        multiplier = 100
+        multiplier = 1  # multiply dex offset by this
 
         weights = None
         if weight_property is not None and len(weight_property):
             weights = part[species_name].prop(weight_property, pindices)
 
-        self.say('median, dif_pop, dif_pp')
-        self.say('68% width, dif_pop, dif_pp')
-        self.say('95% width, dif_pop, dif_pp')
-        self.say(f'(dif x {multiplier})')
+        self.say('{}'.format(part.info['simulation.name']))
+        self.say('atr-sim popu: median, 68%, 95%')
+        self.say('atr-sim part: median, 68%, 95%')
+        self.say('')
 
-        for element_name in part[species_name].ElementAgeTracer['yields']:
-            values_at = part[species_name].prop(f'metallicity.agetracer.{element_name}', pindices)
-            values_sim = part[species_name].prop(f'metallicity.{element_name}', pindices)
-            difs = values_at - values_sim
+        for element_name in part[species_name].ElementAgeTracer['yield.massfractions']:
+            atr_values = part[species_name].prop(f'metallicity.agetracer.{element_name}', pindices)
+            sim_values = part[species_name].prop(f'metallicity.{element_name}', pindices)
+            pdifs = atr_values - sim_values
 
-            med_at = ut.math.percentile_weighted(values_at, 50, weights)
-            med_sim = ut.math.percentile_weighted(values_sim, 50, weights)
-            med_pp = ut.math.percentile_weighted(difs, 50, weights)
+            atr_med = ut.math.percentile_weighted(atr_values, 50, weights)
+            sim_med = ut.math.percentile_weighted(sim_values, 50, weights)
+            pdif_med = ut.math.percentile_weighted(pdifs, 50, weights)
 
-            p84 = ut.math.percentile_weighted(values_at, 84, weights)
-            p16 = ut.math.percentile_weighted(values_at, 16, weights)
-            w68_at = (p84 - p16) / 2
-            p84 = ut.math.percentile_weighted(values_sim, 84, weights)
-            p16 = ut.math.percentile_weighted(values_sim, 16, weights)
-            w68_sim = (p84 - p16) / 2
-            p84 = ut.math.percentile_weighted(difs, 84, weights)
-            p16 = ut.math.percentile_weighted(difs, 16, weights)
-            w68_pp = (p84 - p16) / 2
+            p84 = ut.math.percentile_weighted(atr_values, 84, weights)
+            p16 = ut.math.percentile_weighted(atr_values, 16, weights)
+            atr_w68 = (p84 - p16) / 2
+            p84 = ut.math.percentile_weighted(sim_values, 84, weights)
+            p16 = ut.math.percentile_weighted(sim_values, 16, weights)
+            sim_w68 = (p84 - p16) / 2
+            p84 = ut.math.percentile_weighted(pdifs, 84, weights)
+            p16 = ut.math.percentile_weighted(pdifs, 16, weights)
+            pdif_w68 = (p84 - p16) / 2
 
-            p98 = ut.math.percentile_weighted(values_at, 97.725, weights)
-            p02 = ut.math.percentile_weighted(values_at, 2.275, weights)
-            w95_at = (p98 - p02) / 2
-            p98 = ut.math.percentile_weighted(values_sim, 97.725, weights)
-            p02 = ut.math.percentile_weighted(values_sim, 2.275, weights)
-            w95_sim = (p98 - p02) / 2
-            p98 = ut.math.percentile_weighted(difs, 97.725, weights)
-            p02 = ut.math.percentile_weighted(difs, 2.275, weights)
-            w95_pp = (p98 - p02) / 2
+            p98 = ut.math.percentile_weighted(atr_values, 97.725, weights)
+            p02 = ut.math.percentile_weighted(atr_values, 2.275, weights)
+            atr_w95 = (p98 - p02) / 2
+            p98 = ut.math.percentile_weighted(sim_values, 97.725, weights)
+            p02 = ut.math.percentile_weighted(sim_values, 2.275, weights)
+            sim_w95 = (p98 - p02) / 2
+            p98 = ut.math.percentile_weighted(pdifs, 97.725, weights)
+            p02 = ut.math.percentile_weighted(pdifs, 2.275, weights)
+            pdif_w95 = (p98 - p02) / 2
 
+            self.say(element_name)
+            # self.say('{:5.1f} {:5.2f} {:5.2f}'.format(sim_med, sim_w68, sim_w95))
             self.say(
-                '{:10} {:5.1f} {:5.2f} {:5.2f}'.format(element_name, med_sim, w68_sim, w95_sim,)
-            )
-            self.say(
-                '           {:5.1f} {:5.1f} {:5.1f}'.format(
-                    (med_at - med_sim) * multiplier,
-                    (w68_at - w68_sim) * multiplier,
-                    (w95_at - w95_sim) * multiplier,
+                '{:6.3f} {:6.3f} {:6.3f}'.format(
+                    (atr_med - sim_med) * multiplier,
+                    (atr_w68 - sim_w68) * multiplier,
+                    (atr_w95 - sim_w95) * multiplier,
                 )
             )
             self.say(
-                '           {:5.1f} {:5.1f} {:5.1f}'.format(
-                    med_pp * multiplier, w68_pp * multiplier, w95_pp * multiplier
+                '{:6.3f} {:6.3f} {:6.3f}'.format(
+                    pdif_med * multiplier, pdif_w68 * multiplier, pdif_w95 * multiplier
                 )
             )
             self.say('')
 
-    def test_agetracers_progenitor_metallicity(
+    def test_agetracers_with_progenitor_metallicity(
         self, part, species_name='star', weight_property=None, pindices=None, model='fire2.1'
     ):
         '''
@@ -2349,7 +2356,6 @@ class ElementAgeTracerClass(ut.io.SayClass):
             massfraction_initial[element_name] = (
                 10 ** metallicity_initial * FIREYield.sun_massfraction[element_name]
             )
-        massfraction_initial['helium'] = 0.24
 
         med_old = -Inf
 
@@ -2359,11 +2365,13 @@ class ElementAgeTracerClass(ut.io.SayClass):
                 FIREYield = gizmo_agetracer.FIREYieldClass(
                     model, progenitor_metallicity=progenitor_metallicity
                 )
-                yield_dict = FIREYield.get_element_yields(
+                element_yield_dict = FIREYield.get_element_yields(
                     part[species_name].ElementAgeTracer['age.bins']
                 )
-                part[species_name].ElementAgeTracer.assign_element_yields(yield_dict)
-                part[species_name].ElementAgeTracer.assign_element_massfraction_initial(
+                part[species_name].ElementAgeTracer.assign_element_yield_massfractions(
+                    element_yield_dict
+                )
+                part[species_name].ElementAgeTracer.assign_element_initial_massfraction(
                     massfraction_initial
                 )
 
@@ -2394,6 +2402,38 @@ class ElementAgeTracerClass(ut.io.SayClass):
                 )
             )
 
+    def test_progenitor_metallicity_dependence(
+        self,
+        part,
+        species_name='star',
+        progenitor_metallicities=[0.1, 1],
+        yield_model='fire2.2',
+        element_names=['metals', 'carbon', 'nitrogen', 'oxygen', 'magnesium', 'iron'],
+    ):
+        '''
+        .
+        '''
+        from . import gizmo_agetracer
+
+        metal_dicts = []
+
+        for progenitor_metallicity in progenitor_metallicities:
+            gizmo_agetracer.initialize_agetracers(
+                part, species_name, progenitor_metallicity, yield_model=yield_model,
+            )
+            metal_dict = {}
+            for element_name in element_names:
+                metal_dict[element_name] = part[species_name].prop(
+                    f'metallicity.{element_name}.agetracer'
+                )
+            metal_dicts.append(metal_dict)
+
+        for element_name in element_names:
+            metal_difs = metal_dicts[1][element_name] - metal_dicts[0][element_name]
+
+            self.say(f'\n* {element_name}')
+            ut.math.print_statistics(metal_difs)
+
     def plot_element_distribution(
         self,
         part,
@@ -2401,7 +2441,6 @@ class ElementAgeTracerClass(ut.io.SayClass):
         property_name='metallicity.fe',
         property_limits=[-4, 1],
         property_bin_width=0.1,
-        property_bin_number=None,
         property_statistic='probability',
         axis_y_limits=[],
         axis_y_log_scale=True,
@@ -2426,8 +2465,6 @@ class ElementAgeTracerClass(ut.io.SayClass):
             min and max limits of element
         property_bin_width : float
             width of element bin
-        property_bin_number : int
-            number of bins within limits (use this or element_bin_width)
         property_statistic : str
             statistic to plot: 'probability', 'probability.cum', 'probability.norm', 'histogram',
             'histogram.cum'
@@ -2447,40 +2484,38 @@ class ElementAgeTracerClass(ut.io.SayClass):
             index of figure for matplotlib
         '''
         model_number = 2
-        at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
+        atr_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
 
         Stat = ut.math.StatisticClass()
 
-        property_values = part[species_name].prop(property_name, part_indices)
-        at_property_values = part[species_name].prop(at_property_name, part_indices)
+        sim_property_values = part[species_name].prop(property_name, part_indices)
+        atr_property_values = part[species_name].prop(atr_property_name, part_indices)
 
         weights = None
         if weight_property:
             weights = part[species_name].prop(weight_property, part_indices)
 
-        masks = property_values > -Inf
+        masks = sim_property_values > -Inf
         # masks *= (property_values > element_limits[0]) * (property_values < element_limits[1])
-        masks *= (at_property_values > property_limits[0]) * (
-            at_property_values < property_limits[1]
+        masks *= (atr_property_values > property_limits[0]) * (
+            atr_property_values < property_limits[1]
         )
 
-        property_difs = at_property_values[masks] - property_values[masks]
+        property_difs = atr_property_values[masks] - sim_property_values[masks]
         ut.math.print_statistics(property_difs, weights[masks])
 
-        distr_sim = Stat.get_distribution_dict(
-            property_values,
+        sim_distr = Stat.get_distribution_dict(
+            sim_property_values,
             property_limits,
             property_bin_width,
-            property_bin_number,
             log_scale=False,
             weights=weights,
         )
 
-        distr_at = Stat.get_distribution_dict(
-            at_property_values,
+        atr_distr = Stat.get_distribution_dict(
+            atr_property_values,
             property_limits,
             property_bin_width,
-            property_bin_number,
             log_scale=False,
             weights=weights,
         )
@@ -2488,7 +2523,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         # plot ----------
         _fig, subplot = ut.plot.make_figure(figure_index)
 
-        y_values = np.array([distr_sim[property_statistic], distr_at[property_statistic]])
+        y_values = np.array([sim_distr[property_statistic], atr_distr[property_statistic]])
 
         ut.plot.set_axes_scaling_limits(
             subplot, False, property_limits, None, axis_y_log_scale, axis_y_limits, y_values
@@ -2506,16 +2541,16 @@ class ElementAgeTracerClass(ut.io.SayClass):
         colors = ut.plot.get_colors(model_number)
 
         subplot.plot(
-            distr_sim['bin.mid'],
-            distr_sim[property_statistic],
+            sim_distr['bin.mid'],
+            sim_distr[property_statistic],
             color=colors[0],
             alpha=0.8,
             label='FIRE',
         )
 
         subplot.plot(
-            distr_at['bin.mid'],
-            distr_at[property_statistic],
+            atr_distr['bin.mid'],
+            atr_distr[property_statistic],
             color=colors[1],
             alpha=0.8,
             label='age-tracer',
@@ -2575,15 +2610,15 @@ class ElementAgeTracerClass(ut.io.SayClass):
             index of figure for matplotlib
         '''
         model_number = 2
-        x_at_property_name = x_property_name.replace('metallicity', 'metallicity.agetracer')
-        y_at_property_name = y_property_name.replace('metallicity', 'metallicity.agetracer')
+        atr_x_property_name = x_property_name.replace('metallicity', 'metallicity.agetracer')
+        atr_y_property_name = y_property_name.replace('metallicity', 'metallicity.agetracer')
 
         if x_property_limits is not None and len(x_property_limits) > 0:
             part_indices = ut.array.get_indices(
                 part[species_name].prop(x_property_name), x_property_limits, part_indices
             )
             part_indices = ut.array.get_indices(
-                part[species_name].prop(x_at_property_name), x_property_limits, part_indices
+                part[species_name].prop(atr_x_property_name), x_property_limits, part_indices
             )
 
         weights = None
@@ -2592,14 +2627,14 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         Bin = ut.binning.BinClass(x_property_limits, x_property_width)
 
-        stat_sim = Bin.get_statistics_of_array(
+        sim_stat = Bin.get_statistics_of_array(
             part[species_name].prop(x_property_name, part_indices),
             part[species_name].prop(y_property_name, part_indices),
             weights,
         )
-        stat_at = Bin.get_statistics_of_array(
-            part[species_name].prop(x_at_property_name, part_indices),
-            part[species_name].prop(y_at_property_name, part_indices),
+        atr_stat = Bin.get_statistics_of_array(
+            part[species_name].prop(atr_x_property_name, part_indices),
+            part[species_name].prop(atr_y_property_name, part_indices),
             weights,
         )
 
@@ -2608,7 +2643,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         y_values = [
             part[species_name].prop(y_property_name, part_indices),
-            part[species_name].prop(y_at_property_name, part_indices),
+            part[species_name].prop(atr_y_property_name, part_indices),
         ]
 
         ut.plot.set_axes_scaling_limits(
@@ -2623,14 +2658,14 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         colors = ut.plot.get_colors(model_number)
 
-        ut.plot.draw_stats(subplot, stat_sim, 'bin.mid', 'median', 2, color=colors[0], label='FIRE')
+        ut.plot.draw_stats(subplot, sim_stat, 'bin.mid', 'median', 2, color=colors[0], label='FIRE')
         ut.plot.draw_stats(
-            subplot, stat_at, 'bin.mid', 'median', 2, color=colors[1], label='age-tracer'
+            subplot, atr_stat, 'bin.mid', 'median', 2, color=colors[1], label='age-tracer'
         )
 
-        print(ut.io.get_string_from_numbers(stat_at['median'] - stat_sim['median']))
+        print(ut.io.get_string_from_numbers(atr_stat['median'] - sim_stat['median']))
 
-        print('median {:.3f}'.format(np.mean(stat_at['median'] - stat_sim['median'])))
+        print('median {:.3f}'.format(np.mean(atr_stat['median'] - sim_stat['median'])))
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
@@ -2683,7 +2718,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         species_name = 'star'
         model_number = 2
         time_log_scale = False
-        at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
+        atr_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
 
         if time_limits is not None and len(time_limits) > 0:
             part_indices = ut.array.get_indices(
@@ -2696,14 +2731,14 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         Bin = ut.binning.BinClass(time_limits, time_width, log_scale=time_log_scale)
 
-        stat_sim = Bin.get_statistics_of_array(
+        sim_stat = Bin.get_statistics_of_array(
             part[species_name].prop(time_name, part_indices),
             part[species_name].prop(property_name, part_indices),
             weights,
         )
-        stat_at = Bin.get_statistics_of_array(
+        atr_stat = Bin.get_statistics_of_array(
             part[species_name].prop(time_name, part_indices),
-            part[species_name].prop(at_property_name, part_indices),
+            part[species_name].prop(atr_property_name, part_indices),
             weights,
         )
 
@@ -2712,7 +2747,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         y_values = [
             part[species_name].prop(property_name, part_indices),
-            part[species_name].prop(at_property_name, part_indices),
+            part[species_name].prop(atr_property_name, part_indices),
         ]
 
         ut.plot.set_axes_scaling_limits(
@@ -2727,14 +2762,14 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         colors = ut.plot.get_colors(model_number)
 
-        ut.plot.draw_stats(subplot, stat_sim, 'bin.mid', 'median', 2, color=colors[0], label='FIRE')
+        ut.plot.draw_stats(subplot, sim_stat, 'bin.mid', 'median', 2, color=colors[0], label='FIRE')
         ut.plot.draw_stats(
-            subplot, stat_at, 'bin.mid', 'median', 2, color=colors[1], label='age-tracer'
+            subplot, atr_stat, 'bin.mid', 'median', 2, color=colors[1], label='age-tracer'
         )
 
-        print(ut.io.get_string_from_numbers(stat_at['median'] - stat_sim['median']))
+        print(ut.io.get_string_from_numbers(atr_stat['median'] - sim_stat['median']))
 
-        print('median {:.3f}'.format(np.mean(stat_at['median'] - stat_sim['median'])))
+        print('median {:.3f}'.format(np.mean(atr_stat['median'] - sim_stat['median'])))
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
@@ -2800,7 +2835,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         '''
         model_number = 2
 
-        at_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
+        atr_property_name = property_name.replace('metallicity', 'metallicity.agetracer')
 
         SpeciesProfile = ut.particle.SpeciesProfileClass(
             distance_limits,
@@ -2809,7 +2844,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
             dimension_number=dimension_number,
         )
 
-        pro_sim = SpeciesProfile.get_statistics_profiles(
+        sim_pro = SpeciesProfile.get_statistics_profiles(
             part,
             species_name,
             property_name,
@@ -2819,10 +2854,10 @@ class ElementAgeTracerClass(ut.io.SayClass):
             part_indicess=part_indices,
         )[species_name]
 
-        pro_at = SpeciesProfile.get_statistics_profiles(
+        atr_pro = SpeciesProfile.get_statistics_profiles(
             part,
             species_name,
-            at_property_name,
+            atr_property_name,
             weight_property,
             rotation=rotation,
             other_axis_distance_limits=other_axis_distance_limits,
@@ -2830,14 +2865,14 @@ class ElementAgeTracerClass(ut.io.SayClass):
         )[species_name]
 
         # print results
-        print(pro_at[property_statistic] - pro_sim[property_statistic])
+        print(atr_pro[property_statistic] - sim_pro[property_statistic])
 
         # plot ----------
         _fig, subplot = ut.plot.make_figure(figure_index)
 
         y_values = [
-            np.min(np.concatenate((pro_sim['percent.16'], pro_at['percent.16']))),
-            np.max(np.concatenate((pro_sim['percent.84'], pro_at['percent.84']))),
+            np.min(np.concatenate((sim_pro['percent.16'], atr_pro['percent.16']))),
+            np.max(np.concatenate((sim_pro['percent.84'], atr_pro['percent.84']))),
         ]
 
         _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
@@ -2857,10 +2892,10 @@ class ElementAgeTracerClass(ut.io.SayClass):
         colors = ut.plot.get_colors(model_number)
 
         ut.plot.draw_stats(
-            subplot, pro_sim, 'distance.mid', 'median', 2, color=colors[0], label='FIRE'
+            subplot, sim_pro, 'distance.mid', 'median', 2, color=colors[0], label='FIRE'
         )
         ut.plot.draw_stats(
-            subplot, pro_at, 'distance.mid', 'median', 2, color=colors[1], label='age-tracer'
+            subplot, atr_pro, 'distance.mid', 'median', 2, color=colors[1], label='age-tracer'
         )
 
         ut.plot.make_legends(subplot)
@@ -5388,9 +5423,11 @@ class CompareSimulationsClass(ut.io.SayClass):
         redshifts : float or list
         parts, species, redshifts = self._parse_inputs(parts, species, redshifts)
         '''
+        if redshifts is None or np.isscalar(redshifts):
+            redshifts = [redshifts]
 
         for redshift in redshifts:
-            if len(redshifts) > 1 or parts is None:
+            if redshift >= 0 and parts is None:
                 parts = self.Read.read_snapshots_simulations(
                     species,
                     'redshift',
@@ -5417,10 +5454,14 @@ class CompareSimulationsClass(ut.io.SayClass):
 
         Parameters
         ----------
-        parts : list : dictionaries of particles at snapshot
-        species : str or list : name[s] of particle species to read and analyze
-        distance_max : float : maximum distance from center to plot
-        mass_fraction : float : mass fraction (within distance_max) to determine edge of galaxy
+        parts : list of dicts
+            catalogs of particles at snapshot
+        species : str or list
+            name[s] of particle species to read and analyze
+        distance_max : float
+            maximum distance from center to plot
+        mass_fraction : float
+            mass fraction (within distance_max) to determine edge of galaxy
         '''
         if species is not None and np.isscalar(species):
             species = [species]

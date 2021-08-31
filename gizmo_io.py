@@ -1,15 +1,16 @@
-#!/usr/bin/env python3
-
 '''
 Read Gizmo snapshots, intended for use with FIRE simulations.
 
+----------
 @author:
     Andrew Wetzel <arwetzel@gmail.com>
     Shea Garrison-Kimmel <sheagk@gmail.com>
     Andrew Emerick <aemerick11@gmail.com>
 
 ----------
-Units: unless otherwise noted, this package converts all quantities to (combinations of):
+Units
+
+Unless otherwise noted, this package converts all quantities to (combinations of)
     mass [M_sun]
     position [kpc comoving]
     distance, radius [kpc physical]
@@ -158,6 +159,10 @@ import utilities as ut
 from . import gizmo_default
 
 
+# default FIRE model for stellar evolution to assume throughout
+FIRE_MODEL_DEFAULT = 'fire2'
+
+
 # --------------------------------------------------------------------------------------------------
 # particle dictionary class
 # --------------------------------------------------------------------------------------------------
@@ -165,8 +170,8 @@ class ParticleDictionaryClass(dict):
     '''
     Dictionary class to store particle data.
     This functions like a normal dictionary in terms of storing default properties of particles,
-    but it also allows greater flexibility, storing additional meta-data (such as snapshot
-    information and cosmological parameters) and calling derived quantities via .prop().
+    but it also allows greater flexibility for storing meta-data (such as snapshot
+    information and cosmological parameters) and for calling derived properties via .prop().
     '''
 
     def __init__(self):
@@ -208,8 +213,8 @@ class ParticleDictionaryClass(dict):
 
     def prop(self, property_name, indices=None, _dict_only=False):
         '''
-        Get property, either as stored in self's dictionary or derive it on the fly from stored
-        properties. Can compute basic mathematical manipulations/combinations, for example:
+        Get property, either stored in self's dictionary or derive it from stored properties.
+        Can compute basic mathematical manipulations/combinations, for example:
             'log temperature', 'temperature / density', 'abs position'
 
         Parameters
@@ -217,10 +222,10 @@ class ParticleDictionaryClass(dict):
         property_name : str
             name of property
         indices : array
-            indices of particles to select
+            indices of particles to get properties of
         _dict_only : bool
             require property_name to be in self's dict - avoids endless recursion
-            primarily for internal/recursive usage within this function
+            primarily for internal/recursive usage of this function
 
         Returns
         -------
@@ -295,12 +300,18 @@ class ParticleDictionaryClass(dict):
         # parsing specific to this catalog ----------
         # stellar mass loss
         if ('mass' in property_name and 'form' in property_name) or 'mass.loss' in property_name:
-            fire_model = 'fire2'
+            if (
+                'fire.model' in self.info
+                and isinstance(self.info['fire.model'], str)
+                and len(self.info['fire.model']) > 0
+            ):
+                fire_model = self.info['fire.model']
+            else:
+                fire_model = FIRE_MODEL_DEFAULT
 
             if 'MassLoss' not in self.__dict__ or self.MassLoss is None:
                 from . import gizmo_star
 
-                # TODO: input FIRE version here
                 # create class to compute/store stellar mass loss as a function of age, metallicity
                 self.MassLoss = gizmo_star.MassLossClass(model=fire_model)
 
@@ -605,15 +616,15 @@ class ParticleDictionaryClass(dict):
 
     def _get_abundances(self, property_name, indices=None):
         '''
-        Get element mass fraction[s] or metallicity[s],
-        either as stored in dictionary or via post-processing via age-tracers.
+        Get element mass fraction[s] or metallicity[s], either stored in dictionary or via
+        post-processing stored age-tracer mass weights.
 
         Parameters
         ----------
         property_name : str
             name of property to get
         indices : array [optional]
-            indices of particles to select
+            indices of particles to get property of
 
         Returns
         -------
@@ -661,21 +672,21 @@ class ParticleDictionaryClass(dict):
             else:
                 values = self['massfraction'][indices, element_index]
 
-        # compute elemental abundances in post-processing using age-tracer weights
+        # compute elemental abundances using age-tracer weights
         elif 'agetracer' in property_name:
             assert 'ElementAgeTracer' in self.__dict__ and self.ElementAgeTracer is not None
-            assert len(self.ElementAgeTracer['yields']) > 0
+            assert len(self.ElementAgeTracer['yield.massfractions']) > 0
 
             for element_name in property_name.split('.'):
                 if element_name in ut.constant.element_name_from_symbol:
                     element_name = ut.constant.element_name_from_symbol[element_name]
-                if element_name in self.ElementAgeTracer['yields']:
-                    break
+                if element_name in self.ElementAgeTracer['yield.massfractions']:
+                    break  # found a match
             else:
                 raise KeyError(
-                    f'not sure how to parse property = {property_name}.'
+                    f'not sure how to parse element = {property_name}.'
                     + ' element age-tracer dictionary has these elements available:  {}'.format(
-                        self.ElementAgeTracer['yields'].keys()
+                        self.ElementAgeTracer['yield.massfractions'].keys()
                     )
                 )
 
@@ -684,13 +695,13 @@ class ParticleDictionaryClass(dict):
             agetracer_index_start = self.ElementAgeTracer['element.index.start']
             if indices is None:
                 agetracer_mass_weights = self['massfraction'][:, agetracer_index_start:]
-                metallicities = self['massfraction'][:, 0]
+                metal_massfractions = self['massfraction'][:, 0]
             else:
                 agetracer_mass_weights = self['massfraction'][indices, agetracer_index_start:]
-                metallicities = self['massfraction'][indices, 0]
+                metal_massfractions = self['massfraction'][indices, 0]
 
             values = self.ElementAgeTracer.get_element_massfractions(
-                element_name, agetracer_mass_weights, metallicities
+                element_name, agetracer_mass_weights, metal_massfractions
             )
 
         # convert to metallicity := log10(mass_fraction / mass_fraction_solar)
@@ -1346,12 +1357,12 @@ class ReadClass(ut.io.SayClass):
             'Flag_Metals': 'element.number',
             'Flag_AgeTracers': 'has.agetracer',  # not in newer headers
             # age-tracers to assign elemental abundances in post-processing
-            # will have either agetracer.min + agetracer.max or agetracer.bins
-            'AgeTracer_NumberOfBins': 'agetracer.number',
-            'AgeTracerBinStart': 'agetracer.min',
-            'AgeTracerBinEnd': 'agetracer.max',
-            'AgeTracer_CustomTimeBins': 'agetracer.bins',  # or this array
-            'AgeTracerEventsPerTimeBin': 'agetracer.events.per.bin',
+            # will have either agetracer.age.min + agetracer.age.max or agetracer.age.bins
+            'AgeTracer_NumberOfBins': 'agetracer.age.bin.number',
+            'AgeTracerBinStart': 'agetracer.age.min',
+            'AgeTracerBinEnd': 'agetracer.age.max',
+            'AgeTracer_CustomTimeBins': 'agetracer.age.bins',  # or this array
+            'AgeTracerEventsPerTimeBin': 'agetracer.event.number.per.age.bin',
             # level of compression of snapshot file
             'CompactLevel': 'compression.level',
             'Compactify_Version': 'compression.version',
@@ -1372,7 +1383,7 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self._get_snapshot_file_names_indices(
+        path_file_name = self.get_snapshot_file_names_indices(
             snapshot_directory, snapshot_index, snapshot_block_index
         )
 
@@ -1425,12 +1436,12 @@ class ReadClass(ut.io.SayClass):
                     break
 
         # check if simulation contains age-tracers to assign elemental abundances in post-processing
-        if 'agetracer.number' in header and header['agetracer.number'] > 0:
+        if 'agetracer.age.bin.number' in header and header['agetracer.age.bin.number'] > 0:
             header['has.agetracer'] = True
             header['has.rprocess'] = False
-            if 'agetracer.bins' in header:
+            if 'agetracer.age.bins' in header:
                 header['has.agetracer.custom'] = True
-            elif 'agetracer.min' in header:
+            elif 'agetracer.age.min' in header:
                 header['has.agetracer.custom'] = False
             else:
                 raise ValueError('not sure how to parse age-tracer model in snapshot header')
@@ -1605,7 +1616,7 @@ class ReadClass(ut.io.SayClass):
         else:
             snapshot_index = snapshot_value
 
-        path_file_name = self._get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
         # check if need to read snapshot header information
         if not header:
@@ -1689,21 +1700,34 @@ class ReadClass(ut.io.SayClass):
                             header
                         )
 
-                        # generate nucleosynthetic yields for this stellar evolution model
+                        """
+                        if 'fire.model' in header and isinstance(header['fire.model'], str)
+                            and len(header['fire.model']) > 0:
+                            fire_model = header['fire.model']
+                        else:
+                            fire_model = FIRE_MODEL_DEFAULT
+                        if 'fire3' in fire_model:
+                            metallicity_initial = 0
+                        else:
+                            metallicity_initial = 10 ** -5
+                        progenitor_metallicity = 0.6
+
+                        # generate nucleosynthetic yield mass fractions for this model
                         FIREYield = gizmo_agetracer.FIREYieldClass(
-                            'fire2', progenitor_metallicity=0.7
+                            fire_model, progenitor_metallicity
                         )
-                        yield_dict = FIREYield.get_element_yields(
+                        element_yield_dict = FIREYield.get_element_yields(
                             part[spec_name].ElementAgeTracer['age.bins']
                         )
                         # assign yields to age-tracer dictionary class
-                        part[spec_name].ElementAgeTracer.assign_element_yields(yield_dict)
-
-                        # set initial conditions for elemental mass fractions
-                        metallicity_initial = 10 ** -5
-                        part[spec_name].ElementAgeTracer.assign_element_massfraction_initial(
+                        part[spec_name].ElementAgeTracer.assign_element_yield_massfractions(
+                            element_yield_dict
+                        )
+                        # set initial conditions for mass fractions for each element
+                        part[spec_name].ElementAgeTracer.assign_element_initial_massfraction(
                             FIREYield.sun_massfraction, metallicity_initial
                         )
+                        """
                     else:
                         del part[spec_name].ElementAgeTracer
 
@@ -1962,7 +1986,11 @@ class ReadClass(ut.io.SayClass):
                 part[spec_name]['mass'] *= 1e10 / header['hubble']
 
             if 'massfraction' in part[spec_name] and part[spec_name].info['has.agetracer']:
-                # convert the mass weights in the age-tracer bins to [M_sun]
+                # convert the age-tracer mass weights into dimensionless units of:
+                # mass fraction (relative to my own mass) of winds/ejecta deposited into me
+                # (as a gas particle) during each age-tracer age bin
+                # age-tracer weight value of 1 therefore means that a particle received
+                # winds/ejecta from its own mass of stars across the entire age bin
                 agetracer_index_start = part[spec_name].ElementAgeTracer['element.index.start']
                 part[spec_name]['massfraction'][:, agetracer_index_start:] *= (
                     header['hubble'] / 1e10
@@ -2050,7 +2078,7 @@ class ReadClass(ut.io.SayClass):
                         ::particle_subsample_factor
                     ]
 
-    def _get_snapshot_file_names_indices(
+    def get_snapshot_file_names_indices(
         self, directory, snapshot_index=None, snapshot_block_index=0
     ):
         '''
@@ -2644,7 +2672,7 @@ class ReadClass(ut.io.SayClass):
             snapshot_value_kind, snapshot_value, self._verbose
         )
 
-        path_file_name = self._get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
+        path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
         self.say('* reading header from:  {}'.format(path_file_name.lstrip('./')), end='\n\n')
 
         # read header ----------
