@@ -2402,6 +2402,38 @@ class ElementAgeTracerClass(ut.io.SayClass):
                 )
             )
 
+    def test_progenitor_metallicity_dependence(
+        self,
+        part,
+        species_name='star',
+        progenitor_metallicities=[0.1, 1],
+        yield_model='fire2.2',
+        element_names=['metals', 'carbon', 'nitrogen', 'oxygen', 'magnesium', 'iron'],
+    ):
+        '''
+        .
+        '''
+        from . import gizmo_agetracer
+
+        metal_dicts = []
+
+        for progenitor_metallicity in progenitor_metallicities:
+            gizmo_agetracer.initialize_agetracers(
+                part, species_name, progenitor_metallicity, yield_model=yield_model,
+            )
+            metal_dict = {}
+            for element_name in element_names:
+                metal_dict[element_name] = part[species_name].prop(
+                    f'metallicity.{element_name}.agetracer'
+                )
+            metal_dicts.append(metal_dict)
+
+        for element_name in element_names:
+            metal_difs = metal_dicts[1][element_name] - metal_dicts[0][element_name]
+
+            self.say(f'\n* {element_name}')
+            ut.math.print_statistics(metal_difs)
+
     def plot_element_distribution(
         self,
         part,

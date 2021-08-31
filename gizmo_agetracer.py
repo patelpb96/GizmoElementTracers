@@ -786,3 +786,47 @@ class NuGridYieldClass:
             y = self._model_yield_rate[:, element_index]
 
         return np.interp(t, x, y)
+
+
+# --------------------------------------------------------------------------------------------------
+# master function to set up age-tracer information in a particle catalog
+# --------------------------------------------------------------------------------------------------
+def initialize_agetracers(
+    parts,
+    species_names=['star', 'gas'],
+    progenitor_metallicity=0.6,
+    metallicity_initial=1e-5,
+    yield_model='fire2.1',
+    YieldClass=FIREYieldClass,
+):
+    '''
+    .
+    '''
+    # ensure lists
+    if isinstance(parts, dict):
+        parts = [parts]
+    if isinstance(species_names, str):
+        species_names = [species_names]
+
+    for part in parts:
+        if yield_model is None or len(yield_model) == 0:
+            if part.info['fire.model'] is not None and len(part.info['fire.model']) > 0:
+                yield_model = part.info['fire.model']
+            else:
+                yield_model = 'fire2.1'
+
+        # generate yield model
+        Yield = YieldClass(yield_model, progenitor_metallicity=progenitor_metallicity)
+        spec_name = species_names[0]
+        # get dictionary of yield mass fractions in age bins
+        yield_dict = Yield.get_element_yields(part[spec_name].ElementAgeTracer['age.bins'])
+
+        for spec_name in species_names:
+            # initialize age-tracer age bins
+            part[spec_name].ElementAgeTracer = ElementAgeTracerClass(part.info)
+            # transfer yields to ElementAgeTracer
+            part[spec_name].ElementAgeTracer.assign_element_yield_massfractions(yield_dict)
+            # set initial conditions for elemental mass fractions
+            part[spec_name].ElementAgeTracer.assign_element_initial_massfraction(
+                Yield.sun_massfraction, metallicity_initial
+            )
