@@ -339,15 +339,16 @@ class ContaminationClass(ut.io.SayClass):
     Diagnose contamination by low-resolution dark matter.
     '''
 
-    def print_contamination_v_distance_both(
+    def print_plot_contamination_v_distance_both(
         self,
         snapshot_value_kind='index',
         snapshot_value=gizmo_default.snapshot_index,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
+        virial_kind='200m',
         verbose=False,
-        file_name=None,
+        plot_file_name=None,
     ):
         '''
         Print [and plot] contamination from low-resolution dark-matter particles around halo/galaxy
@@ -365,15 +366,16 @@ class ContaminationClass(ut.io.SayClass):
             directory of snapshot files within simulation_directory
         track_directory : str
             directory of files for particle pointers, formation coordinates, and host coordinates
+        virial_kind : str
+            virial overdensity to set halo radius
         verbose : bool
             verbosity flag
-        file_name : str
+        plot_file_name : str
             whether to write figure to file and its name. True = use default naming convention
         '''
-        distance_bin_width = 0.01
-        distance_limits_phys = [10, 2000]  # [kpc physical]
-        distance_limits_halo = [0.01, 7]  # [units of R_halo]
-        virial_kind = '200m'
+        distance_limits_phys = [10, 3000]  # [kpc physical]
+        distance_limits_halo = [0.01, 8]  # [units of R_halo]
+        distance_bin_width = 0.003  # log bins by default
 
         Read = gizmo_io.ReadClass()
         part = Read.read_snapshots(
@@ -389,7 +391,7 @@ class ContaminationClass(ut.io.SayClass):
 
         halo_prop = ut.particle.get_halo_properties(part, 'all', virial_kind)
 
-        self.print_contamination_v_distance(
+        self.print_plot_contamination_v_distance(
             part,
             distance_limits_phys,
             distance_bin_width,
@@ -397,11 +399,11 @@ class ContaminationClass(ut.io.SayClass):
             scale_to_halo_radius=False,
             virial_kind=virial_kind,
             verbose=verbose,
-            file_name=file_name,
+            plot_file_name=plot_file_name,
             directory='plot',
         )
 
-        self.print_contamination_v_distance(
+        self.print_plot_contamination_v_distance(
             part,
             distance_limits_halo,
             distance_bin_width,
@@ -409,14 +411,14 @@ class ContaminationClass(ut.io.SayClass):
             scale_to_halo_radius=True,
             virial_kind=virial_kind,
             verbose=verbose,
-            file_name=file_name,
+            plot_file_name=plot_file_name,
             directory='plot',
         )
 
-    def print_contamination_v_distance(
+    def print_plot_contamination_v_distance(
         self,
         part,
-        distance_limits=[10, 2000],
+        distance_limits=[10, 3000],
         distance_bin_width=0.005,
         distance_log_scale=True,
         halo_radius=None,
@@ -427,7 +429,7 @@ class ContaminationClass(ut.io.SayClass):
         axis_y_limits=[0.0001, 1],
         axis_y_log_scale=True,
         verbose=False,
-        file_name=None,
+        plot_file_name=None,
         directory='.',
         figure_index=1,
     ):
@@ -449,7 +451,7 @@ class ContaminationClass(ut.io.SayClass):
         scale_to_halo_radius : bool
             whether to scale distance to halo_radius
         virial_kind : str
-            virial overdensity to use
+            virial overdensity to set halo radius
         center_position : array
             position of galaxy/halo center
         host_index : int
@@ -460,7 +462,7 @@ class ContaminationClass(ut.io.SayClass):
             whether to use logarithmic scaling for y axis
         verbose : bool
             verbosity flag
-        file_name : str
+        plot_file_name : str
             whether to write figure to file and its name. True = use default naming convention
         directory : str
             directory in which to write figure file
@@ -576,6 +578,7 @@ class ContaminationClass(ut.io.SayClass):
                             # print only 1 distance bin for lower-resolution particles
                             break
 
+        distance_max = max(distance_limits)
         print()
         print('contamination')
         species = 'dark2'
@@ -586,50 +589,70 @@ class ContaminationClass(ut.io.SayClass):
                     profile_number[species]['sum.cum'][dist_i_halo], species, virial_kind
                 )
             )
-        dist_i = np.where(profile_number[species]['sum.cum'] > 0)[0][0]
-        print(
-            '* {} closest d = {:.0f} kpc, {:.1f} R_halo'.format(
-                species, distances_phys[dist_i], distances_halo[dist_i]
-            )
-        )
-        dist_i = np.where(profile_mass_frac[species]['sum.cum'] > 0.0001)[0][0]
-        print(
-            '* {} mass frac = 0.01% at d < {:.0f} kpc, {:.1f} R_halo'.format(
-                species, distances_phys[dist_i], distances_halo[dist_i]
-            )
-        )
-        dist_i = np.where(profile_mass_frac[species]['sum.cum'] > 0.001)[0][0]
-        print(
-            '* {} mass frac = 0.1% at d < {:.0f} kpc, {:.1f} R_halo'.format(
-                species, distances_phys[dist_i], distances_halo[dist_i]
-            )
-        )
-        if profile_mass_frac[species]['sum.cum'].max() > 0.01:
-            dist_i = np.where(profile_mass_frac[species]['sum.cum'] > 0.01)[0][0]
+        else:
+            print(f'* no {species} particles within R_{virial_kind}')
+
+        masks = profile_number[species]['sum.cum'] > 0
+        if np.max(masks):
+            dist_i = np.where(masks)[0][0]
             print(
-                '* {} mass frac = 1% at d < {:.0f} kpc, {:.1f} R_halo'.format(
-                    species, distances_phys[dist_i], distances_halo[dist_i]
+                '* {} closest d = {:.0f} kpc, {:.1f} R_{}'.format(
+                    species, distances_phys[dist_i], distances_halo[dist_i], virial_kind
                 )
             )
         else:
-            print(f'* {species} mass frac = 1% at no distance within limits')
+            print(f'* no {species} particles within distance_max = {distance_max} kpc')
+
+        masks = profile_mass_frac[species]['sum.cum'] > 0.0001
+        if np.max(masks):
+            dist_i = np.where(masks)[0][0]
+            print(
+                '* {} mass fraction(< d) = 0.01% at d < {:.0f} kpc, {:.1f} R_{}'.format(
+                    species, distances_phys[dist_i], distances_halo[dist_i], virial_kind
+                )
+            )
+        else:
+            print(f'* {species} mass fraction(< d) < 0.01% at all d < {distance_max} kpc')
+
+        masks = profile_mass_frac[species]['sum.cum'] > 0.001
+        if np.max(masks):
+            dist_i = np.where(masks)[0][0]
+            print(
+                '* {} mass fraction(< d) =  0.1% at d < {:.0f} kpc, {:.1f} R_{}'.format(
+                    species, distances_phys[dist_i], distances_halo[dist_i], virial_kind
+                )
+            )
+        else:
+            print(f'* {species} mass fraction(< d) <  0.1% at all d < {distance_max} kpc')
+
+        masks = profile_mass_frac[species]['sum.cum'] > 0.01
+        if np.max(masks):
+            dist_i = np.where(masks)[0][0]
+            print(
+                '* {} mass fraction(< d) =    1% at d < {:.0f} kpc, {:.1f} R_{}'.format(
+                    species, distances_phys[dist_i], distances_halo[dist_i], virial_kind
+                )
+            )
+        else:
+            print(f'* {species} mass fraction(< d) <    1% at all d < {distance_max} kpc')
 
         for spec_name in species_lowres_dark:
             if species != 'dark2' and profile_number[spec_name]['sum.cum'][dist_i_halo] > 0:
                 print(
-                    '! {} {} particles within R_halo'.format(
-                        profile_number[species]['sum.cum'][dist_i_halo], species
+                    '! {} {} particles within R_{}'.format(
+                        profile_number[species]['sum.cum'][dist_i_halo], species, virial_kind
                     )
                 )
-                dist_i = np.where(profile_number[spec_name]['sum.cum'] > 0)[0][0]
-                print(
-                    '! {} closest d = {:.0f} kpc, {:.1f} R_halo'.format(
-                        species, distances_phys[dist_i], distances_halo[dist_i]
+                masks = profile_number[spec_name]['sum.cum'] > 0
+                if np.max(masks):
+                    dist_i = np.where(masks)[0][0]
+                    print(
+                        '! {} closest d = {:.0f} kpc, {:.1f} R_{}'.format(
+                            species, distances_phys[dist_i], distances_halo[dist_i], virial_kind
+                        )
                     )
-                )
-        print()
 
-        if file_name is None or file_name is False:
+        if not plot_file_name:
             return
 
         # plot ----------
@@ -665,14 +688,14 @@ class ContaminationClass(ut.io.SayClass):
 
         ut.plot.make_legends(subplot, 'best')
 
-        if file_name is True or file_name == '':
+        if plot_file_name is True or plot_file_name == '':
             distance_name = 'dist'
             if scale_to_halo_radius:
                 distance_name += '.' + virial_kind
-            file_name = ut.plot.get_file_name(
+            plot_file_name = ut.plot.get_file_name(
                 'mass.frac', distance_name, snapshot_dict=part.snapshot
             )
-        ut.plot.parse_output(file_name, directory)
+        ut.plot.parse_output(plot_file_name, directory)
 
 
 Contamination = ContaminationClass()
@@ -917,7 +940,7 @@ def print_summary(
         assign_hosts_rotation=True,
     )
 
-    Contamination.print_contamination_v_distance(part)
+    Contamination.print_plot_contamination_v_distance(part)
 
     print_galaxy_properties(part)
 
@@ -1339,7 +1362,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             snapshot_redshift = float(sys.argv[2])
 
-        Contamination.print_contamination_v_distance_both(
+        Contamination.print_plot_contamination_v_distance_both(
             snapshot_value_kind='redshift', snapshot_value=snapshot_redshift
         )
 
