@@ -53,7 +53,7 @@ class InitialConditionClass(ut.io.SayClass):
         host_index=0,
         hal=None,
         hal_index=None,
-        distance_max=10,
+        distance_max=8,
         scale_to_halo_radius=True,
         virial_kind='200m',
         region_kind='convex-hull',
@@ -107,7 +107,7 @@ class InitialConditionClass(ut.io.SayClass):
         assert region_kind in ['particles', 'convex-hull', 'cube']
 
         if parts is None or len(parts) == 0:
-            parts = self._read_particles()
+            parts = self.read_particles()
 
         # ensure final catalog is at lowest redshift
         part_fin, part_ini = parts
@@ -347,8 +347,8 @@ class InitialConditionClass(ut.io.SayClass):
         '''
         from halo_analysis import halo_io
 
-        hal = self._read_halos(mass_limits)
-        parts = self._read_particles()
+        hal = self.read_halos(mass_limits)
+        parts = self.read_particles()
 
         if (
             'dark2' in parts[0]
@@ -359,7 +359,7 @@ class InitialConditionClass(ut.io.SayClass):
 
         return hal, parts
 
-    def _read_halos(
+    def read_halos(
         self, mass_limits=[1e11, np.Inf], file_kind='hdf5', assign_nearest_neighbor=True
     ):
         '''
@@ -390,7 +390,7 @@ class InitialConditionClass(ut.io.SayClass):
 
         return hal
 
-    def _read_particles(self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
+    def read_particles(self, properties=['position', 'mass', 'id'], sort_dark_by_id=True):
         '''
         Read particles at the final and the initial snapshot.
 
