@@ -25,7 +25,7 @@ snapshot_name_base = 'snap*[!txt]'
 snapshot_index = 600
 
 # name of text file that lists (only) snapshot scale-factors
-snapshot_scalefactor_file_name = 'snapshot_scale-factors.txt'
+snapshot_scalefactor_file_name = 'snapshot_scalefactors.txt'
 
 # name of text file that lists full time information of snapshots
 snapshot_time_file_name = 'snapshot_times.txt'
