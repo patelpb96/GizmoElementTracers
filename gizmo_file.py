@@ -958,7 +958,7 @@ class RsyncClass(ut.io.SayClass):
             '*.ics',
             'submit_music*',
             'input_powerspec.txt',
-            'snapshot_scale-factors.txt',
+            'snapshot_scalefactors.txt',
             'submit_gizmo*.py',
             '*.bin',
             '*.particles',
