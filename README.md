@@ -1,6 +1,6 @@
 # Description
 
-Python package for reading and analyzing simulations generating using the Gizmo code, in particular, the FIRE cosmological simulations.
+Python package for reading and analyzing simulations that were generated using the Gizmo code, in particular, the FIRE cosmological simulations.
 
 
 ---
@@ -38,7 +38,7 @@ We develop this package using python 3.9 and recommend that you use it with this
 * run diagnostics on Gizmo simulations
 
 ## gizmo_ic.py
-* generate cosmological zoom-in initial conditions from snapshot files
+* generate cosmological zoom-in initial conditions from existing snapshot files
 
 ## snapshot_times.txt
 * example file for storing information about snapshots: scale-factors, redshifts, times, etc
@@ -50,14 +50,14 @@ We develop this package using python 3.9 and recommend that you use it with this
 ---
 # Units
 
-Unless otherwise noted, all quantities are in (or converted to during read-in) these units (and combinations thereof):
+Unless otherwise noted, all quantities are in (or converted to during read-in to) these units (and combinations thereof):
 
 * mass [M_sun]
 * position [kpc comoving]
 * distance, radius [kpc physical]
 * velocity [km / s]
 * time [Gyr]
-* elemental abundance [(linear) mass fraction]
+* elemental abundance [linear mass fraction]
 * metallicity [log10(mass_fraction / mass_fraction_solar)], assuming Asplund et al 2009 for Solar
 
 
