@@ -2446,6 +2446,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         axis_y_log_scale=True,
         weight_property='mass',
         part_indices=None,
+        verbose=True,
         plot_file_name=None,
         plot_directory='.',
         figure_index=1,
@@ -2476,6 +2477,8 @@ class ElementAgeTracerClass(ut.io.SayClass):
             property to weight each particle by
         part_indices : array
             indices of particles from which to select
+        verbose : bool
+            verbosity flag
         plot_file_name : str
             whether to write figure to file and its name. True = use default naming convention
         plot_directory : str
@@ -2496,13 +2499,16 @@ class ElementAgeTracerClass(ut.io.SayClass):
             weights = part[species_name].prop(weight_property, part_indices)
 
         masks = sim_property_values > -Inf
-        # masks *= (property_values > element_limits[0]) * (property_values < element_limits[1])
+        masks *= (sim_property_values > property_limits[0]) * (
+            sim_property_values < property_limits[1]
+        )
         masks *= (atr_property_values > property_limits[0]) * (
             atr_property_values < property_limits[1]
         )
 
         property_difs = atr_property_values[masks] - sim_property_values[masks]
-        ut.math.print_statistics(property_difs, weights[masks])
+        if verbose:
+            ut.math.print_statistics(property_difs, weights[masks])
 
         sim_distr = Stat.get_distribution_dict(
             sim_property_values,
@@ -2548,12 +2554,20 @@ class ElementAgeTracerClass(ut.io.SayClass):
             label='FIRE',
         )
 
+        plt.arrow(
+            np.median(sim_property_values), 0, 0, 0.15, width=0.01, color=colors[0], alpha=0.8
+        )
+
         subplot.plot(
             atr_distr['bin.mid'],
             atr_distr[property_statistic],
             color=colors[1],
             alpha=0.8,
             label='age-tracer',
+        )
+
+        plt.arrow(
+            np.median(atr_property_values), 0, 0, 0.15, width=0.01, color=colors[1], alpha=0.8
         )
 
         ut.plot.make_legends(subplot)  # time_value=parts.snapshot['redshift'])
@@ -5427,7 +5441,7 @@ class CompareSimulationsClass(ut.io.SayClass):
             redshifts = [redshifts]
 
         for redshift in redshifts:
-            if redshift >= 0 and parts is None:
+            if redshift is not None and redshift >= 0 and parts is None:
                 parts = self.Read.read_snapshots_simulations(
                     species,
                     'redshift',
