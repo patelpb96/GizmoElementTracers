@@ -297,9 +297,6 @@ class CompressClass(ut.io.SayClass):
             self.say(f'{compression_wrong_snapshots}')  # list wrong-compressed snapshots
 
 
-Compress = CompressClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # clean and archive simulation directories and files
 # --------------------------------------------------------------------------------------------------
@@ -713,9 +710,6 @@ class ArchiveClass(ut.io.SayClass):
                     os.system(f'rm -rf {halo_name}')
 
 
-Archive = ArchiveClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # transfer files via globus
 # --------------------------------------------------------------------------------------------------
@@ -846,9 +840,6 @@ class GlobusClass(ut.io.SayClass):
 
         with open(file_name, 'w') as file_out:
             file_out.write(transfer_string)
-
-
-Globus = GlobusClass()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -996,9 +987,6 @@ class RsyncClass(ut.io.SayClass):
         os.system('chmod u=rw,go=r $(find . -type f); chmod u=rwX,go=rX $(find . -type d)')
 
 
-Rsync = RsyncClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # running from command line
 # --------------------------------------------------------------------------------------------------
@@ -1030,12 +1018,15 @@ if __name__ == '__main__':
 
         snapshot_indices = np.arange(snapshot_index_limits[0], snapshot_index_limits[1] + 1)
 
+        Compress = CompressClass()
         Compress.test_compression(simulation_directory, snapshot_indices=snapshot_indices)
 
     elif 'clean' in function_kind:
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
+
+        Archive = ArchiveClass()
         Archive.clean_directories(directory)
 
         if 'archive' in function_kind:
@@ -1045,6 +1036,8 @@ if __name__ == '__main__':
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
+
+        Archive = ArchiveClass()
         Archive.tar_directories(directory)
 
     elif 'delete' in function_kind:
@@ -1056,12 +1049,15 @@ if __name__ == '__main__':
         if len(sys.argv) > 3:
             snapshot_index_limits = [int(sys.argv[3]), int(sys.argv[4])]
 
+        Archive = ArchiveClass()
         Archive.delete_snapshots(simulation_directory, snapshot_index_limits=snapshot_index_limits)
 
     elif 'globus' in function_kind:
         directory = '.'
         if len(sys.argv) > 2:
             directory = str(sys.argv[2])
+
+        Globus = GlobusClass()
         Globus.submit_transfer(directory)
 
     elif 'rsync' in function_kind:
@@ -1072,6 +1068,7 @@ if __name__ == '__main__':
         directory_from = str(sys.argv[3])
         directory_to = str(sys.argv[4])
 
+        Rsync = RsyncClass()
         Rsync.rsync_simulation_files(
             machine_from, directory_from, directory_to, snapshot_index=600,
         )

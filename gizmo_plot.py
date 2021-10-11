@@ -6037,9 +6037,6 @@ class CompareSimulationsClass(ut.io.SayClass):
                 )
 
 
-CompareSimulations = CompareSimulationsClass()
-
-
 def compare_star_formation_models(
     parts,
     density_limits=[1, 1e6],

@@ -203,7 +203,7 @@ class InitialConditionClass(ut.io.SayClass):
             'matter', part_ini.snapshot['redshift'], 'kpc comoving'
         )
         if part_ini.info['has.baryons']:
-            # subtract baryonic mass
+            # remove baryonic mass
             density_ini *= part_ini.Cosmology['omega_dm'] / part_ini.Cosmology['omega_matter']
 
         # convex hull
@@ -355,7 +355,8 @@ class InitialConditionClass(ut.io.SayClass):
             and 'mass' in parts[0]['dark2']
             and len(parts[0]['dark2']['mass']) > 0
         ):
-            halo_io.Particle.assign_lowres_mass(hal, parts[0])
+            Particle = halo_io.ParticleClass()
+            Particle.assign_lowres_mass(hal, parts[0])
 
         return hal, parts
 
@@ -436,9 +437,6 @@ class InitialConditionClass(ut.io.SayClass):
         return parts
 
 
-InitialCondition = InitialConditionClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # run from command line
 # --------------------------------------------------------------------------------------------------
@@ -448,4 +446,5 @@ if __name__ == '__main__':
 
     distance_max = float(sys.argv[1])
 
+    InitialCondition = InitialConditionClass()
     InitialCondition.write_positions_at_initial_snapshot(distance_max=distance_max)
