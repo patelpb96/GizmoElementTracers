@@ -157,6 +157,7 @@ import numpy as np
 
 import utilities as ut
 from . import gizmo_default
+from . import gizmo_track
 
 
 # default FIRE model for stellar evolution to assume throughout
@@ -834,10 +835,6 @@ class ReadClass(ut.io.SayClass):
         verbose : bool
             whether to print diagnostics
         '''
-        from . import gizmo_track
-
-        self.gizmo_track = gizmo_track
-
         self.gas_eos = 5 / 3  # assumed equation of state of gas
 
         # this format avoids accidentally reading text file that contains snapshot indices
@@ -1092,7 +1089,7 @@ class ReadClass(ut.io.SayClass):
 
             if assign_pointers:
                 # assign star and gas particle pointers from z = 0 to this snapshot
-                ParticlePointer = self.gizmo_track.ParticlePointerClass(
+                ParticlePointer = gizmo_track.ParticlePointerClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
                 ParticlePointer.io_pointers(part)
@@ -2398,7 +2395,8 @@ class ReadClass(ut.io.SayClass):
             try:
                 if method == 'track':
                     # read coordinates of each host across all snapshots
-                    self.gizmo_track.ParticleCoordinate.io_hosts_coordinates(
+                    ParticleCoordinate = gizmo_track.ParticleCoordinateClass()
+                    ParticleCoordinate.io_hosts_coordinates(
                         part,
                         simulation_directory,
                         track_directory,

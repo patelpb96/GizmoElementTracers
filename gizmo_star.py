@@ -635,9 +635,6 @@ class NucleosyntheticYieldClass(dict):
             )
 
 
-NucleosyntheticYield = NucleosyntheticYieldClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # stellar mass loss
 # --------------------------------------------------------------------------------------------------
@@ -936,9 +933,6 @@ class StellarWindClass:
             mass_loss_fractions = [mass_loss_fractions]
 
         return mass_loss_fractions
-
-
-StellarWind = StellarWindClass()
 
 
 class SupernovaCCClass:
@@ -1340,9 +1334,6 @@ class SupernovaCCClass:
         return mass_loss_fractions
 
 
-SupernovaCC = SupernovaCCClass()
-
-
 class SupernovaIaClass(ut.io.SayClass):
     '''
     Compute rates, cumulative numbers, and cumulative ejecta masses for supernovae Ia
@@ -1595,9 +1586,6 @@ class SupernovaIaClass(ut.io.SayClass):
         return mass_loss_fractions
 
 
-SupernovaIa = SupernovaIaClass()
-
-
 class MassLossClass(ut.io.SayClass):
     '''
     Compute mass loss from all channels (stellar winds, core-collapse and Ia supernovae) as
@@ -1845,9 +1833,6 @@ class MassLossClass(ut.io.SayClass):
         with open(self._file_name, 'rb') as f:
             self.Spline = pickle.load(f)
             self.say(f'read mass-loss spline from:  {self._file_name}')
-
-
-MassLoss = MassLossClass()
 
 
 def plot_supernova_number_v_age(

@@ -331,9 +331,6 @@ class RuntimeClass(ut.io.SayClass):
             print()
 
 
-Runtime = RuntimeClass()
-
-
 class ContaminationClass(ut.io.SayClass):
     '''
     Diagnose contamination by low-resolution dark matter.
@@ -698,9 +695,6 @@ class ContaminationClass(ut.io.SayClass):
         ut.plot.parse_output(plot_file_name, directory)
 
 
-Contamination = ContaminationClass()
-
-
 def print_galaxy_properties(
     part=None,
     species='star',
@@ -940,10 +934,12 @@ def print_summary(
         assign_hosts_rotation=True,
     )
 
+    Contamination = ContaminationClass()
     Contamination.print_plot_contamination_v_distance(part)
 
     print_galaxy_properties(part)
 
+    Runtime = RuntimeClass()
     _ = Runtime.print_run_times()
 
 
@@ -964,7 +960,8 @@ def test_stellar_mass_loss(
     species = 'star'
 
     if 'Pointer' not in part_z.__dict__:
-        gizmo_track.ParticlePointer.io_pointers(part_z)
+        ParticlePointer = gizmo_track.ParticlePointerClass()
+        ParticlePointer.io_pointers(part_z)
 
     MetalBin = ut.binning.BinClass(
         metallicity_limits, metallicity_bin_width, include_max=True, log_scale=True
@@ -987,9 +984,9 @@ def test_stellar_mass_loss(
     )
 
     # compute metallicity using solar abundance assumed in Gizmo
+    sun_massfraction = gizmo_star.get_sun_massfraction('fire2')
     metallicities = (
-        part_z0[species].prop('massfraction.metals', part_indices_z0)
-        / gizmo_star.StellarWind.sun_massfraction['metals']
+        part_z0[species].prop('massfraction.metals', part_indices_z0) / sun_massfraction['metals']
     )
 
     metal_bin_indices = MetalBin.get_bin_indices(metallicities)
@@ -1355,6 +1352,7 @@ if __name__ == '__main__':
                 scalefactor_width = float(sys.argv[4])
             scalefactors = np.arange(scalefactor_min, 1.01, scalefactor_width)
 
+        Runtime = RuntimeClass()
         _ = Runtime.print_run_times(wall_time_restart=wall_time_restart, scalefactors=scalefactors)
 
     elif 'contamination' in function_kind:
@@ -1362,6 +1360,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             snapshot_redshift = float(sys.argv[2])
 
+        Contamination = ContaminationClass()
         Contamination.print_plot_contamination_v_distance_both(
             snapshot_value_kind='redshift', snapshot_value=snapshot_redshift
         )
