@@ -863,8 +863,8 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots(
         self,
         species='all',
-        snapshot_value_kind='index',
-        snapshot_values=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_values=gizmo_default.snapshot_redshift,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
@@ -1115,8 +1115,8 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots_simulations(
         self,
         species='all',
-        snapshot_value_kind='index',
-        snapshot_value=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_value=gizmo_default.snapshot_redshift,
         simulation_directories=[],
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,

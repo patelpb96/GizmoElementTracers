@@ -21,7 +21,8 @@ snapshot_directory = 'output/'
 # name base of snapshot files/directories, to input to glob to find all files/directories
 snapshot_name_base = 'snap*[!txt]'
 
-# default snapshot index (typically z = 0)
+# default snapshot redshift and index
+snapshot_redshift = 0
 snapshot_index = 600
 
 # name of text file that lists (only) snapshot scale-factors
