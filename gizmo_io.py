@@ -201,12 +201,14 @@ class ParticleDictionaryClass(dict):
         self.Cosmology = None
         self.host = {'position': [], 'velocity': [], 'rotation': [], 'axis.ratios': []}
 
-        # these classes are only for star and gas particles
-        self.MassLoss = None  # relevant for star particles
-        self.ElementAgeTracer = None  # relevant for star and gas particles
+        # for gas
+        # adiabatic index (ratio of secific heats) to convert specific intern energy to temperature
+        self.adiabatic_index = None
 
-        # these arrays are relevant for star and gas particles
-        # to convert id and id.child to pointer to array index
+        # for stars and gas
+        self.MassLoss = None  # relevant for stars
+        self.ElementAgeTracer = None  # relevant for stars and gas
+        # onvert id and id.child to pointer to array index
         self._id0_to_index = None  # array of pointer indices for particles with id.child = 0
         self._ids_to_index = None  # dict of pointer indices for particles with id.child > 0
         self._id0_to_species = None  # array of pointer species for particles with id.child = 0
@@ -438,14 +440,13 @@ class ParticleDictionaryClass(dict):
         # undo the conversion from internal energy -> temperature
         if 'internal.energy' in property_name:
             helium_mass_fracs = self.prop('massfraction.helium')
-            gas_eos = 5.0 / 3
             ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
             mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
             molecular_weights = mus * ut.constant.proton_mass
 
             values = self.prop('temperature') / (
                 ut.constant.centi_per_kilo ** 2
-                * (gas_eos - 1)
+                * (self.adiabatic_index - 1)
                 * molecular_weights
                 / ut.constant.boltzmann
             )
@@ -835,7 +836,9 @@ class ReadClass(ut.io.SayClass):
         verbose : bool
             whether to print diagnostics
         '''
-        self.gas_eos = 5 / 3  # assumed equation of state of gas
+        # assumed adiabatic index (ratio of specific heats) for gas
+        # use only to convert between gas specific internal energy and temperature
+        self.gas_adiabatic_index = 5 / 3
 
         # this format avoids accidentally reading text file that contains snapshot indices
         self._snapshot_name_base = snapshot_name_base
@@ -1600,6 +1603,7 @@ class ReadClass(ut.io.SayClass):
         # delete these classes by default, because they only apply to some particle species
         del part.MassLoss
         del part.ElementAgeTracer
+        del part.adiabatic_index
 
         # parse input directories
         simulation_directory = ut.io.get_path(simulation_directory)
@@ -1642,6 +1646,7 @@ class ReadClass(ut.io.SayClass):
                         properties_temp.append(prop_read_name)
             properties = properties_temp
             del properties_temp
+
         if 'InternalEnergy' in properties:
             # need Helium abundance and electron fraction to compute temperature
             for prop_name in np.setdiff1d(['ElectronAbundance', 'Metallicity'], properties):
@@ -1674,8 +1679,14 @@ class ReadClass(ut.io.SayClass):
                 # initialize particle dictionary class for this species
                 part[spec_name] = ParticleDictionaryClass()
 
+                # adiabatic index (ratio of specific heats) relevant only for gas
+                if spec_name == 'gas':
+                    part[spec_name].adiabatic_index = self.gas_adiabatic_index
+                else:
+                    del part[spec_name].adiabatic_index
+
+                # mass loss relevant only for stars
                 if spec_name != 'star':
-                    # mass loss class only relevant for stars
                     del part[spec_name].MassLoss
 
                 if spec_name in ['star', 'gas']:
@@ -2043,7 +2054,7 @@ class ReadClass(ut.io.SayClass):
                 molecular_weights = mus * ut.constant.proton_mass
                 part[spec_name]['temperature'] *= (
                     ut.constant.centi_per_kilo ** 2
-                    * (self.gas_eos - 1)
+                    * (part[spec_name].adiabatic_index - 1)
                     * molecular_weights
                     / ut.constant.boltzmann
                 )
