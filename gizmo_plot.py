@@ -1892,7 +1892,7 @@ def plot_neighbors_v_distance(
             neig_number_max,
             dimension_indices,
             host_index,
-            property_select,
+            property_select=property_select,
         )
         neig_distances = neig_distancess[(neig_distancess > 0) * (neig_distancess < np.Inf)]
         pro = DistanceBin.get_sum_profile(neig_distances)
