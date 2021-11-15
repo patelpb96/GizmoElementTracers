@@ -24,11 +24,10 @@ Unless otherwise noted, all quantities are in (combinations of)
     elemental abundance [linear mass fraction]
 '''
 
-import os
 import collections
-import pickle
 import numpy as np
 from scipy import integrate
+from scipy import interpolate
 
 import utilities as ut
 
@@ -1612,8 +1611,6 @@ class MassLossClass(ut.io.SayClass):
         self.MetalBin = None
         self.mass_loss_fractions = None
 
-        self._file_name = os.environ['HOME'] + '/.gizmo_star_mass_loss_spline.pkl'
-
     def _parse_model(self, model):
         '''
         Parse input model.
@@ -1771,8 +1768,6 @@ class MassLossClass(ut.io.SayClass):
         age_bin_number=20,
         metallicity_limits=[0.01, 3],
         metallicity_bin_number=25,
-        force_remake=False,
-        write_spline=False,
     ):
         '''
         Create 2-D bivariate spline (in age and metallicity) for fractional mass loss
@@ -1788,18 +1783,7 @@ class MassLossClass(ut.io.SayClass):
             min and max limits of (linear) metallicity
         metallicity_bin_number : float
             number of metallicity bins
-        force_remake : bool
-            whether to force a recalculation of the spline, even if file exists
-        write_spline : bool
-            whether to write the spline to a pickle file for rapid loading in the future
         '''
-        from os.path import isfile
-        from scipy import interpolate
-
-        if not force_remake and isfile(self._file_name):
-            self._read_mass_loss_spline()
-            return
-
         age_min = 0
 
         self.AgeBin = ut.binning.BinClass(age_limits, number=age_bin_number, log_scale=True)
@@ -1820,19 +1804,6 @@ class MassLossClass(ut.io.SayClass):
         self.Spline = interpolate.RectBivariateSpline(
             self.AgeBin.mins, self.MetalBin.mins, self.mass_loss_fractions
         )
-
-        if write_spline:
-            self._write_mass_loss_spline()
-
-    def _write_mass_loss_spline(self):
-        with open(self._file_name, 'wb') as f:
-            pickle.dump(self.Spline, f)
-        self.say(f'wrote mass-loss spline to:  {self._file_name}')
-
-    def _read_mass_loss_spline(self):
-        with open(self._file_name, 'rb') as f:
-            self.Spline = pickle.load(f)
-            self.say(f'read mass-loss spline from:  {self._file_name}')
 
 
 def plot_supernova_number_v_age(
