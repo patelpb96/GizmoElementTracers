@@ -2212,7 +2212,7 @@ class ReadClass(ut.io.SayClass):
                     end='\n\n',
                 )
                 # read cosmological parameters
-                with open(path_file_name, 'r') as file_in:
+                with open(path_file_name, 'r', encoding='utf-8') as file_in:
                     for line in file_in:
                         line = line.lower().strip().strip('\n')  # ensure lowercase for safety
                         if 'omega_l' in line:
@@ -2752,7 +2752,7 @@ class ReadClass(ut.io.SayClass):
         file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
         part_spec = part[spec_name]
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
                 '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n'
             )
@@ -2775,7 +2775,7 @@ class ReadClass(ut.io.SayClass):
         file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
         part_spec = part[spec_name]
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
                 '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
                 + ' density[M_sun/kpc^3] temperature[K]\n'
@@ -2801,7 +2801,7 @@ class ReadClass(ut.io.SayClass):
         file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
         part_spec = part[spec_name]
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
                 '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
                 + ' age[Gyr]\n'

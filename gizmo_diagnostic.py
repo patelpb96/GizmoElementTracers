@@ -58,13 +58,13 @@ class RuntimeClass(ut.io.SayClass):
         machine_name : string
             name of machine run on
         '''
-        loop_number_max = 1000
+        line_number_max = 100
 
         file_name = ut.io.get_path(simulation_directory) + gizmo_out_file_name
         path_file_names = glob.glob(file_name)
-        file_read = open(path_file_names[0], 'r')
+        file_read = open(path_file_names[0], 'r', encoding='utf-8')
 
-        loop_i = 0
+        line_i = 0
         mpi_number = None
         omp_number = None
         machine_name = None
@@ -74,9 +74,10 @@ class RuntimeClass(ut.io.SayClass):
                 mpi_number = int(line.split()[2])
             elif 'OpenMP threads' in line:
                 omp_number = int(line.split()[1])
-            elif 'running on' in line:
-                for machine_name in self.machine:
-                    if machine_name in line:
+            elif 'Build on' in line:
+                for _machine_name in self.machine:
+                    if _machine_name in line:
+                        machine_name = _machine_name
                         if machine_name == 'pfe':
                             machine_name = 'pleiades'
                         break
@@ -84,8 +85,8 @@ class RuntimeClass(ut.io.SayClass):
             if mpi_number and omp_number:
                 break
 
-            loop_i += 1
-            if loop_i > loop_number_max:
+            line_i += 1
+            if line_i > line_number_max:
                 break
 
         if mpi_number:
@@ -178,7 +179,7 @@ class RuntimeClass(ut.io.SayClass):
             + ut.io.get_path(snapshot_directory)
             + gizmo_cpu_file_name
         )
-        file_read = open(path_file_name, 'r')
+        file_read = open(path_file_name, 'r', encoding='utf-8')
 
         wall_times = []
 
