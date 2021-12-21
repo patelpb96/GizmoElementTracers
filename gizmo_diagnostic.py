@@ -25,9 +25,9 @@ class RuntimeClass(ut.io.SayClass):
     def __init__(self):
         # dictionary of cluster name and (default) number of cores per node
         self.machine = {
-            'stampede2': 48,
             'frontera': 56,
-            'bridges2': 1,
+            'stampede2': 48,
+            'bridges2': 64,
             'pleiades': 20,
             'pfe': 20,
             'peloton': 32,
@@ -64,29 +64,26 @@ class RuntimeClass(ut.io.SayClass):
         path_file_names = glob.glob(file_name)
         file_read = open(path_file_names[0], 'r', encoding='utf-8')
 
-        line_i = 0
         mpi_number = None
         omp_number = None
         machine_name = None
 
-        for line in file_read:
-            if 'MPI tasks' in line:
+        for line_i, line in enumerate(file_read):
+            if mpi_number is None and 'MPI tasks' in line:
                 mpi_number = int(line.split()[2])
-            elif 'OpenMP threads' in line:
+            elif omp_number is None and 'OpenMP threads' in line:
                 omp_number = int(line.split()[1])
-            elif 'Build on' in line:
-                for _machine_name in self.machine:
-                    if _machine_name in line:
-                        machine_name = _machine_name
+            elif machine_name is None and 'Build on' in line:
+                for m in self.machine:
+                    if m in line:
+                        machine_name = m
                         if machine_name == 'pfe':
                             machine_name = 'pleiades'
                         break
 
-            if mpi_number and omp_number:
+            if mpi_number and omp_number and machine_name:
                 break
-
-            line_i += 1
-            if line_i > line_number_max:
+            elif line_i > line_number_max:
                 break
 
         if mpi_number:
