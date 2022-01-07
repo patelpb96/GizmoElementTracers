@@ -102,7 +102,7 @@ def get_ages_transition(model=FIRE_MODEL_DEFAULT):
     if 'fire2' in model:
         ages_transition = np.sort([1.0, 3.4, 3.5, 10.37, 37.53, 50, 100, 1000])  # [Myr]
     elif 'fire3' in model:
-        ages_transition = np.sort([1.7, 3.7, 4.0, 6.5, 8, 18, 20, 30, 44, 1000])  # [Myr]
+        ages_transition = np.sort([1.7, 3.7, 4, 7, 8, 18, 20, 30, 44, 1000])  # [Myr]
 
     return ages_transition
 
@@ -244,7 +244,7 @@ class NucleosyntheticYieldClass(dict):
             ejecta_mass = 1  # stellar wind yields are intrinsically mass fractions
 
             if 'fire2' in self.model:
-                # FIRE-2: stellar_evolution.c line ~583
+                # FIRE-2: stellar_evolution.c line ~587
                 # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
                 # assume the total wind abundances for He, C, N, and O as below
                 # for all other elements, simply return progenitor surface abundance
@@ -266,7 +266,7 @@ class NucleosyntheticYieldClass(dict):
                     pass  # no dependence on progenitor metallicity
 
             elif self.model == 'fire3':
-                # FIRE-3: stellar_evolution.c line ~563
+                # FIRE-3: stellar_evolution.c line ~567
                 # use surface abundance for all elements except He, C, N, O, S-process
                 # C, N, O conserved to high accuracy in sum for secondary production
 
@@ -287,6 +287,7 @@ class NucleosyntheticYieldClass(dict):
                     + self.sun_massfraction['nitrogen']
                     + self.sun_massfraction['oxygen']
                 )
+
                 # He production scales off of the fraction of H in IC
                 # y represents the yield of He produced by burning H, scales off availability
                 t1 = 2.8  # [Myr]
@@ -377,7 +378,7 @@ class NucleosyntheticYieldClass(dict):
 
         elif event_kind in ['supernova.cc' or 'supernova.ii']:
             if 'fire2' in self.model:
-                # FIRE-2: stellar_evolution.c line ~501
+                # FIRE-2: stellar_evolution.c line ~504
                 # yields from Nomoto et al 2006, IMF averaged
                 # y = [He: 3.69e-1, C: 1.27e-2, N: 4.56e-3, O: 1.11e-1, Ne: 3.81e-2, Mg: 9.40e-3,
                 # Si: 8.89e-3, S: 3.78e-3, Ca: 4.36e-4, Fe: 7.06e-3]
@@ -412,18 +413,18 @@ class NucleosyntheticYieldClass(dict):
                     pass  # no dependence on progenitor metallicity
 
             elif self.model == 'fire3':
-                # FIRE-3: stellar_evolution.c line ~471
+                # FIRE-3: stellar_evolution.c line ~474
                 # ejecta_mass = 8.72  # IMF-averaged [M_sun], but FIRE-3 does not use this directly
 
                 # numbers for interpolation of ejecta masses
                 # [must be careful here that this integrates to the correct -total- ejecta mass]
                 # these break times: tmin = 3.7 Myr corresponds to the first explosions
-                # (Eddington-limited lifetime of the most massive stars), tbrk = 6.5 Myr to the end
+                # (Eddington-limited lifetime of the most massive stars), tbrk = 7 Myr to the end
                 # of this early phase, stars with ZAMS mass ~30+ Msun here. curve flattens both from
                 # IMF but also b/c mass-loss less efficient. tmax = 44 Myr to the last explosion
                 # determined by lifetime of stars at 8 Msun
                 cc_age_min = 3.7
-                cc_age_brk = 6.5
+                cc_age_brk = 7
                 cc_age_max = 44
                 cc_mass_max = 35
                 cc_mass_brk = 10
@@ -511,7 +512,7 @@ class NucleosyntheticYieldClass(dict):
             ejecta_mass = 1.4  # [M_sun]
 
             if 'fire2' in self.model:
-                # FIRE-2: stellar_evolution.c line ~498
+                # FIRE-2: stellar_evolution.c line ~501
                 # yields from Iwamoto et al 1999, W7 model, IMF averaged
                 # below are mass fractions
                 element_yield['metals'] = 1
@@ -527,7 +528,7 @@ class NucleosyntheticYieldClass(dict):
                 element_yield['iron'] = 0.531
 
             elif self.model == 'fire3':
-                # FIRE-3: stellar_evolution.c line 460 (or so)
+                # FIRE-3: stellar_evolution.c line ~464
                 # total metal mass (species below, + residuals primarily in Ar, Cr, Mn, Ni)
                 element_yield['metals'] = 1
                 # adopted yield: mean of W7 and WDD2 in Mori et al 2018
@@ -579,7 +580,7 @@ class NucleosyntheticYieldClass(dict):
             and isinstance(progenitor_massfraction_dict, dict)
             and len(progenitor_massfraction_dict) > 0
         ):
-            # FIRE-2: stellar_evolution.c line ~509
+            # FIRE-2: stellar_evolution.c line ~512
             # enforce that yields obey pre-existing surface abundances
             # allow for larger abundances in the progenitor star - usually irrelevant
             # original FIRE-2 applied this to all mass-loss channels (including winds)
@@ -755,10 +756,9 @@ class StellarWindClass:
             metallicity = 1.0
 
         if 'fire2' in self.model:
-            # FIRE-2: stellar_evolution.c line ~350
+            # FIRE-2: stellar_evolution.c line ~351
             if np.isscalar(ages):
                 assert ages >= age_min and ages < age_max
-                # FIRE-2: stellar_evolution.c line ~352
                 if ages <= 1:
                     # rates = 4.76317  # rate [Gyr^-1], used (accidentally?) in original FIRE-2
                     rates = 4.76317 * metallicity  # # rate [Gyr^-1]
@@ -791,7 +791,7 @@ class StellarWindClass:
                 )
 
         elif 'fire3' in self.model:
-            # FIRE-3: stellar_evolution.c line ~355
+            # FIRE-3: stellar_evolution.c line ~354
             # separates the more robust line-driven winds [massive-star-dominated] component,
             # and -very- uncertain AGB. extremely good fits to updated STARBURST99 result for a
             # 3-part Kroupa IMF (0.3,1.3,2.3 slope, 0.01-0.08-0.5-100 Msun, 8-120 SNe/BH cutoff,
@@ -1020,7 +1020,7 @@ class SupernovaCCClass:
                 if 'fire2' in self.model:
                     cc_age_break = 10.37  # [Myr]
                 elif 'fire3' in self.model:
-                    cc_age_break = 6.5  # [Myr]
+                    cc_age_break = 7  # [Myr]
             assert cc_age_break >= 0
             self.cc_age_break = cc_age_break
 

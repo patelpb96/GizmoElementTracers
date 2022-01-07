@@ -387,7 +387,7 @@ class InitialConditionClass(ut.io.SayClass):
         )
 
         if assign_nearest_neighbor:
-            halo_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rneig', 8000)
+            halo_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 3000, 'Rneig', 10000)
 
         return hal
 
