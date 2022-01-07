@@ -977,16 +977,26 @@ class ReadClass(ut.io.SayClass):
                 host_number, simulation_directory, os
             )
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
+        Snapshot = ut.simulation.read_snapshot_times(
+            simulation_directory, self._verbose, error_if_no_file=False
+        )
+        if Snapshot is None:
+            # could not read file that lists all snapshots - require input snapshot index
+            if snapshot_value_kind != 'index':
+                raise OSError(f'cannot find file of snapshot times in {simulation_directory}')
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
 
         # read all input snapshots
         for snapshot_value in snapshot_values:
-            snapshot_index = Snapshot.parse_snapshot_values(
-                snapshot_value_kind, snapshot_value, self._verbose
-            )
+            if Snapshot is None:
+                # if could not read list of snapshots, assume input snapshot index
+                snapshot_index = snapshot_value
+            else:
+                snapshot_index = Snapshot.parse_snapshot_values(
+                    snapshot_value_kind, snapshot_value, self._verbose
+                )
 
             # read header from snapshot file
             header = self.read_header(
@@ -1375,13 +1385,13 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        if snapshot_value_kind != 'index':
+        if snapshot_value_kind == 'index':
+            snapshot_index = snapshot_value
+        else:
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
             snapshot_index = Snapshot.parse_snapshot_values(
                 snapshot_value_kind, snapshot_value, self._verbose
             )
-        else:
-            snapshot_index = snapshot_value
 
         path_file_name = self.get_snapshot_file_names_indices(
             snapshot_directory, snapshot_index, snapshot_block_index
@@ -1609,13 +1619,13 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        if snapshot_value_kind != 'index':
+        if snapshot_value_kind == 'index':
+            snapshot_index = snapshot_value
+        else:
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
             snapshot_index = Snapshot.parse_snapshot_values(
                 snapshot_value_kind, snapshot_value, self._verbose
             )
-        else:
-            snapshot_index = snapshot_value
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
