@@ -439,7 +439,8 @@ class ArchiveClass(ut.io.SayClass):
                 os.chdir(f'{snapshot_directory}')
                 self.say(f'* cleaning:  {snapshot_directory}')
                 os.system(f'rm -rf {restart_directory}')
-                os.system('rm -f HIIheating.txt MomWinds.txt sfr.txt SNeIIheating.txt')
+                os.system('rm -f balance.txt energy.txt sfr.txt timings.txt')
+                os.system('rm -f HIIheating.txt MomWinds.txt SNeIIheating.txt')
                 os.chdir('..')
             else:
                 self.say(f'! could not find:  {snapshot_directory}')
