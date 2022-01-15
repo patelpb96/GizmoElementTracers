@@ -2641,8 +2641,91 @@ class ReadClass(ut.io.SayClass):
                 for prop_name in orb[spec_name]:
                     part[spec_name][host_name + prop_name] = orb[spec_name][prop_name]
 
-    # re-write to file ----------
-    def _rewrite_snapshot(
+
+Read = ReadClass()
+
+
+class WriteClass(ReadClass):
+    '''
+    Read Gizmo snapshot and (re)write information to file.
+    '''
+
+    def write_exsitu_flag(
+        self,
+        snapshot_value_kind='redshift',
+        snapshot_value=0,
+        simulation_directory=gizmo_default.simulation_directory,
+        track_directory=gizmo_default.track_directory,
+        exsitu_distance=30,
+        exsitu_distance_scaling=True,
+    ):
+        '''
+        Read single snapshot, with star coordinates at formation.
+        Apply a total distance treshold to define ex-situ stars.
+        Write text file that contains binary flag of whether star particle formed ex-situ.
+
+        Parameters
+        ----------
+        snapshot_value_kind : str
+            input snapshot number kind: 'index', 'redshift'
+        snapshot_value : int or float
+            index (number) of snapshot file
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers, formation coordinates, and host coordinates
+        exsitu_distance : float
+            minimum distance to define ex-situ stars [kpc physical]
+        exsitu_distance_scaling : bool
+            whether to scale exsitu_distance with scale-factor at formation
+        '''
+        species_name = 'star'
+        file_name = f'{species_name}_exsitu_flag_{{}}.txt'
+
+        track_directory = ut.io.get_path(track_directory)
+
+        part = self.read_snapshots(
+            species_name,
+            snapshot_value_kind,
+            snapshot_value,
+            simulation_directory,
+            track_directory=track_directory,
+            properties=['form.scalefactor', 'id'],
+            assign_formation_coordinates=True,
+            check_properties=False,
+        )
+
+        file_path_name = track_directory + file_name.format(part.snapshot['index'])
+
+        form_distance = part[species_name].prop('form.host.distance.total')
+        if exsitu_distance_scaling:
+            form_distance /= part[species_name].prop('form.scalefactor')
+        exsitu_masks = 1 * (form_distance > exsitu_distance)
+
+        self.say(
+            '{:d} of {:d} ({:.1f}\%) stars formed ex-situ'.format(
+                exsitu_masks.sum(), exsitu_masks.size, 100 * exsitu_masks.sum() / exsitu_masks.size
+            )
+        )
+
+        with open(file_path_name, 'w', encoding='utf-8') as file_out:
+            header = '# for every star particle at snapshot {},'.format(part.snapshot['index'])
+            header += ' this ex-situ flag = 1 if distance_from_host_at_formation > {:.1f}'.format(
+                exsitu_distance
+            )
+            if exsitu_distance_scaling:
+                header += ' kpc comoving\n'
+            else:
+                header += ' kpc physical\n'
+
+            file_out.write(header)
+
+            for exsitu_mask in exsitu_masks:
+                file_out.write(f'{exsitu_mask}\n')
+
+        self.say(f'wrote {file_path_name}')
+
+    def rewrite_snapshot(
         self,
         species='gas',
         action='delete',
@@ -2653,7 +2736,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory=gizmo_default.snapshot_directory,
     ):
         '''
-        Read single snapshot. Rewrite, deleting given species and/or adjusting particle properties.
+        Read single snapshot.
+        Rewrite, deleting given species and/or adjusting particle properties.
 
         Parameters
         ----------
@@ -2749,7 +2833,7 @@ class ReadClass(ut.io.SayClass):
                     header['NumPart_ThisFile'] = part_number_in_file
                     header['NumPart_Total'] = part_number
 
-    def _rewrite_snapshot_text(self, part):
+    def rewrite_snapshot_to_text(self, part):
         '''
         Re-write snapshot to text file, one file per particle species.
 
@@ -2831,6 +2915,3 @@ class ReadClass(ut.io.SayClass):
                         part_spec.prop('age', pi),
                     )
                 )
-
-
-Read = ReadClass()
