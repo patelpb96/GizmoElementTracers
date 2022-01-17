@@ -225,7 +225,7 @@ class InitialConditionClass(ut.io.SayClass):
         # MUSIC does not support header information in points file, so put in separate log file
         log_file_name = file_name.replace('.txt', '_log.txt')
 
-        with open(log_file_name, 'w') as file_out:
+        with open(log_file_name, 'w', encoding='utf-8') as file_out:
             Write = ut.io.WriteClass(file_out, print_stdout=True)
 
             Write.write(
@@ -321,7 +321,7 @@ class InitialConditionClass(ut.io.SayClass):
                     f'# using convex hull with {positions_ini.shape[0]} vertices for initial volume'
                 )
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             for pi in range(positions_ini.shape[0]):
                 file_out.write(
                     '{:.8f} {:.8f} {:.8f}\n'.format(

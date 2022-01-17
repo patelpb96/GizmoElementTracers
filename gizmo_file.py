@@ -839,7 +839,7 @@ class GlobusClass(ut.io.SayClass):
                 snapshot_string = f'{snapshot_name} {snapshot_name}\n'
                 transfer_string += snapshot_string
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(transfer_string)
 
 

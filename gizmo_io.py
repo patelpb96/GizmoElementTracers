@@ -2647,7 +2647,7 @@ Read = ReadClass()
 
 class WriteClass(ReadClass):
     '''
-    Read Gizmo snapshot and (re)write information to file.
+    Read Gizmo snapshot[s] and (re)write information to file.
     '''
 
     def write_exsitu_flag(
@@ -2842,9 +2842,9 @@ class WriteClass(ReadClass):
         part : dict class
             catalog of particles at snapshot
         '''
-        spec_name = 'dark'
-        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-        part_spec = part[spec_name]
+        species_name = 'dark'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], species_name)
+        part_spec = part[species_name]
 
         with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
@@ -2865,9 +2865,9 @@ class WriteClass(ReadClass):
                     )
                 )
 
-        spec_name = 'gas'
-        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-        part_spec = part[spec_name]
+        species_name = 'gas'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], species_name)
+        part_spec = part[species_name]
 
         with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
@@ -2891,9 +2891,9 @@ class WriteClass(ReadClass):
                     )
                 )
 
-        spec_name = 'star'
-        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-        part_spec = part[spec_name]
+        species_name = 'star'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], species_name)
+        part_spec = part[species_name]
 
         with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
