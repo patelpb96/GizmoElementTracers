@@ -654,7 +654,7 @@ class ImageClass(ut.io.SayClass):
         '''
         file_name = self.plot_file_name + '.txt'
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             Write = ut.io.WriteClass(file_out, print_stdout=False)
             Write.write(
                 '# pixel (smoothing) scale is {:.2f} kpc'.format(
