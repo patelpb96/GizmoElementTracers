@@ -203,7 +203,7 @@ class InitialConditionClass(ut.io.SayClass):
             'matter', part_ini.snapshot['redshift'], 'kpc comoving'
         )
         if part_ini.info['has.baryons']:
-            # subtract baryonic mass
+            # remove baryonic mass
             density_ini *= part_ini.Cosmology['omega_dm'] / part_ini.Cosmology['omega_matter']
 
         # convex hull
@@ -225,7 +225,7 @@ class InitialConditionClass(ut.io.SayClass):
         # MUSIC does not support header information in points file, so put in separate log file
         log_file_name = file_name.replace('.txt', '_log.txt')
 
-        with open(log_file_name, 'w') as file_out:
+        with open(log_file_name, 'w', encoding='utf-8') as file_out:
             Write = ut.io.WriteClass(file_out, print_stdout=True)
 
             Write.write(
@@ -321,7 +321,7 @@ class InitialConditionClass(ut.io.SayClass):
                     f'# using convex hull with {positions_ini.shape[0]} vertices for initial volume'
                 )
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             for pi in range(positions_ini.shape[0]):
                 file_out.write(
                     '{:.8f} {:.8f} {:.8f}\n'.format(
@@ -355,7 +355,8 @@ class InitialConditionClass(ut.io.SayClass):
             and 'mass' in parts[0]['dark2']
             and len(parts[0]['dark2']['mass']) > 0
         ):
-            halo_io.Particle.assign_lowres_mass(hal, parts[0])
+            Particle = halo_io.ParticleClass()
+            Particle.assign_lowres_mass(hal, parts[0])
 
         return hal, parts
 
@@ -386,7 +387,7 @@ class InitialConditionClass(ut.io.SayClass):
         )
 
         if assign_nearest_neighbor:
-            halo_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 2000, 'Rneig', 8000)
+            halo_io.IO.assign_nearest_neighbor(hal, 'mass', mass_limits, 3000, 'Rneig', 10000)
 
         return hal
 
@@ -436,9 +437,6 @@ class InitialConditionClass(ut.io.SayClass):
         return parts
 
 
-InitialCondition = InitialConditionClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # run from command line
 # --------------------------------------------------------------------------------------------------
@@ -448,4 +446,5 @@ if __name__ == '__main__':
 
     distance_max = float(sys.argv[1])
 
+    InitialCondition = InitialConditionClass()
     InitialCondition.write_positions_at_initial_snapshot(distance_max=distance_max)

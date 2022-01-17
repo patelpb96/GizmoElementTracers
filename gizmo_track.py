@@ -689,13 +689,11 @@ class ParticlePointerClass(ut.io.SayClass):
         self.io_pointers(Pointer=Pointer)
 
 
-ParticlePointer = ParticlePointerClass()
-
-
 def test_particle_pointers(part, part_z1, part_z2):
     '''
     .
     '''
+    ParticlePointer = ParticlePointerClass()
     ParticlePointer.io_pointers(part_z1)
     ParticlePointer.io_pointers(part_z2)
 
@@ -1321,9 +1319,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
             self.io_hosts_coordinates(part_z0, write=True)
 
 
-ParticleCoordinate = ParticleCoordinateClass()
-
-
 # --------------------------------------------------------------------------------------------------
 # run from command line
 # --------------------------------------------------------------------------------------------------
@@ -1336,7 +1331,9 @@ if __name__ == '__main__':
     assert 'pointer' in function_kind or 'coordinate' in function_kind
 
     if 'pointer' in function_kind:
+        ParticlePointer = ParticlePointerClass()
         ParticlePointer.generate_write_pointers()
 
     if 'coordinate' in function_kind:
+        ParticleCoordinate = ParticleCoordinateClass()
         ParticleCoordinate.generate_write_hosts_coordinates()

@@ -157,6 +157,7 @@ import numpy as np
 
 import utilities as ut
 from . import gizmo_default
+from . import gizmo_track
 
 
 # default FIRE model for stellar evolution to assume throughout
@@ -200,12 +201,14 @@ class ParticleDictionaryClass(dict):
         self.Cosmology = None
         self.host = {'position': [], 'velocity': [], 'rotation': [], 'axis.ratios': []}
 
-        # these classes are only for star and gas particles
-        self.MassLoss = None  # relevant for star particles
-        self.ElementAgeTracer = None  # relevant for star and gas particles
+        # for gas
+        # adiabatic index (ratio of secific heats) to convert specific intern energy to temperature
+        self.adiabatic_index = None
 
-        # these arrays are relevant for star and gas particles
-        # to convert id and id.child to pointer to array index
+        # for stars and gas
+        self.MassLoss = None  # relevant for stars
+        self.ElementAgeTracer = None  # relevant for stars and gas
+        # onvert id and id.child to pointer to array index
         self._id0_to_index = None  # array of pointer indices for particles with id.child = 0
         self._ids_to_index = None  # dict of pointer indices for particles with id.child > 0
         self._id0_to_species = None  # array of pointer species for particles with id.child = 0
@@ -437,14 +440,13 @@ class ParticleDictionaryClass(dict):
         # undo the conversion from internal energy -> temperature
         if 'internal.energy' in property_name:
             helium_mass_fracs = self.prop('massfraction.helium')
-            gas_eos = 5.0 / 3
             ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
             mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
             molecular_weights = mus * ut.constant.proton_mass
 
             values = self.prop('temperature') / (
                 ut.constant.centi_per_kilo ** 2
-                * (gas_eos - 1)
+                * (self.adiabatic_index - 1)
                 * molecular_weights
                 / ut.constant.boltzmann
             )
@@ -834,11 +836,9 @@ class ReadClass(ut.io.SayClass):
         verbose : bool
             whether to print diagnostics
         '''
-        from . import gizmo_track
-
-        self.gizmo_track = gizmo_track
-
-        self.gas_eos = 5 / 3  # assumed equation of state of gas
+        # assumed adiabatic index (ratio of specific heats) for gas
+        # use only to convert between gas specific internal energy and temperature
+        self.gas_adiabatic_index = 5 / 3
 
         # this format avoids accidentally reading text file that contains snapshot indices
         self._snapshot_name_base = snapshot_name_base
@@ -863,8 +863,8 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots(
         self,
         species='all',
-        snapshot_value_kind='index',
-        snapshot_values=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_values=gizmo_default.snapshot_redshift,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
@@ -977,16 +977,26 @@ class ReadClass(ut.io.SayClass):
                 host_number, simulation_directory, os
             )
 
-        Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
+        Snapshot = ut.simulation.read_snapshot_times(
+            simulation_directory, self._verbose, error_if_no_file=False
+        )
+        if Snapshot is None:
+            # could not read file that lists all snapshots - require input snapshot index
+            if snapshot_value_kind != 'index':
+                raise OSError(f'cannot find file of snapshot times in {simulation_directory}')
         snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
 
         # read all input snapshots
         for snapshot_value in snapshot_values:
-            snapshot_index = Snapshot.parse_snapshot_values(
-                snapshot_value_kind, snapshot_value, self._verbose
-            )
+            if Snapshot is None:
+                # if could not read list of snapshots, assume input snapshot index
+                snapshot_index = snapshot_value
+            else:
+                snapshot_index = Snapshot.parse_snapshot_values(
+                    snapshot_value_kind, snapshot_value, self._verbose
+                )
 
             # read header from snapshot file
             header = self.read_header(
@@ -1092,7 +1102,7 @@ class ReadClass(ut.io.SayClass):
 
             if assign_pointers:
                 # assign star and gas particle pointers from z = 0 to this snapshot
-                ParticlePointer = self.gizmo_track.ParticlePointerClass(
+                ParticlePointer = gizmo_track.ParticlePointerClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
                 ParticlePointer.io_pointers(part)
@@ -1115,8 +1125,8 @@ class ReadClass(ut.io.SayClass):
     def read_snapshots_simulations(
         self,
         species='all',
-        snapshot_value_kind='index',
-        snapshot_value=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_value=gizmo_default.snapshot_redshift,
         simulation_directories=[],
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
@@ -1375,13 +1385,13 @@ class ReadClass(ut.io.SayClass):
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        if snapshot_value_kind != 'index':
+        if snapshot_value_kind == 'index':
+            snapshot_index = snapshot_value
+        else:
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
             snapshot_index = Snapshot.parse_snapshot_values(
                 snapshot_value_kind, snapshot_value, self._verbose
             )
-        else:
-            snapshot_index = snapshot_value
 
         path_file_name = self.get_snapshot_file_names_indices(
             snapshot_directory, snapshot_index, snapshot_block_index
@@ -1603,18 +1613,19 @@ class ReadClass(ut.io.SayClass):
         # delete these classes by default, because they only apply to some particle species
         del part.MassLoss
         del part.ElementAgeTracer
+        del part.adiabatic_index
 
         # parse input directories
         simulation_directory = ut.io.get_path(simulation_directory)
         snapshot_directory = simulation_directory + ut.io.get_path(snapshot_directory)
 
-        if snapshot_value_kind != 'index':
+        if snapshot_value_kind == 'index':
+            snapshot_index = snapshot_value
+        else:
             Snapshot = ut.simulation.read_snapshot_times(simulation_directory, self._verbose)
             snapshot_index = Snapshot.parse_snapshot_values(
                 snapshot_value_kind, snapshot_value, self._verbose
             )
-        else:
-            snapshot_index = snapshot_value
 
         path_file_name = self.get_snapshot_file_names_indices(snapshot_directory, snapshot_index)
 
@@ -1645,6 +1656,7 @@ class ReadClass(ut.io.SayClass):
                         properties_temp.append(prop_read_name)
             properties = properties_temp
             del properties_temp
+
         if 'InternalEnergy' in properties:
             # need Helium abundance and electron fraction to compute temperature
             for prop_name in np.setdiff1d(['ElectronAbundance', 'Metallicity'], properties):
@@ -1677,8 +1689,14 @@ class ReadClass(ut.io.SayClass):
                 # initialize particle dictionary class for this species
                 part[spec_name] = ParticleDictionaryClass()
 
+                # adiabatic index (ratio of specific heats) relevant only for gas
+                if spec_name == 'gas':
+                    part[spec_name].adiabatic_index = self.gas_adiabatic_index
+                else:
+                    del part[spec_name].adiabatic_index
+
+                # mass loss relevant only for stars
                 if spec_name != 'star':
-                    # mass loss class only relevant for stars
                     del part[spec_name].MassLoss
 
                 if spec_name in ['star', 'gas']:
@@ -2046,7 +2064,7 @@ class ReadClass(ut.io.SayClass):
                 molecular_weights = mus * ut.constant.proton_mass
                 part[spec_name]['temperature'] *= (
                     ut.constant.centi_per_kilo ** 2
-                    * (self.gas_eos - 1)
+                    * (part[spec_name].adiabatic_index - 1)
                     * molecular_weights
                     / ut.constant.boltzmann
                 )
@@ -2204,7 +2222,7 @@ class ReadClass(ut.io.SayClass):
                     end='\n\n',
                 )
                 # read cosmological parameters
-                with open(path_file_name, 'r') as file_in:
+                with open(path_file_name, 'r', encoding='utf-8') as file_in:
                     for line in file_in:
                         line = line.lower().strip().strip('\n')  # ensure lowercase for safety
                         if 'omega_l' in line:
@@ -2398,7 +2416,8 @@ class ReadClass(ut.io.SayClass):
             try:
                 if method == 'track':
                     # read coordinates of each host across all snapshots
-                    self.gizmo_track.ParticleCoordinate.io_hosts_coordinates(
+                    ParticleCoordinate = gizmo_track.ParticleCoordinateClass()
+                    ParticleCoordinate.io_hosts_coordinates(
                         part,
                         simulation_directory,
                         track_directory,
@@ -2622,8 +2641,91 @@ class ReadClass(ut.io.SayClass):
                 for prop_name in orb[spec_name]:
                     part[spec_name][host_name + prop_name] = orb[spec_name][prop_name]
 
-    # re-write to file ----------
-    def _rewrite_snapshot(
+
+Read = ReadClass()
+
+
+class WriteClass(ReadClass):
+    '''
+    Read Gizmo snapshot[s] and (re)write information to file.
+    '''
+
+    def write_exsitu_flag(
+        self,
+        snapshot_value_kind='redshift',
+        snapshot_value=0,
+        simulation_directory=gizmo_default.simulation_directory,
+        track_directory=gizmo_default.track_directory,
+        exsitu_distance=30,
+        exsitu_distance_scaling=True,
+    ):
+        '''
+        Read single snapshot, with star coordinates at formation.
+        Apply a total distance treshold to define ex-situ stars.
+        Write text file that contains binary flag of whether star particle formed ex-situ.
+
+        Parameters
+        ----------
+        snapshot_value_kind : str
+            input snapshot number kind: 'index', 'redshift'
+        snapshot_value : int or float
+            index (number) of snapshot file
+        simulation_directory : str
+            directory of simulation
+        track_directory : str
+            directory of files for particle pointers, formation coordinates, and host coordinates
+        exsitu_distance : float
+            minimum distance to define ex-situ stars [kpc physical]
+        exsitu_distance_scaling : bool
+            whether to scale exsitu_distance with scale-factor at formation
+        '''
+        species_name = 'star'
+        file_name = f'{species_name}_exsitu_flag_{{}}.txt'
+
+        track_directory = ut.io.get_path(track_directory)
+
+        part = self.read_snapshots(
+            species_name,
+            snapshot_value_kind,
+            snapshot_value,
+            simulation_directory,
+            track_directory=track_directory,
+            properties=['form.scalefactor', 'id'],
+            assign_formation_coordinates=True,
+            check_properties=False,
+        )
+
+        file_path_name = track_directory + file_name.format(part.snapshot['index'])
+
+        form_distance = part[species_name].prop('form.host.distance.total')
+        if exsitu_distance_scaling:
+            form_distance /= part[species_name].prop('form.scalefactor')
+        exsitu_masks = 1 * (form_distance > exsitu_distance)
+
+        self.say(
+            '{:d} of {:d} ({:.1f}\%) stars formed ex-situ'.format(
+                exsitu_masks.sum(), exsitu_masks.size, 100 * exsitu_masks.sum() / exsitu_masks.size
+            )
+        )
+
+        with open(file_path_name, 'w', encoding='utf-8') as file_out:
+            header = '# for every star particle at snapshot {},'.format(part.snapshot['index'])
+            header += ' this ex-situ flag = 1 if distance_from_host_at_formation > {:.1f}'.format(
+                exsitu_distance
+            )
+            if exsitu_distance_scaling:
+                header += ' kpc comoving\n'
+            else:
+                header += ' kpc physical\n'
+
+            file_out.write(header)
+
+            for exsitu_mask in exsitu_masks:
+                file_out.write(f'{exsitu_mask}\n')
+
+        self.say(f'wrote {file_path_name}')
+
+    def rewrite_snapshot(
         self,
         species='gas',
         action='delete',
@@ -2634,7 +2736,8 @@ class ReadClass(ut.io.SayClass):
         snapshot_directory=gizmo_default.snapshot_directory,
     ):
         '''
-        Read single snapshot. Rewrite, deleting given species and/or adjusting particle properties.
+        Read single snapshot.
+        Rewrite, deleting given species and/or adjusting particle properties.
 
         Parameters
         ----------
@@ -2730,7 +2833,7 @@ class ReadClass(ut.io.SayClass):
                     header['NumPart_ThisFile'] = part_number_in_file
                     header['NumPart_Total'] = part_number
 
-    def _rewrite_snapshot_text(self, part):
+    def rewrite_snapshot_to_text(self, part):
         '''
         Re-write snapshot to text file, one file per particle species.
 
@@ -2739,11 +2842,11 @@ class ReadClass(ut.io.SayClass):
         part : dict class
             catalog of particles at snapshot
         '''
-        spec_name = 'dark'
-        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-        part_spec = part[spec_name]
+        species_name = 'dark'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], species_name)
+        part_spec = part[species_name]
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
                 '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]\n'
             )
@@ -2762,11 +2865,11 @@ class ReadClass(ut.io.SayClass):
                     )
                 )
 
-        spec_name = 'gas'
-        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-        part_spec = part[spec_name]
+        species_name = 'gas'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], species_name)
+        part_spec = part[species_name]
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
                 '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
                 + ' density[M_sun/kpc^3] temperature[K]\n'
@@ -2788,11 +2891,11 @@ class ReadClass(ut.io.SayClass):
                     )
                 )
 
-        spec_name = 'star'
-        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], spec_name)
-        part_spec = part[spec_name]
+        species_name = 'star'
+        file_name = 'snapshot_{}_{}.txt'.format(part.snapshot['index'], species_name)
+        part_spec = part[species_name]
 
-        with open(file_name, 'w') as file_out:
+        with open(file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(
                 '# id mass[M_sun] distance_wrt_host(x,y,z)[kpc] velocity_wrt_host(x,y,z)[km/s]'
                 + ' age[Gyr]\n'
@@ -2812,6 +2915,3 @@ class ReadClass(ut.io.SayClass):
                         part_spec.prop('age', pi),
                     )
                 )
-
-
-Read = ReadClass()

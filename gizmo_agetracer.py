@@ -705,9 +705,6 @@ class ElementAgeTracerClass(dict):
         return element_mass_fractions
 
 
-ElementAgeTracer = ElementAgeTracerClass()
-
-
 class ElementAgeTracerZClass(ElementAgeTracerClass):
     '''
     EXPERIMENTAL: Store and assign yields in bins of progenitor metallicity.

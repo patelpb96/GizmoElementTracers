@@ -25,9 +25,9 @@ class RuntimeClass(ut.io.SayClass):
     def __init__(self):
         # dictionary of cluster name and (default) number of cores per node
         self.machine = {
-            'stampede2': 48,
             'frontera': 56,
-            'bridges2': 1,
+            'stampede2': 48,
+            'bridges2': 64,
             'pleiades': 20,
             'pfe': 20,
             'peloton': 32,
@@ -58,34 +58,32 @@ class RuntimeClass(ut.io.SayClass):
         machine_name : string
             name of machine run on
         '''
-        loop_number_max = 1000
+        line_number_max = 100
 
         file_name = ut.io.get_path(simulation_directory) + gizmo_out_file_name
         path_file_names = glob.glob(file_name)
-        file_read = open(path_file_names[0], 'r')
+        file_read = open(path_file_names[0], 'r', encoding='utf-8')
 
-        loop_i = 0
         mpi_number = None
         omp_number = None
         machine_name = None
 
-        for line in file_read:
-            if 'MPI tasks' in line:
+        for line_i, line in enumerate(file_read):
+            if mpi_number is None and 'MPI tasks' in line:
                 mpi_number = int(line.split()[2])
-            elif 'OpenMP threads' in line:
+            elif omp_number is None and 'OpenMP threads' in line:
                 omp_number = int(line.split()[1])
-            elif 'running on' in line:
-                for machine_name in self.machine:
-                    if machine_name in line:
+            elif machine_name is None and 'Build on' in line:
+                for m in self.machine:
+                    if m in line:
+                        machine_name = m
                         if machine_name == 'pfe':
                             machine_name = 'pleiades'
                         break
 
-            if mpi_number and omp_number:
+            if mpi_number and omp_number and machine_name:
                 break
-
-            loop_i += 1
-            if loop_i > loop_number_max:
+            elif line_i > line_number_max:
                 break
 
         if mpi_number:
@@ -178,7 +176,7 @@ class RuntimeClass(ut.io.SayClass):
             + ut.io.get_path(snapshot_directory)
             + gizmo_cpu_file_name
         )
-        file_read = open(path_file_name, 'r')
+        file_read = open(path_file_name, 'r', encoding='utf-8')
 
         wall_times = []
 
@@ -329,9 +327,6 @@ class RuntimeClass(ut.io.SayClass):
                 print(' {:5.1f}'.format(wall_timess[d_i][a_i] / wall_timess[0][a_i]), end='')
                 print(' {:5.1f}'.format(cpu_timess[d_i][a_i] / cpu_timess[0][a_i]), end='')
             print()
-
-
-Runtime = RuntimeClass()
 
 
 class ContaminationClass(ut.io.SayClass):
@@ -698,9 +693,6 @@ class ContaminationClass(ut.io.SayClass):
         ut.plot.parse_output(plot_file_name, directory)
 
 
-Contamination = ContaminationClass()
-
-
 def print_galaxy_properties(
     part=None,
     species='star',
@@ -940,10 +932,12 @@ def print_summary(
         assign_hosts_rotation=True,
     )
 
+    Contamination = ContaminationClass()
     Contamination.print_plot_contamination_v_distance(part)
 
     print_galaxy_properties(part)
 
+    Runtime = RuntimeClass()
     _ = Runtime.print_run_times()
 
 
@@ -964,7 +958,8 @@ def test_stellar_mass_loss(
     species = 'star'
 
     if 'Pointer' not in part_z.__dict__:
-        gizmo_track.ParticlePointer.io_pointers(part_z)
+        ParticlePointer = gizmo_track.ParticlePointerClass()
+        ParticlePointer.io_pointers(part_z)
 
     MetalBin = ut.binning.BinClass(
         metallicity_limits, metallicity_bin_width, include_max=True, log_scale=True
@@ -987,9 +982,9 @@ def test_stellar_mass_loss(
     )
 
     # compute metallicity using solar abundance assumed in Gizmo
+    sun_massfraction = gizmo_star.get_sun_massfraction('fire2')
     metallicities = (
-        part_z0[species].prop('massfraction.metals', part_indices_z0)
-        / gizmo_star.StellarWind.sun_massfraction['metals']
+        part_z0[species].prop('massfraction.metals', part_indices_z0) / sun_massfraction['metals']
     )
 
     metal_bin_indices = MetalBin.get_bin_indices(metallicities)
@@ -1355,6 +1350,7 @@ if __name__ == '__main__':
                 scalefactor_width = float(sys.argv[4])
             scalefactors = np.arange(scalefactor_min, 1.01, scalefactor_width)
 
+        Runtime = RuntimeClass()
         _ = Runtime.print_run_times(wall_time_restart=wall_time_restart, scalefactors=scalefactors)
 
     elif 'contamination' in function_kind:
@@ -1362,6 +1358,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             snapshot_redshift = float(sys.argv[2])
 
+        Contamination = ContaminationClass()
         Contamination.print_plot_contamination_v_distance_both(
             snapshot_value_kind='redshift', snapshot_value=snapshot_redshift
         )
