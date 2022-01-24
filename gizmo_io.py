@@ -2703,7 +2703,7 @@ class WriteClass(ReadClass):
             # simulation has multiple primary hosts - use smallest distance
             form_host2_distance = part[species_name].prop('form.host2.distance.total')
             masks = form_host2_distance < form_host_distance
-            form_host_distance = form_host2_distance[masks]
+            form_host_distance[masks] = form_host2_distance[masks]
 
         if exsitu_distance_scaling:
             # use fixed threshold in comoving distance: d_form > exsitu_distance * a kpc
