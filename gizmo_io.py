@@ -2675,7 +2675,7 @@ class WriteClass(ReadClass):
         track_directory : str
             directory of files for particle pointers, formation coordinates, and host coordinates
         exsitu_distance : float
-            minimum distance to define ex-situ stars [kpc physical]
+            minimum distance to define ex-situ stars [kpc physical or comoving]
         exsitu_distance_scaling : bool
             whether to scale exsitu_distance with scale-factor at formation
         '''
@@ -2697,10 +2697,19 @@ class WriteClass(ReadClass):
 
         file_path_name = track_directory + file_name.format(part.snapshot['index'])
 
-        form_distance = part[species_name].prop('form.host.distance.total')
+        form_host_distance = part[species_name].prop('form.host.distance.total')
+
+        if 'form.host2.distance' in part[species_name]:
+            # simulation has multiple primary hosts - use smallest distance
+            form_host2_distance = part[species_name].prop('form.host2.distance.total')
+            masks = form_host2_distance < form_host_distance
+            form_host_distance = form_host2_distance[masks]
+
         if exsitu_distance_scaling:
-            form_distance /= part[species_name].prop('form.scalefactor')
-        exsitu_masks = 1 * (form_distance > exsitu_distance)
+            # use fixed threshold in comoving distance: d_form > exsitu_distance * a kpc
+            form_host_distance /= part[species_name].prop('form.scalefactor')
+
+        exsitu_masks = 1 * (form_host_distance > exsitu_distance)
 
         self.say(
             '{:d} of {:d} ({:.1f}\%) stars formed ex-situ'.format(
@@ -2761,8 +2770,6 @@ class WriteClass(ReadClass):
         snapshot_directory : str
             directory of snapshot files within simulation_directory
         '''
-        # pylint: disable=unsupported-assignment-operation
-
         if np.isscalar(species):
             species = [species]  # ensure is list
 
