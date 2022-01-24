@@ -2010,9 +2010,9 @@ def print_densities(
                 * (max(distance_limitss[0]) ** 2 - min(distance_limitss[0]) ** 2)
                 * ut.constant.kilo ** 2
             )
-            area *= (max(distance_limitss[2]) - min(distance_limitss[2])) / (2 * np.pi)
-            # compute voluem [pc^3]
-            volume = area * (max(distance_limitss[1]) - min(distance_limitss[1])) * ut.constant.kilo
+            area *= (max(distance_limitss[1]) - min(distance_limitss[1])) / (2 * np.pi)
+            # compute volume [pc^3]
+            volume = area * (max(distance_limitss[2]) - min(distance_limitss[2])) * ut.constant.kilo
             density_2d = mass / area
             density_3d = mass / volume
 
