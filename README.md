@@ -102,9 +102,6 @@ In commands, that is:
 ```
 #!bash
 
-DIR=$HOME/code/
-mkdir -p $DIR
-cd $DIR
 git clone git@bitbucket.org:awetzel/gizmo_analysis.git
 cp gizmo_analysis/setup.py .
 pip install -e . -r gizmo_analysis/requirements.txt
