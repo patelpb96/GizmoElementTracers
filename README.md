@@ -107,7 +107,7 @@ mkdir -p $DIR
 cd $DIR
 git clone git@bitbucket.org:awetzel/gizmo_analysis.git
 cp gizmo_analysis/setup.py .
-python setup.py develop
+pip install -e . -r gizmo_analysis/requirements.txt
 ```
 
 
