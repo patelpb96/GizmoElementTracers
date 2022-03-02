@@ -1,0 +1,40 @@
+analysis:
+    01-gizmo_analysis
+        We will first set up the default analysis software.
+        This software is referenced at the end of the data release reference paper.
+        You are welcome to use alternatives, but the suggested analysis software will make starting out much easier.
+        This software will work on both local and remote computers.
+    02-clone
+        To install the software you must be able to use command line, i.e. enter commands into a terminal.
+        All modern computers, including supercomputers, should have this capability.
+        If you do not know how to use command line, please see the linked resources, or ask a peer or mentor.
+        Move to your dedicated analysis folder and enter the following command to retrieve the analysis software.
+        git clone git@bitbucket.org:awetzel/gizmo_analysis.git
+        If you get an error, or do not know what git is, please see the linked resources.
+    03-install
+        Once cloned, install the software by entering the following command: `bash ./gizmo_analysis/install_helper.sh`.
+        This will install gizmo_analysis, the primary analysis package, as well as its dependencies.
+    04-installation_check
+        After installation, your analysis directory should look like this.
+        In the analysis directory you will find the simulation directory, the gizmo_analysis directory containing most of the analysis code,
+            as well as the primary dependency for gizmo_analysis, halo_analysis.
+        The rest are folders created as part of the installation.
+    05-the_tutorials
+        We will open up the python tutorial notebooks with jupyterlab.
+        There are two tutorial notebooks that are included as part of gizmo_analysis.
+        A minimal tutorial, designed to help you open simulation data as quickly and simply as possible,
+            and a much more in-depth tutorial notebook, useful as a reference.
+        We will go through the minimal tutorial notebook.
+    06-loading_the_data
+        The first step is loading the data.
+        If your directory structure is setup as we showed earlier then gizmo_analysis will handle this for you.
+    07-a_simple_plot
+    08-a_simple_projected_plot
+
+In the description:
+    Resources for command line: command line to be dangerous
+    Resources for git: git to be dangerous, bitbucket tutorial, bitbucket add ssh key
+
+wrapup:
+    * Fix all instances of wrong IC file...
+    * Switch default bitbucket user
