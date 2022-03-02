@@ -48,7 +48,7 @@ pip install -r gizmo_analysis/requirements.txt -e .
 if $INSTALL_JUPYTERLAB
 then
 	echo ''
-	echo 'Installing gizmo_analysis...'
+	echo 'Installing jupyter-lab...'
 	echo ''
 	pip install jupyterlab
 fi
