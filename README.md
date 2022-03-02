@@ -64,9 +64,21 @@ Unless otherwise noted, all quantities are in (or converted to during read-in to
 ---
 # Installing
 
-This package functions either as a subfolder in your `$PYTHONPATH` or by installing it with `setup.py develop`, which should place an egg.link to the source code in a place that whichever `python` you used to install it knows where to look.
+## Installation via install_helper
+
+The easiest way to install the analysis code and all dependencies is to navigate to the directory you would like the code to be placed in, and then to run the following two lines.
+
+```
+#!bash
+
+git clone git@bitbucket.org:awetzel/gizmo_analysis.git
+bash ./gizmo_analysis/install_helper.sh
+```
 
 ## Instructions for placing in PYTHONPATH:
+
+This is an alternative installation method.
+This will not automatically install any dependencies.
 
 1. create any directory $DIR
 2. add $DIR to your `$PYTHONPATH`
@@ -88,25 +100,6 @@ That is, you should end up with `$DIR/gizmo_analysis/gizmo_*.py`, with `$DIR` in
 You then will be able to import gizmo_analysis.<whatever>
 
 To update, cd into $DIR/gizmo_analysis and execute `git pull`.
-
-
-## Instructions for installing as a package:
-
-1. create any directory $DIR
-2. clone gizmo_analysis into $DIR
-3. copy setup.py from gizmo_analysis into $DIR
-4. run python setup.py develop
-
-In commands, that is:
-
-```
-#!bash
-
-git clone git@bitbucket.org:awetzel/gizmo_analysis.git
-cp gizmo_analysis/setup.py .
-pip install -e . -r gizmo_analysis/requirements.txt
-```
-
 
 ---
 # Using
