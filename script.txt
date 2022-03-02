@@ -1,4 +1,5 @@
-analysis:
+data_retrieval
+analysis
     01-gizmo_analysis
         We will first set up the default analysis software.
         This software is referenced at the end of the data release reference paper.
@@ -16,20 +17,49 @@ analysis:
         This will install gizmo_analysis, the primary analysis package, as well as its dependencies.
     04-installation_check
         After installation, your analysis directory should look like this.
-        In the analysis directory you will find the simulation directory, the gizmo_analysis directory containing most of the analysis code,
-            as well as the primary dependency for gizmo_analysis, halo_analysis.
+        In the analysis directory you will find the simulation directory, the gizmo_analysis directory containing most of the analysis code, as well as the primary dependency for gizmo_analysis, halo_analysis.
         The rest are folders created as part of the installation.
     05-the_tutorials
         We will open up the python tutorial notebooks with jupyterlab.
         There are two tutorial notebooks that are included as part of gizmo_analysis.
-        A minimal tutorial, designed to help you open simulation data as quickly and simply as possible,
-            and a much more in-depth tutorial notebook, useful as a reference.
+        A minimal tutorial, designed to help you open simulation data as quickly and simply as possible, and a much more in-depth tutorial notebook, useful as a reference.
         We will go through the minimal tutorial notebook.
     06-loading_the_data
         The first step is loading the data.
         If your directory structure is setup as we showed earlier then gizmo_analysis will handle this for you.
+        First we import the main analysis module.
+        Then we open the data.
+        Note that the simulation directory listed here assumes the simulation is m12i_res7100, and that it is located in the analysis directory.
+        The first argument describes what particle types you want to load.
+        Stars, gas, and dark matter are the typical options.
+        The second and third arguments detail how you will open the snapshot.
+        In this case we will open the simulation data at redshift 0, i.e. snapshot 600.
+        The fourth argument is the location of the simulation directory.
+        This cell demonstrates we've loaded the data, and what the overall structure of the loaded data is.
     07-a_simple_plot
-    08-a_simple_projected_plot
+        We will next make a simple plot, to demonstrate how to use the data.
+        First we import some standard python modules: numpy for working with arrays, and matplotlib for plotting.
+        Next we will make the figure itself.
+        This figure is a standard log-space 2D histogram.
+        I will not go into the details of how to make such a plot.
+        The important part for our purposes is located in the first two lines of ax.hist2d.
+        There you can see retrieval of the gas density and temperature.
+    08-identify_main_galaxy
+        Next we will show how to identify particles associated with the simulation's main galaxy.
+        This is simple to do with gizmo_analysis.
+        You can see the commands here for coordinates relative to the main galaxy, and distance to the center of the main galaxy.
+        For more advanced commands, please look at the in-depth tutorial, as well as the halo_analysis tutorial linked here.
+        For now we will select all gas particles within 10 kpc of the center of the main galaxy.
+        The trick we 
+    09-simple_image
+        We will wrap up by looking at a trick to make a simple image of the simulation.
+        This is just a 2D histogram of two of the coordinates.
+        The plotting script is nearly the same as before, but now the first two lines of ax.hist2d have been changed.
+        Now they select the first and second dimensions of the coordinates relative to the main galaxy, and then mask the data to choose only particles in the main galaxy.
+    10-wrapup
+        With this you should have everything you need to get started with the FIRE data.
+        There is much, much, much more you can do with the data, as the wide variety of FIRE papers to-date indicates.
+        Best wishes for you learning something new yourself!
 
 In the description:
     Resources for command line: command line to be dangerous

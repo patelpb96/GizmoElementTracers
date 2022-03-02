@@ -6,8 +6,9 @@
 BITBUCKET_USER=zhafen
 # BITBUCKET_USER=awetzel
 
+# Optional installs
+INSTALL_HALO_ANALYSIS=true
 INSTALL_JUPYTERLAB=true
-INSTALL_HALO_ANALYSIS=false
 
 ################################################################
 # Installation Script
