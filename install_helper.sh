@@ -7,6 +7,7 @@ BITBUCKET_USER=zhafen
 # BITBUCKET_USER=awetzel
 
 INSTALL_JUPYTERLAB=true
+INSTALL_HALO_ANALYSIS=false
 
 ################################################################
 # Installation Script
@@ -24,15 +25,18 @@ cp ./utilities/setup.py ./
 pip install -e .
 
 # Install utilities dependency
-echo ''
-echo 'Installing halo_analysis dependency...'
-echo ''
-# Clone the repository
-git clone git@bitbucket.org:$BITBUCKET_USER/halo_analysis.git
-# Retrieve the setup.py script. This script must be in the directory *containing* the package it's run for (utilities).
-cp ./halo_analysis/setup.py ./
-# Run the install script using pip
-pip install -r halo_analysis/requirements.txt -e .
+if $INSTALL_HALO_ANALYSIS
+then
+	echo ''
+	echo 'Installing halo_analysis dependency...'
+	echo ''
+	# Clone the repository
+	git clone git@bitbucket.org:$BITBUCKET_USER/halo_analysis.git
+	# Retrieve the setup.py script. This script must be in the directory *containing* the package it's run for (utilities).
+	cp ./halo_analysis/setup.py ./
+	# Run the install script using pip
+	pip install -r halo_analysis/requirements.txt -e .
+fi
 
 # Install gizmo analysis
 echo ''
