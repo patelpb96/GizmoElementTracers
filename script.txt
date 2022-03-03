@@ -8,79 +8,85 @@ data_retrieval
         If you are watching this video, you probably know what they are.
         You can find more information in the links in the description.
     02-FIRE2_data_release
-        With the imminent release of the third generation of FIRE simulations much of the data from the second generation of FIRE simulations has been made publicly available, an effort led by Andrew Wetzel.
+        With the creation of the third generation of FIRE simulations much of the data from the second generation of FIRE simulations has been made publicly available, an effort led by Andrew Wetzel.
         In this video we will be downloading and opening data from this data release.
         The data from the public data release has exactly the same format as unreleased FIRE data, so you can also use this tutorial for getting familiar with any FIRE data.
     03-data_release_paper
         This paper on arxiv, at arXiv ID 2202.06969, is your all-in-one guide to the FIRE-2 data release.
         If you have any questions, this paper can help answer them.
         Of all the information this paper contains, the most important is the link to the data.
+        You can also find this link in the arXiv abstract.
     04-flathub
-        The data is stored by the Flatiron Institute.
+        The data is stored by the Flatiron Institute at flathub.flatironinstitute.org/fire
         There is a lot of useful information here, but I'm going to scroll straight down to the download information, at the bottom of the page.
     05-data_download
         There are two options for downloading the data.
         One is directly via the browser.
         This is only recommended for small amounts of data, a single snapshot or two, and is the method we will be using today.
-        The second way to download data is via Globus ID.
+        The second way to download data is via Globus with this Globus ID.
         This is the recommended way to download a large amount of data.
-        I will include links for more information, but Globus ID is beyond what we need to get started.
+        I will include links for more information, but Globus is beyond what we need to get started.
     06-fire_suites
         There are three suites of FIRE simulations available for download.
         A high redshift suite, a massive galaxies suite, and the core suite.
         The core suite is the most widely used, and is the one we will be using today.
-    07-core_simulations
+    07-m12i_res7100
         There are a wide variety of FIRE simulations available for download.
         We will download data from m12i_res7100.
-        This is the fiducial simulation of the most commonly-used FIRE simulation, m12i, also known as Latte.
+        This is the fiducial resolution of the most commonly-used FIRE simulation, m12i, also known as Latte.
     08-simulation_directory_structure
         This is the directory structure for m12i, and most other FIRE simulations.
         We will download a little bit of data from most of these directories.
     09-parameter_files
         The parameter files are the first thing we will download.
-        These are recordings of the parameters used when generating the simulation, which is useful for interpreting the outputs.
-        First we'll download gizmo_config.h and gizmo_parameters.txt-usedvalues, which record parameters for the physics models, among other things.
-        This is as simple as clicking on them.
+        These are records of the parameters used when generating the simulation.
+        First we'll download gizmo_config.h and gizmo_parameters.txt-usedvalues
+        These record parameters for the physics models, among other things.
+        Downloading them is as simple as clicking on them.
+    10-snapshot_times
         Next we'll download the snapshot_times.txt, which lists which snapshots correspond to which redshifts, ages of the universe, or lookback times.
         To do so we'll click on it, then save it from the browser.
         For mac this is as simple as pressing command-S, then clicking confirm.
-        Finally we'll download the parameters the initial conditions were downloaded with.
+    11-music_conf
+        Finally we'll download the parameters the initial conditions were generated with.
         To do so we go into the initial_conditions folder and click on the file ending in .conf.
-    10-output
+    12-output
         Next we will download the simulation output, arguably the most important part.
         This involves navigating into the output folder, navigating into the folder containing the snapshot we want (remember that snapshot 600 corresponds to present day, a redshift of 0), and clicking on each file in turn.
-    11-halo_data
-        We will finish the download by downloading the halo data.
+    13-halo_data
+        We will finish retrieving the data by downloading the halo data.
         The halo data includes information on where the galaxy are actually located inside the simulation, and their basic properties.
         To download the halo data we enter the halo directory, then the rockstar_dm directory, and finally the catalog_hdf5 directory.
         We click on the halo files with the desired snapshot number in their name, in this case 600.
         Everything is now downloading.
         This will take a while, so I will fast forward to when it's complete.
-    12-raw_data
+    14-raw_data
         The data for m12i, snapshot 600 is now downloaded, and you can see it on the left.
         On the right is the directory I will be doing the analysis in.
         You can place the directory for your analysis whereever you want.
         I've placed mine in my User folder.
-    13-filetree
+    15-filetree
         We will now set up the filetree manually, which will allow the analysis code to understand the simulation format.
         This is necessary when downloading from the browser, but should take only a minute.
         Downloading using Globus ID should preserve the directory structure.
         There may be a way to preserve the directory structure when downloading data via the browser, but if you are doing something that sophisticated you should just use Globus ID.
         First we will create a folder with the name of the simulation, m12i_res7100.
+    16-main_dirs
         Inside the m12i_res7100 we will create an output directory, a halo directory, and an initial_condition directory.
-    14-output
+    17-output
         We will first move the output into our target directory.
         Navigate into the output folder, and inside create a directory with the following name, replacing 600 with the number of the snapshot you downloaded.
         Then move the snapshot output files into the directory.
-    15-halo
+    18-halo
         Next we will move the halo data in.
         Enter the halo directory and create a rockstar_dm subfolder.
         Enter that subfolder and create a catalog_hdf5 subfolder.
         Move the halo data, halo_600.hdf5 and star_600.hdf5, into the subfolder.
-    16-parameters
+    19-parameters
         We will wrap up by relocating the parameter files.
         Move everything you haven't moved into the main directory.
         Then, move the music.conf file into the initial_condition directory.
+    20-outro
         You're done!
         The data is now prepped to be analyzed.
         Next we'll open the data.
@@ -104,7 +110,7 @@ analysis
         This will install gizmo_analysis, the primary analysis package, as well as its dependencies.
     04-installation_check
         After installation, your analysis directory should look like this.
-        In the analysis directory you will find the simulation directory, the gizmo_analysis directory containing most of the analysis code, as well as the primary dependency for gizmo_analysis, halo_analysis.
+        In the analysis directory you will find the simulation directory, the gizmo_analysis directory containing most of the analysis code, as well as the primary dependencies for gizmo_analysis, utilities and halo_analysis.
         The rest are folders created as part of the installation.
     05-the_tutorials
         We will open up the python tutorial notebooks with jupyterlab.
@@ -145,16 +151,17 @@ analysis
     10-wrapup
         With this you should have everything you need to get started with the FIRE data.
         There is much, much, much more you can do with the data, as the wide variety of FIRE papers to-date indicates.
-        Best wishes for you learning something new yourself!
+        Best of luck with your research, and I hope you find some fascinating behavior to look at in these incredible simulations.
 
 In the description:
     FIRE simulation info
     FIRE-2 data release link
+    Analysis links
+    Commands to enter
     Resources for globus ID
     Resources for yt
     Resources for command line: command line to be dangerous
     Resources for git: git to be dangerous, bitbucket tutorial, bitbucket add ssh key
 
 wrapup:
-    * Fix all instances of wrong IC file...
     * Switch default bitbucket user
