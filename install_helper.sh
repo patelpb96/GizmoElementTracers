@@ -3,8 +3,8 @@
 ################################################################
 
 # Which bitbucket user to pull from?
-BITBUCKET_USER=zhafen
-# BITBUCKET_USER=awetzel
+# BITBUCKET_USER=zhafen # Forked repo, for testing.
+BITBUCKET_USER=awetzel
 
 # Optional installs
 INSTALL_HALO_ANALYSIS=true
