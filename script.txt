@@ -1,0 +1,167 @@
+data_retrieval
+    01-intro
+        *scene: FIRE, FIRE-2, and FIRE-3 papers*
+        Hello, my name is Zach Hafen.
+        I am currently an astrophysics fellow at UC Irvine, and I routinely work with the FIRE simulations.
+        Today I will be showing you the simplest way to get started working with the FIRE simulations.
+        The FIRE simulations are a set of high-resolution galaxy simulations that resolve individual galaxies and their cosmological environment.
+        If you are watching this video, you probably know what they are.
+        You can find more information in the links in the description.
+    02-FIRE2_data_release
+        With the creation of the third generation of FIRE simulations much of the data from the second generation of FIRE simulations has been made publicly available, an effort led by Andrew Wetzel.
+        In this video we will be downloading and opening data from this data release.
+        The data from the public data release has exactly the same format as unreleased FIRE data, so you can also use this tutorial for getting familiar with any FIRE data.
+    03-data_release_paper
+        This paper on arxiv, at arXiv ID 2202.06969, is your all-in-one guide to the FIRE-2 data release.
+        If you have any questions, this paper can help answer them.
+        Of all the information this paper contains, the most important is the link to the data.
+        You can also find this link in the arXiv abstract.
+    04-flathub
+        The data is stored by the Flatiron Institute at flathub.flatironinstitute.org/fire
+        There is a lot of useful information here, but I'm going to scroll straight down to the download information, at the bottom of the page.
+    05-data_download
+        There are two options for downloading the data.
+        One is directly via the browser.
+        This is only recommended for small amounts of data, a single snapshot or two, and is the method we will be using today.
+        The second way to download data is via Globus with this Globus ID.
+        This is the recommended way to download a large amount of data.
+        I will include links for more information, but Globus is beyond what we need to get started.
+    06-fire_suites
+        There are three suites of FIRE simulations available for download.
+        A high redshift suite, a massive galaxies suite, and the core suite.
+        The core suite is the most widely used, and is the one we will be using today.
+    07-m12i_res7100
+        There are a wide variety of FIRE simulations available for download.
+        We will download data from m12i_res7100.
+        This is the fiducial resolution of the most commonly-used FIRE simulation, m12i, also known as Latte.
+    08-simulation_directory_structure
+        This is the directory structure for m12i, and most other FIRE simulations.
+        We will download a little bit of data from most of these directories.
+    09-parameter_files
+        The parameter files are the first thing we will download.
+        These are records of the parameters used when generating the simulation.
+        First we'll download gizmo_config.h and gizmo_parameters.txt-usedvalues
+        These record parameters for the physics models, among other things.
+        Downloading them is as simple as clicking on them.
+    10-snapshot_times
+        Next we'll download the snapshot_times.txt, which lists which snapshots correspond to which redshifts, ages of the universe, or lookback times.
+        To do so we'll click on it, then save it from the browser.
+        For mac this is as simple as pressing command-S, then clicking confirm.
+    11-music_conf
+        Finally we'll download the parameters the initial conditions were generated with.
+        To do so we go into the initial_conditions folder and click on the file ending in .conf.
+    12-output
+        Next we will download the simulation output, arguably the most important part.
+        This involves navigating into the output folder, navigating into the folder containing the snapshot we want (remember that snapshot 600 corresponds to present day, a redshift of 0), and clicking on each file in turn.
+    13-halo_data
+        We will finish retrieving the data by downloading the halo data.
+        The halo data includes information on where the galaxy are actually located inside the simulation, and their basic properties.
+        To download the halo data we enter the halo directory, then the rockstar_dm directory, and finally the catalog_hdf5 directory.
+        We click on the halo files with the desired snapshot number in their name, in this case 600.
+        Everything is now downloading.
+        This will take a while, so I will fast forward to when it's complete.
+    14-raw_data
+        The data for m12i, snapshot 600 is now downloaded, and you can see it on the left.
+        On the right is the directory I will be doing the analysis in.
+        You can place the directory for your analysis whereever you want.
+        I've placed mine in my User folder.
+    15-filetree
+        We will now set up the filetree manually, which will allow the analysis code to understand the simulation format.
+        This is necessary when downloading from the browser, but should take only a minute.
+        Downloading using Globus ID should preserve the directory structure.
+        There may be a way to preserve the directory structure when downloading data via the browser, but if you are doing something that sophisticated you should just use Globus ID.
+        First we will create a folder with the name of the simulation, m12i_res7100.
+    16-main_dirs
+        Inside the m12i_res7100 we will create an output directory, a halo directory, and an initial_condition directory.
+    17-output
+        We will first move the output into our target directory.
+        Navigate into the output folder, and inside create a directory with the following name, replacing 600 with the number of the snapshot you downloaded.
+        Then move the snapshot output files into the directory.
+    18-halo
+        Next we will move the halo data in.
+        Enter the halo directory and create a rockstar_dm subfolder.
+        Enter that subfolder and create a catalog_hdf5 subfolder.
+        Move the halo data, halo_600.hdf5 and star_600.hdf5, into the subfolder.
+    19-parameters
+        We will wrap up by relocating the parameter files.
+        Move everything you haven't moved into the main directory.
+        Then, move the music.conf file into the initial_condition directory.
+    20-outro
+        You're done!
+        The data is now prepped to be analyzed.
+        Next we'll open the data.
+analysis
+    01-gizmo_analysis
+        We will first set up the default analysis software.
+        This software is referenced at the end of the data release reference paper.
+        You are welcome to use alternatives, but the suggested analysis software will make starting out much easier.
+        This software will work on both local and remote computers.
+        That said, one common analysis software that works with the FIRE simulations is yt.
+        I've included links below on opening the FIRE data with yt.
+    02-clone
+        To install the software you must be able to use command line, i.e. enter commands into a terminal.
+        All modern computers, including supercomputers, should have this capability.
+        If you do not know how to use command line, please see the linked resources, or ask a peer or mentor.
+        Move to your dedicated analysis folder and enter the following command to retrieve the analysis software.
+        git clone git@bitbucket.org:awetzel/gizmo_analysis.git
+        If you get an error, or do not know what git is, please see the linked resources.
+    03-install
+        Once cloned, install the software by entering the following command: `bash ./gizmo_analysis/install_helper.sh`.
+        This will install gizmo_analysis, the primary analysis package, as well as its dependencies.
+    04-installation_check
+        After installation, your analysis directory should look like this.
+        In the analysis directory you will find the simulation directory, the gizmo_analysis directory containing most of the analysis code, as well as the primary dependencies for gizmo_analysis, utilities and halo_analysis.
+        The rest are folders created as part of the installation.
+    05-the_tutorials
+        We will open up the python tutorial notebooks with jupyterlab.
+        There are two tutorial notebooks that are included as part of gizmo_analysis.
+        A minimal tutorial, designed to help you open simulation data as quickly and simply as possible, and a much more in-depth tutorial notebook, useful as a reference.
+        We will go through the minimal tutorial notebook.
+    06-loading_the_data
+        The first step is loading the data.
+        If your directory structure is setup as we showed earlier then gizmo_analysis will handle this for you.
+        First we import the main analysis module.
+        Then we open the data.
+        Note that the simulation directory listed here assumes the simulation is m12i_res7100, and that it is located in the analysis directory.
+        The first argument describes what particle types you want to load.
+        Stars, gas, and dark matter are the typical options.
+        The second and third arguments detail how you will open the snapshot.
+        In this case we will open the simulation data at redshift 0, i.e. snapshot 600.
+        The fourth argument is the location of the simulation directory.
+        This cell demonstrates we've loaded the data, and what the overall structure of the loaded data is.
+    07-a_simple_plot
+        We will next make a simple plot, to demonstrate how to use the data.
+        First we import some standard python modules: numpy for working with arrays, and matplotlib for plotting.
+        Next we will make the figure itself.
+        This figure is a standard log-space 2D histogram.
+        I will not go into the details of how to make such a plot.
+        The important part for our purposes is located in the first two lines of ax.hist2d.
+        There you can see retrieval of the gas density and temperature.
+    08-identify_main_galaxy
+        Next we will show how to identify particles associated with the simulation's main galaxy.
+        This is simple to do with gizmo_analysis.
+        You can see the commands here for coordinates relative to the main galaxy, and distance to the center of the main galaxy.
+        For more advanced commands, please look at the in-depth tutorial, as well as the halo_analysis tutorial linked here.
+        For now we will select all gas particles within 10 kpc of the center of the main galaxy.
+    09-simple_image
+        We will wrap up by looking at a trick to make a simple image of the simulation.
+        This is just a 2D histogram of two of the coordinates.
+        The plotting script is nearly the same as before, but now the first two lines of ax.hist2d have been changed.
+        Now they select the first and second dimensions of the coordinates relative to the main galaxy, and then mask the data to choose only particles in the main galaxy.
+    10-wrapup
+        With this you should have everything you need to get started with the FIRE data.
+        There is much, much, much more you can do with the data, as the wide variety of FIRE papers to-date indicates.
+        Best of luck with your research, and I hope you find some fascinating behavior to look at in these incredible simulations.
+
+In the description:
+    FIRE simulation info
+    FIRE-2 data release link
+    Analysis links
+    Commands to enter
+    Resources for globus ID
+    Resources for yt
+    Resources for command line: command line to be dangerous
+    Resources for git: git to be dangerous, bitbucket tutorial, bitbucket add ssh key
+
+wrapup:
+    * Switch default bitbucket user
