@@ -1138,6 +1138,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
         count_tot : dict
             diagnostic counters
         '''
+        galaxy_radius_max = 30  # [kpc comoving]
+
         part_z0_indices = ut.array.get_arange(part_z0[self.species_name][self.id_name])
 
         if snapshot_index == part_z0.snapshot['index']:
@@ -1249,8 +1251,8 @@ class ParticleCoordinateClass(ut.io.SayClass):
                 return
 
             # assign hosts size and mass - use host_edge_percent of species mass within an initial
-            # radius of 20 kpc comoving, to approximate galaxy size growth
-            distance_max = 20 * part_z.snapshot['scalefactor']
+            # comoving radius, to approximate galaxy size growth
+            distance_max = galaxy_radius_max * part_z.snapshot['scalefactor']
             for prop_name in self.host_properties:
                 if 'radius' in prop_name or 'height' in prop_name or 'mass' in prop_name:
                     part_z.host[prop_name] = np.zeros(host_number, dtype=self.coordinate_dtype)
