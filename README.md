@@ -44,8 +44,10 @@ We develop this package using python 3.9 and recommend that you use it with this
 * example file for storing information about snapshots: scale-factors, redshifts, times, etc
 
 ## gizmo_tutorial.ipynb
-* jupyter notebook tutorial for using this package
+* comprehensive tutorial for using many features of this package (jupyter notebook)
 
+## gizmo_tutorial_minimal.ipynb
+* minimal/quick tutorial for using the basic features of this package (jupyter notebook)
 
 ---
 # Units
@@ -122,7 +124,11 @@ gizmo.io
 ---
 # License
 
-Copyright 2014-2021 by Andrew Wetzel <arwetzel@gmail.com>, Shea Garrison-Kimmel <sheagk@gmail.com>, Andrew Emerick <aemerick11@gmail.com>.
+Copyright 2014-2022 by:
+* Andrew Wetzel <arwetzel@gmail.com>
+* Shea Garrison-Kimmel <sheagk@gmail.com>
+* Andrew Emerick <aemerick11@gmail.com>
+* Zach Hafen <zachary.h.hafen@gmail.com>
 
 If you use this package in work that you publish, please cite it, along the lines of: 'This work used GizmoAnalysis (http://ascl.net/2002.015), which first was used in Wetzel et al 2016 (https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W).'
 
