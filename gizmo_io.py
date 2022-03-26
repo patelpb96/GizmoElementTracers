@@ -352,6 +352,12 @@ class ParticleDictionaryClass(dict):
                 # mass from neutral hydrogen (excluding helium, metals, and ionized hydrogen)
                 values = values * self.prop('hydrogen.neutral.fraction', indices, _dict_only=True)
 
+            elif property_name == 'mass.hydrogen.ionized':
+                # mass from neutral hydrogen (excluding helium, metals, and ionized hydrogen)
+                values = values * (
+                    1 - self.prop('hydrogen.neutral.fraction', indices, _dict_only=True)
+                )
+
             return values
 
         # elemental abundance
@@ -2799,8 +2805,8 @@ class WriteClass(ReadClass):
                 self.say('reading particles from: ' + file_name_i.split('/')[-1])
 
                 if 'delete' in action:
-                    part_number_in_file = header['NumPart_ThisFile']
-                    part_number = header['NumPart_Total']
+                    part_number_in_file = list(header['NumPart_ThisFile'])
+                    part_number = list(header['NumPart_Total'])
 
                 # read and delete particle properties
                 for _spec_i, spec_name in enumerate(species):
@@ -2813,7 +2819,7 @@ class WriteClass(ReadClass):
 
                         # zero numbers in header
                         part_number_in_file[spec_id] = 0
-                        part_number[spec_id] = 0  # pylint: disable=unsupported-assignment-operation
+                        part_number[spec_id] = 0
 
                         # delete properties
                         # for prop_name in file_in[spec_read]:
