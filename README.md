@@ -73,7 +73,7 @@ The easiest way to install the analysis code and all dependencies is to navigate
 ```
 #!bash
 
-git clone git@bitbucket.org:awetzel/gizmo_analysis.git
+git clone https://bitbucket.org/awetzel/gizmo_analysis.git
 bash ./gizmo_analysis/install_helper.sh
 ```
 
@@ -94,7 +94,7 @@ DIR=$HOME/code
 echo $PYTHONPATH=$DIR:$PYTHONPATH >> ~/.bashrc
 mkdir -p $DIR
 cd $DIR
-git clone git@bitbucket.org:awetzel/gizmo_analysis.git
+git clone https://bitbucket.org/awetzel/gizmo_analysis.git
 ```
 
 That is, you should end up with `$DIR/gizmo_analysis/gizmo_*.py`, with `$DIR` in your `$PYTHONPATH`
