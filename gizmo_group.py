@@ -156,7 +156,7 @@ class GroupDictionaryClass(dict,):
                     prop_values = prop_values - self.prop(prop_name, indices)
 
             if prop_values.size == 1:
-                prop_values = np.float(prop_values)
+                prop_values = np.float64(prop_values)
 
             return prop_values
 

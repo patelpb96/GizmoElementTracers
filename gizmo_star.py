@@ -398,7 +398,7 @@ class NucleosyntheticYieldClass(dict):
                 element_yield['iron'] = 0.00706
 
                 if model == 'fire2':
-                    yield_nitrogen_orig = np.float(element_yield['nitrogen'])
+                    yield_nitrogen_orig = np.float64(element_yield['nitrogen'])
 
                     # nitrogen yield increases linearly with progenitor metallicity @ Z/Z_sun < 1.65
                     if progenitor_massfraction_dict['metals'] < 0.033:

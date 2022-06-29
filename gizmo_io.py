@@ -289,7 +289,7 @@ class ParticleDictionaryClass(dict):
                     prop_values = prop_values - self.prop(prop_name, indices)
 
             if prop_values.size == 1:
-                prop_values = np.float(prop_values)
+                prop_values = np.float64(prop_values)
 
             return prop_values
 
@@ -1831,8 +1831,6 @@ class ReadClass(ut.io.SayClass):
                         prop_read_dtype = part_read[prop_read_name].dtype
                         if convert_float32 and prop_read_dtype == 'float64':
                             prop_read_dtype = np.float32
-                        # elif prop == 'mass':
-                        #    prop_read_dtype = np.float64  # added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec_name][prop_name] = np.zeros(prop_shape, prop_read_dtype) - 1
