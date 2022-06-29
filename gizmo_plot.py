@@ -3373,7 +3373,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         property_select : dict
             properties to select on: names as keys and limits as values
         part_indicess : array
-            part_indices of particles from which to select
+            indices of particles from which to select
         sfh_limits : list
             min and max limits for y-axis
         sfh_log_scale : bool
@@ -3423,6 +3423,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 time_log_scale,
                 distance_limits,
                 center_positions[part_i],
+                host_index,
                 property_select,
                 part_indicess[part_i],
             )
@@ -5002,8 +5003,8 @@ def explore_galaxy(
     distance_bin_width=0.2,
     distance_bin_number=None,
     plot_only_members=True,
-    plot_file_name=False,
-    plot_directory='.',
+    # plot_file_name=False,
+    # plot_directory='.',
 ):
     '''
     Print and plot several properties of galaxies in list.
@@ -5039,7 +5040,7 @@ def explore_galaxy(
 
     if part is not None:
         if not distance_max and 'star.radius.90' in hal:
-            distance_max = 2 * hal.prop('star.radius.90', hi)
+            distance_max = 3 * hal.prop('star.radius.90', hi)
 
         if 'star' in species_plot and 'star' in part and 'star.indices' in hal:
             part_indices = None
@@ -5059,8 +5060,6 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('star.position', hi),
                 part_indices=part_indices,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=10,
             )
 
@@ -5072,150 +5071,131 @@ def explore_galaxy(
                 'histogram',
                 [0, 1, 2],
                 [0, 1, 2],
-                distance_max * 4,
+                distance_max,
                 distance_bin_width,
                 distance_bin_number,
                 hal.prop('star.position', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=11,
             )
 
-            plot_property_distribution(
+            # image of all nearby particles
+            Image.plot_image(
                 part,
                 'star',
-                'velocity.total',
-                [0, None],
-                2,
-                None,
-                False,
+                'mass',
                 'histogram',
-                [],
+                [0, 1, 2],
+                [0, 1, 2],
+                distance_max * 5,
+                distance_bin_width,
+                distance_bin_number,
                 hal.prop('star.position', hi),
-                hal.prop('star.velocity', hi),
-                0,
-                {},
-                part_indices,
-                [0, None],
-                False,
-                plot_file_name,
-                plot_directory,
                 figure_index=12,
             )
 
-            try:
-                element_name = 'metallicity.iron'
-                hal.prop('star.' + element_name)
-            except KeyError:
-                element_name = 'metallicity.metals'
+            # distribution of total velocity
+            plot_property_distribution(
+                part,
+                'star',
+                property_name='velocity.total',
+                property_limits=[0, None],
+                property_bin_width=2,
+                property_bin_number=None,
+                property_log_scale=False,
+                property_statistic='histogram',
+                distance_limits=[0, distance_max],
+                center_positions=hal.prop('star.position', hi),
+                center_velocities=hal.prop('star.velocity', hi),
+                part_indicess=part_indices,
+                axis_y_limits=[0, None],
+                axis_y_log_scale=False,
+                figure_index=13,
+            )
 
             plot_property_distribution(
                 part,
                 'star',
-                element_name,
-                [-4, 1],
-                0.1,
-                None,
-                False,
-                'histogram',
+                property_name='metallicity.iron',
+                property_limits=[-4, 0.5],
+                property_bin_width=0.1,
+                property_bin_number=None,
+                property_log_scale=False,
+                property_statistic='histogram',
+                distance_limits=[0, distance_max],
+                center_positions=hal.prop('star.position', hi),
                 part_indicess=part_indices,
                 axis_y_limits=[0, None],
                 axis_y_log_scale=False,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
-                figure_index=13,
-            )
-
-            plot_property_v_distance(
-                part,
-                'star',
-                'mass',
-                'density',
-                True,
-                [None, None],
-                None,
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
-                center_positions=hal.prop('star.position', hi),
-                part_indicess=part_indices,
-                distance_reference=hal.prop('star.radius.50', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=14,
             )
 
-            # plot_property_v_distance(
-            #    part, 'star', 'mass', 'sum.cum', True, False, None,
-            #    [0.1, distance_max], 0.1, True, 3,
-            #    center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
-            #    distance_reference=hal.prop('star.radius.50', hi),
-            #    plot_file_name=plot_file_name, plot_directory=plot_directory, figure_index=15,
-            # )
+            StarFormHistory.plot_star_form_history(
+                part,
+                sfh_name='mass.normalized',
+                time_name='time.lookback',
+                time_limits=[13.6, 0],
+                time_width=0.2,
+                time_log_scale=False,
+                distance_limits=[0, distance_max],
+                center_positions=hal.prop('star.position', hi),
+                part_indicess=part_indices,
+                sfh_limits=[0, 1],
+                sfh_log_scale=False,
+                figure_index=15,
+            )
 
             plot_property_v_distance(
                 part,
                 'star',
-                'velocity.total',
-                'std.cum',
-                False,
-                [None, None],
-                'mass',
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
+                property_name='mass',
+                property_statistic='density',
+                property_log_scale=True,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
+                dimension_number=3,
                 center_positions=hal.prop('star.position', hi),
-                center_velocities=hal.prop('star.velocity', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=16,
             )
 
             plot_property_v_distance(
                 part,
                 'star',
-                element_name,
-                'median',
-                False,
-                [None, None],
-                'mass',
-                [0.1, distance_max],
-                0.2,
-                True,
-                3,
+                property_name='velocity.total',
+                property_statistic='std.cum',
+                property_log_scale=False,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
                 center_positions=hal.prop('star.position', hi),
+                center_velocities=hal.prop('star.velocity', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=17,
             )
 
-            StarFormHistory.plot_star_form_history(
+            plot_property_v_distance(
                 part,
-                'mass.normalized',
-                'time.lookback',
-                [13.6, 0],
-                0.2,
-                False,
+                'star',
+                property_name='metallicity.iron',
+                property_statistic='median',
+                property_log_scale=False,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.2,
+                distance_log_scale=True,
+                center_positions=hal.prop('star.position', hi),
                 part_indicess=part_indices,
-                sfh_limits=[0, 1],
-                sfh_log_scale=False,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
+                distance_reference=hal.prop('star.radius.50', hi),
                 figure_index=18,
             )
 
         if 'dark' in species_plot and 'dark' in part:
             part_indices = None
-
-            center_position = hal.prop('position', hi)
-            # if 'star.position' in hal:
-            #    center_position = hal.prop('star.position', hi)
 
             if 'star.radius.50' in hal:
                 distance_reference = hal.prop('star.radius.50', hi)
@@ -5235,8 +5215,6 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('star.position', hi),
                 background_color='black',
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=20,
             )
 
@@ -5253,57 +5231,39 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('position', hi),
                 background_color='black',
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=21,
             )
 
             plot_property_v_distance(
                 part,
                 'dark',
-                'mass',
-                'density',
-                True,
-                [None, None],
-                None,
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
-                center_positions=center_position,
+                property_name='mass',
+                property_statistic='density',
+                property_log_scale=True,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
+                center_positions=hal.prop('position', hi),
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=22,
             )
-
-            # plot_property_v_distance(
-            #    part, 'dark', 'velocity.total', 'std.cum', False, True, None,
-            #    [0.1, distance_max], 0.1, True', 3,
-            #    center_positions=center_position, center_velocities=center_velocity,
-            #    part_indicess=part_indices,
-            #    distance_reference=distance_reference,
-            #    plot_file_name=plot_file_name, plot_directory=plot_directory, figure_index=23)
 
             plot_property_v_distance(
                 part,
                 'dark',
-                'mass',
-                'vel.circ',
-                False,
-                [None, None],
-                None,
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
-                center_positions=center_position,
+                property_name='mass',
+                property_statistic='vel.circ',
+                property_log_scale=False,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
+                center_positions=hal.prop('position', hi),
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
-                figure_index=24,
+                figure_index=23,
             )
 
         if 'gas' in species_plot and 'gas' in part and 'gas.indices' in hal:
@@ -5324,8 +5284,6 @@ def explore_galaxy(
                     distance_bin_number,
                     hal.prop('star.position', hi),
                     part_indices=part_indices,
-                    plot_file_name=plot_file_name,
-                    plot_directory=plot_directory,
                     figure_index=30,
                 )
 
@@ -5341,8 +5299,6 @@ def explore_galaxy(
                     distance_bin_number,
                     hal.prop('star.position', hi),
                     part_indices=part_indices,
-                    plot_file_name=plot_file_name,
-                    plot_directory=plot_directory,
                     figure_index=31,
                 )
             else:
