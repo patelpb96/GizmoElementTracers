@@ -1664,9 +1664,13 @@ class ReadClass(ut.io.SayClass):
             del properties_temp
 
         if 'InternalEnergy' in properties:
-            # need Helium abundance and electron fraction to compute temperature
+            # to compute temperature from InternalEnergy, need Helium abundance & electron fraction
             for prop_name in np.setdiff1d(['ElectronAbundance', 'Metallicity'], properties):
                 properties.append(prop_name)
+                if prop_name == 'Metallicity' and elements is None:
+                    # user asked to read temperature but not elemental abundances,
+                    # so assume that they just need He for computing temperature
+                    elements = ['helium']
 
         # parse input list of elemental abundances to read
         if elements in ['all', ['all'], []]:
