@@ -1253,11 +1253,6 @@ def plot_property_v_property(
         y_prop_values,
     )
 
-    if x_property_log_scale:
-        x_prop_values = ut.math.get_log(x_prop_values)
-    if y_property_log_scale:
-        y_prop_values = ut.math.get_log(y_prop_values)
-
     axis_x_label = ut.plot.Label.get_label(
         x_property_name, species_name=species_name, get_words=True
     )
@@ -1268,6 +1263,17 @@ def plot_property_v_property(
     )
     subplot.set_ylabel(axis_y_label)
 
+    if x_property_log_scale:
+        axis_x_log_limits = ut.math.get_log(axis_x_limits)
+        axis_x_bins = np.logspace(axis_x_log_limits[0], axis_x_log_limits[1], property_bin_number)
+    else:
+        axis_x_bins = np.linspace(axis_x_limits[0], axis_x_limits[1], property_bin_number)
+    if y_property_log_scale:
+        axis_y_log_limits = ut.math.get_log(axis_y_limits)
+        axis_y_bins = np.logspace(axis_y_log_limits[0], axis_y_log_limits[1], property_bin_number)
+    else:
+        axis_y_bins = np.linspace(axis_y_limits[0], axis_y_limits[1], property_bin_number)
+
     color_map = plt.cm.inferno_r  # pylint: disable=no-member
     # color_map = plt.cm.gist_heat_r  # pylint: disable=no-member
     # color_map = plt.cm.afmhot_r  # pylint: disable=no-member
@@ -1275,7 +1281,8 @@ def plot_property_v_property(
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values,
         y_prop_values,
-        property_bin_number,
+        # property_bin_number,
+        [axis_x_bins, axis_y_bins],
         [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(),
         weights=weights,
@@ -1284,21 +1291,24 @@ def plot_property_v_property(
         cmap=color_map,
     )
 
-    # valuess, _xs, _ys = np.histogram2d(
-    #    x_prop_values, y_prop_values, property_bin_number,
-    #    [axis_x_limits, axis_y_limits],
-    #    weights=masses)
+    """
+    valuess, _xs, _ys = np.histogram2d(
+        x_prop_values, y_prop_values, property_bin_number, [axis_x_limits, axis_y_limits],
+        weights=weights)
 
-    # subplot.imshow(
-    #    valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
-    #    aspect='auto',
-    #    interpolation='nearest',
-    #    #interpolation='none',
-    #    extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
-    #    #vmin=valuess.min(), vmax=valuess.max(),
-    #    #label=label,
-    # )
-    # plt.colorbar()
+    subplot.imshow(
+        valuess.transpose(),
+        norm=colors.LogNorm(),
+        cmap=color_map,
+        aspect='auto',
+        interpolation='nearest',
+        #interpolation='none',
+        extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
+        #vmin=valuess.min(), vmax=valuess.max(),
+        #label=label,
+    )
+    plt.colorbar()
+    """
 
     if draw_statistics:
         print(stat['bin.mid'])
