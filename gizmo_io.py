@@ -876,7 +876,7 @@ class ReadClass(ut.io.SayClass):
         track_directory=gizmo_default.track_directory,
         simulation_name='',
         properties='all',
-        elements='all',
+        elements=None,
         particle_subsample_factor=None,
         separate_dark_lowres=False,
         sort_dark_by_id=False,
@@ -1521,7 +1521,7 @@ class ReadClass(ut.io.SayClass):
         snapshot_value_kind='index',
         snapshot_value=gizmo_default.snapshot_index,
         properties='all',
-        elements='all',
+        elements=None,
         convert_float32=False,
         header=None,
     ):
@@ -1678,6 +1678,9 @@ class ReadClass(ut.io.SayClass):
         if elements is not None:
             if np.isscalar(elements):
                 elements = [elements]  # ensure is list
+            if 'InternalEnergy' in properties and 'he' not in elements and 'helium' not in elements:
+                # need Helium to compute temperature from internal energy
+                elements.append('helium')
             # make safe list of elements to read
             elements = [str.lower(element_name) for element_name in elements]
             for element_name in elements:
@@ -1761,14 +1764,6 @@ class ReadClass(ut.io.SayClass):
 
                     if elements is not None:
                         # re-set element dictionary pointers if reading a subset of elements
-                        # need to read Helium abundance if calculating temperature
-                        if (
-                            'InternalEnergy' in properties
-                            and 'he' not in elements
-                            and 'helium' not in elements
-                        ):
-                            elements.append('helium')
-
                         element_indices_keep = []  # indices of elements to keep
                         for element_name in elements:
                             element_indices_keep.append(
@@ -1861,6 +1856,10 @@ class ReadClass(ut.io.SayClass):
                 if file_read_i is not None:
                     # close, if had to open another snapshot file to find particles of this species
                     file_read_i.close()
+
+        if elements is not None:
+            # read only a sub-set of elemental abundances
+            self.say(f'* reading elemental abundances: {elements}')
 
         # read properties for each species ----------
         # initialize particle indices to assign to each species from each file
@@ -2066,7 +2065,7 @@ class ReadClass(ut.io.SayClass):
             if 'temperature' in part[spec_name]:
                 # convert from [(km / s) ^ 2] to [Kelvin]
                 # ignore small corrections from elements beyond He
-                helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
+                helium_mass_fracs = part[spec_name].prop('massfraction.helium')
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
                 molecular_weights = mus * ut.constant.proton_mass
