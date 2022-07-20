@@ -22,7 +22,10 @@ from matplotlib import pyplot as plt
 
 import utilities as ut
 
+global Z_0
+
 feedback_type = ['wind', 'mannucci', 'maoz', 'cc']
+timespan = np.logspace(0, 4.1367, 3000)
 
 # Yield Dictionaries for feedback types
 element_yield_wind = {'He' : 0.36, 'C' : 0.016, 'N' : 0.0041, 'O' : 0.0118}
@@ -32,6 +35,12 @@ element_yield_mannucci = {'Z' : 1.0, 'He' : 0.0, 'C' : 0.035, 'N' : 8.57e-7, 'O'
             'Mg' : 0.00614, 'Si' : 0.111, 'S' : 0.0621, 'Ca' : 0.00857, 'Fe' : 0.531}
 element_yield_maoz = {'Z' : 1.0, 'He' : 0.0, 'C' : 0.035, 'N' : 8.57e-7, 'O' : 0.102, 'Ne' : 0.00321,
             'Mg' : 0.00614, 'Si' : 0.111, 'S' : 0.0621, 'Ca' : 0.00857, 'Fe' : 0.531}
+
+# Ejecta Masses for Each Event 
+ejecta_masses = {'wind' : 1,
+                 'mannucci': 1.4,
+                 'maoz' : 1.4,
+                 'cc' : 10.5} # corresponding directly to the above
 
 def get_sun_massfraction(model='fire2'):
 
@@ -95,10 +104,11 @@ def element_yields(source = None, includeZ = False, plot = False):
     
     cc = element_yields('cc')
 
-class feedback(source = 'cc'):
-    assert source.lower() in feedback_type
+class feedback:
 
-    def get_rate_wind(ages, Z = Z_0, massloss = True, metal_mass_fraction = None, model = 'wind', element_name = False):
+    Z_0 = 1 # solar metallicity 
+
+    def get_rate_wind(ages = timespan, Z = Z_0, massloss = True, metal_mass_fraction = None, model = 'wind', element_name = False):
 
         '''
         Returns the rates versus stellar age for stellar winds in FIRE-2. 
@@ -136,5 +146,63 @@ class feedback(source = 'cc'):
             return element_yields(model)[element_name]*r_wind, a_wind, transition_ages
 
         return r_wind, a_wind, transition_ages
+
+    def get_rate_cc(ages, Z = Z_0, massloss = True, metal_mass_fraction = None, model = 'cc', element_name = False):
+    
+        transition_ages = np.array([3.4, 10.37, 37.53])
+    
+        mask1 = [True if 0 < i <= transition_ages[0] else False for i in ages]
+        mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in ages]
+        mask3 = [True if transition_ages[1] <= i <= transition_ages[2] else False for i in ages]
+        mask4 = [True if transition_ages[2] <= i else False for i in ages]
+
+        func1 = 0*(ages[mask1]/ages[mask1])
+        func2 = 5.408e-4*(ages[mask2]/ages[mask2])
+        func3 = 2.516e-4*(ages[mask3]/ages[mask3])
+        func4 = 0*(ages[mask4]/ages[mask4])
+
+        r_cc = np.array([*func1, *func2, *func3, *func4], dtype = 'object') # y-axis: rate
+        a_cc = np.array([*timespan[mask1], *timespan[mask2], *timespan[mask3], *timespan[mask4]], dtype = 'object') # x-axis: age
+
+        if massloss == True:
+            r_cc *= ejecta_masses[model]
+
+            if element_name:
+                print("Selected " + str(element_name) + " yields for " + str(model))
+                print(element_yields(model)[element_name])
+                return element_yields(model)[element_name]*r_cc, a_cc, transition_ages
+
+        if element_name:
+            print("Selected " + str(element_name) + " yields for " + str(model))
+            print(element_yields(model)[element_name])
+            return element_yields(model)[element_name]*r_cc, a_cc, transition_ages
+
+        return r_cc, a_cc, transition_ages
+
+    def get_rate_ia(ages, Z = Z_0, massloss = True, metal_mass_fraction = None, model = 'mannucci', element_name = False):
+
+        transition_ages = np.array([37.53])
+
+        mask1 = [True if 0 < i <= transition_ages[0] else False for i in ages]
+        mask2 = [True if transition_ages[0] <= i else False for i in ages]
+
+        func1 = 0*(ages[mask1]/ages[mask1])
+        func2 = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((ages[mask2] - 50) / 10) ** 2)
+
+        r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
+        a_ia = np.array([*timespan[mask1], *timespan[mask2]], dtype = 'object') # x-axis: age
+
+        if massloss == True:
+            r_ia = ejecta_masses[model]*r_ia
+
+            if element_name:
+                print("Selected " + str(element_name) + " yields for " + str(model))
+                print(element_yields(model)[element_name])
+                return element_yields(model)[element_name]*r_ia, a_ia, transition_ages
+
+            return r_ia, a_ia, transition_ages
+
+        return r_ia, a_ia, transition_ages
+
 
     
