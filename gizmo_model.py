@@ -114,19 +114,13 @@ class feedback:
         Init allows a user to specify a source (wind, ccsn, ia, etc.), specify a particular element name, and modify the transition ages (t_w, t_cc, t_ia) of feedback rates.
         The FIRE-2 defaults (mannucci) are implemented natively, but can be modified with input lists.
         '''
-
         self.source = source
         self.element = element_name
         self.timespan = np.logspace(0, 4.1367, 3000)
 
-        if type(t_w) and type(t_cc) and type(t_ia) and list:
-
-            self.trans_w = np.array(t_w)
-            self.trans_ia = np.array(t_ia)
-            self.trans_cc = np.array(t_cc)
-
-            print("Transition ages loaded.")
-
+        self.trans_w = np.array(t_w) # transition age of winds
+        self.trans_ia = np.array(t_ia) # transition age of SNe Ia
+        self.trans_cc = np.array(t_cc) # transition age of CCSNe
 
     def get_rate_wind(self, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
 
@@ -149,7 +143,7 @@ class feedback:
         mask3 = [True if transition_ages[1] <= i <= transition_ages[2] else False for i in self.timespan]
         mask4 = [True if transition_ages[2] <= i else False for i in self.timespan]
 
-        func1 = 4.76317 * Z * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2
+        #func1 = 4.76317 * Z * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2
         func1 = 4.76317 * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2.1
         func2 = 4.76317 * Z * self.timespan[mask2] ** (1.838 * (0.79 + np.log10(Z)))
         func3 = 29.4 * (self.timespan[mask3] / 3.5) ** -3.25 + 0.0041987
