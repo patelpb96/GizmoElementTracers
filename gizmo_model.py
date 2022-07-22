@@ -103,8 +103,6 @@ def element_yields(source = None, includeZ = False, plot = False):
         plt.show()
         
     return globals()[string] #globals() converts the [string] into a variable (or function, if needed). Works like eval()
-    
-    cc = element_yields('cc')
 
 class feedback:
 
@@ -208,7 +206,7 @@ class feedback:
 
         return r_cc, a_cc, transition_ages
 
-    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, type = "mannucci"):
+    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, model_version = "mannucci"):
 
         transition_ages = self.trans_ia
 
@@ -218,27 +216,18 @@ class feedback:
         func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
         func2 = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
 
-        r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
         a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
+        r_ia = ejecta_masses[self.source]*np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
-        if massloss == True:
-            r_ia = ejecta_masses[self.source]*r_ia
-
-            if self.element:
-                print("Selected " + str(self.element) + " yields for " + str(self.source))
-                print(element_yields(self.source)[self.element])
-
-                if plot:
-                    plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia)
-                    plt.show()
-
-                return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
+        if self.element:
+            print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
+            print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
 
             if plot:
-                plt.loglog(a_ia, r_ia)
+                plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia)
                 plt.show()
 
-            return r_ia, a_ia, transition_ages
+            return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
 
         if plot:
             plt.loglog(a_ia, r_ia)
@@ -246,10 +235,28 @@ class feedback:
 
         return r_ia, a_ia, transition_ages
 
-    def integrate_massloss(self, ages, Z = Z_0, massloss = True, metal_mass_fraction = None, source = 'wind', element_name = False):
-        elem = element_name
 
-        a,b,c = self.eval("get_rate_" + str(source) + "(self.timespan, Z = Z_0, element_name = " + str(elem) + ")")
-        d = integrate.cumtrapz(a, b)
+    def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False):
+        elem = self.element
+        #print(str(self.source) + " selected.") #diagnostic
 
-        return b, d
+        if self.source == 'wind':
+            r_w, a_w, t_w = self.get_rate_wind()
+            i_w = integrate.cumtrapz(r_w, a_w)
+            return a_w[1:], i_w
+
+        if self.source == 'ia':
+            r_ia, a_ia, t_ia = self.get_rate_ia()
+            i_ia = integrate.cumtrapz(r_ia, a_ia)
+            return a_ia[1:], i_ia
+
+        if self.source == 'cc':
+            r_cc, a_cc, t_cc = self.get_rate_cc()
+            i_cc = integrate.cumtrapz(r_cc, a_cc)
+            return a_cc[1:], i_cc
+        
+
+
+        #use_string = "self.get_rate_" + str(self.source) + "()"
+        #a,b,c = globals()[use_string](self.timespan)
+        #a,b,c = self.eval("get_rate_" + str(self.source) + "(self.timespan, Z = Z_0, element_name =  str(" + elem + ") + )")
