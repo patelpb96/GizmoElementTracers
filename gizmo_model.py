@@ -106,11 +106,15 @@ def element_yields(source = None, includeZ = False, plot = False):
 
 class feedback:
 
-    def __init__(self, source = 'any', element_name = False, t_w = [1.0, 3.5, 100], t_cc = [3.4, 10.37, 37.53], t_ia = [37.53]):
+    def __init__(self, source = 'any', element_name = False, t_w = [1.0, 3.5, 100], t_cc = [3.4, 10.37, 37.53], t_ia = [37.53], ia_model = 'mannucci'):
 
         '''
-        Init allows a user to specify a source (wind, ccsn, ia, etc.), specify a particular element name, and modify the transition ages (t_w, t_cc, t_ia) of feedback rates.
-        The FIRE-2 defaults (mannucci) are implemented natively, but can be modified with input lists.
+        source: ['wind', 'ia', 'cc']
+        t_w: transition times for winds (list)
+        t_cc: transition times for ccsn
+        t_ia: transition times for SNe Ia
+        ia_model: 'maoz' or 'mannucci' (mannucci by default)
+
         '''
         self.source = source
         self.element = element_name
@@ -119,11 +123,19 @@ class feedback:
         self.trans_w = np.array(t_w) # transition age of winds
         self.trans_ia = np.array(t_ia) # transition age of SNe Ia
         self.trans_cc = np.array(t_cc) # transition age of CCSNe
+        self.ia_model = ia_model
 
     def get_rate_wind(self, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
 
         '''
         Returns the rates versus stellar age for stellar winds in FIRE-2. 
+
+        Z: progenitor metallicity. Set to 1 by default, do not change for FIRE-2
+        massloss: not sure why this is here, will be removed.
+        metal_mass_fraction: was going to add as a potential fix to an inherent metallicity dependence built into FIRE-2. I did not implement this, but I could.
+        plot: set to True to plot the results. 
+
+
         '''
     
         transition_ages = self.trans_w
@@ -206,15 +218,23 @@ class feedback:
 
         return r_cc, a_cc, transition_ages
 
-    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, model_version = "mannucci"):
+    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
 
         transition_ages = self.trans_ia
+        model_version = self.ia_model
 
         mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
 
-        func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
-        func2 = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
+        if model_version.lower() == 'mannucci':
+            print(model_version)
+            func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
+            func2 = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
+
+        if model_version.lower() == 'maoz':
+            print(model_version)
+            func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
+            func2 = 2.6e-7 * (self.timespan[mask2] / 1e3) ** -1.1
 
         a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
         r_ia = ejecta_masses[self.source]*np.array([*func1, *func2], dtype = 'object') # y-axis: rate
