@@ -245,6 +245,8 @@ class FIREYieldClass:
         if not hasattr(self, 'ages_transition'):
             self.ages_transition = None
 
+        print(age_bins)
+
         # compile yields within/across each age bin by integrating over the assumed rates
         for ai in np.arange(np.size(age_bins) - 1):
             age_min = age_bins[ai]
@@ -304,6 +306,190 @@ class FIREYieldClass:
 
         return element_yield_rate
 
+class FIREYieldClass2:
+    '''
+    Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
+    '''
+
+    def __init__(self, model='fire2', progenitor_metallicity=1.0, ia_type = 'mannucci'):
+        '''
+        Parameters
+        -----------
+        model : str
+            name for this rate + yield model: 'fire2', 'fire3'
+            'fire2.1' is 'fire2' but removes prgenitor metallicity dependence to all yields
+            'fire2.2' is 'fire2.1' but also removes progenitor metallicity dependence to
+            stellar wind mass-loss rates
+        progenitor_metallicity : float
+            metallicity [linear mass fraction relative to Solar]
+            for nucleosynthetic rates and yields that depend on progenitor metallicity
+        '''
+        from . import gizmo_star
+        from . import gizmo_model
+
+        self.model = model.lower()
+        self.gizmo_model = gizmo_model
+        
+        assert self.model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
+
+        # this class computes the yields
+        self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+
+        # these classes compute the rates
+        self.SupernovaCC = gizmo_model.feedback(source = 'cc')
+        self.SupernovaIa = gizmo_model.feedback(source = 'ia', ia_model = ia_type)
+        self.StellarWind = gizmo_model.feedback(source = 'wind')
+
+        self.rate_cc, self.age_cc, self.trans_cc = self.SupernovaCC.get_rate_cc()
+        self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaCC.get_rate_ia()
+        self.rate_wind, self.age_wind, self.trans_wind = self.SupernovaCC.get_rate_wind()
+        
+
+        # store the Solar abundances
+        self.sun_massfraction = gizmo_model.get_sun_massfraction()
+
+        # store list of names of elements tracked in this model
+        self.element_names = [element_name.lower() for element_name in self.sun_massfraction]
+        """
+        self.element_names = [
+            'metals',
+            'helium',
+            'carbon',
+            'nitrogen',
+            'oxygen',
+            'neon',
+            'magnesium',
+            'silicon',
+            'sulfur',
+            'calcium',
+            'iron',
+        ]
+        """
+
+        # transition/discontinuous ages [Myr] in this model to be careful near integrating
+        self.ages_transition = gizmo_star.get_ages_transition(model)
+        # self.ages_transition = None
+
+        # store this (default) progenitor metallicity, including the mass fraction for each element
+        # scale all progenitor abundances to Solar ratios - this is not accurate in detail,
+        # but it is a reasonable approximation
+        self.progenitor_metallicity = progenitor_metallicity
+        self.progenitor_massfraction_dict = {}
+        for element_name in self.element_names:
+            # scale to Solar abundance ratios
+            self.progenitor_massfraction_dict[element_name] = (
+                progenitor_metallicity * self.sun_massfraction[element_name]
+            )
+
+        # store all yields as mass fraction relative to the IMF-averaged mass of stars at that time
+        # can store because in FIRE-2 yields are independent of stellar age and mass-loss rate
+        self.NucleosyntheticYield.assign_element_yields(
+            # match FIRE-2
+            progenitor_massfraction_dict=self.progenitor_massfraction_dict,
+            # test: do not model correction of yields from pre-existing surface abundances
+            # progenitor_metallicity=self.progenitor_metallicity,
+            # progenitor_massfraction_dict=None,
+        )
+
+    def get_element_yields(self, age_bins, element_names=None):
+        '''
+        Construct and return a dictionary of stellar nucleosynthetic yields.
+        * Each key is an element name
+        * Each key value is a 1-D array of yields within each input age bin,
+          constructed by integrating the total yield for each element across each age bin.
+
+        Supply the returned element_yield_dict to
+            ElementAgeTracerClass.assign_element_yield_massfractions()
+        to assign elemental abundances to star or gas particles via the age-tracer mass weights in
+        a Gizmo simulation.
+
+        Parameters
+        -----------
+        age_bins : array
+            stellar age bins used in Gizmo for the age-tracer model [Myr]
+            Should have N_age-bins + 1 values: left edges plus right edge of final bin.
+        element_names : list
+            names of elements to generate, if only generating a subset
+            If input None, assign all elements in this model.
+
+        Returns
+        -------
+        element_yield_dict : dict of 1-D arrays
+            fractional mass (relative to IMF-averaged mass of stars at that time) of each element
+            produced within each age bin
+        '''
+        # if input element_names is None, generate yields for all elements in this model
+        element_names = parse_element_names(self.element_names, element_names, scalarize=False)
+        print(element_names)
+
+        # initialize main dictionary
+        element_yield_dict = {}
+        for element_name in element_names:
+            element_yield_dict[element_name] = np.zeros(np.size(age_bins) - 1)
+
+        # ages to be careful around during integration
+        if not hasattr(self, 'ages_transition'):
+            self.ages_transition = None
+
+        # compile yields within/across each age bin by integrating over the assumed rates
+        for ai in np.arange(np.size(age_bins) - 1):
+            age_min = age_bins[ai]
+            if ai == 0:
+                age_min = 0  # ensure min age starts at 0
+            age_max = age_bins[ai + 1]
+
+            for element_name in element_names:
+                # get the integrated yield mass within/across the age bin
+
+                integral1 = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
+                integral2 = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
+                integral3 = self.gizmo_model.feedback(source = 'ia', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
+
+                print(element_name)
+
+                element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
+
+        return element_yield_dict
+
+    def _get_element_yield_rate(self, age, element_name, progenitor_metallicity=None):
+        '''
+        Return the specific rate of nucleosynthetic yield (yield mass relative to IMF-averaged mass
+        of stars at that time) [Myr ^ -1] at input stellar age [Myr] for input element_name,
+        from all stellar processes.
+        get_element_yields() uses this to integrate across age within each age bin.
+
+        Parameters
+        ----------
+        age : float
+            stellar age [Myr] at which to compute the nucleosynthetic yield rate
+        element_name : str
+            name of element, must be in self.element_names
+        progenitor_metallicity : float
+            metallicity [linear mass fraction relative to Solar]
+            In FIRE-3 and FIRE-3, this determines the mass-loss rate of stellar winds.
+
+        Returns
+        -------
+        element_yield_rate : float
+            specific rate (yield mass relative to IMF-averaged mass of stars at that time)
+            [Myr ^ -1] at input age for input element_name
+        '''
+        if progenitor_metallicity is None:
+            progenitor_metallicity = self.progenitor_metallicity
+
+        # rates below are fractional mass rate relative to mass of stars at formation [Myr ^ -1]
+        # wind is the only mass loss rate in FIRE-2 and FIRE-3 that depends on metallicity
+        wind_rate, wind_ages, wind_trans = self.StellarWind.get_rate_wind(Z=progenitor_metallicity)
+        sncc_rate, sncc_ages, sncc_trans = self.SupernovaCC.get_rate_cc()
+        snia_rate, snia_ages, snia_trans = self.SupernovaIa.get_rate_ia()
+
+        element_yield_rate = (
+            self.gizmo_model.feedback('wind', elem_name = element_name).get_rate_wind()[0][1:] +
+            self.gizmo_model.feedback('cc', elem_name = element_name).get_rate_cc()[0][1:] +
+            self.gizmo_model.feedback('ia', elem_name = element_name).get_rate_ia()[0][1:]
+        )
+
+        return element_yield_rate
 
 # --------------------------------------------------------------------------------------------------
 # NuGrid/Sygma model for nucleosynthetic yields

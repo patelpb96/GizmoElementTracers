@@ -30,14 +30,15 @@ feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 #timespan = np.logspace(0, 4.1367, 3000)
 
 # Yield Dictionaries for feedback types
-element_yield_wind = {'He' : 0.36, 'C' : 0.016, 'N' : 0.0041, 'O' : 0.0118, 'Ne' : 0,
-            'Mg' : 0, 'Si' : 0, 'S' : 0, 'Ca' : 0, 'Fe' : 0}
-element_yield_cc = {'Z' : 0.19, 'He' : 0.369, 'C' : 0.0127, 'N' : 0.00456, 'O' : 0.111, 'Ne' : 0.0381,
-            'Mg' : 0.00940, 'Si' : 0.00889, 'S' : 0.00378, 'Ca' : 0.000436, 'Fe' : 0.00706}
-element_yield_mannucci = {'Z' : 1.0, 'He' : 0.0, 'C' : 0.035, 'N' : 8.57e-7, 'O' : 0.102, 'Ne' : 0.00321,
-            'Mg' : 0.00614, 'Si' : 0.111, 'S' : 0.0621, 'Ca' : 0.00857, 'Fe' : 0.531}
-element_yield_ia = {'Z' : 1.0, 'He' : 0.0, 'C' : 0.035, 'N' : 8.57e-7, 'O' : 0.102, 'Ne' : 0.00321,
-            'Mg' : 0.00614, 'Si' : 0.111, 'S' : 0.0621, 'Ca' : 0.00857, 'Fe' : 0.531}
+element_yield_wind = {'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
+            'magnesium' : 0, 'silicon' : 0, 'sulfur' : 0, 'calcium' : 0, 'iron' : 0}
+
+element_yield_cc = {'metals' : 0.19, 'helium' : 0.369, 'carbon' : 0.0127, 'neon' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
+            'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706}
+element_yield_mannucci = {'metals' : 1.0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+            'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
+element_yield_ia = {'metals' : 1.0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+            'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
 
 # Ejecta Masses for Each Event 
 ejecta_masses = {'wind' : 1,
@@ -106,7 +107,7 @@ def element_yields(source = None, includeZ = False, plot = False):
 
 class feedback:
 
-    def __init__(self, source = 'any', elem_name = False, t_w = [1.0, 3.5, 100], t_cc = [3.4, 10.37, 37.53], t_ia = [37.53], ia_model = 'mannucci'):
+    def __init__(self, time_span = None, source = 'any', elem_name = False, t_w = [1.0, 3.5, 100], t_cc = [3.4, 10.37, 37.53], t_ia = [37.53], ia_model = 'mannucci'):
 
         '''
         source: one of 'wind', 'ia', or 'cc'
@@ -118,7 +119,10 @@ class feedback:
         '''
         self.source = source
         self.element = elem_name
+
         self.timespan = np.logspace(0, 4.1367, 3000)
+        if time_span is not None:
+            self.timespan = time_span
 
         self.trans_w = np.array(t_w) # transition age of winds
         self.trans_ia = np.array(t_ia) # transition age of SNe Ia
@@ -181,6 +185,8 @@ class feedback:
     def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
     
         transition_ages = np.array([3.4, 10.37, 37.53])
+
+        print(self.timespan)
     
         mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in self.timespan]
@@ -255,22 +261,44 @@ class feedback:
 
         return r_ia, a_ia, transition_ages
 
-    def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False):
+    def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False, ageBins = None):
         elem = self.element
         #print(str(self.source) + " selected.") #diagnostic
 
         if self.source == 'wind':
             r_w, a_w, t_w = self.get_rate_wind()
+
+            #For use with agetracers 
+            if ageBins is not None:
+                mask = np.logical_and(ageBins[0] <= a_w, a_w <= ageBins[1])
+                i_w = integrate.trapz(r_w[mask])#, a_w[mask])
+                return a_w[1:], i_w
+
             i_w = integrate.cumtrapz(r_w, a_w)
+
             return a_w[1:], i_w
 
         if self.source == 'ia':
             r_ia, a_ia, t_ia = self.get_rate_ia()
+
+            #For use with agetracers 
+            if ageBins is not None:
+                mask = np.logical_and(ageBins[0] <= a_ia, a_ia <= ageBins[1])
+                i_ia = integrate.trapz(r_ia[mask])#, a_ia[mask])
+                return a_ia[1:], i_ia
+
             i_ia = integrate.cumtrapz(r_ia, a_ia)
             return a_ia[1:], i_ia
 
         if self.source == 'cc':
             r_cc, a_cc, t_cc = self.get_rate_cc()
+
+            #For use with agetracers 
+            if ageBins is not None:
+                mask = np.logical_and(ageBins[0] <= a_cc, a_cc <= ageBins[1])
+                i_cc = integrate.trapz(r_cc[mask])#, a_cc[mask])
+                return a_cc[1:], i_cc
+
             i_cc = integrate.cumtrapz(r_cc, a_cc)
             return a_cc[1:], i_cc
         
