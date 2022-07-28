@@ -15,6 +15,7 @@ Unless otherwise noted, all quantities are in (combinations of)
     elemental abundance [linear mass fraction]
 '''
 
+from operator import iadd
 import numpy as np
 from scipy import integrate
 from scipy import interpolate
@@ -30,11 +31,11 @@ feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 #timespan = np.logspace(0, 4.1367, 3000)
 
 # Yield Dictionaries for feedback types
-element_yield_wind = {'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
+element_yield_wind = {'metals' : 0.0, 'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
             'magnesium' : 0, 'silicon' : 0, 'sulfur' : 0, 'calcium' : 0, 'iron' : 0}
 
 element_yield_cc = {'metals' : 0.19, 'helium' : 0.369, 'carbon' : 0.0127, 'neon' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
-            'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706}
+            'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706, 'nitrogen' : 1.32e-3}
 element_yield_mannucci = {'metals' : 1.0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
 element_yield_ia = {'metals' : 1.0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
@@ -169,8 +170,8 @@ class feedback:
         a_wind = np.array([*self.timespan[mask1], *self.timespan[mask2], *self.timespan[mask3], *self.timespan[mask4]], dtype = 'object') # x-axis: age
 
         if self.element:
-            print("Selected " + str(self.element) + " yields for " + str(self.source))
-            print(element_yields(self.source)[self.element])
+            #print("Selected " + str(self.element) + " yields for " + str(self.source))
+            #print(element_yields(self.source)[self.element])
 
             if plot:
                 plt.loglog(a_wind, element_yields(self.source)[self.element]*r_wind)
@@ -185,8 +186,6 @@ class feedback:
     def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
     
         transition_ages = np.array([3.4, 10.37, 37.53])
-
-        print(self.timespan)
     
         mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in self.timespan]
@@ -204,9 +203,9 @@ class feedback:
         if massloss == True:
             r_cc *= ejecta_masses[self.source]
 
-            if self.element:
-                print("Selected " + str(self.element) + " yields for " + str(self.source))
-                print(element_yields(self.source)[self.element])
+            if self.element is not False:
+                #print("Selected " + str(self.element) + " yields for " + str(self.source))
+                #print(element_yields(self.source)[self.element])
 
                 if plot:
                     plt.loglog(a_cc, element_yields(self.source)[self.element]*r_cc)
@@ -214,8 +213,8 @@ class feedback:
                 return element_yields(self.source)[self.element]*r_cc, a_cc, transition_ages
 
         if self.element:
-            print("Selected " + str(self.element) + " yields for " + str(self.source))
-            print(element_yields(self.source)[self.element])
+            #print("Selected " + str(self.element) + " yields for " + str(self.source))
+            #print(element_yields(self.source)[self.element])
 
             return element_yields(self.source)[self.element]*r_cc, a_cc, transition_ages
 
@@ -224,21 +223,21 @@ class feedback:
 
         return r_cc, a_cc, transition_ages
 
-    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
+    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, ia_version = 'mannucci'):
 
         transition_ages = self.trans_ia
-        model_version = self.ia_model
+
+        model_version = ia_version
 
         mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
 
         if model_version == 'mannucci':
-            print(model_version)
             func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
             func2 = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
 
         if model_version == 'maoz':
-            print(model_version)
+            print("Used Maoz for Rates")
             func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
             func2 = 2.6e-7 * (self.timespan[mask2] / 1e3) ** -1.1
 
@@ -246,8 +245,8 @@ class feedback:
         r_ia = ejecta_masses[self.source]*np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
         if self.element:
-            print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
-            print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
+            #print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
+            #print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
 
             if plot:
                 plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia)
@@ -261,30 +260,39 @@ class feedback:
 
         return r_ia, a_ia, transition_ages
 
-    def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False, ageBins = None):
+    def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False, ageBins = None, ia_ver = 'mannucci'):
         elem = self.element
+        print("INTEGRATOR IS USING " + str(ia_ver))
         #print(str(self.source) + " selected.") #diagnostic
 
         if self.source == 'wind':
-            r_w, a_w, t_w = self.get_rate_wind()
+            
 
             #For use with agetracers 
             if ageBins is not None:
+                r_w, a_w, t_w = self.get_rate_wind()
+
                 mask = np.logical_and(ageBins[0] <= a_w, a_w <= ageBins[1])
-                i_w = integrate.trapz(r_w[mask])#, a_w[mask])
+
+
+                i_w = integrate.trapz(r_w[mask]/len(r_w[mask]), x = [ageBins[0], ageBins[1]])#, a_w[mask])
+
                 return a_w[1:], i_w
 
+            r_w, a_w, t_w = self.get_rate_wind()
+            # For raw plotting purposes (or whatever other relevant use case comes up)
             i_w = integrate.cumtrapz(r_w, a_w)
 
             return a_w[1:], i_w
 
         if self.source == 'ia':
-            r_ia, a_ia, t_ia = self.get_rate_ia()
+            r_ia, a_ia, t_ia = self.get_rate_ia(ia_version = ia_ver)
 
             #For use with agetracers 
             if ageBins is not None:
                 mask = np.logical_and(ageBins[0] <= a_ia, a_ia <= ageBins[1])
-                i_ia = integrate.trapz(r_ia[mask])#, a_ia[mask])
+                i_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [ageBins[0], ageBins[1]])#, a_ia[mask])
+                print("Check 2")
                 return a_ia[1:], i_ia
 
             i_ia = integrate.cumtrapz(r_ia, a_ia)
@@ -296,7 +304,7 @@ class feedback:
             #For use with agetracers 
             if ageBins is not None:
                 mask = np.logical_and(ageBins[0] <= a_cc, a_cc <= ageBins[1])
-                i_cc = integrate.trapz(r_cc[mask])#, a_cc[mask])
+                i_cc = integrate.trapz(r_cc[mask]/len(r_cc[mask]), x = [ageBins[0], ageBins[1]])#, a_cc[mask])
                 return a_cc[1:], i_cc
 
             i_cc = integrate.cumtrapz(r_cc, a_cc)

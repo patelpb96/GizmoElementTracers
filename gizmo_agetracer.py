@@ -245,7 +245,7 @@ class FIREYieldClass:
         if not hasattr(self, 'ages_transition'):
             self.ages_transition = None
 
-        print(age_bins)
+        print(self.ages_transition)
 
         # compile yields within/across each age bin by integrating over the assumed rates
         for ai in np.arange(np.size(age_bins) - 1):
@@ -253,6 +253,8 @@ class FIREYieldClass:
             if ai == 0:
                 age_min = 0  # ensure min age starts at 0
             age_max = age_bins[ai + 1]
+
+            #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
 
             for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
@@ -298,6 +300,9 @@ class FIREYieldClass:
         sncc_rate = self.SupernovaCC.get_mass_loss_rate(age)
         snia_rate = self.SupernovaIa.get_mass_loss_rate(age)
 
+        #pstate = self.NucleosyntheticYield['supernova.cc'][element_name] * snia_rate
+        #print(f'{pstate:.10f}')
+
         element_yield_rate = (
             self.NucleosyntheticYield['wind'][element_name] * wind_rate
             + self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate
@@ -329,6 +334,8 @@ class FIREYieldClass2:
 
         self.model = model.lower()
         self.gizmo_model = gizmo_model
+        self.ia_model = ia_type
+        print(ia_type)
         
         assert self.model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
@@ -341,8 +348,8 @@ class FIREYieldClass2:
         self.StellarWind = gizmo_model.feedback(source = 'wind')
 
         self.rate_cc, self.age_cc, self.trans_cc = self.SupernovaCC.get_rate_cc()
-        self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaCC.get_rate_ia()
-        self.rate_wind, self.age_wind, self.trans_wind = self.SupernovaCC.get_rate_wind()
+        self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaIa.get_rate_ia(ia_version=ia_type)
+        self.rate_wind, self.age_wind, self.trans_wind = self.StellarWind.get_rate_wind()
         
 
         # store the Solar abundances
@@ -420,7 +427,6 @@ class FIREYieldClass2:
         '''
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
-        print(element_names)
 
         # initialize main dictionary
         element_yield_dict = {}
@@ -431,21 +437,26 @@ class FIREYieldClass2:
         if not hasattr(self, 'ages_transition'):
             self.ages_transition = None
 
+
         # compile yields within/across each age bin by integrating over the assumed rates
         for ai in np.arange(np.size(age_bins) - 1):
             age_min = age_bins[ai]
+            #print("For ai: " + str(ai) + "| For age_min: " + str(age_min) )
             if ai == 0:
                 age_min = 0  # ensure min age starts at 0
             age_max = age_bins[ai + 1]
+            #print("For age max: " + str(age_max))
 
             for element_name in element_names:
+                #print("For " + str(element_name) + "in " + str(element_names))
                 # get the integrated yield mass within/across the age bin
+                #print(age_min, age_max)
 
                 integral1 = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
                 integral2 = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
-                integral3 = self.gizmo_model.feedback(source = 'ia', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
+                integral3 = self.gizmo_model.feedback(source = 'ia', elem_name = element_name, ia_model = self.ia_model).integrate_massloss(ageBins = [age_min, age_max], ia_ver = self.ia_model)[1]
 
-                print(element_name)
+                #print(f'{integral3:f}')
 
                 element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
 
@@ -474,6 +485,7 @@ class FIREYieldClass2:
             specific rate (yield mass relative to IMF-averaged mass of stars at that time)
             [Myr ^ -1] at input age for input element_name
         '''
+        print("THIS SHOULD NOT SHOW UP")
         if progenitor_metallicity is None:
             progenitor_metallicity = self.progenitor_metallicity
 
@@ -484,9 +496,9 @@ class FIREYieldClass2:
         snia_rate, snia_ages, snia_trans = self.SupernovaIa.get_rate_ia()
 
         element_yield_rate = (
-            self.gizmo_model.feedback('wind', elem_name = element_name).get_rate_wind()[0][1:] +
-            self.gizmo_model.feedback('cc', elem_name = element_name).get_rate_cc()[0][1:] +
-            self.gizmo_model.feedback('ia', elem_name = element_name).get_rate_ia()[0][1:]
+            self.gizmo_model.feedback('wind', elem_name = element_name).get_rate_wind()[0][0:] +
+            self.gizmo_model.feedback('cc', elem_name = element_name).get_rate_cc()[0][0:] +
+            self.gizmo_model.feedback('ia', elem_name = element_name).get_rate_ia()[0][0:]
         )
 
         return element_yield_rate
