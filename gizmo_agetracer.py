@@ -73,6 +73,7 @@ Unless otherwise noted, all quantities are in (combinations of)
 
 import numpy as np
 from scipy import integrate
+import time
 
 from utilities import constant
 
@@ -154,6 +155,8 @@ class FIREYieldClass:
 
         # this class computes the yields
         self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+        print("Type NucleosyntheticYield: " + str(type(self.NucleosyntheticYield)))
+        print(self.NucleosyntheticYield)
 
         # these classes compute the rates
         self.SupernovaCC = gizmo_star.SupernovaCCClass(model)
@@ -316,7 +319,7 @@ class FIREYieldClass2:
     Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
     '''
 
-    def __init__(self, model='fire2', progenitor_metallicity=1.0, ia_type = 'mannucci'):
+    def __init__(self, model='fire2', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], normalization_ia = 1.6e-5):
         '''
         Parameters
         -----------
@@ -334,22 +337,29 @@ class FIREYieldClass2:
 
         self.model = model.lower()
         self.gizmo_model = gizmo_model
+
+        # For use with Agetracer grid 
         self.ia_model = ia_type
-        print(ia_type)
+        self.ia_transition_time = trans_time_ia
+        self.ia_normalization = normalization_ia
+
+        #print("Self.ia_model = " + str(ia_type))
         
         assert self.model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
         # this class computes the yields
         self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+        #print("Type NucleosyntheticYield: " + str(type(self.NucleosyntheticYield)))
+        #print(self.NucleosyntheticYield)
 
         # these classes compute the rates
-        self.SupernovaCC = gizmo_model.feedback(source = 'cc')
-        self.SupernovaIa = gizmo_model.feedback(source = 'ia', ia_model = ia_type)
-        self.StellarWind = gizmo_model.feedback(source = 'wind')
+        #self.SupernovaCC = gizmo_model.feedback(source = 'cc')
+        #self.SupernovaIa = gizmo_model.feedback(source = 'ia', ia_model = ia_type)
+        #self.StellarWind = gizmo_model.feedback(source = 'wind')
 
-        self.rate_cc, self.age_cc, self.trans_cc = self.SupernovaCC.get_rate_cc()
-        self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaIa.get_rate_ia(ia_version=ia_type)
-        self.rate_wind, self.age_wind, self.trans_wind = self.StellarWind.get_rate_wind()
+        #self.rate_cc, self.age_cc, self.trans_cc = self.SupernovaCC.get_rate_cc()
+        #self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaIa.get_rate_ia()
+        #self.rate_wind, self.age_wind, self.trans_wind = self.StellarWind.get_rate_wind()
         
 
         # store the Solar abundances
@@ -428,10 +438,13 @@ class FIREYieldClass2:
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
 
+        
+        start = time.process_time()
         # initialize main dictionary
         element_yield_dict = {}
         for element_name in element_names:
             element_yield_dict[element_name] = np.zeros(np.size(age_bins) - 1)
+        print("ln 445: t = " + str(time.process_time() - start))
 
         # ages to be careful around during integration
         if not hasattr(self, 'ages_transition'):
@@ -451,14 +464,31 @@ class FIREYieldClass2:
                 #print("For " + str(element_name) + "in " + str(element_names))
                 # get the integrated yield mass within/across the age bin
                 #print(age_min, age_max)
+                
 
-                integral1 = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
-                integral2 = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
-                integral3 = self.gizmo_model.feedback(source = 'ia', elem_name = element_name, ia_model = self.ia_model).integrate_massloss(ageBins = [age_min, age_max], ia_ver = self.ia_model)[1]
+                #integral1 = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
+
+                r_ia, a_ia, t_ia = self.gizmo_model.feedback(source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+                mask = np.logical_and(age_min <= a_ia, a_ia <= age_max)
+                int_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [age_min, age_max])#, a_ia[mask])
+
+
+                #integral2 = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
+
+                r_cc, a_cc, t_cc = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).get_rate_cc()
+                mask = np.logical_and(age_min <= a_cc, a_cc <= age_max)
+                int_cc = integrate.trapz(r_cc[mask]/len(r_cc[mask]), x = [age_min, age_max])#, a_cc[mask])
+
+                #integral3 = self.gizmo_model.feedback(source = 'ia', elem_name = element_name, ia_model = self.ia_model).integrate_massloss(ageBins = [age_min, age_max], ia_ver = self.ia_model)[1]
+
+                r_w, a_w, t_w = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).get_rate_wind()
+                mask = np.logical_and(age_min <= a_w, a_w <= age_max)
+                int_w = integrate.trapz(r_w[mask]/len(r_w[mask]), x = [age_min, age_max])#, a_w[mask])
 
                 #print(f'{integral3:f}')
 
-                element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
+                #element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
+                element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
         return element_yield_dict
 
@@ -617,16 +647,25 @@ class NuGridYieldClass:
             total yields at a given time for desired element in units of Msun / Gyr per Msun of
             star formation
         '''
-
+        
         assert element in self.elements
 
+        start = time.process_time()
         x = 0.5 * (self._model_time[1:] + self._model_time[:-1])
+        print("ln 649: t = " + str(time.process_time() - start))
 
         if element == 'metals':
             y = self._model_total_metal_rate
         else:
+            start = time.process_time()
             element_index = self._sygma_model.history.elements.index(element)
             y = self._model_yield_rate[:, element_index]
+            print("ln 655 - ln 658: t = " + str(time.process_time() - start))
+
+
+        start = time.process_time()
+        to_return = np.interp(t, x, y)
+        print("ln 662: t = " + str(time.process_time() - start))
 
         return np.interp(t, x, y)
 
