@@ -408,7 +408,7 @@ class FIREYieldClass2:
             # progenitor_massfraction_dict=None,
         )
 
-    def get_element_yields(self, age_bins, element_names=None, time_span = False):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -435,15 +435,6 @@ class FIREYieldClass2:
             fractional mass (relative to IMF-averaged mass of stars at that time) of each element
             produced within each age bin
         '''
-        def _return_feedback_rate(times, element):
-
-            assert len(times) == 1, "Not using list of length 1 (sorry, will fix this... eventually)."
-            types = ['ia', 'cc', 'wind']
-
-            for i in types:
-                rate, ages, t_times = self.gizmo_model.feedback(time_span = [times], source = i, elem_name = element).get_rate_wind()
-
-            return rate, ages
 
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
@@ -466,7 +457,7 @@ class FIREYieldClass2:
             age_max = age_bins[ai + 1]
             #print("For age max: " + str(age_max))
 
-            if time_span == False:
+            if continuous == False:
                 for element_name in element_names:
                     #print("For " + str(element_name) + "in " + str(element_names))
                     # get the integrated yield mass within/across the age bin
@@ -497,30 +488,33 @@ class FIREYieldClass2:
                     #element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
-            def _feedback_handler(self):
-                r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [time_span], source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
-                r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [time_span], source = 'cc', elem_name = element_name).get_rate_cc()
-                r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [time_span], source = 'wind', elem_name = element_name).get_rate_wind()
-
-                return r_ia 
-
-            if time_span is not False:
+            if continuous is not False:
                 for element_name in element_names:
-                    r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [time_span], source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
-                    r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [time_span], source = 'cc', elem_name = element_name).get_rate_cc()
-                    r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [time_span], source = 'wind', elem_name = element_name).get_rate_wind()
-
                 # get the integrated yield mass within/across the age bin
+                    print(self._feedback_handler(time_span = [age_min], element_of_choice = element_name))
                     element_yield_dict[element_name][ai] = integrate.quad(
-                        _return_feedback_rate,
+                        self._rates,
                         age_min,
                         age_max,
-                        (element_name,),
+                        (element_name),
                         points=self.ages_transition,
                     )[0]
+
         return element_yield_dict
 
-
+    def _feedback_handler(self, some_time, element_of_choice = None):
+            
+        if element_of_choice:
+            element_name = element_of_choice
+            
+        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], source = 'cc', elem_name = element_name).get_rate_cc()
+        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], source = 'wind', elem_name = element_name).get_rate_wind()
+        rate_sum = r_ia + r_cc + r_w
+        return rate_sum
+        
+    def _rates(self, some_time, element_of_choice):
+        return self._feedback_handler(some_time, element_of_choice)
 
     def _get_element_yield_rate(self, age, element_name, progenitor_metallicity=None):
         '''
