@@ -1,6 +1,8 @@
 '''
-Accomplishes the same as gizmo_star.py, but with added generality and the (eventual) ability to perturb the main models 
+Accomplishes the same as gizmo_star.py, but with added generality and the ability to perturb the main models 
 for use with the agetracers. 
+
+Currently, only SNe Ia can be perturbed (normalization and delay time).
 
 See gizmo_star.py for additional details. 
 
@@ -15,6 +17,7 @@ Unless otherwise noted, all quantities are in (combinations of)
     elemental abundance [linear mass fraction]
 '''
 
+from logging import error
 from operator import iadd
 import numpy as np
 from scipy import integrate
@@ -106,9 +109,27 @@ def element_yields(source = None, includeZ = False, plot = False):
         
     return globals()[string] #globals() converts the [string] into a variable (or function, if needed). Works like eval()
 
+def _to_num(num):
+
+    list_i = isinstance(num, (list, np.ndarray))
+    num_i = isinstance(num, (int, float))
+
+    if list_i:
+        return float(num[0])
+    if num_i:
+        return float(num)
+
 class feedback:
 
-    def __init__(self, time_span = None, source = 'any', elem_name = False, t_w = [1.0, 3.5, 100], t_cc = [3.4, 10.37, 37.53], t_ia = [37.53], n_ia = 1.6e-5, ia_model = 'mannucci'):
+    def __init__(self, 
+    time_span = None, 
+    source = 'any', 
+    elem_name = False, 
+    t_w = [1.0, 3.5, 100], 
+    t_cc = [3.4, 10.37, 37.53], 
+    t_ia = [37.53], 
+    n_ia = 1.6e-5, 
+    ia_model = 'mannucci'):
 
         '''
         source: one of 'wind', 'ia', or 'cc'
@@ -121,22 +142,24 @@ class feedback:
         self.source = source
         self.element = elem_name
 
-        timespan_default = np.logspace(0, 4.1367, 3000)
-        self.timespan = timespan_default
         if time_span is not None:
-            if len(time_span) == 1:
-                self.timespan = np.log(time_span)
-            elif len(time_span) > 1:
+            if len(time_span) > 1:
+                print("!! This input only accepts a list of length 1 for time_span - using the first index (time_span[0] = " + str (time_span[0]) + ") only. !!")
+            if time_span[0] > 1:
+                #print(time_span[0])
+                self.timespan = np.array(time_span)
+            if time_span[0] <= 1:
+                #print("time_span[0] = " + str(time_span[0]))
                 self.timespan = time_span
+        else:
+            self.timespan = np.logspace(0, 4.1367, 1500)
+                
 
-        self.trans_w = np.array(t_w) # transition age of winds
-        self.trans_ia = np.array(t_ia) # transition age of SNe Ia
-        self.trans_cc = np.array(t_cc) # transition age of CCSNe
+        self.trans_w = np.array(t_w) # transition ages of winds
+        self.trans_ia = np.array(t_ia) # transition ages of SNe Ia
+        self.trans_cc = np.array(t_cc) # transition ages of CCSNe
         self.ia_model = ia_model.lower()
         self.ia_norm = n_ia
-
-    def get_default_timespan():
-        return np.logspace(0, 4.1367, 3000)
 
     def get_rate_wind(self, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
 
@@ -159,7 +182,34 @@ class feedback:
         age_min = 0  # Myr
         age_max = 13700
 
-        # MODEL BELOW
+        # MODEL(s) BELOW
+        if len(self.timespan) == 1:
+            t = _to_num(self.timespan)
+            ##########################################################
+            # Piecewise function for continuous function integration #
+            ##########################################################
+
+            if t <= transition_ages[0]:
+                r_wind = 4.76317 * t
+
+            elif t <= transition_ages[1]:
+                r_wind = 4.76317 * Z * t ** (1.838 * (0.79 + np.log10(Z)))
+
+            elif t <= transition_ages[2]:
+                r_wind = 29.4 * (t / 3.5) ** -3.25 + 0.0041987
+
+            else:
+                r_wind = 0.41987 * (t / 1e3) ** -1.1 / (12.9 - np.log(t / 1e3))
+
+            if self.element:
+                return element_yields(self.source)[self.element]*r_wind/1e3, self.timespan, transition_ages
+            
+            else:
+                return r_wind/1e3, self.timespan, transition_ages
+
+        ###########################################################################################
+        # Piecewise function for pre-generating a table of values and then performing operations. #
+        ###########################################################################################
 
         mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in self.timespan]
@@ -167,6 +217,8 @@ class feedback:
         mask4 = [True if transition_ages[2] <= i else False for i in self.timespan]
 
         #func1 = 4.76317 * Z * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2
+
+
         func1 = 4.76317 * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2.1
         func2 = 4.76317 * Z * self.timespan[mask2] ** (1.838 * (0.79 + np.log10(Z)))
         func3 = 29.4 * (self.timespan[mask3] / 3.5) ** -3.25 + 0.0041987
@@ -191,45 +243,34 @@ class feedback:
 
         return r_wind, a_wind, transition_ages
 
-    def get_instant_rate_wind(self, time, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
-
-        '''
-        Originally intended to help use another integrator, may be deleted in the near future....
-        '''
-    
-        transition_ages = self.trans_w
-
-        # Imposed mins and maxes based on FIRE-2 and FIRE-3. For stability or something
-        metallicity_min = 0.01
-        metallicity_max = 3
-        age_min = 0  # Myr
-        age_max = 13700
-        r_wind = 0
-
-        # model below
-        
-        if 0 < time <= transition_ages[0]:
-            r_wind = 4.76317 * Z * (time) # FIRE-2.1
-
-        if transition_ages[0] < time <= transition_ages[1]:
-            r_wind = 4.76317 * Z * time ** (1.838 * (0.79 + np.log10(Z)))
-
-        if transition_ages[1] < time <= transition_ages[2]:
-            r_wind = 29.4 * (time / 3.5) ** -3.25 + 0.0041987
-
-        if transition_ages[2] < time:
-            r_wind = 0.41987 * (time / 1e3) ** -1.1 / (12.9 - np.log(time / 1e3))
-
-        if self.element:
-            return element_yields(self.source)[self.element]*r_wind
-
-        return r_wind
-
     def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
     
-        transition_ages = np.array([3.4, 10.37, 37.53])
+        transition_ages = self.trans_cc
+
+        if len(self.timespan) == 1:
+            t = _to_num(self.timespan)
+            ##########################################################
+            # Piecewise function for continuous function integration #
+            ##########################################################
+
+            if 0 <= t <= transition_ages[0]:
+                r_cc = 0
+
+            if transition_ages[0] <= t <= transition_ages[1]:
+                r_cc = 5.408e-4 * t
+            if transition_ages[1] <= t <= transition_ages[2]:
+                r_cc = 2.516e-4 * t
+
+            if transition_ages[2] <= t:
+                r_cc = 0
+
+            if self.element:
+                return ejecta_masses[self.source]*element_yields(self.source)[self.element]*r_cc, self.timespan, transition_ages
+            
+            else:
+                return ejecta_masses[self.source]*r_cc, self.timespan, transition_ages
     
-        mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
+        mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in self.timespan]
         mask3 = [True if transition_ages[1] <= i <= transition_ages[2] else False for i in self.timespan]
         mask4 = [True if transition_ages[2] <= i else False for i in self.timespan]
@@ -268,14 +309,30 @@ class feedback:
     def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
 
         transition_ages = self.trans_ia
-
         model_version = self.ia_model
-
-        mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
-        mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
         ia_norm = self.ia_norm
+        t = _to_num(self.timespan)
 
         if model_version == 'mannucci':
+
+            if len(self.timespan) == 1:
+                if t < transition_ages[0]:
+                    r_ia = 0
+                else:
+                    r_ia = 5.3e-8 + ia_norm * np.exp(-0.5 * ((t - 50) / 10) ** 2)
+
+                if self.element:
+                    #print("at t = " + str(t) + ", r_ia = ")
+                    rfin = ejecta_masses[self.source]*element_yields(self.source)[self.element]*r_ia
+                    #print("at t = " + str(t) + ", r_ia = " + str(rfin))
+
+                    return rfin, self.timespan, transition_ages
+                else:
+                    return ejecta_masses[self.source]*r_ia, self.timespan, transition_ages
+
+            mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
+            mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
+
             func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
             func2 = 5.3e-8 + ia_norm * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
 
@@ -293,6 +350,21 @@ class feedback:
 
         if model_version == 'maoz':
             #print("Used Maoz for Rates")
+
+            if len(self.timespan) == 1:
+                if 0 <= self.timespan < transition_ages[0]:
+                    r_ia = 0 * self.timespan
+                if transition_ages[0] <= self.timespan:
+                    r_ia = 2.6e-7 * (self.timespan / 1e3) ** -1.1
+
+                if self.element:
+                    return ejecta_masses[self.source]*element_yields(self.source)[self.element]*r_ia, self.timespan, transition_ages
+                else:
+                    return ejecta_masses[self.source]*r_ia, self.timespan, transition_ages
+
+            mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
+            mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
+
             func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
             func2 = 2.6e-7 * (self.timespan[mask2] / 1e3) ** -1.1
 

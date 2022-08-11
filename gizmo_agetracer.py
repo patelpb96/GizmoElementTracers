@@ -155,8 +155,8 @@ class FIREYieldClass:
 
         # this class computes the yields
         self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
-        print("Type NucleosyntheticYield: " + str(type(self.NucleosyntheticYield)))
-        print(self.NucleosyntheticYield)
+        #print("Type NucleosyntheticYield: " + str(type(self.NucleosyntheticYield)))
+        #print(self.NucleosyntheticYield)
 
         # these classes compute the rates
         self.SupernovaCC = gizmo_star.SupernovaCCClass(model)
@@ -248,7 +248,7 @@ class FIREYieldClass:
         if not hasattr(self, 'ages_transition'):
             self.ages_transition = None
 
-        print(self.ages_transition)
+        #print(self.ages_transition)
 
         # compile yields within/across each age bin by integrating over the assumed rates
         for ai in np.arange(np.size(age_bins) - 1):
@@ -453,7 +453,7 @@ class FIREYieldClass2:
             age_min = age_bins[ai]
             #print("For ai: " + str(ai) + "| For age_min: " + str(age_min) )
             if ai == 0:
-                age_min = 0  # ensure min age starts at 0
+                age_min = 0  # ensure min age starts arbitrarily close to 0
             age_max = age_bins[ai + 1]
             #print("For age max: " + str(age_max))
 
@@ -485,32 +485,41 @@ class FIREYieldClass2:
 
                     #print(f'{integral3:f}')
 
+                    #if element_name == 'magnesium':
+                    #print("Rate: " + str(element_name) + " | Age min: " + str(age_min) + "| " + str(r_ia + r_cc + r_w[1:])) 
+                    #print("Rate: " + str(element_name) + " | Age max: " + str(age_max) + "| " + str(r_ia + r_cc + r_w[1:])) 
+
                     #element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
             if continuous is not False:
                 for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
-                    print(self._feedback_handler(time_span = [age_min], element_of_choice = element_name))
+                    #if element_name == 'magnesium':
+                        #print("Rate: " + str(element_name) + " | Age min: " + str(age_min) + "| " + str(self._rates(age_min, element_name))) 
+                        #print("Rate: " + str(element_name) + " | Age max: " + str(age_max) + "| " + str(self._rates(age_max, element_name))) 
                     element_yield_dict[element_name][ai] = integrate.quad(
-                        self._rates,
+                        self._feedback_handler,
                         age_min,
                         age_max,
-                        (element_name),
+                        (element_name,),
                         points=self.ages_transition,
+                        #epsval = 1e-10,
+                        #epsmax = 1e-10,
                     )[0]
 
         return element_yield_dict
 
-    def _feedback_handler(self, some_time, element_of_choice = None):
+    def _feedback_handler(self, some_time, element_of_choice = False):
             
-        if element_of_choice:
+        if element_of_choice is not False:
             element_name = element_of_choice
             
         r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
         r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], source = 'cc', elem_name = element_name).get_rate_cc()
         r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], source = 'wind', elem_name = element_name).get_rate_wind()
         rate_sum = r_ia + r_cc + r_w
+
         return rate_sum
         
     def _rates(self, some_time, element_of_choice):
