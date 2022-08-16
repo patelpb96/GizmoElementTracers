@@ -49,6 +49,25 @@ ejecta_masses = {'wind' : 1,
                  'ia': 1.4,
                  'cc' : 10.5} # corresponding directly to the above
 
+def get_simulation_directory(machine = False):
+
+    mach = machine.lower()
+
+    if machine == 'stampede2':
+        dirs = { 'm11b' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11b_res260' ,'m11b_2100' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m11b_res2100_no-swb_contaminated',
+            'm11q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11q_res880','m11h' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11h_res880','m10q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
+            'm09_30' : '/home1/05738/tg850372/scratch/m09_res30', 'm11b_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m11b_res2100', 'm11h_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/cr_suite/m11h/cr_700',
+            'f3_m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3'}
+
+        return dirs
+
+    if machine == 'peloton':
+        print("In development, sorry")
+        return 0
+
+    print("Something went wrong in directory loading - are you passing machine == 'stampede2' ? ")
+
+
 
 def get_sun_massfraction(model='fire2'):
 
