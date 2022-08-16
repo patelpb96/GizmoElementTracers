@@ -483,29 +483,17 @@ class FIREYieldClass2:
                     mask = np.logical_and(age_min <= a_w, a_w <= age_max)
                     int_w = integrate.trapz(r_w[mask]/len(r_w[mask]), x = [age_min, age_max])#, a_w[mask])
 
-                    #print(f'{integral3:f}')
-
-                    #if element_name == 'magnesium':
-                    #print("Rate: " + str(element_name) + " | Age min: " + str(age_min) + "| " + str(r_ia + r_cc + r_w[1:])) 
-                    #print("Rate: " + str(element_name) + " | Age max: " + str(age_max) + "| " + str(r_ia + r_cc + r_w[1:])) 
-
-                    #element_yield_dict[element_name][ai] = integral1 + integral2 + integral3
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
             if continuous is not False:
                 for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
-                    #if element_name == 'magnesium':
-                        #print("Rate: " + str(element_name) + " | Age min: " + str(age_min) + "| " + str(self._rates(age_min, element_name))) 
-                        #print("Rate: " + str(element_name) + " | Age max: " + str(age_max) + "| " + str(self._rates(age_max, element_name))) 
                     element_yield_dict[element_name][ai] = integrate.quad(
                         self._feedback_handler,
                         age_min,
                         age_max,
                         (element_name,),
                         points=self.ages_transition,
-                        #epsval = 1e-10,
-                        #epsmax = 1e-10,
                     )[0]
 
         return element_yield_dict
