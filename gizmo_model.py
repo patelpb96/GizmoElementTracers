@@ -60,7 +60,7 @@ def get_simulation_directory(machine = False):
             'm09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30', 'm11b_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m11b_res2100', 'm11h_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/cr_suite/m11h/cr_700',
             'f3_m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core', 'f3_m10q_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
             'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30', 'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' ,
-            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_res250_uvb-late'}
+            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_res250_uvb-late', 'm09_250_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m09_res250'}
 
         return dirs
 
