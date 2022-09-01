@@ -17,6 +17,7 @@ Unless otherwise noted, all quantities are in (combinations of)
     elemental abundance [linear mass fraction]
 '''
 
+from http.client import NOT_ACCEPTABLE
 from logging import error
 from operator import iadd
 import numpy as np
@@ -27,7 +28,7 @@ from matplotlib import pyplot as plt
 import utilities as ut
 
 global Z_0
-Z_0 = 1
+Z_0 = 1.0
 
 feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 
@@ -57,7 +58,8 @@ def get_simulation_directory(machine = False):
         dirs = { 'm11b' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11b_res260' ,'m11b_2100' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m11b_res2100_no-swb_contaminated',
             'm11q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11q_res880','m11h' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11h_res880','m10q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
             'm09_30' : '/home1/05738/tg850372/scratch/m09_res30', 'm11b_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m11b_res2100', 'm11h_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/cr_suite/m11h/cr_700',
-            'f3_m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core', 'f3_m10q_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core' }
+            'f3_m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core', 'f3_m10q_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
+            'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30', 'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' }
 
         return dirs
 
@@ -148,6 +150,8 @@ class feedback:
     t_cc = [3.4, 10.37, 37.53], 
     t_ia = [37.53], 
     n_ia = 1.6e-5, 
+    n_cc = False,
+    n_w = False,
     ia_model = 'mannucci'):
 
         '''
@@ -155,6 +159,8 @@ class feedback:
         t_w: transition times for winds (list)
         t_cc: transition times for CCSN
         t_ia: transition times for SNe Ia
+        n_ia: type ia normalization 
+        
         ia_model: 'maoz' or 'mannucci' (mannucci by default)
 
         '''
@@ -179,6 +185,9 @@ class feedback:
         self.trans_cc = np.array(t_cc) # transition ages of CCSNe
         self.ia_model = ia_model.lower()
         self.ia_norm = n_ia
+        self.cc_norm = n_cc 
+        self.w_norm = n_w
+
 
     def get_rate_wind(self, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
 
@@ -209,7 +218,7 @@ class feedback:
             ##########################################################
 
             if t <= transition_ages[0]:
-                r_wind = 4.76317 * t
+                r_wind = 4.76317 * Z
 
             elif t <= transition_ages[1]:
                 r_wind = 4.76317 * Z * t ** (1.838 * (0.79 + np.log10(Z)))

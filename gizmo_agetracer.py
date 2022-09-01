@@ -268,6 +268,9 @@ class FIREYieldClass:
                     (element_name,),
                     points=self.ages_transition,
                 )[0]
+                #c = self._get_element_yield_rate(age_min, element_name)
+                #log = str(c) + ",FY1," +str(ai) + "," + str(element_name)
+                #print(log)
 
         return element_yield_dict
 
@@ -408,7 +411,7 @@ class FIREYieldClass2:
             # progenitor_massfraction_dict=None,
         )
 
-    def get_element_yields(self, age_bins, element_names=None, continuous = False):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False, fast_int = True):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -446,16 +449,52 @@ class FIREYieldClass2:
 
         # ages to be careful around during integration
         if not hasattr(self, 'ages_transition'):
+            print("FATAL ERROR !! ")
             self.ages_transition = None
 
+        if fast_int == True:
+            integrals = [[],[],[]]
+
+            r_ia, a_ia, t_ia = self.gizmo_model.feedback(source = 'ia', ia_model= self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+            r_cc, a_cc, t_cc = self.gizmo_model.feedback(source = 'cc').get_rate_cc()
+            r_w, a_w, t_w = self.gizmo_model.feedback(source = 'wind').get_rate_wind()
+        
         # compile yields within/across each age bin by integrating over the assumed rates
+            for ai in np.arange(np.size(age_bins) - 1):
+                age_min = age_bins[ai]
+                #print("For ai: " + str(ai) + "| For age_min: " + str(age_min) )
+                if ai == 0:
+                    age_min = 0  # ensure min age starts arbitrarily close to 0
+                age_max = age_bins[ai + 1]
+                #print("For age max: " + str(age_max))
+
+
+
+                # Faster integration methods when element yields are not metallicity/time dependent. 
+
+                mask1 = np.logical_and(age_min <= a_ia, a_ia <= age_max)
+                mask2 = np.logical_and(age_min <= a_cc, a_cc <= age_max)
+                mask3 = np.logical_and(age_min <= a_w, a_w <= age_max)
+                int_ia = integrate.trapz(r_ia[mask1]/len(r_ia[mask1]), x = [age_min, age_max])#, a_ia[mask])
+                int_cc = integrate.trapz(r_cc[mask2]/len(r_cc[mask2]), x = [age_min, age_max])#, a_cc[mask])
+                int_w = integrate.trapz(r_w[mask3]/len(r_w[mask3]), x = [age_min, age_max])#, a_w[mask])
+                
+                integrals[0].append(int_ia)
+                integrals[1].append(int_cc)
+                integrals[2].append(int_w)
+
+            for ai in np.arange(np.size(age_bins) - 1):
+                for element_name in element_names:
+                    element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*integrals[0][ai] + self.gizmo_model.element_yield_cc[element_name]*integrals[1][ai] + self.gizmo_model.element_yield_wind[element_name]*integrals[2][ai]
+
+                return element_yield_dict
+
         for ai in np.arange(np.size(age_bins) - 1):
             age_min = age_bins[ai]
             #print("For ai: " + str(ai) + "| For age_min: " + str(age_min) )
             if ai == 0:
                 age_min = 0  # ensure min age starts arbitrarily close to 0
             age_max = age_bins[ai + 1]
-            #print("For age max: " + str(age_max))
 
             if continuous == False:
                 for element_name in element_names:
@@ -495,6 +534,11 @@ class FIREYieldClass2:
                         (element_name,),
                         points=self.ages_transition,
                     )[0]
+
+                    #c = self._feedback_handler(age_min, element_name)
+                    #log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
+                    #print(log)
+
 
         return element_yield_dict
 
