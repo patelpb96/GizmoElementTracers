@@ -442,6 +442,11 @@ class FIREYieldClass2:
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
         
+        print(element_names)
+        print("Initialized")
+        print("continuous: " + str(continuous))
+        print("fast_integ: " + str(fast_int))
+
         # initialize main dictionary
         element_yield_dict = {}
         for element_name in element_names:
@@ -524,7 +529,7 @@ class FIREYieldClass2:
 
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
-            if continuous is not False:
+            if continuous == True:
                 for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
                     element_yield_dict[element_name][ai] = integrate.quad(
@@ -542,15 +547,22 @@ class FIREYieldClass2:
 
         return element_yield_dict
 
-    def _feedback_handler(self, some_time, element_of_choice = False):
+    def _feedback_handler(self, some_time, element_of_choice = 'metals'):
+        print("eoc: " + str(element_of_choice))
             
-        if element_of_choice is not False:
+        if element_of_choice is not 'metals':
             element_name = element_of_choice
+
             
-        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
-        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], source = 'cc', elem_name = element_name).get_rate_cc()
-        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], source = 'wind', elem_name = element_name).get_rate_wind()
-        rate_sum = r_ia + r_cc + r_w
+        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], source = 'cc').get_rate_cc()
+        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], source = 'wind').get_rate_wind()
+
+        rate_sum = (self.NucleosyntheticYield['wind'][element_name] * r_w
+            + self.NucleosyntheticYield['supernova.cc'][element_name] * r_cc
+            + self.NucleosyntheticYield['supernova.ia'][element_name] * r_ia)
+
+        print("RATE SUM: " + str(rate_sum))
 
         return rate_sum
         
