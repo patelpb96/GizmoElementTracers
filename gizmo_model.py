@@ -486,3 +486,14 @@ class feedback:
 
             i_cc = integrate.cumtrapz(r_cc, a_cc)
             return a_cc[1:], i_cc
+
+class analysis:
+    def __init__(self, 
+    z = 0):
+        self.dirs = get_simulation_directory('stampede2')
+        self.redshift = z
+
+    def get_metrics(self, directory):
+        metrics = {}
+
+        return metrics
