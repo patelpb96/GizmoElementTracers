@@ -76,6 +76,8 @@ def get_simulation_directory(dirkey = False):
             'm10_res30_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res30',
             'm10_res250_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res250',
             'test' : 'test'}
+            
+        return dirs
 
     if mach == 'm09':
         dirs = {'m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30',
@@ -87,6 +89,8 @@ def get_simulation_directory(dirkey = False):
             'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res250_uvb-late_snia-maoz',
             #'m09_30_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res30_uvb-late_snia-maoz'
             }
+
+        return dirs
 
     if mach == 'm10':
         dirs = {'m10q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
