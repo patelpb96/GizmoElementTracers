@@ -50,11 +50,11 @@ ejecta_masses = {'wind' : 1,
                  'ia': 1.4,
                  'cc' : 10.5} # corresponding directly to the above
 
-def get_simulation_directory(machine = False):
+def get_simulation_directory(dirkey = False):
 
-    mach = machine.lower()
+    mach = dirkey.lower()
 
-    if machine == 'stampede2':
+    if mach == 'stampede2':
         dirs = { 'm11b' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11b_res260' ,
             'm11b_2100' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m11b_res2100_no-swb_contaminated',
             'm11q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11q_res880',
@@ -77,13 +77,29 @@ def get_simulation_directory(machine = False):
             'm10_res250_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res250',
             'test' : 'test'}
 
+    if mach == 'm09m10':
+        dirs = {'m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30',
+            'm09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
+            'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30',
+            'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' ,
+            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_res250_uvb-late',
+            'm09_250_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m09_res250',
+            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res250_uvb-late_snia-maoz',
+            'm09_30_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res30_uvb-late_snia-maoz',
+            'm10q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
+            'm10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
+            'm10_res30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res30',
+            'm10_res250' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
+            'm10_res30_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res30',
+            'm10_res250_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res250'}
+
         return dirs
 
-    if machine == 'peloton':
+    if mach == 'peloton':
         print("In development, sorry")
         return 0
 
-    print("Something went wrong in directory loading - are you passing machine == 'stampede2' ? ")
+    print("Something went wrong in directory loading - i.e. are you passing machine == 'stampede2' ? ")
 
 
 
