@@ -85,7 +85,9 @@ def get_simulation_directory(dirkey = False):
             'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30',
             'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' ,
             #'m09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_res250_uvb-late',
-            'm09_250_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m09_res250'
+            'm09_250_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m09_res250',
+            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
+            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30'
             #'m09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res250_uvb-late_snia-maoz',
             #'m09_30_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res30_uvb-late_snia-maoz'
             }
