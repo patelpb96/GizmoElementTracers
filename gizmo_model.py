@@ -52,9 +52,9 @@ ejecta_masses = {'wind' : 1,
 
 def get_simulation_directory(dirkey = False):
 
-    mach = dirkey.lower()
+    dirset = dirkey.lower()
 
-    if mach == 'stampede2':
+    if dirset == 'stampede2':
         dirs = { 'm11b' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11b_res260' ,
             'm11b_2100' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m11b_res2100_no-swb_contaminated',
             'm11q' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11q_res880',
@@ -79,7 +79,23 @@ def get_simulation_directory(dirkey = False):
 
         return dirs
 
-    if mach == 'm09':
+    if dirset == 'epsilon':
+        dirs = {'m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30',
+            'm09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
+            'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30',
+            'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' ,
+            'm09_250_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m09_res250',
+            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
+            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
+            'm10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
+            'm10_res30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res30',
+            'm10_res250' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
+            'm10_res30_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res30'
+            }
+
+        return dirs
+
+    if dirset == 'm09':
         dirs = {'m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30',
             'm09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
             'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30',
@@ -94,7 +110,7 @@ def get_simulation_directory(dirkey = False):
 
         return dirs
 
-    if mach == 'm10':
+    if dirset == 'm10':
         dirs = {'m10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
             'm10_res30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res30',
             'm10_res250' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
@@ -104,7 +120,7 @@ def get_simulation_directory(dirkey = False):
 
         return dirs
 
-    if mach == 'peloton':
+    if dirset == 'peloton':
         print("In development, sorry")
         return 0
 
