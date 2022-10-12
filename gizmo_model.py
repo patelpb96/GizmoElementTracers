@@ -95,6 +95,15 @@ def get_simulation_directory(dirkey = False):
 
         return dirs
 
+    if dirset == 'eps_f3':
+        dirs = {'m09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
+            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
+            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
+            'm10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
+            }
+
+        return dirs
+
     if dirset == 'm09':
         dirs = {'m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30',
             'm09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
