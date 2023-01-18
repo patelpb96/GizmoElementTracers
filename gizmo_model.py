@@ -105,7 +105,8 @@ def get_simulation_directory(dirkey = False):
             'm11_880' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r880',
             'm11_110' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r110',
             'm11_110_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m11i_r110_uvb2020',
-            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_r250_uvb-late'
+            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_r250_uvb-late',
+            'm09_30_nomol' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_r30'
             }
 
         return dirs
