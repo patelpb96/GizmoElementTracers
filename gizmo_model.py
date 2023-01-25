@@ -515,13 +515,12 @@ class feedback:
                 r_w, a_w, t_w = self.get_rate_wind()
 
                 mask = np.logical_and(ageBins[0] <= a_w, a_w <= ageBins[1])
-
-
                 i_w = integrate.trapz(r_w[mask]/len(r_w[mask]), x = [ageBins[0], ageBins[1]])#, a_w[mask])
 
                 return a_w[1:], i_w
 
             r_w, a_w, t_w = self.get_rate_wind()
+            
             # For raw plotting purposes (or whatever other relevant use case comes up)
             i_w = integrate.cumtrapz(r_w, a_w)
 
