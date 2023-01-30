@@ -9,3 +9,4 @@ from . import gizmo_plot as plot
 from . import gizmo_star as star
 from . import gizmo_track as track
 from . import gizmo_model as model
+from . import gizmo_helpfuncs as helpfuncs
