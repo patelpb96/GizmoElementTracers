@@ -7,7 +7,7 @@ A set of helper functions designed to make everything easier (for me)
 
 import os
 
-class Batch(make = False):
+class Batch:
     '''
     Idea: submit a python File to batch  
     '''
@@ -23,4 +23,5 @@ class Batch(make = False):
         os.system("dos2unix" + self.sbatch_filename)
 
     def submit(self):
+        self.conv2unix()
         os.system("sbatch " + self.sbatch_filename)
