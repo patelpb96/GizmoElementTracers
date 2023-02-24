@@ -168,6 +168,7 @@ class FIREYieldClass:
 
         # store list of names of elements tracked in this model
         self.element_names = [element_name.lower() for element_name in self.sun_massfraction]
+        self._event_kinds = ['wind', 'supernova.cc', 'supernova.ia']
         """
         self.element_names = [
             'metals',
@@ -238,6 +239,8 @@ class FIREYieldClass:
         '''
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
+        #print("element names: " + str(element_names))
+        #print("element names type: " + str(type(element_names)))
 
         # initialize main dictionary
         element_yield_dict = {}
@@ -257,7 +260,7 @@ class FIREYieldClass:
                 age_min = 0  # ensure min age starts at 0
             age_max = age_bins[ai + 1]
 
-            #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
+            print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
 
             for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
@@ -352,6 +355,7 @@ class FIREYieldClass2:
 
         # this class computes the yields
         self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+        self.NucleosyntheticYield = gizmo_model.nucleosyntheticYieldDict
         #print("Type NucleosyntheticYield: " + str(type(self.NucleosyntheticYield)))
         #print(self.NucleosyntheticYield)
 
@@ -403,14 +407,18 @@ class FIREYieldClass2:
 
         # store all yields as mass fraction relative to the IMF-averaged mass of stars at that time
         # can store because in FIRE-2 yields are independent of stellar age and mass-loss rate
-        self.NucleosyntheticYield.assign_element_yields(
+
+        #self.NucleosyntheticYield.assign_element_yields(
             # match FIRE-2
-            progenitor_massfraction_dict=self.progenitor_massfraction_dict,
+            #progenitor_massfraction_dict=self.progenitor_massfraction_dict,
             # test: do not model correction of yields from pre-existing surface abundances
             # progenitor_metallicity=self.progenitor_metallicity,
             # progenitor_massfraction_dict=None,
-        )
+        #)
 
+        #for event_kind in self._event_kinds:
+        #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()
+            
     def get_element_yields(self, age_bins, element_names=None, continuous = False, fast_int = True):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
@@ -442,8 +450,9 @@ class FIREYieldClass2:
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
         
-        print(element_names)
-        print("Initialized")
+        #print("element names: " + str(element_names))
+        #print("element names type: " + str(type(element_names)))
+        #print("Initialized")
         print("continuous: " + str(continuous))
         print("fast_integ: " + str(fast_int))
 
@@ -514,7 +523,6 @@ class FIREYieldClass2:
                     mask = np.logical_and(age_min <= a_ia, a_ia <= age_max)
                     int_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [age_min, age_max])#, a_ia[mask])
 
-
                     #integral2 = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
 
                     r_cc, a_cc, t_cc = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).get_rate_cc()
@@ -529,6 +537,8 @@ class FIREYieldClass2:
 
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
+            print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
+
             if continuous == True:
                 for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
@@ -540,29 +550,31 @@ class FIREYieldClass2:
                         points=self.ages_transition,
                     )[0]
 
-                    #c = self._feedback_handler(age_min, element_name)
-                    #log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
+                    c = self._feedback_handler(age_min, element_name)
+                    log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
                     #print(log)
 
 
         return element_yield_dict
 
-    def _feedback_handler(self, some_time, element_of_choice = 'metals'):
-        print("eoc: " + str(element_of_choice))
+    def _feedback_handler(self, some_time, element_of_choice):
+        #print("eoc: " + str(element_of_choice))
             
-        if element_of_choice is not 'metals':
-            element_name = element_of_choice
+        element_name = element_of_choice
 
             
-        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
-        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], source = 'cc').get_rate_cc()
-        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], source = 'wind').get_rate_wind()
+        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
+        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
 
-        rate_sum = (self.NucleosyntheticYield['wind'][element_name] * r_w
-            + self.NucleosyntheticYield['supernova.cc'][element_name] * r_cc
-            + self.NucleosyntheticYield['supernova.ia'][element_name] * r_ia)
 
-        print("RATE SUM: " + str(rate_sum))
+        try:
+            len(r_ia)
+            rate_sum = (r_w[0:] + r_cc[0:] + r_ia[0:])
+        except:
+            rate_sum = (r_w + r_cc + r_ia)
+
+        #print("RATE SUM: " + str(rate_sum))
 
         return rate_sum
         
