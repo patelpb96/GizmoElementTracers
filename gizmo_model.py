@@ -35,15 +35,22 @@ feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 #timespan = np.logspace(0, 4.1367, 3000)
 
 # Yield Dictionaries for feedback types
-element_yield_wind = {'metals' : 0.0, 'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
+element_yield_wind = {'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
             'magnesium' : 0, 'silicon' : 0, 'sulfur' : 0, 'calcium' : 0, 'iron' : 0}
-
-element_yield_cc = {'metals' : 0.19, 'helium' : 0.369, 'carbon' : 0.0127, 'neon' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
+element_yield_cc = {'helium' : 0.369, 'carbon' : 0.0127, 'neon' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
             'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706, 'nitrogen' : 1.32e-3}
-element_yield_mannucci = {'metals' : 1.0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+element_yield_mannucci = {'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
-element_yield_ia = {'metals' : 1.0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+element_yield_ia = {'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
+
+all_yields = [element_yield_wind, element_yield_cc, element_yield_ia, element_yield_mannucci]
+
+for yield_dict in all_yields:
+    for element_name in yield_dict:
+        if element_name != 'helium':
+            yield_dict['metals'] += yield_dict[k]
+
 
 # Ejecta Masses for Each Event 
 ejecta_masses = {'wind' : 1,
@@ -151,8 +158,6 @@ def get_simulation_directory(dirkey = False):
         return 0
 
     print("Something went wrong in directory loading - i.e. are you passing machine == 'stampede2' ? ")
-
-
 
 def get_sun_massfraction(model='fire2'):
 
