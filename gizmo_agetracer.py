@@ -210,7 +210,7 @@ class FIREYieldClass:
             # progenitor_massfraction_dict=None,
         )
 
-    def get_element_yields(self, age_bins, element_names=None):
+    def get_element_yields(self, age_bins, element_names=None, testing = False):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -241,6 +241,7 @@ class FIREYieldClass:
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
         #print("element names: " + str(element_names))
         #print("element names type: " + str(type(element_names)))
+        test = testing
 
         # initialize main dictionary
         element_yield_dict = {}
@@ -249,6 +250,7 @@ class FIREYieldClass:
 
         # ages to be careful around during integration
         if not hasattr(self, 'ages_transition'):
+            print("Not using ages_transition")
             self.ages_transition = None
 
         #print(self.ages_transition)
@@ -260,7 +262,7 @@ class FIREYieldClass:
                 age_min = 0  # ensure min age starts at 0
             age_max = age_bins[ai + 1]
 
-            print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
+            #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
 
             for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
@@ -268,7 +270,7 @@ class FIREYieldClass:
                     self._get_element_yield_rate,
                     age_min,
                     age_max,
-                    (element_name,),
+                    (element_name,test),
                     points=self.ages_transition,
                 )[0]
                 #c = self._get_element_yield_rate(age_min, element_name)
@@ -277,7 +279,7 @@ class FIREYieldClass:
 
         return element_yield_dict
 
-    def _get_element_yield_rate(self, age, element_name, progenitor_metallicity=None):
+    def _get_element_yield_rate(self, age, element_name, test = False, progenitor_metallicity=None):
         '''
         Return the specific rate of nucleosynthetic yield (yield mass relative to IMF-averaged mass
         of stars at that time) [Myr ^ -1] at input stellar age [Myr] for input element_name,
@@ -309,6 +311,18 @@ class FIREYieldClass:
         sncc_rate = self.SupernovaCC.get_mass_loss_rate(age)
         snia_rate = self.SupernovaIa.get_mass_loss_rate(age)
 
+        if test == 'winds':
+            sncc_rate = 0
+            snia_rate = 0
+        
+        if test == 'cc':
+            wind_rate = 0
+            snia_rate = 0
+
+        if test == 'ia':
+            wind_rate = 0
+            sncc_rate = 0
+
         #pstate = self.NucleosyntheticYield['supernova.cc'][element_name] * snia_rate
         #print(f'{pstate:.10f}')
 
@@ -325,7 +339,7 @@ class FIREYieldClass2:
     Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
     '''
 
-    def __init__(self, model='fire2', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], normalization_ia = 1.6e-5):
+    def __init__(self, model='fire2', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [50], normalization_ia = 1.6e-5):
         '''
         Parameters
         -----------
@@ -419,7 +433,7 @@ class FIREYieldClass2:
         #for event_kind in self._event_kinds:
         #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()
             
-    def get_element_yields(self, age_bins, element_names=None, continuous = False, fast_int = True):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False, fast_int = True, testing = False):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -452,9 +466,9 @@ class FIREYieldClass2:
         
         #print("element names: " + str(element_names))
         #print("element names type: " + str(type(element_names)))
-        #print("Initialized")
+
         print("continuous: " + str(continuous))
-        print("fast_integ: " + str(fast_int))
+        print("fast_integ: " + str(fast_int)) # refers to the simplifcation of the yield dictionary. 
 
         # initialize main dictionary
         element_yield_dict = {}
@@ -515,11 +529,15 @@ class FIREYieldClass2:
                     #print("For " + str(element_name) + "in " + str(element_names))
                     # get the integrated yield mass within/across the age bin
                     #print(age_min, age_max)
-                    
 
                     #integral1 = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
 
-                    r_ia, a_ia, t_ia = self.gizmo_model.feedback(source = 'ia', elem_name = element_name, ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+                    r_ia, a_ia, t_ia = self.gizmo_model.feedback(source = 'ia', 
+                                                                 elem_name = element_name, 
+                                                                 ia_model=self.ia_model, 
+                                                                 t_ia = self.ia_transition_time, 
+                                                                 n_ia = self.ia_normalization).get_rate_ia()
+                    
                     mask = np.logical_and(age_min <= a_ia, a_ia <= age_max)
                     int_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [age_min, age_max])#, a_ia[mask])
 
@@ -537,8 +555,9 @@ class FIREYieldClass2:
 
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
-            print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
+            #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
 
+            test = testing
             if continuous == True:
                 for element_name in element_names:
                 # get the integrated yield mass within/across the age bin
@@ -546,26 +565,41 @@ class FIREYieldClass2:
                         self._feedback_handler,
                         age_min,
                         age_max,
-                        (element_name,),
+                        (element_name,test),
                         points=self.ages_transition,
                     )[0]
 
-                    c = self._feedback_handler(age_min, element_name)
+                    c = self._feedback_handler(age_min, element_name, test)
                     log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
                     #print(log)
 
 
         return element_yield_dict
 
-    def _feedback_handler(self, some_time, element_of_choice):
+    def _feedback_handler(self, some_time, element_of_choice, test_process):
         #print("eoc: " + str(element_of_choice))
-            
+    
         element_name = element_of_choice
 
             
         r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
         r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
         r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
+
+        if test_process == 'winds':
+            r_ia = 0
+            r_cc = 0
+            print("TESTING WINDS")
+
+        if test_process == 'cc':
+            r_w = 0
+            r_ia = 0
+            print("TESTING CCSN")
+
+        if test_process == 'ia':
+            r_cc = 0
+            r_w = 0
+            print("TESTING IA")
 
 
         try:

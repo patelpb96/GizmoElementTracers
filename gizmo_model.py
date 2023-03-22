@@ -30,6 +30,9 @@ import utilities as ut
 global Z_0
 Z_0 = 1.0
 
+colors = ['black', 'rosybrown', 'brown', 'red', 'peru', 'darkorange', 'gold', 'olive', 'olivedrab', 
+          'turquoise', 'dodgerblue', 'navy']
+
 feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 
 #timespan = np.logspace(0, 4.1367, 3000)
@@ -37,10 +40,13 @@ feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 # Yield Dictionaries for feedback types
 element_yield_wind = {'metals' : 0, 'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
             'magnesium' : 0, 'silicon' : 0, 'sulfur' : 0, 'calcium' : 0, 'iron' : 0}
+
 element_yield_cc = {'metals' : 0, 'helium' : 0.369, 'carbon' : 0.0127, 'nitrogen' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
             'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706}
+
 element_yield_mannucci = {'metals' : 0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
+
 element_yield_ia = {'metals' : 0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
 
@@ -62,6 +68,8 @@ nucleosyntheticYieldDict = {'wind' : element_yield_wind, 'cc' : element_yield_cc
 ejecta_masses = {'wind' : 1,
                  'ia': 1.4,
                  'cc' : 10.5} # corresponding directly to the above
+
+
 
 def get_simulation_directory(dirkey = False):
 
@@ -370,7 +378,7 @@ class feedback:
 
         return r_wind, a_wind, transition_ages
 
-    def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
+    def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, plotcolor = 'k'):
     
         transition_ages = self.trans_cc
 
@@ -384,9 +392,9 @@ class feedback:
                 r_cc = 0
 
             if transition_ages[0] <= t <= transition_ages[1]:
-                r_cc = 5.408e-4 * t # [Myr]
+                r_cc = 5.408e-4 * t # [Myr ^ -1]
             if transition_ages[1] <= t <= transition_ages[2]:
-                r_cc = 2.516e-4 * t # [Myr]
+                r_cc = 2.516e-4 * t # [Myr ^ -1]
 
             if transition_ages[2] <= t:
                 r_cc = 0
@@ -419,10 +427,13 @@ class feedback:
             #print("Selected " + str(self.element) + " yields for " + str(self.source))
             #print(element_yields(self.source)[self.element])
 
+            if plot:
+                plt.loglog(a_cc, element_yields(self.source)[self.element]*r_cc, label = str(self.element), c = plotcolor)
+
             return element_yields(self.source)[self.element]*r_cc, a_cc, transition_ages
 
         if plot:
-            plt.loglog(a_cc, r_cc, label = "CCSN")
+            plt.loglog(a_cc, r_cc, label = "CCSN", c = plotcolor)
 
         return r_cc, a_cc, transition_ages
 
