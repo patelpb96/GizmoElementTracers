@@ -2042,6 +2042,8 @@ def plot_mass_loss_v_age(
         )
     ut.plot.parse_output(file_name, directory)
 
+    return total
+
 
 def plot_nucleosynthetic_yields(
     event_kinds='wind',
