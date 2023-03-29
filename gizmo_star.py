@@ -385,7 +385,7 @@ class NucleosyntheticYieldClass(dict):
                 # Si: 8.89e-3, S: 3.78e-3, Ca: 4.36e-4, Fe: 7.06e-3]
                 ejecta_mass = 10.5  # [M_sun]
                 # below are mass fractions
-                element_yield['metals'] = 0.19#5926
+                element_yield['metals'] = 0.195926
                 element_yield['helium'] = 0.369
                 element_yield['carbon'] = 0.0127
                 element_yield['nitrogen'] = 0.00456
