@@ -392,12 +392,14 @@ class feedback:
                 r_cc = 0
 
             if transition_ages[0] <= t <= transition_ages[1]:
-                r_cc = 5.408e-4 * t # [Myr ^ -1]
+                r_cc = 5.408e-4 # [Myr ^ -1]
             if transition_ages[1] <= t <= transition_ages[2]:
-                r_cc = 2.516e-4 * t # [Myr ^ -1]
+                r_cc = 2.516e-4 # [Myr ^ -1]
 
             if transition_ages[2] <= t:
                 r_cc = 0
+
+            r_cc *= ejecta_masses[self.source]
 
             if self.element:
                 return element_yields(self.source)[self.element]*r_cc, self.timespan, transition_ages
@@ -444,11 +446,13 @@ class feedback:
         if model_version == 'mannucci':
 
             if len(self.timespan) == 1:
+                t = _to_num(self.timespan)
                 if t < transition_ages[0]:
                     r_ia = 0
                 else:
                     r_ia = 5.3e-8 + ia_norm * np.exp(-0.5 * ((t - 50) / 10) ** 2)
 
+                r_ia *= ejecta_masses[self.source]
                 if self.element:
                     #print("at t = " + str(t) + ", r_ia = ")
                     rfin = element_yields(self.source)[self.element]*r_ia
