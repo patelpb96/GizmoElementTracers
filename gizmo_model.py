@@ -44,13 +44,14 @@ element_yield_wind = {'metals' : 0, 'helium' : 0.36, 'carbon' : 0.016, 'nitrogen
 element_yield_cc = {'metals' : 0, 'helium' : 0.369, 'carbon' : 0.0127, 'nitrogen' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
             'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706}
 
-element_yield_mannucci = {'metals' : 0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+element_yield_mannucci = {'metals' : 1, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
 
-element_yield_ia = {'metals' : 0, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+element_yield_ia = {'metals' : 1, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
             'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
 
 all_yields = [element_yield_wind, element_yield_cc, element_yield_ia, element_yield_mannucci]
+all_yields = [element_yield_wind, element_yield_cc]#, element_yield_ia, element_yield_mannucci]
 
 # adds 'metals' to each dictionary 
 for yield_dict in all_yields:
@@ -64,7 +65,7 @@ for yield_dict in all_yields:
 
 nucleosyntheticYieldDict = {'wind' : element_yield_wind, 'cc' : element_yield_cc, 'ia' :  element_yield_ia, 'mannucci' : element_yield_mannucci}
 
-# Ejecta Masses for Each Event 
+# Ejecta Masses for Each Event, in M_sun
 ejecta_masses = {'wind' : 1,
                  'ia': 1.4,
                  'cc' : 10.5} # corresponding directly to the above
@@ -279,7 +280,7 @@ class feedback:
                 #print("time_span[0] = " + str(time_span[0]))
                 self.timespan = time_span
         else:
-            self.timespan = np.logspace(0, 4.1367, 1500)
+            self.timespan = np.logspace(0, 4.146159, 1500)
                 
 
         self.trans_w = np.array(t_w) # transition ages of winds
@@ -310,7 +311,7 @@ class feedback:
         metallicity_min = 0.01
         metallicity_max = 3
         age_min = 0  # Myr
-        age_max = 13700
+        age_max = 14001
 
         # MODEL(s) BELOW
         if len(self.timespan) == 1:
@@ -335,7 +336,6 @@ class feedback:
                 return element_yields(self.source)[self.element]*r_wind/1e3, self.timespan, transition_ages
             
             else:
-                print("ELSE WIND")
                 return r_wind/1e3, self.timespan, transition_ages
 
         ###########################################################################################
@@ -403,8 +403,6 @@ class feedback:
                 return element_yields(self.source)[self.element]*r_cc, self.timespan, transition_ages
             
             else:
-                print("ELSE CC")
-                print(self.element)
                 return r_cc, self.timespan, transition_ages
     
         mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
@@ -421,7 +419,6 @@ class feedback:
         a_cc = np.array([*self.timespan[mask1], *self.timespan[mask2], *self.timespan[mask3], *self.timespan[mask4]], dtype = 'object') # x-axis: age
 
         r_cc *= ejecta_masses[self.source]
-
 
         if self.element:
             #print("Selected " + str(self.element) + " yields for " + str(self.source))
@@ -460,25 +457,25 @@ class feedback:
                     return rfin, self.timespan, transition_ages
                 else:
                     return r_ia, self.timespan, transition_ages
+                
+            elif len(self.timespan) > 1:
+                mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
+                mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
 
-            mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
-            mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
+                func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
+                func2 = 5.3e-8 + ia_norm * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
 
-            func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
-            func2 = 5.3e-8 + ia_norm * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
+                a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
+                r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
-            a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
-            r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
+                r_ia *= ejecta_masses[self.source] # multiply by ejecta mass of 1.4 M_sun to get mass loss rate 
 
-            r_ia *= ejecta_masses[self.source]
-            if self.element:
-                #print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
-                #print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
+                if self.element:
 
-                if plot:
-                    plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Mannucci")
-
-                return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
+                    if plot:
+                        plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Mannucci")
+                    else:
+                        return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
 
         if model_version == 'maoz':
             #print("Used Maoz for Rates")
@@ -503,6 +500,7 @@ class feedback:
             a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
             r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
+            r_ia *= ejecta_masses[self.source]
             if self.element:
                 #print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
                 #print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
@@ -520,8 +518,10 @@ class feedback:
         if plot:
             plt.loglog(a_ia, r_ia, label = "Mannucci")
 
+        r_ia *= ejecta_masses[self.source]
         return r_ia, a_ia, transition_ages
 
+'''
     def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False, ageBins = None, ia_ver = 'mannucci'):
         elem = self.element
         ia_model = ia_ver
@@ -573,7 +573,8 @@ class feedback:
 
             i_cc = integrate.cumtrapz(r_cc, a_cc)
             return a_cc[1:], i_cc
-
+'''
+            
 class analysis:
     def __init__(self, 
     z = 0):

@@ -14,10 +14,17 @@ Unless otherwise noted, this package converts all quantities to (combinations of
     mass [M_sun]
     position [kpc comoving]
     distance, radius [kpc physical]
-    velocity [km / s]
     time [Gyr]
+    temperature [K]
     magnetic field [Gauss]
-    elemental abundance [(linear) mass fraction]
+    elemental abundance [linear mass fraction]
+
+with these special cases
+    velocity [km / s]
+    acceleration [km / s^2]
+    rates (star formation, cooling, accretion): [M_sun / yr]
+    metallicity (if converted from stored massfraction)
+        [log10(mass_fraction / mass_fraction_solar)], using Asplund et al 2009 for Solar
 
 ----------
 Reading a snapshot
@@ -61,18 +68,19 @@ All particle species have the following properties:
     'mass' : mass [M_sun]
     'potential' : potential (computed via all particles in the box) [km^2 / s^2 physical]
 
-Star and gas particles have 2 additional IDs:
-(because a gas particle splits if it gets too massive, and a star particle inherits these IDs)
+Star particles and gas cells have two additional IDs
+(because a gas cell splits if it gets too massive, and a star particle inherits these IDs):
     'id.child' : child ID
     'id.generation' : generation ID
-These 2 IDs are initialized to 0 for all gas particles.
-Each time a gas particle splits into 2, the 'self' particle retains id.child, while the other
-particle gets id.child += 2 ^ id.generation.
-Both particles then get id.generation += 1.
-Caveat: this allows a maximum of 30 generations, then its resets to 0.
-Thus, particles with id.generation > 30 are not unique anymore.
+Gizmo initializes id.child and id.generation to 0 for all gas cells.
+Each time a gas cell splits into two, one cell retains the same id.child,
+the other cell gets: id.child += 2 ^ id.generation.
+Both cells then get id.generation += 1.
+Because Gizmo stores id.child as a 32-bit int, this allows for a maximum of 30 generations,
+then id.child aliases back to 0.
+Thus, a particle with id.generation > 30 may not have a uniqe id.child.
 
-Star and gas particles also have:
+Star particle and gas cells also have:
     'massfraction' : fraction of the mass that is in different elemental abundances,
         stored as an array for each particle, with indexes as follows:
         0 = all metals (everything not H, He)
@@ -81,11 +89,11 @@ Star and gas particles also have:
 Star particles also have:
   'form.scalefactor' : expansion scale-factor when the star particle formed [0 to 1]
 
-Gas particles also have:
+Gas cells also have:
     'temperature' : [K]
     'density' : [M_sun / kpc^3]
     'size' : kernel (smoothing) length [kpc physical]
-    'electron.fraction' : free-electron number per proton, averaged over mass of gas particle
+    'electron.fraction' : free-electron number per proton, averaged over mass of gas cells
     'hydrogen.neutral.fraction' : fraction of hydrogen that is neutral (not ionized)
     'sfr' : instantaneous star formation rate [M_sun / yr]
     'magnetic.field' : 3-D vector of magnetic field [Gauss]
@@ -121,10 +129,10 @@ Some useful examples:
     part[species_name].prop('host.velocity.total') : total (scalar) velocity [km / s]
     part[species_name].prop('host.velocity.principal') :
         3-D velocity aligned with the galaxy principal (major, intermed, minor) axes [km / s]
-    part[species_name].prop('host.distance.principal.cylindrical') :
+    part[species_name].prop('host.velocity.principal.cylindrical') :
         same, but in cylindrical coordinates [km / s]:
             along the major axes v_R (signed)
-            along the azimuth v_phi )signed)
+            along the azimuth v_phi (signed)
             along the vertical wrt the disk v_Z (signed)
 
     part['star'].prop('form.time') : time of the Universe when star particle formed [Gyr]
@@ -195,10 +203,11 @@ class ParticleDictionaryClass(dict):
         self._element_index['rprocess3'] = 13
         self._element_index['rprocess4'] = 14
 
-        self.info = {}
-        self.snapshot = {}
-        self.Snapshot = None
-        self.Cosmology = None
+        self.info = {}  # meta-data about simulation and particle catalog
+        self.snapshot = {}  # information about current snapshot
+        self.Snapshot = None  # information about all snapshots
+        self.Cosmology = None  # information about cosmology and cosmological functions
+        # properties of host galaxy/halo[s]
         self.host = {'position': [], 'velocity': [], 'rotation': [], 'axis.ratios': []}
 
         # for gas
@@ -289,7 +298,7 @@ class ParticleDictionaryClass(dict):
                     prop_values = prop_values - self.prop(prop_name, indices)
 
             if prop_values.size == 1:
-                prop_values = np.float(prop_values)
+                prop_values = np.float64(prop_values)
 
             return prop_values
 
@@ -324,7 +333,8 @@ class ParticleDictionaryClass(dict):
             elif 'fire3' in fire_model:
                 metal_mass_fractions = self.prop('massfraction.iron', indices)
             values = self.MassLoss.get_mass_loss_from_spline(
-                self.prop('age', indices) * 1000, metal_mass_fractions=metal_mass_fractions,
+                self.prop('age', indices) * 1000,
+                metal_mass_fractions=metal_mass_fractions,
             )
 
             if 'mass.loss' in property_name:
@@ -341,7 +351,7 @@ class ParticleDictionaryClass(dict):
 
             return values
 
-        # mass of element
+        # mass of single element
         if 'mass.' in property_name:
             # mass from individual element
             values = self.prop('mass', indices, _dict_only=True) * self.prop(
@@ -368,7 +378,7 @@ class ParticleDictionaryClass(dict):
             values = (
                 self.prop('density', indices, _dict_only=True)
                 * ut.constant.proton_per_sun
-                * ut.constant.kpc_per_cm ** 3
+                * ut.constant.kpc_per_cm**3
             )
 
             if 'hydrogen' in property_name:
@@ -381,7 +391,7 @@ class ParticleDictionaryClass(dict):
             return values
 
         if 'size' in property_name:
-            # default size := inter-particle spacing = mass / density [kpc]
+            # default size := inter-particle spacing = (mass / density)^(1/3) [kpc]
             f = (np.pi / 3) ** (1 / 3) / 2  # 0.5077, converts from default size to full extent
 
             if 'size' in self:
@@ -418,59 +428,82 @@ class ParticleDictionaryClass(dict):
                 # convert to [pc^3]
                 values = values * 1e9
 
+        # free-fall time of gas cell := (3 pi / (32 G rho)) ^ 0.5
+        if 'time.freefall' in property_name:
+            values = self.prop('density', indices, _dict_only=True)  # [M_sun / kpc ^ 3]
+            values = (3 * np.pi / (32 * ut.constant.grav_kpc_msun_Gyr * values)) ** 0.5  # [Gyr]
+
+            return values
+
         if 'magnetic' in property_name and (
             'energy' in property_name or 'pressure' in property_name
         ):
-            # magnetic field: energy density = pressure = B^2 / (8 pi) [erg / cm^3]
+            # magnetic field: energy density = pressure = B^2 / (8 pi)
+            # convert from stored [Gauss] to [erg / cm^3]
             values = self.prop('magnetic.field', indices, _dict_only=True)
-            values = np.sum(values ** 2, 1) / (8 * np.pi)
+            values = np.sum(values**2, 1) / (8 * np.pi)
 
             if 'energy' in property_name and 'density' not in property_name:
                 # total energy in magnetic field [erg]
-                values = values * self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
+                values = values * self.prop('volume', indices) * ut.constant.cm_per_kpc**3
 
             return values
 
         if 'cosmicray.energy.density' in property_name:
-            # energy density in cosmic rays [erg / cm^3]
+            # energy density in cosmic rays [M_sun / kpc / Gyr^2]
             return self.prop('cosmicray.energy', indices, _dict_only=True) / (
-                self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
+                self.prop('volume', indices)
             )
 
-        # if 'photon.energy.density' in property_name:
-        #    return self.prop('cosmicray.energy', indices, _dict_only=True) / (
-        #        self.prop('volume', indices) * ut.constant.cm_per_kpc ** 3
-        #    )
+        if 'photon.energy.density' in property_name:
+            return self.prop('cosmicray.energy', indices, _dict_only=True) / (
+                self.prop('volume', indices)
+            )
 
-        # internal energy of the gas
-        # undo the conversion from internal energy -> temperature
-        if 'internal.energy' in property_name:
-            helium_mass_fracs = self.prop('massfraction.helium')
+        # mean molecular mass [g] or mass ratio [dimensionless]
+        if 'molecular.mass' in property_name:
+            helium_mass_fracs = self.prop('massfraction.helium', indices)
             ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
-            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
-            molecular_weights = mus * ut.constant.proton_mass
+            molecular_mass_ratios = (1 + 4 * ys_helium) / (
+                1 + ys_helium + self.prop('electron.fraction', indices, _dict_only=True)
+            )
+            values = molecular_mass_ratios
+
+            if property_name == 'molecular.mass.ratio':
+                pass
+            elif property_name == 'molecular.mass':
+                values *= ut.constant.proton_mass
+
+            return values
+
+        # internal energy of gas [cm^2 / s^2] - undo conversion to temperature
+        if 'internal.energy' in property_name:
+            molecular_masses = self.prop('molecular.mass', indices, _dict_only=True)
 
             values = self.prop('temperature') / (
-                ut.constant.centi_per_kilo ** 2
+                ut.constant.centi_per_kilo**2
                 * (self.adiabatic_index - 1)
-                * molecular_weights
+                * molecular_masses
                 / ut.constant.boltzmann
             )
 
             return values
 
-        if 'mu' in property_name or 'molecular_weight' in property_name:
-            helium_mass_fracs = self.prop('massfraction.helium')
-            ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
-            mus = (1 + 4 * ys_helium) / (1 + ys_helium + self.prop('electron.fraction'))
-            values = mus
-
-            if 'molecular_weight' in property_name:
-                values *= ut.constant.proton_mass
+        # sound speed [km / s], for simulations that do not store it
+        if 'sound.speed' in property_name:
+            values = (
+                np.sqrt(
+                    self.adiabatic_index
+                    * ut.constant.boltzmann
+                    * self.prop('temperature', indices, _dict_only=True)
+                    / ut.constant.proton_mass
+                )
+                * ut.constant.kilo_per_centi
+            )
 
             return values
 
-        # formation time or coordinates
+        # formation time [Gyr] or coordinates
         if (
             ('form.' in property_name or property_name == 'age')
             and 'host' not in property_name
@@ -511,10 +544,7 @@ class ParticleDictionaryClass(dict):
             or 'velocity' in property_name
             or 'acceleration' in property_name
         ):
-            if 'host.near.' in property_name:
-                host_name = 'host.near.'
-                host_index = 0
-            elif 'host.' in property_name or 'host1.' in property_name:
+            if 'host.' in property_name or 'host1.' in property_name:
                 host_name = 'host.'
                 host_index = 0
             elif 'host2.' in property_name:
@@ -595,7 +625,9 @@ class ParticleDictionaryClass(dict):
 
                 if '.rad' in property_name:
                     values = values[:, 0]
-                elif '.vert' in property_name:
+                elif '.azi' in property_name:
+                    values = values[:, 1]
+                elif '.ver' in property_name:
                     values = values[:, 2]
 
             # compute total (scalar) of distance
@@ -604,7 +636,7 @@ class ParticleDictionaryClass(dict):
                     shape_pos = 0
                 else:
                     shape_pos = 1
-                values = np.sqrt(np.sum(values ** 2, shape_pos))
+                values = np.sqrt(np.sum(values**2, shape_pos))
 
             return values
 
@@ -614,7 +646,7 @@ class ParticleDictionaryClass(dict):
             prop_name = property_name.replace('.total', '')
             try:
                 values = self.prop(prop_name, indices)
-                values = np.sqrt(np.sum(values ** 2, 1))
+                values = np.sqrt(np.sum(values**2, 1))
                 return values
             except ValueError:
                 pass
@@ -753,7 +785,7 @@ class ParticleDictionaryClass(dict):
             indices = np.where(pindices >= 0)[0]
             species[indices] = 'gas'
 
-            # deal with ids that do not have a matched index in gas particle catalog
+            # deal with ids that do not have a matched index in gas cell catalog
             # almost all should be stars, modulo any that do not exist at all in this catalog
             indices = np.where(pindices < 0)[0]
             pindices[indices] = self['star'].get_pointers_from_ids(ids[indices], child_ids[indices])
@@ -831,14 +863,12 @@ class ReadClass(ut.io.SayClass):
     Read Gizmo snapshot[s].
     '''
 
-    def __init__(self, snapshot_name_base=gizmo_default.snapshot_name_base, verbose=True):
+    def __init__(self, verbose=True):
         '''
         Set properties for snapshot files.
 
         Parameters
         ----------
-        snapshot_name_base : str
-            name base of snapshot files/directories
         verbose : bool
             whether to print diagnostics
         '''
@@ -846,11 +876,10 @@ class ReadClass(ut.io.SayClass):
         # use only to convert between gas specific internal energy and temperature
         self.gas_adiabatic_index = 5 / 3
 
-        # this format avoids accidentally reading text file that contains snapshot indices
-        self._snapshot_name_base = snapshot_name_base
-        if '*' not in self._snapshot_name_base:
-            self._snapshot_name_base += '*'
-        self._file_extension = '.hdf5'
+        # name base of snapshot files/directories, to use in glob to find all files/directories
+        # safely skip files ending in '.txt' or '.ewah'
+        self._snapshot_name_base = 'snap*[!.txt!.ewah]'
+        self._snapshot_file_extension = '.hdf5'
 
         # create ordered dictionary to convert particle species name to its id,
         # set all possible species, and set the order in which to read species
@@ -870,13 +899,13 @@ class ReadClass(ut.io.SayClass):
         self,
         species='all',
         snapshot_value_kind='redshift',
-        snapshot_values=gizmo_default.snapshot_redshift,
+        snapshot_values=0,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
         simulation_name='',
         properties='all',
-        elements='all',
+        elements=None,
         particle_subsample_factor=None,
         separate_dark_lowres=False,
         sort_dark_by_id=False,
@@ -943,7 +972,7 @@ class ReadClass(ut.io.SayClass):
                 if a baryonic simulation (or input species_name='star'), try 'track' then 'mass'
                 if a DM-only simulations (or input species_name='dark'), try 'halo' then 'mass'
         assign_hosts_rotation : bool
-            whether to assign principal axes ratios and rotation tensor of each host galaxy/halo
+            whether to assign principal axes rotation tensor of each host galaxy
         assign_orbits : bool
             whether to assign orbital properties wrt each host galaxy/halo
         assign_formation_coordinates : bool
@@ -1107,7 +1136,7 @@ class ReadClass(ut.io.SayClass):
                     self.assign_hosts_rotation(part)
 
             if assign_pointers:
-                # assign star and gas particle pointers from z = 0 to this snapshot
+                # assign star particle and gas cell pointers from z = 0 to this snapshot
                 ParticlePointer = gizmo_track.ParticlePointerClass(
                     simulation_directory=simulation_directory, track_directory=track_directory
                 )
@@ -1132,7 +1161,7 @@ class ReadClass(ut.io.SayClass):
         self,
         species='all',
         snapshot_value_kind='redshift',
-        snapshot_value=gizmo_default.snapshot_redshift,
+        snapshot_value=0,
         simulation_directories=[],
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
@@ -1295,8 +1324,8 @@ class ReadClass(ut.io.SayClass):
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        snapshot_value_kind='index',
-        snapshot_value=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_value=0,
         simulation_name='',
         snapshot_block_index=0,
         verbose=True,
@@ -1518,10 +1547,10 @@ class ReadClass(ut.io.SayClass):
         self,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        snapshot_value_kind='index',
-        snapshot_value=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_value=0,
         properties='all',
-        elements='all',
+        elements=None,
         convert_float32=False,
         header=None,
     ):
@@ -1557,39 +1586,37 @@ class ReadClass(ut.io.SayClass):
         property_dict = {
             # all particles ----------
             'ParticleIDs': 'id',  # indexing starts at 0
-            'Coordinates': 'position',
-            'Velocities': 'velocity',
-            'Masses': 'mass',
-            'Potential': 'potential',
+            'Coordinates': 'position',  # [kpc comoving]
+            'Velocities': 'velocity',  # [km / s physical]
+            'Masses': 'mass',  # [M_sun]
+            'Potential': 'potential',  # [km^2 / s^2 physical]
             # grav acceleration for dark matter and stars, grav + hydro acceleration for gas
-            'Acceleration': 'acceleration',
+            'Acceleration': 'acceleration',  # [km / s^2 physical]
             # particles with adaptive smoothing
-            #'AGS-Softening': 'kernel.length',  # for gas, this is same as SmoothingLength
-            # gas particles ----------
-            'InternalEnergy': 'temperature',
-            'Density': 'density',
-            'Pressure': 'pressure',
-            'SoundSpeed': 'sound.speed',
-            'SmoothingLength': 'size',  # size of kernel (smoothing) length
-            # average free-electron number per proton, averaged over mass of gas particle
-            'ElectronAbundance': 'electron.fraction',
+            #'AGS-Softening': 'kernel.length',  # [kpc] (same as SmoothingLength)
+            # gas ----------
+            'InternalEnergy': 'temperature',  # [K] (converted from stored internal energy)
+            'Density': 'density',  # [M_sun / kpc^3]
+            'Pressure': 'pressure',  # [M_sun / kpc / Gyr^2]
+            'SoundSpeed': 'sound.speed',  # [km / s]
+            'SmoothingLength': 'size',  # size/radius of kernel (smoothing) length [kpc physical]
+            'ElectronAbundance': 'electron.fraction',  # average number of free electrons per proton
             # fraction of hydrogen that is neutral (not ionized)
             'NeutralHydrogenAbundance': 'hydrogen.neutral.fraction',
-            'MolecularMassFraction': 'molecule.fraction',  # molecular mass fraction
-            'CoolingRate': 'cool.rate',  #
+            'MolecularMassFraction': 'molecule.fraction',  # fraction of mass that is molecular
+            'CoolingRate': 'cool.rate',  # [M_sun / yr]
             'StarFormationRate': 'sfr',  # [M_sun / yr]
             'MagneticField': 'magnetic.field',  # 3-D magnetic field [Gauss]
             # divergence of magnetic field (for testing)
-            #'DivergenceOfMagneticField': 'magnetic.field.div',
+            #'DivergenceOfMśgneticField': 'magnetic.field.div',
             #'DivBcleaningFunctionGradPhi': 'magnetic.field.clean.func.grad.phi', # 3-D
             #'DivBcleaningFunctionPhi': 'magnetic.field.clean.func.phi', # 1-D
-            # N_frequencies-D array, total energy of radiation in each frequency bin [erg]
+            # energy of radiation in each frequency bin [M_sun kpc^2 / Gyr^2]
             'PhotonEnergy': 'photon.energy',
-            'CosmicRayEnergy': 'cosmicray.energy',  # energy of cosmic rays [erg]
-            #'SoundSpeed': 'sound.speed',
-            # star/gas particles ----------
-            # id.generation and id.child initialized to 0 for all gas particles
-            # each time a gas particle splits into two:
+            'CosmicRayEnergy': 'cosmicray.energy',  # energy of cosmic rays [M_sun kpc^2 / Gyr^2]
+            # star/gas ----------
+            # id.generation and id.child initialized to 0 for all gas cells
+            # each time a gas cell splits into two:
             #   'self' particle retains id.child, other particle gets id.child += 2 ^ id.generation
             #   both particles get id.generation += 1
             # allows maximum of 30 generations, then restarts at 0
@@ -1599,18 +1626,18 @@ class ReadClass(ut.io.SayClass):
             # mass fraction of individual elements ----------
             # 0 = all metals (everything not H, He)
             # 1 = He, 2 = C, 3 = N, 4 = O, 5 = Ne, 6 = Mg, 7 = Si, 8 = S, 9 = Ca, 10 = Fe
-            #
-            'Metallicity': 'massfraction',
-            # star particles ----------
+            'Metallicity': 'massfraction',  # linear mass fraction
+            # stars ----------
             # 'time' when star particle formed
             # for cosmological runs, = scale-factor; for non-cosmological runs, = time [Gyr/h]
             'StellarFormationTime': 'form.scalefactor',
-            # black hole particles ----------
-            'BH_Mass': 'blackhole.mass',
-            'BH_Mdot': 'blackhole.accretion.rate',
-            'BH_Mass_AlphaDisk': 'blackhole.disk.mass',
-            'BH_AccretionLength': 'blackhole.accretion.length',
-            'BH_NProgs': 'blackhole.prog.number',
+            # black holes ----------
+            'BH_Mass': 'mass.bh',  # mass of black hole (not including disk) [M_sun]
+            'BH_Mass_AlphaDisk': 'mass.disk',  # mass of accretion disk [M_sun]
+            'BH_Mdot': 'accretion.rate',  # instantaneous accretion rate [M_sun / yr]
+            'BH_AccretionLength': 'size',  # size/radius of accretion kernel [kpc physical]
+            'BH_Specific_AngMom': 'specific.angular.momentum',
+            'BH_NProgs': 'merge.number',  # number of BHs that merged into this one (0 if none)
         }
 
         # dictionary class to store properties for particle species
@@ -1645,6 +1672,9 @@ class ReadClass(ut.io.SayClass):
         if properties in ['all', ['all'], None, []]:
             # read all properties (that are un-commented) in property_dict
             properties = list(property_dict.keys())
+        elif properties in ['subset', ['subset']]:
+            # read default sub-set of properties, should be enough for most analysis
+            properties = ['mass', 'position', 'massfraction', 'form.scalefactor']
         else:
             if np.isscalar(properties):
                 properties = [properties]  # ensure is list
@@ -1664,9 +1694,13 @@ class ReadClass(ut.io.SayClass):
             del properties_temp
 
         if 'InternalEnergy' in properties:
-            # need Helium abundance and electron fraction to compute temperature
+            # to compute temperature from InternalEnergy, need He abundance and electron fraction
             for prop_name in np.setdiff1d(['ElectronAbundance', 'Metallicity'], properties):
                 properties.append(prop_name)
+                if prop_name == 'Metallicity' and elements is None:
+                    # user asked to read temperature but not elemental abundances,
+                    # so assume that they just need He for computing temperature
+                    elements = ['helium']
 
         # parse input list of elemental abundances to read
         if elements in ['all', ['all'], []]:
@@ -1674,6 +1708,16 @@ class ReadClass(ut.io.SayClass):
         if elements is not None:
             if np.isscalar(elements):
                 elements = [elements]  # ensure is list
+            # ensure reading specific elements for specific properties
+            if 'InternalEnergy' in properties and 'he' not in elements and 'helium' not in elements:
+                # need Helium to compute temperature from internal energy
+                elements.append('helium')
+            if 'hydrogen' in elements or 'h' in elements:
+                # simulation does not store H directly - infer it by subtracting helium and metals
+                elements.remove('h')
+                elements.remove('hydrogen')
+                elements.append('helium')
+                elements.append('metals')
             # make safe list of elements to read
             elements = [str.lower(element_name) for element_name in elements]
             for element_name in elements:
@@ -1681,7 +1725,8 @@ class ReadClass(ut.io.SayClass):
         # all subsequent calls to this element dictionary should be via each species' dictionary
         del part._element_index
 
-        self.say(f'* reading species: {self._species_read}')
+        self.say('* reading the following')
+        self.say(f'species: {self._species_read}')
 
         # open snapshot file
         with h5py.File(path_file_name, 'r') as file_read:
@@ -1757,14 +1802,6 @@ class ReadClass(ut.io.SayClass):
 
                     if elements is not None:
                         # re-set element dictionary pointers if reading a subset of elements
-                        # need to read Helium abundance if calculating temperature
-                        if (
-                            'InternalEnergy' in properties
-                            and 'he' not in elements
-                            and 'helium' not in elements
-                        ):
-                            elements.append('helium')
-
                         element_indices_keep = []  # indices of elements to keep
                         for element_name in elements:
                             element_indices_keep.append(
@@ -1831,8 +1868,6 @@ class ReadClass(ut.io.SayClass):
                         prop_read_dtype = part_read[prop_read_name].dtype
                         if convert_float32 and prop_read_dtype == 'float64':
                             prop_read_dtype = np.float32
-                        # elif prop == 'mass':
-                        #    prop_read_dtype = np.float64  # added by Kareem (and ported by SGK)
 
                         # initialize to -1's
                         part[spec_name][prop_name] = np.zeros(prop_shape, prop_read_dtype) - 1
@@ -1849,7 +1884,7 @@ class ReadClass(ut.io.SayClass):
                 if len(properties_to_print) != len(part_read.keys()):
                     # read only a sub-set of properties in snapshot
                     properties_to_print.sort()
-                    self.say(f'* reading {spec_name} properties: {properties_to_print}')
+                    self.say(f'{spec_name} properties: {properties_to_print}')
 
                 # special case: particle mass is fixed and given in mass array in header
                 if 'Masses' in properties and 'Masses' not in part_read:
@@ -1859,6 +1894,12 @@ class ReadClass(ut.io.SayClass):
                 if file_read_i is not None:
                     # close, if had to open another snapshot file to find particles of this species
                     file_read_i.close()
+
+        if elements is not None:
+            # read only a sub-set of elemental abundances
+            self.say(f'elemental abundances: {elements}')
+
+        self.say('')
 
         # read properties for each species ----------
         # initialize particle indices to assign to each species from each file
@@ -1990,6 +2031,10 @@ class ReadClass(ut.io.SayClass):
             print()
 
         # apply unit conversions
+        mass_conversion = 1e10 / header['hubble']  # multiple by this for [M_sun]
+        length_conversion = header['scalefactor'] / header['hubble']  # multiply for [kpc physical]
+        time_conversion = 1 / header['hubble']  # multiply by this for [Gyr]
+
         for spec_name in part:
 
             if 'position' in part[spec_name]:
@@ -2005,76 +2050,84 @@ class ReadClass(ut.io.SayClass):
                 # consistent with v^2 / r at z = 0.5
                 part[spec_name]['acceleration'] *= header['hubble']
 
-            if 'mass' in part[spec_name]:
-                # convert to [M_sun]
-                part[spec_name]['mass'] *= 1e10 / header['hubble']
+            for prop_name in ['mass', 'mass.bh', 'mass.disk']:
+                if prop_name in part[spec_name]:
+                    # convert to [M_sun]
+                    part[spec_name][prop_name] *= mass_conversion
 
-            if 'massfraction' in part[spec_name] and part[spec_name].info['has.agetracer']:
+            if 'accretion.rate' in part[spec_name]:
+                # convert to [M_sun / yr]
+                part[spec_name][prop_name] *= mass_conversion / time_conversion
+
+            if (
+                'massfraction' in part[spec_name]
+                and 'ElementAgeTracer' in part[spec_name].__dict__
+                and part[spec_name].ElementAgeTracer is not None
+            ):
                 # convert the age-tracer mass weights into dimensionless units of:
                 # mass fraction (relative to my own mass) of winds/ejecta deposited into me
-                # (as a gas particle) during each age-tracer age bin
+                # (as a gas cell) during each age-tracer age bin
                 # age-tracer weight value of 1 therefore means that a particle received
                 # winds/ejecta from its own mass of stars across the entire age bin
                 agetracer_index_start = part[spec_name].ElementAgeTracer['element.index.start']
-                part[spec_name]['massfraction'][:, agetracer_index_start:] *= (
-                    header['hubble'] / 1e10
-                )
-
-            if 'blackhole.mass' in part[spec_name]:
-                # convert to [M_sun]
-                part[spec_name]['blackhole.mass'] *= 1e10 / header['hubble']
-
-            if 'cosmicray.energy' in part[spec_name]:
-                # convert to [erg]
-                part[spec_name]['cosmicray.energy'] /= header['hubble']
-
-            if 'photon.energy' in part[spec_name]:
-                # convert to [erg]
-                part[spec_name]['photon.energy'] /= header['hubble']
-
-            if 'potential' in part[spec_name]:
-                # convert to [km^2 / s^2 physical]
-                # TO DO: check if Gizmo writes potential as m / r, in raw units?
-                # might need to add:
-                # M *= 1e10 / header['hubble'] to get Msun
-                # r /= header['hubble'] to get kpc physical
-                # G conversion?
-                part[spec_name]['potential'] /= header['scalefactor']
-
-            if 'density' in part[spec_name]:
-                # convert to [M_sun / kpc^3 physical]
-                part[spec_name]['density'] *= (
-                    1e10 / header['hubble'] / (header['scalefactor'] / header['hubble']) ** 3
-                )
+                part[spec_name]['massfraction'][:, agetracer_index_start:] /= mass_conversion
 
             if 'size' in part[spec_name]:
                 # convert to [kpc physical]
-                part[spec_name]['size'] *= header['scalefactor'] / header['hubble']
-                # to convert to mean interparticle spacing = volume^(1/3): *= (pi/3)^(1/3) / 2 ~ 1/2
-                part[spec_name]['size'] *= (np.pi / 3) ** (1 / 3) / 2
-                # to convert to 1-sigma length of a Gaussian: *= 0.50118 ~ 1/2 (for cubic spline)
+                part[spec_name]['size'] *= length_conversion
+                # size in snapshot is full extent of the kernal (radius of compact support)
+                # convert to mean interparticle spacing = volume^(1/3)
+                part[spec_name]['size'] *= (np.pi / 3) ** (1 / 3) / 2  # 0.5077
+                # convert to 1-sigma length of a Gaussian (assuming cubic spline)
                 # part[spec_name]['size'] *= 0.50118
-                # to convert to plummer softening: *= 1/2.8 (for cubic spline)
+                # convert to plummer softening (assuming cubic spline)
                 # part[spec_name]['size'] /= 2.8
 
             if 'form.scalefactor' in part[spec_name]:
                 if not header['cosmological']:
-                    part[spec_name]['form.scalefactor'] /= header['hubble']  # convert to [Gyr]
+                    part[spec_name]['form.scalefactor'] *= time_conversion  # convert to [Gyr]
+
+            if 'potential' in part[spec_name]:
+                # convert to [km^2 / s^2 physical]
+                # verified that |a_r| = v_circ^2 / r = GM(<r)/r^2 = d/dr(phi) across redshift
+                part[spec_name]['potential'] /= header['scalefactor']
+
+            if 'density' in part[spec_name]:
+                # convert to [M_sun / kpc^3 physical]
+                part[spec_name]['density'] *= mass_conversion / length_conversion**3
+
+            if 'pressure' in part[spec_name]:
+                # convert to [M_sun / kpc / Gyr^2]
+                part[spec_name]['pressure'] *= (
+                    mass_conversion / length_conversion / time_conversion**2
+                )
 
             if 'temperature' in part[spec_name]:
-                # convert from [(km / s) ^ 2] to [Kelvin]
+                # convert from [km^2 / s^2] to [Kelvin]
                 # ignore small corrections from elements beyond He
-                helium_mass_fracs = part[spec_name]['massfraction'][:, 1]
+                helium_mass_fracs = part[spec_name].prop('massfraction.helium')
                 ys_helium = helium_mass_fracs / (4 * (1 - helium_mass_fracs))
                 mus = (1 + 4 * ys_helium) / (1 + ys_helium + part[spec_name]['electron.fraction'])
                 molecular_weights = mus * ut.constant.proton_mass
                 part[spec_name]['temperature'] *= (
-                    ut.constant.centi_per_kilo ** 2
+                    ut.constant.centi_per_kilo**2
                     * (part[spec_name].adiabatic_index - 1)
                     * molecular_weights
                     / ut.constant.boltzmann
                 )
                 del (helium_mass_fracs, ys_helium, mus, molecular_weights)
+
+            if 'cosmicray.energy' in part[spec_name]:
+                # convert to [M_sun kpc^2 / Gyr^2]
+                part[spec_name]['cosmicray.energy'] *= (
+                    mass_conversion * length_conversion**2 / time_conversion**2
+                )
+
+            if 'photon.energy' in part[spec_name]:
+                # convert to [M_sun kpc^2 / Gyr^2]
+                part[spec_name]['photon.energy'] *= (
+                    mass_conversion * length_conversion**2 / time_conversion**2
+                )
 
         # renormalize so potential max = 0
         renormalize_potential = False
@@ -2154,10 +2207,16 @@ class ReadClass(ut.io.SayClass):
 
         path_file_names = path_file_names[np.where(file_indices == snapshot_index)[0][0]]
 
-        if self._file_extension not in path_file_names and isinstance(snapshot_block_index, int):
+        if self._snapshot_file_extension not in path_file_names:
             # got snapshot directory with multiple files
             # get file name with snapshot_block_index in name
-            path_file_names = ut.io.get_file_names(path_file_names + '/' + self._snapshot_name_base)
+            path_file_names = ut.io.get_file_names(
+                path_file_names
+                + '/'
+                + self._snapshot_name_base
+                + '*'
+                + self._snapshot_file_extension
+            )
             path_file_block_name = None
 
             if len(path_file_names) > 0:
@@ -2421,7 +2480,7 @@ class ReadClass(ut.io.SayClass):
         if method in ['track', 'halo']:
             try:
                 if method == 'track':
-                    # read coordinates of each host across all snapshots
+                    # read coordinates and rotation tensor of each host across all snapshots
                     ParticleCoordinate = gizmo_track.ParticleCoordinateClass()
                     ParticleCoordinate.io_hosts_coordinates(
                         part,
@@ -2484,6 +2543,7 @@ class ReadClass(ut.io.SayClass):
     ):
         '''
         Utility function for assign_hosts_coordinates().
+        Compute and assign host galaxy positions and velocities from the particles.
         '''
         if (
             species_name not in part
@@ -2540,6 +2600,7 @@ class ReadClass(ut.io.SayClass):
     ):
         '''
         Utility function for assign_hosts_coordinates().
+        Read and assign host halo positions and velocities from the halo catalog at that snapshot.
         '''
         from halo_analysis import halo_io
 
@@ -2571,18 +2632,19 @@ class ReadClass(ut.io.SayClass):
                 print(') [km / s]')
 
     def assign_hosts_rotation(
-        self, part, species_name='star', distance_max=10, mass_percent=90, age_percent=25
+        self, part, species_name='', distance_max=10, mass_percent=90, age_percent=25
     ):
         '''
-        Assign rotation tensors and axis ratios of principal axes (defined via the moment of
-        inertia tensor) of each host galaxy/halo, using stars for baryonic simulations.
+        Compute and assign rotation tensor and ratios of principal axes
+        (defined via the moment of inertia tensor) for each host galaxy.
+        By default, use stars for baryonic simulations, or if no stars in catalog, use gas.
 
         Parameters
         ----------
         part : dictionary class
             catalog of particles at snapshot
         species_name : string
-            name of particle species to use to determine
+            name of particle species to use to determine rotation
         distance_max : float
             maximum distance to select particles [kpc physical]
         mass_percent : float
@@ -2591,6 +2653,13 @@ class ReadClass(ut.io.SayClass):
         age_percent : float
             keep youngest age_percent of (star) particles within distance cut
         '''
+        if not species_name:
+            if 'star' in part:
+                species_name = 'star'
+            elif 'gas' in part:
+                species_name = 'gas'
+        assert species_name in ['star', 'gas', 'dark']
+
         principal_axes = ut.particle.get_principal_axes(
             part,
             species_name,
@@ -2598,6 +2667,7 @@ class ReadClass(ut.io.SayClass):
             mass_percent,
             age_percent,
             center_positions=part.host['position'],
+            center_velocities=part.host['velocity'],
             return_single_array=False,
             verbose=True,
         )

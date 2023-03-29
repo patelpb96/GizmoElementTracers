@@ -270,7 +270,7 @@ class InitialConditionClass(ut.io.SayClass):
             Write.write('  mass = {:.2e} M_sun'.format(mass_ini_chull))
             Write.write(
                 '  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_chull * ut.constant.mega_per_kilo ** 3
+                    volume_ini_chull * ut.constant.mega_per_kilo**3
                 )
             )
 
@@ -278,7 +278,7 @@ class InitialConditionClass(ut.io.SayClass):
             Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cuboid))
             Write.write(
                 '  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_cuboid * ut.constant.mega_per_kilo ** 3
+                    volume_ini_cuboid * ut.constant.mega_per_kilo**3
                 )
             )
 
@@ -286,7 +286,7 @@ class InitialConditionClass(ut.io.SayClass):
             Write.write('  mass = {:.2e} M_sun'.format(mass_ini_cube))
             Write.write(
                 '  volume = {:.1f} Mpc^3 comoving'.format(
-                    volume_ini_cube * ut.constant.mega_per_kilo ** 3
+                    volume_ini_cube * ut.constant.mega_per_kilo**3
                 )
             )
 

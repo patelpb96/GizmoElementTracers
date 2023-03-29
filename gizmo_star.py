@@ -2,8 +2,8 @@
 Contains the models for stellar evolution as implemented in Gizmo for the FIRE-2 and FIRE-3 models,
 specifically, nucleosynthetic yields and mass-loss rates for
     (1) stellar winds
-    (2) core-collapse supernovae
-    (3) Ia supernovae
+    (2) core-collapse (II) supernovae
+    (3) white-dwarf (Ia) supernovae
 
 The following nucleosynthetic yields and mass-loss rates depend on progenitor metallicity
     FIRE-2
@@ -140,7 +140,7 @@ class NucleosyntheticYieldClass(dict):
         model : str
             stellar evolution model for yields: 'fire2', 'fire3'
         '''
-        self._event_kinds = ['wind', 'supernova.cc', 'supernova.ia']
+        self._event_kinds = ['wind', 'supernova.cc', 'supernova.wd', 'supernova.ia']
         self._models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self.model = None
         self.sun_massfraction = None
@@ -189,13 +189,13 @@ class NucleosyntheticYieldClass(dict):
 
         For stellar winds, FIRE-2 and FIRE-3 add the existing surface abundances from the progenitor
         to the injected yield for elements not included in its yield.
-        For supernovae (core-collapse and Ia), FIRE-2 and FIRE-3 do not add any existing surface
-        abundances from the progenitor to the yield.
+        For supernovae (core-collapse and white-dwarf)), FIRE-2 and FIRE-3 do not add any existing
+        surface abundances from the progenitor to the yield.
 
         Parameters
         ----------
         event_kind : str
-            stellar event: 'wind', 'supernova.cc' or 'supernova.ii', 'supernova.ia'
+            stellar event: 'wind', 'supernova.cc', 'supernova.wd' or 'supernova.ia'
         progenitor_metallicity : float
             total metallicity of progenitor [linear mass fraction wrt sun_mass_fraction['metals']]
         progenitor_massfraction_dict : dict or bool [optional]
@@ -222,7 +222,7 @@ class NucleosyntheticYieldClass(dict):
             element_yield[element_name] = 0.0
 
         event_kind = event_kind.lower()
-        assert event_kind in ['wind', 'supernova.cc', 'supernova.ii', 'supernova.ia']
+        assert event_kind in ['wind', 'supernova.cc', 'supernova.wd', 'supernova.ia']
 
         self._parse_model(model)
 
@@ -318,7 +318,7 @@ class NucleosyntheticYieldClass(dict):
                 t3 = 50
                 t4 = 1900
                 t5 = 14000
-                y1 = 0.2 * max(1e-4, min(Z_CNO_0 ** 2, 0.9))
+                y1 = 0.2 * max(1e-4, min(Z_CNO_0**2, 0.9))
                 y2 = 0.68 * min((Z_CNO_0 + 1e-3) ** 0.1, 0.9)
                 y3 = 0.4
                 y4 = 0.23
@@ -372,11 +372,12 @@ class NucleosyntheticYieldClass(dict):
                 element_yield['carbon'] += y_H_to_C + y_He_to_C
 
             # sum total metal mass (not including H or He)
+            element_yield['metals'] = 0
             for k in element_yield:
-                if k != 'helium':
+                if k not in ['hydrogen', 'helium', 'metals']:
                     element_yield['metals'] += element_yield[k]
 
-        elif event_kind in ['supernova.cc' or 'supernova.ii']:
+        elif event_kind == 'supernova.cc':
             if 'fire2' in self.model:
                 # FIRE-2: stellar_evolution.c line ~504
                 # yields from Nomoto et al 2006, IMF averaged
@@ -384,7 +385,7 @@ class NucleosyntheticYieldClass(dict):
                 # Si: 8.89e-3, S: 3.78e-3, Ca: 4.36e-4, Fe: 7.06e-3]
                 ejecta_mass = 10.5  # [M_sun]
                 # below are mass fractions
-                element_yield['metals'] = 0.19
+                element_yield['metals'] = 0.195926
                 element_yield['helium'] = 0.369
                 element_yield['carbon'] = 0.0127
                 element_yield['nitrogen'] = 0.00456
@@ -398,7 +399,7 @@ class NucleosyntheticYieldClass(dict):
                 element_yield['iron'] = 0.00706
 
                 if model == 'fire2':
-                    yield_nitrogen_orig = np.float(element_yield['nitrogen'])
+                    yield_nitrogen_orig = np.float64(element_yield['nitrogen'])
 
                     # nitrogen yield increases linearly with progenitor metallicity @ Z/Z_sun < 1.65
                     if progenitor_massfraction_dict['metals'] < 0.033:
@@ -423,23 +424,25 @@ class NucleosyntheticYieldClass(dict):
                 # of this early phase, stars with ZAMS mass ~30+ Msun here. curve flattens both from
                 # IMF but also b/c mass-loss less efficient. tmax = 44 Myr to the last explosion
                 # determined by lifetime of stars at 8 Msun
-                cc_age_min = 3.7
-                cc_age_brk = 7
-                cc_age_max = 44
-                cc_mass_max = 35
-                cc_mass_brk = 10
-                cc_mass_min = 6
+                sncc_age_min = 3.7
+                sncc_age_break = 7
+                sncc_age_max = 44
+                sncc_mass_max = 35
+                sncc_mass_break = 10
+                sncc_mass_min = 6
                 # power-law interpolation of ejecta mass
-                if age <= cc_age_brk:
-                    ejecta_mass = cc_mass_max * (age / cc_age_min) ** (
-                        np.log(cc_mass_brk / cc_mass_max) / np.log(cc_age_brk / cc_age_min)
+                if age <= sncc_age_break:
+                    ejecta_mass = sncc_mass_max * (age / sncc_age_min) ** (
+                        np.log(sncc_mass_break / sncc_mass_max)
+                        / np.log(sncc_age_break / sncc_age_min)
                     )
                 else:
-                    ejecta_mass = cc_mass_brk * (age / cc_age_brk) ** (
-                        np.log(cc_mass_min / cc_mass_brk) / np.log(cc_age_max / cc_age_brk)
+                    ejecta_mass = sncc_mass_break * (age / sncc_age_break) ** (
+                        np.log(sncc_mass_min / sncc_mass_break)
+                        / np.log(sncc_age_max / sncc_age_break)
                     )
-                cc_ages = np.array([3.7, 8, 18, 30, 44])  # [Myr]
-                cc_yields_v_age = {
+                sncc_ages = np.array([3.7, 8, 18, 30, 44])  # [Myr]
+                sncc_yields_v_age = {
                     # He [IMF-mean y = 3.67e-1]
                     # have to remove normal solar correction and take care with winds
                     'helium': [4.61e-01, 3.30e-01, 3.58e-01, 3.65e-01, 3.59e-01],
@@ -462,11 +465,11 @@ class NucleosyntheticYieldClass(dict):
                     # Si [IMF-mean y = 4.53e-3]
                     # lots comes from 1a's, so low here is not an issue
                     'silicon': [4.12e-04, 7.69e-03, 8.73e-03, 2.23e-03, 1.18e-03],
-                    # S [IMF-mean y=3.01e-3] - more from Ia's
+                    # S [IMF-mean y=3.01e-3] - more from SNWDs
                     'sulfur': [3.63e-04, 5.61e-03, 5.49e-03, 1.26e-03, 5.75e-04],
-                    # Ca [IMF-mean y = 2.77e-4] - Ia
+                    # Ca [IMF-mean y = 2.77e-4] - SNWD
                     'calcium': [4.28e-05, 3.21e-04, 6.00e-04, 1.84e-04, 9.64e-05],
-                    # Fe [IMF-mean y = 4.11e-3] - Ia
+                    # Fe [IMF-mean y = 4.11e-3] - SNWD
                     'iron': [5.46e-04, 2.18e-03, 1.08e-02, 4.57e-03, 1.83e-03],
                 }
 
@@ -482,20 +485,20 @@ class NucleosyntheticYieldClass(dict):
                 #     else {yields[i_y] = fvec[k][i_t] * pow(t_myr/tvec[i_t] ,
                 #         log(fvec[k][i_t+1]/fvec[k][i_t]) / log(tvec[i_t+1]/tvec[i_t]));}}
 
-                ti = np.digitize(age, cc_ages, right=True) - 1
+                ti = np.digitize(age, sncc_ages, right=True) - 1
 
-                for element_name in cc_yields_v_age:
-                    sncc_yield_v_age = cc_yields_v_age[element_name]
+                for element_name in sncc_yields_v_age:
+                    sncc_yield_v_age = sncc_yields_v_age[element_name]
                     if ti < 0:
                         element_yield[element_name] = sncc_yield_v_age[0]
-                    elif ti >= cc_ages.size - 1:
+                    elif ti >= sncc_ages.size - 1:
                         element_yield[element_name] = sncc_yield_v_age[-1]
                     else:
                         element_yield[element_name] = sncc_yield_v_age[ti] * (
-                            age / cc_ages[ti]
+                            age / sncc_ages[ti]
                         ) ** (
                             np.log(sncc_yield_v_age[ti + 1] / sncc_yield_v_age[ti])
-                            / np.log(cc_ages[ti + 1] / cc_ages[ti])
+                            / np.log(sncc_ages[ti + 1] / sncc_ages[ti])
                         )
 
                 # sum heavy element yields to get the total metal yield, multiplying by a small
@@ -503,12 +506,12 @@ class NucleosyntheticYieldClass(dict):
                 # [mean for CC]
                 element_yield['metals'] = 0
                 for element_name in element_yield:
-                    if element_name not in ['metals', 'helium']:
+                    if element_name not in ['hydrogen', 'helium', 'metals']:
                         # assume some trace species proportional to each species,
                         # not correct in detail, but a tiny correction, so negligible
                         element_yield['metals'] += 1.0144 * element_yield[element_name]
 
-        elif event_kind == 'supernova.ia':
+        elif event_kind in ['supernova.wd', 'supernova.ia']:
             ejecta_mass = 1.4  # [M_sun]
 
             if 'fire2' in self.model:
@@ -559,7 +562,7 @@ class NucleosyntheticYieldClass(dict):
                 # 5.04357143e-02, 1.35621429e-03, 5.10112857e-03, 1.65785714e-01, 9.57078571e-02,
                 # 1.76928571e-02, 5.47890000e-01] -- absolute yield in solar
                 # updated W7 in Leung + Nomoto et al 2018 - seems bit low in Ca/Fe,
-                # less plausible if those dominated by Ia's
+                # less plausible if those dominated by SNWDs
                 # yields[2]=1.31e-2; yields[3]=7.59e-10; yields[4]=9.29e-2; yields[5]=1.79e-3;
                 # yields[6]=2.82e-3; yields[7]=1.06e-1; yields[8]=5.30e-2; yields[9]=6.27e-3;
                 # yields[10]=5.77e-1
@@ -601,6 +604,7 @@ class NucleosyntheticYieldClass(dict):
                     element_yield[element_name] = np.clip(element_yield[element_name], 0, 1)
 
         if return_mass:
+            print("EJECTA MASS BEING MULTIPLIED TWICE POTENTIALLY ")
             # convert to yield masses [M_sun]
             for element_name in element_yield:
                 element_yield[element_name] *= ejecta_mass
@@ -631,7 +635,10 @@ class NucleosyntheticYieldClass(dict):
         # store yields as mass fraction wrt total ejecta/wind mass
         for event_kind in self._event_kinds:
             self[event_kind] = self.get_element_yields(
-                event_kind, progenitor_metallicity, progenitor_massfraction_dict, age=age,
+                event_kind,
+                progenitor_metallicity,
+                progenitor_massfraction_dict,
+                age=age,
             )
 
 
@@ -791,26 +798,20 @@ class StellarWindClass:
                 )
 
         elif 'fire3' in self.model:
-            # FIRE-3: stellar_evolution.c line ~354
+            # FIRE-3: stellar_evolution.c line ~402
             # separates the more robust line-driven winds [massive-star-dominated] component,
             # and -very- uncertain AGB. extremely good fits to updated STARBURST99 result for a
             # 3-part Kroupa IMF (0.3,1.3,2.3 slope, 0.01-0.08-0.5-100 Msun, 8-120 SNe/BH cutoff,
             # wind model evolution, Geneva v40 [rotating, Geneva 2013 updated tracks, at all
             # metallicities available, ~0.1-1 solar], sampling times 1e4-2e10 yr at high res
             # massive stars: piecewise continuous, linking constant early and rapid late decay
-            f1 = 3 * metallicity ** 0.87  # rates [Gyr^-1]
-            f2 = 20 * metallicity ** 0.45
+
+            f1 = 3 * metallicity**0.87  # rates [Gyr^-1]
+            f2 = 20 * metallicity**0.45
             f3 = 0.6 * metallicity
             t1 = 1.7  # transition ages [Myr]
             t2 = 4
             t3 = 20
-            # AGB: note that essentially no models [any of the SB99 geneva or padova tracks,
-            # or NuGrid, or recent other MESA models] predict a significant dependence on
-            # metallicity (that shifts slightly when the 'bump' occurs, but not the overall loss
-            # rate), so this term is effectively metallicity-independent
-            f_agb = 0.01
-            f_agb2 = 0.01
-            t_agb = 1000  # [Myr]
 
             if np.isscalar(ages):
                 assert ages >= age_min and ages < age_max
@@ -823,9 +824,6 @@ class StellarWindClass:
                     rates = f2 * (ages / t2) ** (np.log(f3 / f2) / np.log(t3 / t2))
                 else:
                     rates = f3 * (ages / t3) ** -3.1
-
-                # add AGB
-                rates += f_agb / ((1 + (ages / t_agb) ** 1.1) * (1 + f_agb2 / (ages / t_agb)))
 
             else:
                 assert np.min(ages) >= age_min and np.max(ages) < age_max
@@ -844,8 +842,33 @@ class StellarWindClass:
                 masks = np.where(ages > t3)[0]
                 rates[masks] = f3 * (ages[masks] / t3) ** -3.1
 
-                # add AGB
-                rates += f_agb / ((1 + (ages / t_agb) ** 1.1) * (1 + f_agb2 / (ages / t_agb)))
+            # add AGB
+            # essentially no models [any of the SB99 geneva or padova tracks, or NuGrid, or recent
+            # other MESA models] predict a significant dependence on metallicity
+            # (that shifts slightly when the 'bump' occurs, but not the overall loss rate),
+            # so this term is effectively metallicity-independent
+
+            # new FIRE-3 (more AGB winds)
+            # 2022 May 28: re-fit AGB component based on inputs from Caleb Choban,
+            # previous model for FIRE-3 doesn't make sense for stars 1.5 - 4 Msun,
+            # can't possibly give sub-Chandrasekhar WDs or the correct initial-final mass relation.
+            # Re-fit the AGB mass loss for the Geneva v00 (rotating models show too little),
+            # 2013 tracks, 1x solar, times at same resolution as above, using the 'Empirical' wind
+            # prescription in STARBURST99. Have validated that nothing else, including wind
+            # specific energies, changes - only the mass-loss rates
+            t_agb = 800  # [Myr]
+            xs_agb = (t_agb / np.maximum(ages, 0.1)) ** 2
+            if np.isscalar(ages):
+                fs = 50
+            else:
+                fs = np.zeros(xs_agb.size) + 50
+            rates += (
+                0.1 * xs_agb**0.8 * (np.exp(-np.minimum(fs, xs_agb**3)) + 1 / (100 + xs_agb))
+            )
+
+            # original FIRE-3 (less AGB winds)
+            # t_agb = 1000  # [Myr]
+            # rates += 0.01 / ((1 + (ages / t_agb) ** 1.1) * (1 + 0.01 / (ages / t_agb)))
 
         rates *= 1e-3  # convert fractional mass loss rate to [Myr ^ -1]
         # rates *= 1.4 * 0.291175  # old: expected return fraction from stellar winds alone (~17%)
@@ -861,7 +884,9 @@ class StellarWindClass:
                     rates[ai] *= element_yield[element_name]
             else:
                 element_yield = NucleosyntheticYield.get_element_yields(
-                    'wind', metallicity, age=ages,
+                    'wind',
+                    metallicity,
+                    age=ages,
                 )
                 rates *= element_yield[element_name]
 
@@ -941,31 +966,31 @@ class SupernovaCCClass:
     '''
 
     def __init__(
-        self, model=FIRE_MODEL_DEFAULT, cc_age_min=None, cc_age_break=None, cc_age_max=None
+        self, model=FIRE_MODEL_DEFAULT, sncc_age_min=None, sncc_age_break=None, sncc_age_max=None
     ):
         '''
         Parameters
         ----------
         model : str
             model for core-collapse supernova rates (delay time distribution): 'fire2', 'fire3'
-        cc_age_min : float
+        sncc_age_min : float
             minimum age for core-collapse supernova to occur [Myr]
-        cc_age_break : float
+        sncc_age_break : float
             age at which rate of core-collapse supernova changes/breaks [Myr]
-        cc_age_min : float
+        sncc_age_min : float
             maximum age for core-collapse supernova to occur [Myr]
         '''
         self._models_available = ['fire2', 'fire2.1', 'fire2.2', 'fire3']
         self.model = None
-        self.cc_age_min = None
-        self.cc_age_break = None
-        self.cc_age_max = None
+        self.sncc_age_min = None
+        self.sncc_age_break = None
+        self.sncc_age_max = None
         self.sun_massfraction = None
         self.ages_transition = None
 
-        self._parse_model(model, cc_age_min, cc_age_break, cc_age_max)
+        self._parse_model(model, sncc_age_min, sncc_age_break, sncc_age_max)
 
-    def _parse_model(self, model, cc_age_min=None, cc_age_break=None, cc_age_max=None):
+    def _parse_model(self, model, sncc_age_min=None, sncc_age_break=None, sncc_age_max=None):
         '''
         Parse input model.
 
@@ -973,11 +998,11 @@ class SupernovaCCClass:
         ----------
         model : str
             model for core-collapse supernova rates (delay time distribution): 'fire2', 'fire3'
-        cc_age_min : float
+        sncc_age_min : float
             minimum age for core-collapse supernova to occur [Myr]
-        cc_age_break : float
+        sncc_age_break : float
             age at which rate of core-collapse supernova changes/breaks [Myr]
-        cc_age_min : float
+        sncc_age_min : float
             maximum age for core-collapse supernova to occur [Myr]
         '''
         reset_parameters = False
@@ -1003,38 +1028,40 @@ class SupernovaCCClass:
                 # IMF-averaged mass per event [M_sun], but FIRE-3 does not use this directly,
                 # because it samples different ejecta masses for different mass supernovae
                 self.ejecta_mass = 8.72
-                self.cc_mass_max = 35
-                self.cc_mass_brk = 10
-                self.cc_mass_min = 6
+                self.sncc_mass_max = 35
+                self.sncc_mass_break = 10
+                self.sncc_mass_min = 6
 
             # reset transition ages
-            if cc_age_min is None:
+            if sncc_age_min is None:
                 if 'fire2' in self.model:
-                    cc_age_min = 3.4  # [Myr]
+                    sncc_age_min = 3.4  # [Myr]
                 elif 'fire3' in self.model:
-                    cc_age_min = 3.7  # [Myr]
-            assert cc_age_min >= 0
-            self.cc_age_min = cc_age_min
+                    sncc_age_min = 3.7  # [Myr]
+            assert sncc_age_min >= 0
+            self.sncc_age_min = sncc_age_min
 
-            if cc_age_break is None:
+            if sncc_age_break is None:
                 if 'fire2' in self.model:
-                    cc_age_break = 10.37  # [Myr]
+                    sncc_age_break = 10.37  # [Myr]
                 elif 'fire3' in self.model:
-                    cc_age_break = 7  # [Myr]
-            assert cc_age_break >= 0
-            self.cc_age_break = cc_age_break
+                    sncc_age_break = 7  # [Myr]
+            assert sncc_age_break >= 0
+            self.sncc_age_break = sncc_age_break
 
-            if cc_age_max is None:
+            if sncc_age_max is None:
                 if 'fire2' in self.model:
-                    cc_age_max = 37.53  # [Myr]
+                    sncc_age_max = 37.53  # [Myr]
                 elif 'fire3' in self.model:
-                    cc_age_max = 44  # [Myr]
-            assert cc_age_max >= 0
-            self.cc_age_max = cc_age_max
+                    sncc_age_max = 44  # [Myr]
+            assert sncc_age_max >= 0
+            self.sncc_age_max = sncc_age_max
 
-            self.ages_transition = np.sort([self.cc_age_min, self.cc_age_break, self.cc_age_max])
+            self.ages_transition = np.sort(
+                [self.sncc_age_min, self.sncc_age_break, self.sncc_age_max]
+            )
 
-    def get_rate(self, ages, model=None, cc_age_min=None, cc_age_break=None, cc_age_max=None):
+    def get_rate(self, ages, model=None, sncc_age_min=None, sncc_age_break=None, sncc_age_max=None):
         '''
         Get specific rate[s] of core-collapse supernova events at input age[s]
         [Myr ^ -1 per M_sun of stars at that age].
@@ -1052,11 +1079,11 @@ class SupernovaCCClass:
             age[s] of stellar population [Myr]
         model : str
             model for core-collapse supernova rates (delay time distribution): 'fire2', 'fire3'
-        cc_age_min : float
+        sncc_age_min : float
             minimum age for core-collapse supernova to occur [Myr]
-        cc_age_break : float
+        sncc_age_break : float
             age at which rate of core-collapse supernova changes/breaks [Myr]
-        cc_age_min : float
+        sncc_age_min : float
             maximum age for core-collapse supernova to occur [Myr]
 
         Returns
@@ -1071,12 +1098,12 @@ class SupernovaCCClass:
             rate2 = 5.1e-4  # [Myr ^ -1]
             rate3 = 1.8e-4  # [Myr ^ -1]
             if kind == 'early':
-                return rate1 * (age / self.cc_age_min) ** (
-                    np.log(rate2 / rate1) / np.log(self.cc_age_break / self.cc_age_min)
+                return rate1 * (age / self.sncc_age_min) ** (
+                    np.log(rate2 / rate1) / np.log(self.sncc_age_break / self.sncc_age_min)
                 )
             elif kind == 'late':
-                return rate2 * (age / self.cc_age_break) ** (
-                    np.log(rate3 / rate2) / np.log(self.cc_age_max / self.cc_age_break)
+                return rate2 * (age / self.sncc_age_break) ** (
+                    np.log(rate3 / rate2) / np.log(self.sncc_age_max / self.sncc_age_break)
                 )
 
         fire2_rate_early = 5.408e-4  # [Myr ^ -1]
@@ -1085,18 +1112,18 @@ class SupernovaCCClass:
         age_min = 0
         age_max = 14001
 
-        self._parse_model(model, cc_age_min, cc_age_break, cc_age_max)
+        self._parse_model(model, sncc_age_min, sncc_age_break, sncc_age_max)
 
         if np.isscalar(ages):
             assert ages >= age_min and ages < age_max
-            if ages < self.cc_age_min or ages > self.cc_age_max:
+            if ages < self.sncc_age_min or ages > self.sncc_age_max:
                 rates = 0
-            elif ages <= self.cc_age_break:
+            elif ages <= self.sncc_age_break:
                 if 'fire2' in self.model:
                     rates = fire2_rate_early
                 elif self.model == 'fire3':
                     rates = _get_rate_fire3(ages, 'early')
-            elif ages > self.cc_age_break:
+            elif ages > self.sncc_age_break:
                 if 'fire2' in self.model:
                     rates = fire2_rate_late
                 elif self.model == 'fire3':
@@ -1106,13 +1133,13 @@ class SupernovaCCClass:
             ages = np.asarray(ages)
             rates = np.zeros(ages.size)
 
-            masks = np.where((ages >= self.cc_age_min) * (ages <= self.cc_age_break))[0]
+            masks = np.where((ages >= self.sncc_age_min) * (ages <= self.sncc_age_break))[0]
             if 'fire2' in self.model:
                 rates[masks] = fire2_rate_early
             elif self.model == 'fire3':
                 rates[masks] = _get_rate_fire3(ages[masks], 'early')
 
-            masks = np.where((ages > self.cc_age_break) * (ages <= self.cc_age_max))[0]
+            masks = np.where((ages > self.sncc_age_break) * (ages <= self.sncc_age_max))[0]
             if 'fire2' in self.model:
                 rates[masks] = fire2_rate_late
             elif self.model == 'fire3':
@@ -1125,9 +1152,9 @@ class SupernovaCCClass:
         age_min=0,
         age_maxs=99,
         model=None,
-        cc_age_min=None,
-        cc_age_break=None,
-        cc_age_max=None,
+        sncc_age_min=None,
+        sncc_age_break=None,
+        sncc_age_max=None,
     ):
         '''
         Get specific number[s] of core-collapse supernova events in input age interval[s]
@@ -1141,11 +1168,11 @@ class SupernovaCCClass:
             max age[s] of stellar population [Myr]
         model : str
             model for core-collapse supernova rates (delay time distribution): 'fire2', 'fire3'
-        cc_age_min : float
+        sncc_age_min : float
             minimum age for core-collapse supernova to occur [Myr]
-        cc_age_break : float
+        sncc_age_break : float
             age at which rate of core-collapse supernova changes/breaks [Myr]
-        cc_age_min : float
+        sncc_age_min : float
             maximum age for core-collapse supernova to occur [Myr]
 
         Returns
@@ -1153,7 +1180,7 @@ class SupernovaCCClass:
         numbers : float or array
             specific number[s] of core-collapse supernova events [per M_sun of stars at that age]
         '''
-        self._parse_model(model, cc_age_min, cc_age_break, cc_age_max)
+        self._parse_model(model, sncc_age_min, sncc_age_break, sncc_age_max)
 
         if np.isscalar(age_maxs):
             age_maxs = [age_maxs]
@@ -1164,7 +1191,7 @@ class SupernovaCCClass:
                 self.get_rate,
                 age_min,
                 age,
-                points=[self.cc_age_min, self.cc_age_break, self.cc_age_max],
+                points=[self.sncc_age_min, self.sncc_age_break, self.sncc_age_max],
             )[0]
 
             # alternate method
@@ -1181,9 +1208,9 @@ class SupernovaCCClass:
         self,
         ages,
         model=None,
-        cc_age_min=None,
-        cc_age_break=None,
-        cc_age_max=None,
+        sncc_age_min=None,
+        sncc_age_break=None,
+        sncc_age_max=None,
         element_name=None,
         metallicity=1.0,
     ):
@@ -1197,11 +1224,11 @@ class SupernovaCCClass:
             stellar ages [Myr]
         model : str
             model for core-collapse supernova rates (delay time distribution): 'fire2', 'fire3'
-        cc_age_min : float
+        sncc_age_min : float
             minimum age for core-collapse supernova to occur [Myr]
-        cc_age_break : float
+        sncc_age_break : float
             age at which rate of core-collapse supernova changes/breaks [Myr]
-        cc_age_min : float
+        sncc_age_min : float
             maximum age for core-collapse supernova to occur [Myr]
         element_name : str [optional]
             name of element to get fraction mass loss rate of
@@ -1215,46 +1242,48 @@ class SupernovaCCClass:
             fractional mass loss rate[s] (ejecta mass relative to mass of star at at that age)
             [Myr ^ -1]
         '''
-        self._parse_model(model, cc_age_min, cc_age_break, cc_age_max)
+        self._parse_model(model, sncc_age_min, sncc_age_break, sncc_age_max)
 
         if 'fire2' in self.model:
             ejecta_masses = self.ejecta_mass
         elif 'fire3' in self.model:
             if np.isscalar(ages):
                 # power-law interpolation of ejecta mass
-                if ages < self.cc_age_min or ages > self.cc_age_max:
+                if ages < self.sncc_age_min or ages > self.sncc_age_max:
                     ejecta_masses = 0
-                elif ages <= self.cc_age_break:
-                    ejecta_masses = self.cc_mass_max * (ages / self.cc_age_min) ** (
-                        np.log(self.cc_mass_brk / self.cc_mass_max)
-                        / np.log(self.cc_age_break / self.cc_age_min)
+                elif ages <= self.sncc_age_break:
+                    ejecta_masses = self.sncc_mass_max * (ages / self.sncc_age_min) ** (
+                        np.log(self.sncc_mass_break / self.sncc_mass_max)
+                        / np.log(self.sncc_age_break / self.sncc_age_min)
                     )
                 else:
-                    ejecta_masses = self.cc_mass_brk * (ages / self.cc_age_break) ** (
-                        np.log(self.cc_mass_min / self.cc_mass_brk)
-                        / np.log(self.cc_age_max / self.cc_age_break)
+                    ejecta_masses = self.sncc_mass_break * (ages / self.sncc_age_break) ** (
+                        np.log(self.sncc_mass_min / self.sncc_mass_break)
+                        / np.log(self.sncc_age_max / self.sncc_age_break)
                     )
             else:
                 ages = np.asarray(ages)
                 ejecta_masses = np.zeros(len(ages))
 
                 # power-law interpolation of ejecta mass
-                masks = ages < self.cc_age_min
+                masks = ages < self.sncc_age_min
                 ejecta_masses[masks] = 0
-                masks = ages > self.cc_age_max
+                masks = ages > self.sncc_age_max
                 ejecta_masses[masks] = 0
-                masks = np.where(ages <= self.cc_age_break)[0]
-                ejecta_masses[masks] = self.cc_mass_max * (ages[masks] / self.cc_age_min) ** (
-                    np.log(self.cc_mass_brk / self.cc_mass_max)
-                    / np.log(self.cc_age_break / self.cc_age_min)
+                masks = np.where(ages <= self.sncc_age_break)[0]
+                ejecta_masses[masks] = self.sncc_mass_max * (ages[masks] / self.sncc_age_min) ** (
+                    np.log(self.sncc_mass_break / self.sncc_mass_max)
+                    / np.log(self.sncc_age_break / self.sncc_age_min)
                 )
-                masks = np.where(ages > self.cc_age_break)[0]
-                ejecta_masses[masks] = self.cc_mass_brk * (ages[masks] / self.cc_age_break) ** (
-                    np.log(self.cc_mass_min / self.cc_mass_brk)
-                    / np.log(self.cc_age_max / self.cc_age_break)
+                masks = np.where(ages > self.sncc_age_break)[0]
+                ejecta_masses[masks] = self.sncc_mass_break * (
+                    ages[masks] / self.sncc_age_break
+                ) ** (
+                    np.log(self.sncc_mass_min / self.sncc_mass_break)
+                    / np.log(self.sncc_age_max / self.sncc_age_break)
                 )
 
-        cc_mass_loss_rates = ejecta_masses * self.get_rate(ages)
+        sncc_mass_loss_rates = ejecta_masses * self.get_rate(ages)
 
         if element_name:
             NucelosyntheticYield = NucleosyntheticYieldClass(self.model)
@@ -1263,23 +1292,23 @@ class SupernovaCCClass:
                     element_yield = NucelosyntheticYield.get_element_yields(
                         'supernova.cc', metallicity, age=age
                     )
-                cc_mass_loss_rates[ai] *= element_yield[element_name]
+                    sncc_mass_loss_rates[ai] *= element_yield[element_name]
             else:
                 element_yield = NucelosyntheticYield.get_element_yields(
                     'supernova.cc', metallicity, age=ages
                 )
-                cc_mass_loss_rates *= element_yield[element_name]
+                sncc_mass_loss_rates *= element_yield[element_name]
 
-        return cc_mass_loss_rates
+        return sncc_mass_loss_rates
 
     def get_mass_loss(
         self,
         age_min=0,
         age_maxs=99,
         model=None,
-        cc_age_min=None,
-        cc_age_break=None,
-        cc_age_max=None,
+        sncc_age_min=None,
+        sncc_age_break=None,
+        sncc_age_max=None,
         element_name=None,
         metallicity=1.0,
     ):
@@ -1295,11 +1324,11 @@ class SupernovaCCClass:
             max age[s] of stellar population [Myr]
         model : str
             model for core-collapse supernova rates (delay time distribution): 'fire2', 'fire3'
-        cc_age_min : float
+        sncc_age_min : float
             minimum age for core-collapse supernova to occur [Myr]
-        cc_age_break : float
+        sncc_age_break : float
             age at which rate of core-collapse supernova changes/breaks [Myr]
-        cc_age_min : float
+        sncc_age_min : float
             maximum age for core-collapse supernova to occur [Myr]
         element_name : str [optional]
             name of element to get fractional mass loss of
@@ -1312,7 +1341,7 @@ class SupernovaCCClass:
         mass_loss_fractions : float or array
             fractional mass loss[es] (ejecta mass relative to mass of stars at that age)
         '''
-        self._parse_model(model, cc_age_min, cc_age_break, cc_age_max)
+        self._parse_model(model, sncc_age_min, sncc_age_break, sncc_age_max)
 
         if np.isscalar(age_maxs):
             age_maxs = [age_maxs]
@@ -1333,21 +1362,21 @@ class SupernovaCCClass:
         return mass_loss_fractions
 
 
-class SupernovaIaClass(ut.io.SayClass):
+class SupernovaWDClass(ut.io.SayClass):
     '''
-    Compute rates, cumulative numbers, and cumulative ejecta masses for supernovae Ia
+    Compute rates, cumulative numbers, and cumulative ejecta masses for white-dwarf (Ia) supernovae
     in the FIRE-2 or FIRE-3 model.
     '''
 
-    def __init__(self, model=FIRE_MODEL_DEFAULT, ia_age_min=None):
+    def __init__(self, model=FIRE_MODEL_DEFAULT, age_min=None):
         '''
         Parameters
         ----------
         model : str
             model for rate (delay time distribution):
                 'fire2' or 'mannucci' (FIRE-2 default), 'fire3' (FIRE-3 default), 'maoz' (power law)
-        ia_age_min : float
-            minimum age for supernova Ia to occur [Myr]
+        age_min : float
+            minimum age for WD supernova to occur [Myr]
         '''
         self.ejecta_mass = 1.4  # ejecta mass per event, IMF-averaged [M_sun]
 
@@ -1360,12 +1389,12 @@ class SupernovaIaClass(ut.io.SayClass):
             'maoz',
         ]
         self.model = None
-        self.ia_age_min = None
+        self.age_min = None
         self.sun_massfraction = None
 
-        self._parse_model(model, ia_age_min)
+        self._parse_model(model, age_min)
 
-    def _parse_model(self, model, ia_age_min):
+    def _parse_model(self, model, age_min):
         '''
         Parse input model.
 
@@ -1374,8 +1403,8 @@ class SupernovaIaClass(ut.io.SayClass):
         model : str
             model for rate (delay time distribution):
                 'fire2' or 'mannucci' (FIRE-2 default), 'fire3' (FIRE-3 default), 'maoz' (power law)
-        ia_age_min : float
-            minimum age for supernova Ia to occur [Myr]
+        age_min : float
+            minimum age for WD supernova to occur [Myr]
         '''
         reset_parameters = False
 
@@ -1394,19 +1423,19 @@ class SupernovaIaClass(ut.io.SayClass):
             # reset solar abundances
             self.sun_massfraction = get_sun_massfraction(self.model)
 
-            if ia_age_min is None:
+            if age_min is None:
                 if 'fire2' in self.model:
-                    ia_age_min = 37.53  # [Myr] ensure FIRE-2 default
-                    # self.say(f'input Ia model = {model}, forcing Ia age min = {ia_age_min} Myr')
+                    age_min = 37.53  # [Myr] ensure FIRE-2 default
+                    # self.say(f'input model = {model}, forcing SNWD age min = {age_min} Myr')
                 elif self.model == 'fire3':
-                    ia_age_min = 44  # [Myr] ensure FIRE-3 default
-                    # self.say(f'input Ia model = {model}, forcing Ia age min = {ia_age_min} Myr')
-            assert ia_age_min >= 0
-            self.ia_age_min = ia_age_min
+                    age_min = 44  # [Myr] ensure FIRE-3 default
+                    # self.say(f'input model = {model}, forcing SNWD age min = {age_min} Myr')
+            assert age_min >= 0
+            self.age_min = age_min
 
-    def get_rate(self, ages, model=None, ia_age_min=None):
+    def get_rate(self, ages, model=None, snwd_age_min=None):
         '''
-        Get specific rate[s] of supernovae Ia events [Myr ^ -1 per M_sun of stars at that age].
+        Get specific rate[s] of WD supernova events [Myr ^ -1 per M_sun of stars at that age].
 
         FIRE-2
             rates are from Mannucci, Della Valle, & Panagia 2006, for a delayed population
@@ -1423,17 +1452,17 @@ class SupernovaIaClass(ut.io.SayClass):
         ages : float
             age of stellar population [Myr]
         model : str
-            model for supernova Ia rate (delay time distribution):
+            model for WD supernova rate (delay time distribution):
                 'fire2' or 'mannucci' (FIRE-2 default), 'fire3' (FIRE-3 default), 'maoz' (power law)
-        ia_age_min : float
-            minimum age for supernova Ia to occur [Myr]
+        snwd_age_min : float
+            minimum age for WD supernova to occur [Myr]
             decreasing to 10 Myr increases total number by ~50%,
             increasing to 100 Myr decreases total number by ~50%
 
         Returns
         -------
         rates : float or array
-            specific rate[s] of supernovae Ia events [Myr ^ -1 per M_sun of stars at that age]
+            specific rate[s] of WD supernova events [Myr ^ -1 per M_sun of stars at that age]
         '''
 
         def _get_rate(ages):
@@ -1443,27 +1472,24 @@ class SupernovaIaClass(ut.io.SayClass):
             elif 'fire3' in self.model:
                 # this normalization is 2.67e-7 [Myr ^ -1]
                 rate = (
-                    1.6e-3
-                    * 7.94e-5
-                    / ((self.ia_age_min / 100) ** -0.1 - 0.61)
-                    * (ages / 1e3) ** -1.1
+                    1.6e-3 * 7.94e-5 / ((self.age_min / 100) ** -0.1 - 0.61) * (ages / 1e3) ** -1.1
                 )
             elif self.model == 'maoz':
                 # Maoz & Graur 2017
                 rate = 2.6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] compromise fit
-                # fit to volumetric, Hubble-time-integrated Ia N/M = 1.3 +/- 0.1 per 1000 Msun
+                # fit to volumetric, Hubble-time-integrated SNWD N/M = 1.3 +/- 0.1 per 1000 Msun
                 # rate = 2.1e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1]
-                # fit to field galaxies, Hubble-time-integrated Ia N/M = 1.6 +/- 0.1 per 1000 Msun
+                # fit to field galaxies, Hubble-time-integrated SNWD N/M = 1.6 +/- 0.1 per 1000 Msun
                 # rate = 2.6e-7 * (ages / 1e3) ** -1.13  # [Myr ^ -1]
-                # fit to galaxy clusters, Hubble-time-integrated Ia N/M = 5.4 +/- 0.1 per 1000 Msun
+                # fit to galaxy clusters, Hubble-time-int SNWD N/M = 5.4 +/- 0.1 per 1000 Msun
                 # rate = 6.7e-7 * (ages / 1e3) ** -1.39  # [Myr ^ -1]
 
             return rate
 
-        self._parse_model(model, ia_age_min)
+        self._parse_model(model, snwd_age_min)
 
         if np.isscalar(ages):
-            if ages < self.ia_age_min:
+            if ages < self.age_min:
                 rates = 0
             else:
                 rates = _get_rate(ages)
@@ -1471,14 +1497,14 @@ class SupernovaIaClass(ut.io.SayClass):
             ages = np.asarray(ages)
             rates = np.zeros(ages.size)
 
-            masks = np.where(ages >= self.ia_age_min)[0]
+            masks = np.where(ages >= self.age_min)[0]
             rates[masks] = _get_rate(ages[masks])
 
         return rates
 
-    def get_number(self, age_min=0, age_maxs=99, model=None, ia_age_min=None):
+    def get_number(self, age_min=0, age_maxs=99, model=None, snwd_age_min=None):
         '''
-        Get specific number[s] of supernovae Ia events in input age interval[s]
+        Get specific number[s] of WD supernova events in input age interval[s]
         [per M_sun of stars at that age].
 
         Parameters
@@ -1490,15 +1516,15 @@ class SupernovaIaClass(ut.io.SayClass):
         model : str
             model for rate (delay time distribution):
                 'fire2' or 'mannucci' (FIRE-2 default), 'fire3' (FIRE-3 default), 'maoz' (power law)
-        ia_age_min : float
-            minimum age for supernova Ia to occur [Myr]
+        snwd_age_min : float
+            minimum age for WD supernova to occur [Myr]
 
         Returns
         -------
         numbers : float or array
-            specific number[s] of supernovae Ia events [per M_sun of stars at that age]
+            specific number[s] of WD supernova events [per M_sun of stars at that age]
         '''
-        self._parse_model(model, ia_age_min)
+        self._parse_model(model, snwd_age_min)
 
         if np.isscalar(age_maxs):
             age_maxs = [age_maxs]
@@ -1512,9 +1538,9 @@ class SupernovaIaClass(ut.io.SayClass):
 
         return numbers
 
-    def get_mass_loss_rate(self, ages, model=None, ia_age_min=None, element_name=''):
+    def get_mass_loss_rate(self, ages, model=None, snwd_age_min=None, element_name=''):
         '''
-        Get fractional mass loss rate[s] from supernova Ia in input age interval[s]
+        Get fractional mass loss rate[s] from WD supernovae in input age interval[s]
         (ejecta mass relative to IMF-averaged mass of stars at that age) [Myr ^ -1].
 
         Parameters
@@ -1524,8 +1550,8 @@ class SupernovaIaClass(ut.io.SayClass):
         model : str
             model for rate (delay time distribution):
                 'fire2' or 'mannucci' (FIRE-2 default), 'fire3' (FIRE-3 default), 'maoz' (power law)
-        ia_age_min : float
-            minimum age for supernova Ia to occur [Myr]
+        snwd_age_min : float
+            minimum age for WD supernova to occur [Myr]
         element_name : str [optional]
             name of element to get fractional mass loss of
             if None or '', get mass loss of total ejecta
@@ -1533,23 +1559,23 @@ class SupernovaIaClass(ut.io.SayClass):
         Returns
         -------
         mass_loss_rates : float or array
-             fractional mass loss rate[s] from supernovae Ia
+             fractional mass loss rate[s] from WD supernovae
              (ejecta mass relative to mass of stars at that age) [Myr ^ -1]
         '''
-        self._parse_model(model, ia_age_min)
+        self._parse_model(model, snwd_age_min)
 
         mass_loss_rates = self.ejecta_mass * self.get_rate(ages)
 
         if element_name:
             NucelosyntheticYield = NucleosyntheticYieldClass(self.model)
-            element_yield = NucelosyntheticYield.get_element_yields('supernova.ia')
+            element_yield = NucelosyntheticYield.get_element_yields('supernova.wd')
             mass_loss_rates *= element_yield[element_name]
 
         return mass_loss_rates
 
-    def get_mass_loss(self, age_min=0, age_maxs=99, model=None, ia_age_min=None, element_name=''):
+    def get_mass_loss(self, age_min=0, age_maxs=99, model=None, snwd_age_min=None, element_name=''):
         '''
-        Get fractional mass loss[es] from supernova Ia in input age interval[s]
+        Get fractional mass loss[es] from WD supernovae in input age interval[s]
         (ejecta mass relative to IMF-averaged mass of stars at that age).
 
         Parameters
@@ -1561,8 +1587,8 @@ class SupernovaIaClass(ut.io.SayClass):
         model : str
             model for rate (delay time distribution):
                 'fire2' or 'mannucci' (FIRE-2 default), 'fire3' (FIRE-3 default), 'maoz' (power law)
-        ia_age_min : float
-            minimum age for supernova Ia to occur [Myr]
+        snwd_age_min : float
+            minimum age for WD supernova to occur [Myr]
         element_name : str [optional]
             name of element to get fractional mass loss of
             if None or '', get mass loss of total ejecta
@@ -1570,16 +1596,16 @@ class SupernovaIaClass(ut.io.SayClass):
         Returns
         -------
         mass_loss_fractions : float or array
-            fractional mass loss[es] from supernovae Ia
+            fractional mass loss[es] from WD supernovae
             (ejecta mass relative to mass of stars at that age)
         '''
-        self._parse_model(model, ia_age_min)
+        self._parse_model(model, snwd_age_min)
 
         mass_loss_fractions = self.ejecta_mass * self.get_number(age_min, age_maxs)
 
         if element_name:
             NucelosyntheticYield = NucleosyntheticYieldClass(self.model)
-            element_yield = NucelosyntheticYield.get_element_yields('supernova.ia')
+            element_yield = NucelosyntheticYield.get_element_yields('supernova.wd')
             mass_loss_fractions *= element_yield[element_name]
 
         return mass_loss_fractions
@@ -1587,8 +1613,8 @@ class SupernovaIaClass(ut.io.SayClass):
 
 class MassLossClass(ut.io.SayClass):
     '''
-    Compute mass loss from all channels (stellar winds, core-collapse and Ia supernovae) as
-    implemented in the FIRE-2 or FIRE-3 model.
+    Compute mass loss from all channels (stellar winds, core-collapse and white-dwarf supernovae)
+    as implemented in the FIRE-2 or FIRE-3 model.
     '''
 
     def __init__(self, model=FIRE_MODEL_DEFAULT):
@@ -1604,7 +1630,7 @@ class MassLossClass(ut.io.SayClass):
         self._parse_model(model)
 
         self.SupernovaCC = SupernovaCCClass(self.model)
-        self.SupernovaIa = SupernovaIaClass(self.model)
+        self.SupernovaWD = SupernovaWDClass(self.model)
         self.StellarWind = StellarWindClass(self.model)
         self.Spline = None
         self.AgeBin = None
@@ -1672,7 +1698,7 @@ class MassLossClass(ut.io.SayClass):
             + self.SupernovaCC.get_mass_loss_rate(
                 ages, element_name=element_name, metallicity=metallicity
             )
-            + self.SupernovaIa.get_mass_loss_rate(ages, element_name=element_name)
+            + self.SupernovaWD.get_mass_loss_rate(ages, element_name=element_name)
         )
 
     def get_mass_loss(
@@ -1714,7 +1740,7 @@ class MassLossClass(ut.io.SayClass):
             + self.SupernovaCC.get_mass_loss(
                 age_min, age_maxs, element_name=element_name, metallicity=metallicity
             )
-            + self.SupernovaIa.get_mass_loss(age_min, age_maxs, element_name=element_name)
+            + self.SupernovaWD.get_mass_loss(age_min, age_maxs, element_name=element_name)
         )
 
     def get_mass_loss_from_spline(self, ages, metallicities=None, metal_mass_fractions=None):
@@ -1819,7 +1845,7 @@ def plot_supernova_number_v_age(
 ):
     '''
     Plot specific rates or cumulative numbers [per M_sun of stars at that age] of
-    core-collapse and Ia supernova events versus stellar age [Myr].
+    core-collapse and white-dwarf supernova events versus stellar age [Myr].
 
     Parameters
     ----------
@@ -1846,21 +1872,21 @@ def plot_supernova_number_v_age(
 
     AgeBin = ut.binning.BinClass(age_limits, age_bin_width, include_max=True)
 
-    CC_FIRE2 = SupernovaCCClass(model='fire2')
-    CC_FIRE3 = SupernovaCCClass(model='fire3')
-    Ia_FIRE2 = SupernovaIaClass(model='fire2')
-    SupernovaIa3 = SupernovaIaClass(model='fire3')
+    SNCC_FIRE2 = SupernovaCCClass(model='fire2')
+    SNCC_FIRE3 = SupernovaCCClass(model='fire3')
+    SNWD_FIRE2 = SupernovaWDClass(model='fire2')
+    SNWD_FIRE3 = SupernovaWDClass(model='fire3')
 
     if axis_y_kind == 'rate':
-        cc_fire2 = CC_FIRE2.get_rate(AgeBin.mins)
-        cc_fire3 = CC_FIRE3.get_rate(AgeBin.mins)
-        ia_fire2 = Ia_FIRE2.get_rate(AgeBin.mins)
-        ia_fire3 = SupernovaIa3.get_rate(AgeBin.mins)
+        sncc_fire2 = SNCC_FIRE2.get_rate(AgeBin.mins)
+        sncc_fire3 = SNCC_FIRE3.get_rate(AgeBin.mins)
+        snwd_fire2 = SNWD_FIRE2.get_rate(AgeBin.mins)
+        snwd_fire3 = SNWD_FIRE3.get_rate(AgeBin.mins)
     elif axis_y_kind == 'number':
-        cc_fire2 = CC_FIRE2.get_number(min(age_limits), AgeBin.maxs)
-        cc_fire3 = CC_FIRE3.get_number(min(age_limits), AgeBin.maxs)
-        ia_fire2 = Ia_FIRE2.get_number(min(age_limits), AgeBin.maxs)
-        ia_fire3 = SupernovaIa3.get_number(min(age_limits), AgeBin.maxs)
+        sncc_fire2 = SNCC_FIRE2.get_number(min(age_limits), AgeBin.maxs)
+        sncc_fire3 = SNCC_FIRE3.get_number(min(age_limits), AgeBin.maxs)
+        snwd_fire2 = SNWD_FIRE2.get_number(min(age_limits), AgeBin.maxs)
+        snwd_fire3 = SNWD_FIRE3.get_number(min(age_limits), AgeBin.maxs)
         if axis_y_limits is None or len(axis_y_limits) == 0:
             axis_y_limits = [5e-5, 2e-2]
 
@@ -1874,7 +1900,7 @@ def plot_supernova_number_v_age(
         None,
         axis_y_log_scale,
         axis_y_limits,
-        [cc_fire2, cc_fire3, ia_fire2, ia_fire3],
+        [sncc_fire2, sncc_fire3, snwd_fire2, snwd_fire3],
     )
 
     subplot.set_xlabel('stellar age $\\left[ {\\rm Myr} \\right]$')
@@ -1885,19 +1911,19 @@ def plot_supernova_number_v_age(
 
     colors = ut.plot.get_colors(4, use_black=False)
 
-    subplot.plot(AgeBin.mins, cc_fire2, color=colors[0], alpha=0.8, label='CC (FIRE-2)')
-    subplot.plot(AgeBin.mins, ia_fire2, color=colors[1], alpha=0.8, label='Ia (FIRE-2)')
-    subplot.plot(AgeBin.mins, cc_fire3, color=colors[2], alpha=0.8, label='CC (FIRE-3)')
-    subplot.plot(AgeBin.mins, ia_fire3, color=colors[3], alpha=0.8, label='Ia (FIRE-3)')
+    subplot.plot(AgeBin.mins, sncc_fire2, color=colors[0], alpha=0.8, label='CC (FIRE-2)')
+    subplot.plot(AgeBin.mins, snwd_fire2, color=colors[1], alpha=0.8, label='WD (FIRE-2)')
+    subplot.plot(AgeBin.mins, sncc_fire3, color=colors[2], alpha=0.8, label='CC (FIRE-3)')
+    subplot.plot(AgeBin.mins, snwd_fire3, color=colors[3], alpha=0.8, label='WD (FIRE-3)')
 
     print('CC FIRE-2')
-    print('{:.4f}'.format(cc_fire2[-1]))
-    print('Ia FIRE-2')
-    print('{:.4f}'.format(ia_fire2[-1]))
+    print('{:.4f}'.format(sncc_fire2[-1]))
+    print('WD FIRE-2')
+    print('{:.4f}'.format(snwd_fire2[-1]))
     print('CC FIRE-3')
-    print('{:.4f}'.format(cc_fire3[-1]))
-    print('Ia FIRE-3')
-    print('{:.4f}'.format(ia_fire3[-1]))
+    print('{:.4f}'.format(sncc_fire3[-1]))
+    print('WD FIRE-3')
+    print('{:.4f}'.format(snwd_fire3[-1]))
 
     ut.plot.make_legends(subplot, 'best')
 
@@ -1926,7 +1952,7 @@ def plot_mass_loss_v_age(
 ):
     '''
     Plot fractional mass loss (relative to mass of stars at that age) from all stellar evolution
-    channels (stellar winds, core-collapse and Ia supernovae) versus stellar age [Myr].
+    channels (stellar winds, core-collapse and white-dwarf supernovae) versus stellar age [Myr].
 
     Parameters
     ----------
@@ -1966,7 +1992,7 @@ def plot_mass_loss_v_age(
 
     StellarWind = StellarWindClass(model)
     SupernovaCC = SupernovaCCClass(model)
-    SupernovaIa = SupernovaIaClass(model)
+    SupernovaWD = SupernovaWDClass(model)
 
     if mass_loss_kind == 'rate':
         wind = StellarWind.get_mass_loss_rate(
@@ -1975,7 +2001,7 @@ def plot_mass_loss_v_age(
         supernova_cc = SupernovaCC.get_mass_loss_rate(
             AgeBin.mins, element_name=element_name, metallicity=metallicity
         )
-        supernova_Ia = SupernovaIa.get_mass_loss_rate(AgeBin.mins, element_name=element_name)
+        supernova_wd = SupernovaWD.get_mass_loss_rate(AgeBin.mins, element_name=element_name)
     else:
         age_min = 0
         wind = StellarWind.get_mass_loss(
@@ -1984,9 +2010,9 @@ def plot_mass_loss_v_age(
         supernova_cc = SupernovaCC.get_mass_loss(
             age_min, AgeBin.mins, element_name=element_name, metallicity=metallicity
         )
-        supernova_Ia = SupernovaIa.get_mass_loss(age_min, AgeBin.mins, element_name=element_name)
+        supernova_wd = SupernovaWD.get_mass_loss(age_min, AgeBin.mins, element_name=element_name)
 
-    total = supernova_cc + supernova_Ia + wind
+    total = supernova_cc + supernova_wd + wind
 
     # plot ----------
     _fig, subplot = ut.plot.make_figure(figure_index)
@@ -1998,7 +2024,7 @@ def plot_mass_loss_v_age(
         None,
         mass_loss_log_scale,
         mass_loss_limits,
-        [supernova_cc, supernova_Ia, wind, total],
+        [supernova_cc, supernova_wd, wind, total],
     )
 
     subplot.set_xlabel('star age $\\left[ {\\rm Myr} \\right]$')
@@ -2014,15 +2040,15 @@ def plot_mass_loss_v_age(
 
     subplot.plot(AgeBin.mins, wind, color=colors[0], alpha=0.7, label='stellar winds')
     subplot.plot(AgeBin.mins, supernova_cc, color=colors[1], alpha=0.7, label='supernova cc')
-    subplot.plot(AgeBin.mins, supernova_Ia, color=colors[2], alpha=0.7, label='supernova Ia')
+    subplot.plot(AgeBin.mins, supernova_wd, color=colors[2], alpha=0.7, label='supernova wd')
     subplot.plot(AgeBin.mins, total, color='black', alpha=0.8, label='total')
 
     print('wind')
     print('{:.4f}'.format(wind[-1]))
     print('CC')
     print('{:.4f}'.format(supernova_cc[-1]))
-    print('Ia')
-    print('{:.4f}'.format(supernova_Ia[-1]))
+    print('WD')
+    print('{:.4f}'.format(supernova_wd[-1]))
     print('total')
     print('{:.4f}'.format(total[-1]))
 
@@ -2042,8 +2068,6 @@ def plot_mass_loss_v_age(
         )
     ut.plot.parse_output(file_name, directory)
 
-    return total
-
 
 def plot_nucleosynthetic_yields(
     event_kinds='wind',
@@ -2061,7 +2085,7 @@ def plot_nucleosynthetic_yields(
     Parameters
     ----------
     event_kinds : str or list
-        stellar event: 'wind', 'supernova.cc', 'supernova.ia', 'all'
+        stellar event: 'wind', 'supernova.cc', 'supernova.wd' or 'supernova.ia', 'all'
     metallicity : float
         metallicity of progenitor [linear mass fraction wrt to Solar]
     model : str
@@ -2080,11 +2104,11 @@ def plot_nucleosynthetic_yields(
     title_dict = {
         'wind': 'winds',
         'supernova.cc': 'SN CC',
-        'supernova.ia': 'SN Ia',
+        'supernova.wd': 'SN WD',
     }
 
     if event_kinds == 'all':
-        event_kinds = ['wind', 'supernova.cc', 'supernova.ia']
+        event_kinds = ['wind', 'supernova.cc', 'supernova.wd', 'supernova.ia']
     elif np.isscalar(event_kinds):
         event_kinds = [event_kinds]
 
@@ -2119,19 +2143,27 @@ def plot_nucleosynthetic_yields(
                 StellarWind = StellarWindClass(model)
                 for element_name in element_yield_dict:
                     element_yield_dict[element_name] = StellarWind.get_mass_loss(
-                        age_min, age_max, metallicity=metallicity, element_name=element_name,
+                        age_min,
+                        age_max,
+                        metallicity=metallicity,
+                        element_name=element_name,
                     )
             elif event_kind == 'supernova.cc':
                 SupernovaCC = SupernovaCCClass(model)
                 for element_name in element_yield_dict:
                     element_yield_dict[element_name] = SupernovaCC.get_mass_loss(
-                        age_min, age_max, metallicity=metallicity, element_name=element_name,
+                        age_min,
+                        age_max,
+                        metallicity=metallicity,
+                        element_name=element_name,
                     )
-            elif event_kind == 'supernova.ia':
-                SupernovaIa = SupernovaIaClass(model)
+            elif event_kind in ['supernova.wd', 'supernova.ia']:
+                SupernovaWD = SupernovaWDClass(model)
                 for element_name in element_yield_dict:
-                    element_yield_dict[element_name] = SupernovaIa.get_mass_loss(
-                        age_min, age_max, element_name=element_name,
+                    element_yield_dict[element_name] = SupernovaWD.get_mass_loss(
+                        age_min,
+                        age_max,
+                        element_name=element_name,
                     )
 
         element_yields = [element_yield_dict[e] for e in element_yield_dict]

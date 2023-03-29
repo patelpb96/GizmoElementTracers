@@ -336,8 +336,8 @@ class ContaminationClass(ut.io.SayClass):
 
     def print_plot_contamination_v_distance_both(
         self,
-        snapshot_value_kind='index',
-        snapshot_value=gizmo_default.snapshot_index,
+        snapshot_value_kind='redshift',
+        snapshot_value=0,
         simulation_directory=gizmo_default.simulation_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
         track_directory=gizmo_default.track_directory,
@@ -696,8 +696,8 @@ class ContaminationClass(ut.io.SayClass):
 def print_galaxy_properties(
     part=None,
     species='star',
-    snapshot_value_kind='index',
-    snapshot_value=gizmo_default.snapshot_index,
+    snapshot_value_kind='redshift',
+    snapshot_value=0,
     simulation_directory=gizmo_default.simulation_directory,
     snapshot_directory=gizmo_default.snapshot_directory,
     track_directory=gizmo_default.track_directory,
@@ -744,8 +744,8 @@ def print_galaxy_properties(
 
 def print_particle_properties_statistics(
     species='all',
-    snapshot_value_kind='index',
-    snapshot_value=gizmo_default.snapshot_index,
+    snapshot_value_kind='redshift',
+    snapshot_value=0,
     simulation_directory=gizmo_default.simulation_directory,
     snapshot_directory=gizmo_default.snapshot_directory,
     track_directory=gizmo_default.track_directory,
@@ -898,8 +898,8 @@ def print_particle_property_extrema_all_snapshots(
 
 
 def print_summary(
-    snapshot_value_kind='index',
-    snapshot_value=gizmo_default.snapshot_index,
+    snapshot_value_kind='redshift',
+    snapshot_value=0,
     simulation_directory=gizmo_default.simulation_directory,
     snapshot_directory=gizmo_default.snapshot_directory,
     track_directory=gizmo_default.track_directory,

@@ -156,7 +156,7 @@ class GroupDictionaryClass(dict,):
                     prop_values = prop_values - self.prop(prop_name, indices)
 
             if prop_values.size == 1:
-                prop_values = np.float(prop_values)
+                prop_values = np.float64(prop_values)
 
             return prop_values
 
@@ -185,13 +185,17 @@ class GroupDictionaryClass(dict,):
                 # mean mass density [Msun / pc ^ 2]
                 values = masses / (4 / 3 * np.pi * radiuss ** 3)
             elif 'virial.parameter' in property_name:
-                # alpha_vir := 5 R sigma_vel,1D ^ 2 / GM [dimensionless]
+                # alpha_vir := 5 * R * (sigma_vel,1D^2 + c_s,1D^2) / (G * M) [dimensionless]
                 # convert to 1-D dispersion, by convention
-                vel_stds = self.prop('vel.std', indices, _dict_only=True) / np.sqrt(3)
+                # TODO: add magnetic term to dispersion
+                vel_std2s = (self.prop('vel.std', indices, _dict_only=True) / 3) ** 2
+                if 'sound.speed' in self:
+                    # add thermal velocity
+                    vel_std2s += (self.prop('sound.speed', indices, _dict_only=True) / 3) ** 2
                 values = (
                     5
                     * (radiuss * ut.constant.km_per_pc)
-                    * vel_stds ** 2
+                    * vel_std2s
                     / ut.constant.grav_km_msun_sec
                     / masses
                 )
@@ -342,12 +346,12 @@ class IOClass(ut.io.SayClass):
         self,
         part,
         species_name='gas',
+        property_select={'number.density': [10, np.Inf], 'temperature': [0, 1e4]},
+        part_indices=None,
         linking_length=20,
         particle_number_min=10,
-        property_select={'number.density': [10, np.Inf], 'temperature': [0, 1e4]},
-        dimension_indices=None,
+        dimension_number=3,
         host_index=0,
-        part_indices=None,
     ):
         '''
         Generate and get dictionary catalog of FoF groups of particles of input species.
@@ -358,28 +362,28 @@ class IOClass(ut.io.SayClass):
             catalog of particles at snapshot
         species_name : str
             name of particle species to use
+        property_select : dict
+            properties to select particles on: names as keys and limits as values
+        part_indices : array
+            prior indices[s] of particles to select
         linking_length : float
             maximum distance to link neighbors [pc physical]
         particle_number_min : int
             minimum number of member particles to keep a group
-        property_select : dict
-            properties to select particles on: names as keys and limits as values
-        dimension_indices : list
-            which dimensions of positions to use (use this to run in 2-D)
+        dimension_number : 3
+            number of spatial dimensions to use (to run in 2-D)
         host_index : int
             index of host galaxy to use to get positions and velocities around
-        part_indices : array
-            prior indices[s] of particles to select
         '''
         grp_dict = ut.particle.get_fof_group_catalog(
             part,
             species_name,
-            linking_length,
-            particle_number_min,
-            dimension_indices,
-            host_index,
             property_select,
             part_indices,
+            linking_length,
+            particle_number_min,
+            dimension_number,
+            host_index,
         )
 
         if grp_dict is None:
@@ -467,15 +471,9 @@ class IOClass(ut.io.SayClass):
             group_directory = ut.io.get_path(group_directory)
 
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
+        snapshot_indices = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_values)
 
         grps = [[] for _ in Snapshot['index']]  # list of group catalogs across all snapshots
-
-        if snapshot_values == 'all' or snapshot_values is None or len(snapshot_values) == 0:
-            # read/write all snapshots
-            snapshot_indices = Snapshot['index']
-        else:
-            # get snapshot index[s] corresponding to input snapshot values
-            snapshot_indices = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_values)
 
         # get names of all existing group files
         path_file_names, file_snapshot_indices = self._get_group_file_names_and_indices(
@@ -735,13 +733,7 @@ class IOClass(ut.io.SayClass):
 
         # read list of all snapshots
         Snapshot = ut.simulation.read_snapshot_times(simulation_directory)
-
-        if snapshot_values == 'all' or snapshot_values is None or len(snapshot_values) == 0:
-            # read all snapshots
-            snapshot_indices = Snapshot['index']
-        else:
-            # get snapshot index[s] corresponding to input snapshot values
-            snapshot_indices = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_values)
+        snapshot_indices = Snapshot.parse_snapshot_values(snapshot_value_kind, snapshot_values)
 
         args_list = []
         for snapshot_index in snapshot_indices:
@@ -829,7 +821,7 @@ class IOClass(ut.io.SayClass):
 
         # generate FoF group catalog of species
         grp = self.generate_group_catalog(
-            part, species_name, linking_length, particle_number_min, property_select,
+            part, species_name, property_select, None, linking_length, particle_number_min,
         )
 
         if grp is None:

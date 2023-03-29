@@ -36,7 +36,7 @@ ID_CHILD_NAME = 'id.child'
 class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
     '''
     Dictionary class to store and compute particle pointer indices (and species names),
-    for tracking star and gas particles across snapshots.
+    for tracking star particles and gas cells across snapshots.
     '''
 
     def __init__(self, part_z0=None, part_z=None, species_names=['star', 'gas']):
@@ -164,7 +164,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
                 and len(species_names_to) == 1
                 and species_names_to[0] == 'gas'
             ):
-                self.say('! gas particles cannot have star particle progenitors')
+                self.say('! gas cells cannot have star particle progenitors')
                 return
         else:
             # track backwards in time, from the reference (z0) snapshot to snapshot z
@@ -175,7 +175,7 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
                 and len(species_names_to) == 1
                 and species_names_to[0] == 'star'
             ):
-                self.say('! gas particles cannot have star particle progenitors')
+                self.say('! gas cells cannot have star particle progenitors')
                 return
 
         pointer_index_name = z_from + 'to.' + z_to + 'index'
@@ -251,8 +251,8 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
         '''
         Assign pointer indices going forward in time, from the earlier (z) snapshot to the
         reference (later) snapshot.
-        Currently, if gas particles split, assigns only one split gas particle as a descendant.
-        TODO: deal with gas particle splitting
+        Currently, if gas cell split, assigns only one split gas cell as a descendant.
+        TODO: deal with gas cells splitting
 
         Parameters
         ----------
@@ -298,8 +298,8 @@ class ParticlePointerDictionaryClass(dict, ut.io.SayClass):
 
 class ParticlePointerClass(ut.io.SayClass):
     '''
-    Read or write particle pointer indicies (and species names), for tracking star and gas particles
-    across snapshots.
+    Read or write particle pointer indicies (and species names), for tracking star particles and
+    gas cells across snapshots.
     '''
 
     def __init__(
@@ -308,7 +308,6 @@ class ParticlePointerClass(ut.io.SayClass):
         simulation_directory=gizmo_default.simulation_directory,
         track_directory=gizmo_default.track_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        reference_snapshot_index=gizmo_default.snapshot_index,
     ):
         '''
         Parameters
@@ -321,8 +320,6 @@ class ParticlePointerClass(ut.io.SayClass):
             directory of files for particle pointers and formation coordinates
         snapshot_directory : str
             directory of snapshot files (within simulation directory)
-        reference_snapshot_index : int
-            index of reference (later) snapshot to compute particle pointers relative to
         '''
         self.id_name = ID_NAME
         self.id_child_name = ID_CHILD_NAME
@@ -333,7 +330,7 @@ class ParticlePointerClass(ut.io.SayClass):
         self.simulation_directory = ut.io.get_path(simulation_directory)
         self.track_directory = ut.io.get_path(track_directory)
         self.snapshot_directory = ut.io.get_path(snapshot_directory)
-        self.reference_snapshot_index = reference_snapshot_index
+        self.reference_snapshot_index = None  # placeholder
 
         self.diagnostic = {}
 
@@ -471,7 +468,7 @@ class ParticlePointerClass(ut.io.SayClass):
             snapshot_index=snapshot_index_to, simulation_directory=simulation_directory
         )
 
-        if self.reference_snapshot_index in [snapshot_index_to, snapshot_index_from]:
+        if PointerTo['z0.snapshot.index'] in [snapshot_index_to, snapshot_index_from]:
             pointer_indices = PointerTo.get_pointers(
                 species_name, species_name, forward=forward, return_single_array=True
             )
@@ -511,7 +508,9 @@ class ParticlePointerClass(ut.io.SayClass):
 
         return pointer_indices
 
-    def generate_write_pointers(self, snapshot_indices='all', proc_number=1):
+    def generate_write_pointers(
+        self, snapshot_indices='all', reference_snapshot_index='final', proc_number=1
+    ):
         '''
         Assign to each particle a pointer from its index at the reference (later) snapshot
         to its index (and species name) at all other (earlier) snapshots.
@@ -521,6 +520,8 @@ class ParticlePointerClass(ut.io.SayClass):
         ----------
         snapshot_indices : array-like
             snapshot indices at which to assign pointers
+        reference_snapshot_index : int or str
+            index of reference (final) snapshot to compute particle pointers relative to
         proc_number : int
             number of parallel processes to run
         '''
@@ -529,16 +530,20 @@ class ParticlePointerClass(ut.io.SayClass):
         if isinstance(snapshot_indices, int):
             snapshot_indices = [snapshot_indices]
 
-        # get list of snapshot indices to assign
+        # parse list of snapshot indices to assign
         if snapshot_indices == 'all' or snapshot_indices is None or len(snapshot_indices) == 0:
             snapshot_indices = Snapshot['index']
         else:
             snapshot_indices = np.array(snapshot_indices)
-            if np.max(snapshot_indices) > self.reference_snapshot_index:
-                self.reference_snapshot_index = np.max(snapshot_indices)
-                self.say(
-                    f'setting reference snapshot to max input index = {np.max(snapshot_indices)}'
-                )
+
+        # parse reference snapshot (typically z = 0)
+        if reference_snapshot_index == 'final' or reference_snapshot_index is None:
+            reference_snapshot_index = int(np.max(Snapshot['index']))
+        assert isinstance(reference_snapshot_index, int)
+        if reference_snapshot_index < np.max(snapshot_indices):
+            reference_snapshot_index = np.max(snapshot_indices)
+            self.say(f'setting reference snapshot to max input index = {np.max(snapshot_indices)}')
+        self.reference_snapshot_index = reference_snapshot_index
 
         # read particles at the reference snapshot (typically z = 0)
         part_z0 = self.GizmoRead.read_snapshots(
@@ -793,7 +798,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
         simulation_directory=gizmo_default.simulation_directory,
         track_directory=gizmo_default.track_directory,
         snapshot_directory=gizmo_default.snapshot_directory,
-        reference_snapshot_index=gizmo_default.snapshot_index,
         host_distance_limits=[0, 30],
         host_edge_percent=90,
     ):
@@ -806,8 +810,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
             directory of simulation
         track_directory : str
             directory of files for particle pointers and formation coordinates
-        reference_snapshot_index : float
-            index of reference (later) snapshot to compute particle pointers from
         snapshot_directory : str
             directory of snapshot files (within simulation directory)
         host_distance_limits : list
@@ -819,12 +821,15 @@ class ParticleCoordinateClass(ut.io.SayClass):
         '''
         self.id_name = ID_NAME
         self.id_child_name = ID_CHILD_NAME
+
         self.species_name = species_name
         assert np.isscalar(self.species_name)
+
         self.simulation_directory = ut.io.get_path(simulation_directory)
         self.track_directory = ut.io.get_path(track_directory)
         self.snapshot_directory = ut.io.get_path(snapshot_directory)
-        self.reference_snapshot_index = reference_snapshot_index
+
+        self.reference_snapshot_index = None  # placeholder
         self.host_distance_limits = host_distance_limits
         self.host_edge_percent = host_edge_percent
         self.host_properties = [
@@ -854,16 +859,17 @@ class ParticleCoordinateClass(ut.io.SayClass):
     ):
         '''
         For each host, read or write its position, velocity, and principal axes at each snapshot,
-        computed tracking back only member particles at the reference snapshot (z = 0).
-        If formation_coordinates is True, or each particle, read or write its 3-D distance and
+        computed by tracking back only member particles at the reference snapshot (z = 0).
+        If formation_coordinates is True, for each particle, read or write its 3-D distance and
         3-D velocity wrt each host galaxy at the first snapshot after it formed,
         aligned with (rotated into) the principal axes of each host at that time.
-        If reading, assign to input particle dictionary.
+        If reading, assign to input dictionary of particles (or halos).
 
         Parameters
         ----------
         part : dict
             catalog of particles at a snapshot
+            (or catalog of halos at a snapshot or catalog of halo merger trees across snapshots)
         simulation_directory : str
             directory of simulation
         track_directory : str
@@ -908,24 +914,38 @@ class ParticleCoordinateClass(ut.io.SayClass):
             # read
             dict_read = ut.io.file_hdf5(path_file_name, verbose=verbose)
 
-            # initialize dictionaries to store host properties across snapshots
-            part.hostz = {}
-            for spec_name in part:
-                part[spec_name].hostz = {}
+            if part.info['catalog.kind'] == 'halo.tree':
+                snapshot_index = -1  # for halo tree across all snapshots, default is final snapshot
+            else:
+                snapshot_index = part.snapshot['index']  # for particle or halo catalog, use current
+
+            # initialize dictionaries to store host properties across snapshots and at this snapshot
+            if 'hostz' not in part.__dict__:
+                part.hostz = {}
+            if 'host' not in part.__dict__:
+                part.host = {}
+            if part.info['catalog.kind'] == 'particle':
+                for spec_name in part:
+                    if 'hostz' not in part[spec_name].__dict__:
+                        part[spec_name].hostz = {}
+                    if 'host' not in part[spec_name].__dict__:
+                        part[spec_name].host = {}
             for prop_name in self.host_properties:
                 part.hostz[prop_name] = []
-                for spec_name in part:
-                    part[spec_name].hostz[prop_name] = []
+                if part.info['catalog.kind'] == 'particle':
+                    for spec_name in part:
+                        part[spec_name].hostz[prop_name] = []
 
             for prop_name in dict_read:
                 if prop_name.lstrip('host.') in part.hostz:
                     # assign hosts' coordinates
                     prop_name_store = prop_name.lstrip('host.')
                     part.hostz[prop_name_store] = dict_read[prop_name]
-                    part.host[prop_name_store] = part.hostz[prop_name_store][part.snapshot['index']]
-                    for spec_name in part:
-                        part[spec_name].hostz[prop_name_store] = dict_read[prop_name]
-                        part[spec_name].host[prop_name_store] = part.host[prop_name_store]
+                    part.host[prop_name_store] = part.hostz[prop_name_store][snapshot_index]
+                    if part.info['catalog.kind'] == 'particle':
+                        for spec_name in part:
+                            part[spec_name].hostz[prop_name_store] = dict_read[prop_name]
+                            part[spec_name].host[prop_name_store] = part.host[prop_name_store]
 
             host_number = part.hostz['position'].shape[1]
             host_string = 'host'
@@ -989,7 +1009,12 @@ class ParticleCoordinateClass(ut.io.SayClass):
                             )
 
     def generate_write_hosts_coordinates(
-        self, part_z0=None, host_number=1, proc_number=1, simulation_directory=None
+        self,
+        part_z0=None,
+        host_number=1,
+        reference_snapshot_index='final',
+        proc_number=1,
+        simulation_directory=None,
     ):
         '''
         Select member particles in each host galaxy at the reference snapshot (usually z = 0).
@@ -1006,6 +1031,9 @@ class ParticleCoordinateClass(ut.io.SayClass):
             catalog of particles at the reference snapshot
         host_number : int
             number of host galaxies to assign and compute coordinates relative to
+        reference_snapshot_index : int or str
+            index of reference (final) snapshot (generally z = 0)
+            if 'final', use final snapshot in snapshot_times.txt
         proc_number : int
             number of parallel processes to run
         simulation_directory : str
@@ -1019,8 +1047,15 @@ class ParticleCoordinateClass(ut.io.SayClass):
         else:
             simulation_directory = ut.io.get_path(simulation_directory)
 
+        if reference_snapshot_index == 'final' or reference_snapshot_index is None:
+            # get list of all snapshot indices, use final one
+            Snapshot = ut.simulation.read_snapshot_times(self.simulation_directory)
+            reference_snapshot_index = int(np.max(Snapshot['index']))
+        assert isinstance(reference_snapshot_index, int)
+        self.reference_snapshot_index = reference_snapshot_index
+
         if part_z0 is None:
-            # read particles at z = 0
+            # read particles at reference snapshot (generally z = 0)
             part_z0 = self.GizmoRead.read_snapshots(
                 self.species_name,
                 'index',
@@ -1149,7 +1184,6 @@ class ParticleCoordinateClass(ut.io.SayClass):
             ParticlePointer = ParticlePointerClass(
                 simulation_directory=self.simulation_directory,
                 track_directory=self.track_directory,
-                reference_snapshot_index=self.reference_snapshot_index,
             )
             try:
                 Pointer = ParticlePointer.io_pointers(snapshot_index=snapshot_index)

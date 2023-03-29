@@ -627,7 +627,7 @@ class ImageClass(ut.io.SayClass):
 
             # convert to number density
             if use_column_units:
-                hist_valuess *= ut.constant.hydrogen_per_sun * ut.constant.kpc_per_cm ** 2
+                hist_valuess *= ut.constant.hydrogen_per_sun * ut.constant.kpc_per_cm**2
                 grid_number = hist_valuess.size
                 lls_number = np.sum((hist_valuess > 1e17) * (hist_valuess < 2e20))
                 dla_number = np.sum(hist_valuess > 2e20)
@@ -952,7 +952,12 @@ def plot_density_distribution(
             weights = part[species_name].prop(weight_property, part_indices)
 
             Stat.append_to_dictionary(
-                prop_values, property_limits, property_bin_width, None, property_log_scale, weights,
+                prop_values,
+                property_limits,
+                property_bin_width,
+                None,
+                property_log_scale,
+                weights,
             )
 
             # Stat.print_statistics(-1)
@@ -1253,11 +1258,6 @@ def plot_property_v_property(
         y_prop_values,
     )
 
-    if x_property_log_scale:
-        x_prop_values = ut.math.get_log(x_prop_values)
-    if y_property_log_scale:
-        y_prop_values = ut.math.get_log(y_prop_values)
-
     axis_x_label = ut.plot.Label.get_label(
         x_property_name, species_name=species_name, get_words=True
     )
@@ -1268,6 +1268,17 @@ def plot_property_v_property(
     )
     subplot.set_ylabel(axis_y_label)
 
+    if x_property_log_scale:
+        axis_x_log_limits = ut.math.get_log(axis_x_limits)
+        axis_x_bins = np.logspace(axis_x_log_limits[0], axis_x_log_limits[1], property_bin_number)
+    else:
+        axis_x_bins = np.linspace(axis_x_limits[0], axis_x_limits[1], property_bin_number)
+    if y_property_log_scale:
+        axis_y_log_limits = ut.math.get_log(axis_y_limits)
+        axis_y_bins = np.logspace(axis_y_log_limits[0], axis_y_log_limits[1], property_bin_number)
+    else:
+        axis_y_bins = np.linspace(axis_y_limits[0], axis_y_limits[1], property_bin_number)
+
     color_map = plt.cm.inferno_r  # pylint: disable=no-member
     # color_map = plt.cm.gist_heat_r  # pylint: disable=no-member
     # color_map = plt.cm.afmhot_r  # pylint: disable=no-member
@@ -1275,7 +1286,8 @@ def plot_property_v_property(
     _valuess, _xs, _ys, _Image = plt.hist2d(
         x_prop_values,
         y_prop_values,
-        property_bin_number,
+        # property_bin_number,
+        [axis_x_bins, axis_y_bins],
         [axis_x_limits, axis_y_limits],
         norm=colors.LogNorm(),
         weights=weights,
@@ -1284,21 +1296,24 @@ def plot_property_v_property(
         cmap=color_map,
     )
 
-    # valuess, _xs, _ys = np.histogram2d(
-    #    x_prop_values, y_prop_values, property_bin_number,
-    #    [axis_x_limits, axis_y_limits],
-    #    weights=masses)
+    """
+    valuess, _xs, _ys = np.histogram2d(
+        x_prop_values, y_prop_values, property_bin_number, [axis_x_limits, axis_y_limits],
+        weights=weights)
 
-    # subplot.imshow(
-    #    valuess.transpose(), norm=colors.LogNorm(), cmap=color_map,
-    #    aspect='auto',
-    #    interpolation='nearest',
-    #    #interpolation='none',
-    #    extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
-    #    #vmin=valuess.min(), vmax=valuess.max(),
-    #    #label=label,
-    # )
-    # plt.colorbar()
+    subplot.imshow(
+        valuess.transpose(),
+        norm=colors.LogNorm(),
+        cmap=color_map,
+        aspect='auto',
+        interpolation='nearest',
+        #interpolation='none',
+        extent=(axis_x_limits[0], axis_x_limits[1], axis_y_limits[0], axis_y_limits[1]),
+        #vmin=valuess.min(), vmax=valuess.max(),
+        #label=label,
+    )
+    plt.colorbar()
+    """
 
     if draw_statistics:
         print(stat['bin.mid'])
@@ -1585,9 +1600,9 @@ def plot_property_v_distance(
             ys_fit = intercept + slope * xs
 
             if distance_log_scale:
-                xs = 10 ** xs
+                xs = 10**xs
             if property_log_scale:
-                ys_fit = 10 ** ys_fit
+                ys_fit = 10**ys_fit
 
         elif fit_kind == 'sech2.single':
 
@@ -1648,6 +1663,169 @@ def plot_property_v_distance(
         if len(parts) == 1:
             pros = pros[0]
         return pros
+
+
+def test_potential_v_distance(
+    parts,
+    species_name='total',
+    property_name='mass',
+    property_statistic='vel.circ',
+    property_log_scale=False,
+    property_limits=[0, None],
+    weight_property=None,
+    distance_limits=[1, 500],
+    distance_bin_width=0.05,
+    distance_log_scale=True,
+    dimension_number=3,
+    rotation=None,
+    other_axis_distance_limits=None,
+    center_positions=None,
+    center_velocities=None,
+    host_index=0,
+    part_indicess=None,
+    plot_file_name=False,
+    plot_directory='.',
+    figure_index=1,
+):
+    '''
+    .
+    '''
+    property_name_pot = 'dark'
+    property_stat_pot = 'median'
+
+    if isinstance(parts, dict):
+        parts = [parts]
+
+    center_positions = ut.particle.parse_property(parts, 'position', center_positions, host_index)
+    if 'velocity' in property_name:
+        center_velocities = ut.particle.parse_property(
+            parts, 'velocity', center_velocities, host_index
+        )
+    else:
+        center_velocities = [center_velocities for _ in center_positions]
+    part_indicess = ut.particle.parse_property(parts, 'indices', part_indicess)
+
+    SpeciesProfile = ut.particle.SpeciesProfileClass(
+        distance_limits,
+        width=distance_bin_width,
+        log_scale=distance_log_scale,
+        dimension_number=dimension_number,
+    )
+
+    pros = []
+    pros_pot = []
+
+    for part_i, part in enumerate(parts):
+        pro = SpeciesProfile.get_profiles(
+            part,
+            species_name,
+            property_name,
+            property_statistic,
+            weight_property,
+            host_index,
+            center_positions[part_i],
+            center_velocities[part_i],
+            rotation,
+            other_axis_distance_limits,
+            None,
+            part_indicess[part_i],
+        )
+
+        pro[species_name][property_statistic] *= pro[species_name][property_statistic]
+
+        pros.append(pro)
+
+        pro = SpeciesProfile.get_profiles(
+            part,
+            property_name_pot,
+            'potential',
+            property_stat_pot,
+            weight_property,
+            host_index,
+            center_positions[part_i],
+            center_velocities[part_i],
+            rotation,
+            other_axis_distance_limits,
+            None,
+            part_indicess[part_i],
+        )
+        pots = pro[property_name_pot][property_stat_pot]
+        dists = pro[property_name_pot]['distance']
+        vcircs = np.diff(pots) / distance_bin_width * np.log10(np.e)
+        # vcircs = np.diff(pots) / np.diff(dists)
+        dists = dists[:-1] + np.diff(dists)
+        # vcircs *= dists
+        pro[property_name_pot][property_stat_pot] = vcircs
+        pro[property_name_pot]['distance'] = dists
+
+        pros_pot.append(pro)
+
+    # plot ----------
+    _fig, subplot = ut.plot.make_figure(figure_index)
+
+    y_values = [pro[species_name][property_statistic] for pro in pros]
+    _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+        subplot,
+        distance_log_scale,
+        distance_limits,
+        None,
+        property_log_scale,
+        property_limits,
+        y_values,
+    )
+
+    axis_x_label = 'radius'
+    axis_x_label = ut.plot.Label.get_label(axis_x_label, get_words=True)
+    subplot.set_xlabel(axis_x_label)
+
+    label_property_name = 'vel.circ'
+    axis_y_label = ut.plot.Label.get_label(
+        label_property_name, property_statistic, species_name, dimension_number=dimension_number
+    )
+    subplot.set_ylabel(axis_y_label)
+
+    colors = ut.plot.get_colors(len(parts))
+
+    # plot profiles
+    if len(pros) == 1:
+        alpha = None
+        linewidth = 3.5
+    else:
+        alpha = 0.7
+        linewidth = None
+
+    for part_i, pro in enumerate(pros):
+        pro_pot = pros_pot[part_i]
+        color = colors[part_i]
+
+        label = parts[part_i].info['simulation.name']
+        if len(pros) > 1 and parts[0].info['simulation.name'] == parts[1].info['simulation.name']:
+            label = '$z={:.1f}$'.format(parts[part_i].snapshot['redshift'])
+
+        masks = pro[species_name][property_statistic] != 0  # plot only non-zero values
+        subplot.plot(
+            pro[species_name]['distance'][masks],
+            pro[species_name][property_statistic][masks],
+            color=color,
+            alpha=alpha,
+            linewidth=linewidth,
+            label=label,
+        )
+
+        masks = pro_pot[property_name_pot][property_stat_pot] != 0  # plot only non-zero values
+        subplot.plot(
+            pro_pot[property_name_pot]['distance'][masks],
+            pro_pot[property_name_pot][property_stat_pot][masks],
+            color=color,
+            alpha=alpha,
+            linewidth=linewidth,
+            linestyle='--',
+            label=label,
+        )
+
+    ut.plot.make_legends(subplot, time_value=parts[0].snapshot['redshift'])
+
+    ut.plot.parse_output(plot_file_name, plot_directory)
 
 
 def plot_velocity_distribution(
@@ -1821,7 +1999,7 @@ def plot_neighbors_v_distance(
     distance_bin_width=0.1,
     distance_log_scale=True,
     neig_number_max=5000,
-    dimension_indices=None,
+    dimension_number=3,
     host_index=0,
     property_select={'host.distance.total': [1, 20], 'age': [0, 0.2]},
     neighbor_statistic='density.norm',
@@ -1848,8 +2026,8 @@ def plot_neighbors_v_distance(
         whether to use logarithmic scaling for separation distance bins
     neig_number_max : int
         maximum number of neighbors to find per particle
-    dimension_indices : list
-        which dimensions to get coordinates of
+    dimension_number : int
+        number of spatial dimensions to use
     host_index : int
         index of host galaxy/halo to get position and/or velocity of (if not input them)
     property_select : dict
@@ -1871,11 +2049,6 @@ def plot_neighbors_v_distance(
     if isinstance(parts, dict):
         parts = [parts]
 
-    if dimension_indices is not None:
-        dimension_number = len(dimension_indices)
-    else:
-        dimension_number = parts[0][species_name]['position'].shape[1]
-
     DistanceBin = ut.binning.DistanceBinClass(
         distance_limits,
         distance_bin_width,
@@ -1888,11 +2061,11 @@ def plot_neighbors_v_distance(
         neig_distancess, _neig_indicess = ut.particle.get_neighbors(
             part,
             species_name,
-            max(distance_limits),
-            neig_number_max,
-            dimension_indices,
-            host_index,
             property_select=property_select,
+            neig_distance_max=max(distance_limits),
+            neig_number_max=neig_number_max,
+            dimension_number=dimension_number,
+            host_index=host_index,
         )
         neig_distances = neig_distancess[(neig_distancess > 0) * (neig_distancess < np.Inf)]
         pro = DistanceBin.get_sum_profile(neig_distances)
@@ -2008,7 +2181,7 @@ def print_densities(
             area = (
                 np.pi
                 * (max(distance_limitss[0]) ** 2 - min(distance_limitss[0]) ** 2)
-                * ut.constant.kilo ** 2
+                * ut.constant.kilo**2
             )
             area *= (max(distance_limitss[1]) - min(distance_limitss[1])) / (2 * np.pi)
             # compute volume [pc^3]
@@ -2259,7 +2432,11 @@ class ElementAgeTracerClass(ut.io.SayClass):
     '''
 
     def test_agetracers(
-        self, part, species_name='star', weight_property=None, pindices=None,
+        self,
+        part,
+        species_name='star',
+        weight_property=None,
+        pindices=None,
     ):
         '''
         Test element-to-element variations in abundance ratios (normalizing out the median ratio)
@@ -2354,7 +2531,7 @@ class ElementAgeTracerClass(ut.io.SayClass):
         massfraction_initial = {}
         for element_name in FIREYield.sun_massfraction:
             massfraction_initial[element_name] = (
-                10 ** metallicity_initial * FIREYield.sun_massfraction[element_name]
+                10**metallicity_initial * FIREYield.sun_massfraction[element_name]
             )
 
         med_old = -Inf
@@ -2419,7 +2596,10 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         for progenitor_metallicity in progenitor_metallicities:
             gizmo_agetracer.initialize_agetracers(
-                part, species_name, progenitor_metallicity, yield_model=yield_model,
+                part,
+                species_name,
+                progenitor_metallicity,
+                yield_model=yield_model,
             )
             metal_dict = {}
             for element_name in element_names:
@@ -2683,7 +2863,10 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
-                y_property_name, x_property_name, species_name, snapshot_dict=part.snapshot,
+                y_property_name,
+                x_property_name,
+                species_name,
+                snapshot_dict=part.snapshot,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -2787,7 +2970,10 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
-                property_name, time_name, species_name, snapshot_dict=part.snapshot,
+                property_name,
+                time_name,
+                species_name,
+                snapshot_dict=part.snapshot,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -2890,7 +3076,13 @@ class ElementAgeTracerClass(ut.io.SayClass):
         ]
 
         _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
-            subplot, distance_log_scale, distance_limits, None, False, property_limits, y_values,
+            subplot,
+            distance_log_scale,
+            distance_limits,
+            None,
+            False,
+            property_limits,
+            y_values,
         )
 
         if dimension_number in [2, 3]:
@@ -2922,7 +3114,9 @@ class ElementAgeTracerClass(ut.io.SayClass):
 
         if plot_file_name is True or plot_file_name == '':
             plot_file_name = ut.plot.get_file_name(
-                property_name + '.' + property_statistic, distance_name, species_name,
+                property_name + '.' + property_statistic,
+                distance_name,
+                species_name,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -2931,11 +3125,733 @@ ElementAgeTracer = ElementAgeTracerClass()
 
 
 # --------------------------------------------------------------------------------------------------
+# ISM
+# --------------------------------------------------------------------------------------------------
+class ISMClass(ut.io.SayClass):
+    '''
+    .
+    '''
+
+    def get_positions_sampled(
+        self,
+        parts,
+        species_name='gas',
+        property_select={},
+        part_indicess=None,
+        radius_limits=[3, 12],
+        height_limits=[-0.1, 0.1],
+        coordinate_modifier='principal',
+        host_index=0,
+        dimension_number=3,
+        sample_number=100,
+    ):
+        '''
+        .
+        '''
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        positionss = []
+
+        for part_i, part in enumerate(parts):
+            part_spec = part[species_name]
+
+            part_indices = None
+            if part_indicess is not None:
+                part_indices = part_indicess[part_i]
+
+            position_name, _velocity_name = ut.particle.parse_coordinate_names(
+                host_index, coordinate_modifier
+            )
+
+            if property_select:
+                part_indices = ut.catalog.get_indices_catalog(
+                    part_spec, property_select, part_indices
+                )
+
+            positions_cyl = None
+
+            if radius_limits is not None and len(radius_limits) > 0:
+                if positions_cyl is None:
+                    positions_cyl = part_spec.prop(f'{position_name}.cylindrical')
+                part_indices = ut.array.get_indices(
+                    positions_cyl[:, 0], radius_limits, part_indices
+                )
+
+            if height_limits is not None and len(height_limits) > 0:
+                if positions_cyl is None:
+                    positions_cyl = part_spec.prop(f'{position_name}.cylindrical')
+                part_indices = ut.array.get_indices(
+                    positions_cyl[:, 2], height_limits, part_indices
+                )
+
+            part_indices = np.random.choice(part_indices, sample_number)
+
+            if positions_cyl is not None:
+                R_med = np.median(positions_cyl[part_indices, 0])
+                Z_med = np.median(np.abs(positions_cyl[part_indices, 2]))
+                self.say('  R median = {:.2f} kpc'.format(R_med))
+                self.say('|Z| median = {:.2f} kpc'.format(Z_med))
+
+            positions = part_spec.prop(position_name, part_indices)
+
+            if dimension_number == 2:
+                positions = positions[:, [0, 1]]
+
+            positionss.append(positions)
+
+        return np.array(positionss)
+
+    def get_velocity_dispersion_v_distance(
+        self,
+        center_positionss,
+        parts,
+        species_name='gas',
+        property_select={},
+        part_indicess=None,
+        weight_by_mass=True,
+        neig_number_max=300000,
+        distance_limits=[0.001, 2],
+        distance_bin_width=0.01,
+        distance_log_scale=True,
+        coordinate_modifier='principal',
+        host_index=0,
+        periodic=False,
+    ):
+        '''
+        .
+        '''
+        if np.ndim(center_positionss) == 1:
+            center_positionss = [center_positionss]
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        assert len(center_positionss) == len(parts)
+
+        veldisp = {}
+        for part_i, part in enumerate(parts):
+            center_positions = center_positionss[part_i]
+
+            part_indices = None
+            if part_indicess is not None:
+                part_indices = part_indicess[part_i]
+
+            veldisp_p = ut.particle.get_velocity_dispersion_v_distance(
+                center_positions,
+                part,
+                species_name,
+                property_select,
+                part_indices,
+                weight_by_mass,
+                neig_number_max,
+                distance_limits,
+                distance_bin_width,
+                distance_log_scale,
+                coordinate_modifier,
+                host_index,
+                periodic,
+            )
+            veldisp_p['simulation.name'] = part.info['simulation.name']
+
+            ut.array.append_dictionary(veldisp, veldisp_p)
+
+        return veldisp
+
+        # self.plot_velocity_dispersion_v_distance(
+        #    veldisp, species_name, distance_limits, distance_log_scale,
+        # )
+
+    def plot_velocity_dispersion_v_distance(
+        self,
+        veldisp,
+        species_name='gas',
+        distance_limits=[0.003, 2],
+        distance_log_scale=True,
+        veldisp_limits=[1, 100],
+        veldisp_log_scale=True,
+        plot_file_name=False,
+        plot_directory='.',
+    ):
+        '''
+        .
+        '''
+        galaxy_number = len(veldisp['distance'])
+        distances = veldisp['distance'][0] * 1e3
+        distance_limits = np.array(distance_limits) * 1e3
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure()
+
+        _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+            subplot,
+            distance_log_scale,
+            distance_limits,
+            None,
+            veldisp_log_scale,
+            veldisp_limits,
+            veldisp['cum.median.50'],
+        )
+
+        # subplot.yaxis.set_minor_locator(ticker.AutoMinorLocator(10))
+
+        subplot.set_xlabel('radius $r$ $\\left[ {{\\rm pc}} \\right]$')
+        subplot.set_ylabel('$\sigma_{\\rm vel,3D}(< r)$ $\\left[ {{\\rm km / s}} \\right]$')
+
+        colors = ut.plot.get_colors(galaxy_number)
+
+        for pi in range(galaxy_number):
+            label = veldisp['simulation.name'][pi] + ' median'
+            color = colors[pi]
+
+            subplot.fill_between(
+                distances,
+                veldisp['cum.median.16'][pi],
+                veldisp['cum.median.84'][pi],
+                color=color,
+                alpha=0.4,
+            )
+            subplot.plot(
+                distances,
+                veldisp['cum.median.50'][pi],
+                color=color,
+                alpha=0.8,
+                label=label,
+            )
+            """
+            label = veldisp['simulation.name'][pi] + ' average'
+            subplot.fill_between(
+                distances,
+                veldisp['cum.average.16'][pi],
+                veldisp['cum.average.84'][pi],
+                color=color,
+                alpha=0.4,
+            )
+            subplot.plot(
+                distances, veldisp['cum.average.50'][pi], color=color, alpha=0.8, label=label,
+            )
+            """
+        ut.plot.make_legends(subplot)
+
+        if plot_file_name is True or plot_file_name == '':
+            # property_y = 'disk.orientation'
+            # plot_file_name = ut.plot.get_file_name(
+            #    property_y, property_name, snapshot_dict=part.snapshot
+            # )
+            plot_file_name = f'{species_name}_veldisp_v_rad'
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+
+ISM = ISMClass()
+
+
+# --------------------------------------------------------------------------------------------------
+# stellar mass growth v radius
+# --------------------------------------------------------------------------------------------------
+class MassRadiusClass(ut.io.SayClass):
+    '''
+    .
+    '''
+
+    def __init__(self):
+        '''
+        .
+        '''
+        self.species_name = 'star'
+
+    def plot_age_v_distance(
+        self,
+        parts,
+        distance_limits=[0, 16],
+        distance_bin_width=0.25,
+        distance_log_scale=False,
+        dimension_number=2,
+        height_limits=[-3, 3],
+        age_limits=[0, 10],
+        age_log_scale=False,
+        age_statistic='median',
+        host_index=0,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        Plot average age v radial distance (today and at formation).
+
+        Parameters
+        ----------
+        parts : dict or list
+            catalog[s] of particles
+        species_names : str or list
+            name[s] of particle species to compute: 'star', 'gas', 'dark'
+        property_name : str
+            which property to vary (along x-axis): 'distance', 'age'
+        property_limits : list
+            min and max property for binning
+        property_bin_width : float
+            width of property bin
+        property_log_scale : bool
+            whether to use logarithmic scaling for property
+        host_index : int
+            index of host galaxy/halo to get stored position of (if not input it)
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        species_name = self.species_name
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        host_name = ut.catalog.get_host_name(host_index)
+
+        DistanceBin = ut.binning.DistanceBinClass(
+            distance_limits,
+            distance_bin_width,
+            log_scale=distance_log_scale,
+            dimension_number=dimension_number,
+        )
+
+        stat = {
+            'now': [],
+            'form': [],
+        }
+
+        for part_i, part in enumerate(parts):
+            ages = part[species_name].prop('age')
+
+            # use properties at this snapshot
+            masses = part[species_name].prop('mass')
+
+            pindices = None
+            if dimension_number == 3:
+                distances = part[species_name].prop(f'{host_name}.distance.total')
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+            elif dimension_number == 2:
+                distances = part[species_name].prop(f'{host_name}.distance.cyl')
+                pindices = ut.array.get_indices(distances[:, 2], height_limits, pindices)
+                distances = distances[:, 0]
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+
+            stat_i = DistanceBin.get_statistics_profile(
+                distances[pindices], ages[pindices], masses[pindices], verbose=True
+            )
+            stat['now'].append(stat_i)
+
+            # use properties at formation
+            masses = part[species_name].prop('form.mass')
+
+            pindices = None
+            if dimension_number == 3:
+                distances = part[species_name].prop(f'form.{host_name}.distance.total')
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+            elif dimension_number == 2:
+                distances = part[species_name].prop(f'form.{host_name}.distance.cyl')
+                pindices = ut.array.get_indices(distances[:, 2], height_limits, pindices)
+                distances = distances[:, 0]
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+
+            stat_i = DistanceBin.get_statistics_profile(
+                distances[pindices], ages[pindices], masses[pindices], verbose=True
+            )
+            stat['form'].append(stat_i)
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+            subplot,
+            distance_log_scale,
+            distance_limits,
+            None,
+            age_log_scale,
+            age_limits,
+        )
+
+        subplot.set_xlabel('radius [kpc]')
+        subplot.set_ylabel('age [Gyr]')
+
+        if len(parts) > 1:
+            colors = ut.plot.get_colors(len(parts))
+        else:
+            colors = ut.plot.get_colors(2)
+
+        for part_i, part in enumerate(parts):
+            for time_i, time_kind in enumerate(['form', 'now']):
+                stat_i = stat[time_kind][part_i]
+
+                if len(parts) > 1:
+                    color = colors[part_i]
+                else:
+                    color = colors[time_i]
+
+                subplot.fill_between(
+                    stat_i['distance.mid'],
+                    stat_i['percent.16'],
+                    stat_i['percent.84'],
+                    color=color,
+                    linestyle='-',
+                    alpha=0.4,
+                )
+                subplot.plot(
+                    stat_i['distance.mid'],
+                    stat_i[age_statistic],
+                    color=color,
+                    alpha=0.7,
+                    label=time_kind,
+                )
+
+        ut.plot.make_legends(subplot)
+
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+    def plot_massfraction_v_distance(
+        self,
+        parts,
+        distance_limits=[0, 16],
+        distance_bin_width=0.25,
+        distance_log_scale=False,
+        dimension_number=2,
+        height_limits=[-3, 3],
+        age_limits=[0, 12],
+        age_bin_width=1.5,
+        age_log_scale=False,
+        # mass_statistic='dif',
+        host_index=0,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        Plot average age v radial distance (today and at formation).
+
+        Parameters
+        ----------
+        parts : dict or list
+            catalog[s] of particles
+        property_name : str
+            which property to vary (along x-axis): 'distance', 'age'
+        property_limits : list
+            min and max property for binning
+        property_bin_width : float
+            width of property bin
+        property_log_scale : bool
+            whether to use logarithmic scaling for property
+        host_index : int
+            index of host galaxy/halo to get stored position of (if not input it)
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        species_name = self.species_name
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        host_name = ut.catalog.get_host_name(host_index)
+
+        DistanceBin = ut.binning.DistanceBinClass(
+            distance_limits,
+            distance_bin_width,
+            log_scale=distance_log_scale,
+            dimension_number=dimension_number,
+        )
+
+        AgeBin = ut.binning.BinClass(
+            age_limits,
+            age_bin_width,
+            log_scale=age_log_scale,
+        )
+
+        ratio = {
+            'now': np.zeros((len(parts), AgeBin.number, DistanceBin.number)),
+            'form': np.zeros((len(parts), AgeBin.number, DistanceBin.number)),
+        }
+
+        for part_i, part in enumerate(parts):
+            ages = part[species_name].prop('age')
+
+            # use properties at this snapshot
+            masses = part[species_name].prop('mass')
+
+            pindices = None
+            if dimension_number == 3:
+                distances = part[species_name].prop(f'{host_name}.distance.total')
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+            elif dimension_number == 2:
+                distances = part[species_name].prop(f'{host_name}.distance.cyl')
+                pindices = ut.array.get_indices(distances[:, 2], height_limits, pindices)
+                distances = distances[:, 0]
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+
+            stat_all = DistanceBin.get_sum_profile(
+                distances[pindices], masses[pindices], verbose=True
+            )
+            for age_i, age_min in enumerate(AgeBin.maxs):
+                pindices_age = ut.array.get_indices(ages, [age_min, np.Inf], pindices)
+                stat_i = DistanceBin.get_sum_profile(
+                    distances[pindices_age], masses[pindices_age], verbose=True
+                )
+
+                ratio['now'][part_i, age_i] = stat_i['sum'] / stat_all['sum']
+
+            # use properties at formation
+            masses = part[species_name].prop('form.mass')
+
+            pindices = None
+            if dimension_number == 3:
+                distances = part[species_name].prop(f'form.{host_name}.distance.total')
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+            elif dimension_number == 2:
+                distances = part[species_name].prop(f'form.{host_name}.distance.cyl')
+                pindices = ut.array.get_indices(distances[:, 2], height_limits, pindices)
+                distances = distances[:, 0]
+                pindices = ut.array.get_indices(distances, distance_limits, pindices)
+
+            stat_all = DistanceBin.get_sum_profile(
+                distances[pindices], masses[pindices], verbose=True
+            )
+            for age_i, age_min in enumerate(AgeBin.maxs):
+                pindices_age = ut.array.get_indices(ages, [age_min, np.Inf], pindices)
+                stat_i = DistanceBin.get_sum_profile(
+                    distances[pindices_age], masses[pindices_age], verbose=True
+                )
+
+                ratio['form'][part_i, age_i] = stat_i['sum'] / stat_all['sum']
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+            subplot,
+            distance_log_scale,
+            distance_limits,
+            None,
+            False,
+            [0, 1],
+        )
+
+        subplot.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+
+        subplot.set_xlabel('radius [kpc]')
+        subplot.set_ylabel('$M(> age)/M_{\\rm total}$')
+
+        if len(parts) > 1:
+            colors = ut.plot.get_colors(len(parts))
+        else:
+            colors = ut.plot.get_colors(AgeBin.number)
+
+        for part_i, part in enumerate(parts):
+            for _time_i, time_kind in enumerate(['now', 'form']):
+                for age_i, age_min in enumerate(AgeBin.maxs):
+
+                    if len(parts) > 1:
+                        color = colors[part_i]
+                    else:
+                        color = colors[age_i]
+
+                    if time_kind == 'form':
+                        linestyle = '-'
+                        label = 'age > {:.1f} Gyr'.format(age_min)
+                    elif time_kind == 'now':
+                        linestyle = '--'
+                        label = None
+
+                    subplot.plot(
+                        DistanceBin.mids,
+                        ratio[time_kind][part_i, age_i],
+                        color=color,
+                        linestyle=linestyle,
+                        alpha=0.7,
+                        label=label,
+                    )
+
+        ut.plot.make_legends(subplot)
+
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+    def plot_radius_v_age(
+        self,
+        parts,
+        age_limits=[0, 13.5],
+        age_bin_width=0.5,
+        age_log_scale=False,
+        mass_percents=[20, 50, 90],
+        mass_distance_max=30,
+        distance_limits=[0, 13],
+        dimension_number=2,
+        height_limits=[-3, 3],
+        host_index=0,
+        plot_file_name=False,
+        plot_directory='.',
+        figure_index=1,
+    ):
+        '''
+        Plot average age v radial distance (today and at formation).
+
+        Parameters
+        ----------
+        parts : dict or list
+            catalog[s] of particles
+        property_name : str
+            which property to vary (along x-axis): 'distance', 'age'
+        property_limits : list
+            min and max property for binning
+        property_bin_width : float
+            width of property bin
+        property_log_scale : bool
+            whether to use logarithmic scaling for property
+        host_index : int
+            index of host galaxy/halo to get stored position of (if not input it)
+        plot_file_name : str
+            whether to write figure to file and its name. True = use default naming convention
+        plot_directory : str
+            directory to write figure file
+        figure_index : int
+            index of figure for matplotlib
+        '''
+        species_name = self.species_name
+
+        if isinstance(parts, dict):
+            parts = [parts]
+
+        host_name = ut.catalog.get_host_name(host_index)
+
+        AgeBin = ut.binning.BinClass(
+            age_limits,
+            age_bin_width,
+            log_scale=age_log_scale,
+        )
+
+        radius = {
+            'now': np.zeros((len(parts), len(mass_percents), AgeBin.number)),
+            'form': np.zeros((len(parts), len(mass_percents), AgeBin.number)),
+        }
+
+        for part_i, part in enumerate(parts):
+            ages = part[species_name].prop('age')
+
+            # use properties at this snapshot
+            # masses = part[species_name].prop('mass')
+
+            form_distance_comov = part[species_name].prop(f'form.{host_name}.distance.total')
+            form_distance_comov *= part[species_name].prop('form.scalefactor')
+            pindices = ut.array.get_indices(form_distance_comov, [0, 30])
+
+            # pindices = None
+
+            if dimension_number == 3:
+                distances = part[species_name].prop(f'{host_name}.distance.total')
+                pindices_d = ut.array.get_indices(distances, [0, mass_distance_max], pindices)
+            elif dimension_number == 2:
+                distances = part[species_name].prop(f'{host_name}.distance.cyl')
+                pindices_d = ut.array.get_indices(distances[:, 2], height_limits, pindices)
+                distances = distances[:, 0]
+                pindices_d = ut.array.get_indices(distances, [0, mass_distance_max], pindices_d)
+
+            for age_i, age_min in enumerate(AgeBin.mins):
+                # age_bin_limits = [age_min, np.Inf]
+                age_bin_limits = [age_min, AgeBin.maxs[age_i]]
+                pindices_age = ut.array.get_indices(ages, age_bin_limits, pindices_d)
+                for m_i, mass_percent in enumerate(mass_percents):
+                    r = np.percentile(distances[pindices_age], mass_percent)
+                    # r = ut.math.percentile_weighted(
+                    #    distances[pindices_age], mass_percent, masses[pindices_age]
+                    # )
+                    radius['now'][part_i, m_i, age_i] = r
+
+            # use properties at formation
+            # masses = part[species_name].prop('form.mass')
+
+            if dimension_number == 3:
+                distances = part[species_name].prop(f'form.{host_name}.distance.total')
+                pindices_d = ut.array.get_indices(distances, [0, mass_distance_max], pindices)
+            elif dimension_number == 2:
+                distances = part[species_name].prop(f'form.{host_name}.distance.cyl')
+                pindices_d = ut.array.get_indices(distances[:, 2], height_limits, pindices)
+                distances = distances[:, 0]
+                pindices_d = ut.array.get_indices(distances, [0, mass_distance_max], pindices_d)
+
+            for age_i, age_min in enumerate(AgeBin.mins):
+                # age_bin_limits = [age_min, np.Inf]
+                age_bin_limits = [age_min, AgeBin.maxs[age_i]]
+                pindices_age = ut.array.get_indices(ages, age_bin_limits, pindices_d)
+                for m_i, mass_percent in enumerate(mass_percents):
+                    r = np.percentile(distances[pindices_age], mass_percent)
+                    # r = ut.math.percentile_weighted(
+                    #    distances[pindices_age], mass_percent, masses[pindices_age]
+                    # )
+                    radius['form'][part_i, m_i, age_i] = r
+
+        # plot ----------
+        _fig, subplot = ut.plot.make_figure(figure_index)
+
+        _axis_x_limits, _axis_y_limits = ut.plot.set_axes_scaling_limits(
+            subplot,
+            age_log_scale,
+            age_limits,
+            None,
+            False,
+            distance_limits,
+        )
+
+        subplot.xaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+        # subplot.yaxis.set_major_locator(ticker.AutoLocator(1))
+        subplot.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+
+        subplot.set_xlabel('age [Gyr]')
+        subplot.set_ylabel('radius [kpc]')
+
+        if len(parts) > 1:
+            colors = ut.plot.get_colors(len(parts))
+        else:
+            colors = ut.plot.get_colors(len(mass_percents))
+
+        for part_i, part in enumerate(parts):
+            for _time_i, time_kind in enumerate(['now', 'form']):
+                for m_i, mass_percent in enumerate(mass_percents):
+
+                    if len(parts) > 1:
+                        color = colors[part_i]
+                    else:
+                        color = colors[m_i]
+
+                    if time_kind == 'form':
+                        linestyle = '-'
+                        label = f'$R_{{{mass_percent}}}$'
+                    elif time_kind == 'now':
+                        linestyle = '--'
+                        label = None
+
+                    subplot.plot(
+                        AgeBin.mins,
+                        radius[time_kind][part_i, m_i],
+                        color=color,
+                        linestyle=linestyle,
+                        alpha=0.7,
+                        label=label,
+                    )
+
+        ut.plot.make_legends(subplot)
+
+        ut.plot.parse_output(plot_file_name, plot_directory)
+
+
+MassRadius = MassRadiusClass()
+
+
+# --------------------------------------------------------------------------------------------------
 # host galaxy disk
 # --------------------------------------------------------------------------------------------------
 class DiskClass(ut.io.SayClass):
     '''
-    .
+    Examine the disk orientation and axis ratios.
     '''
 
     def plot_orientation_v_property(
@@ -2948,6 +3864,7 @@ class DiskClass(ut.io.SayClass):
         property_log_scale=False,
         reference_distance_max=8.2,
         center_positions=None,
+        center_velocities=None,
         host_index=0,
         plot_file_name=False,
         plot_directory='.',
@@ -2974,6 +3891,8 @@ class DiskClass(ut.io.SayClass):
             reference distance to compute principal axes
         center_positions : array or list of arrays
             position of center for each particle catalog
+        center_velocities : array or list of arrays
+            velocity of center for each particle catalog
         host_index : int
             index of host galaxy/halo to get stored position of (if not input it)
         plot_file_name : str
@@ -2994,6 +3913,10 @@ class DiskClass(ut.io.SayClass):
             parts, 'position', center_positions, host_index
         )
 
+        center_velocities = ut.particle.parse_property(
+            parts, 'velocity', center_velocities, host_index
+        )
+
         PropertyBin = ut.binning.BinClass(
             property_limits, property_bin_width, include_max=True, log_scale=property_log_scale
         )
@@ -3010,6 +3933,7 @@ class DiskClass(ut.io.SayClass):
                 reference_distance_max,
                 age_limits=[0, 1],
                 center_positions=center_positions[part_i],
+                center_velocities=center_velocities[part_i],
                 host_index=host_index,
                 verbose=False,
             )
@@ -3048,6 +3972,7 @@ class DiskClass(ut.io.SayClass):
                         spec_name,
                         distance_max,
                         center_positions=center_positions[part_i],
+                        center_velocities=center_velocities[part_i],
                         host_index=host_index,
                         part_indicess=part_indices,
                         verbose=False,
@@ -3126,7 +4051,7 @@ class DiskClass(ut.io.SayClass):
         time_name='time.lookback',
         time_limits=[0, 13],
         time_log_scale=False,
-        refrence_snapshot_index=gizmo_default.snapshot_index,
+        refrence_snapshot_index=600,
         axis_indices=[0, 1, 2],
         angle_limits=[0, 90],
         host_index=0,
@@ -3320,7 +4245,7 @@ Disk = DiskClass()
 
 
 # --------------------------------------------------------------------------------------------------
-# formation history
+# star formation history
 # --------------------------------------------------------------------------------------------------
 class StarFormHistoryClass(ut.io.SayClass):
     '''
@@ -3373,7 +4298,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         property_select : dict
             properties to select on: names as keys and limits as values
         part_indicess : array
-            part_indices of particles from which to select
+            indices of particles from which to select
         sfh_limits : list
             min and max limits for y-axis
         sfh_log_scale : bool
@@ -3423,6 +4348,7 @@ class StarFormHistoryClass(ut.io.SayClass):
                 time_log_scale,
                 distance_limits,
                 center_positions[part_i],
+                host_index,
                 property_select,
                 part_indicess[part_i],
             )
@@ -3492,7 +4418,12 @@ class StarFormHistoryClass(ut.io.SayClass):
             if time_name == 'redshift' and min(time_limits) > 1.1 * parts[0].snapshot['redshift']:
                 time_value = min(time_limits)
             plot_file_name = ut.plot.get_file_name(
-                sfh_name + '.history', time_name, 'star', 'redshift', parts[0].snapshot, time_value,
+                sfh_name + '.history',
+                time_name,
+                'star',
+                'redshift',
+                parts[0].snapshot,
+                time_value,
             )
         ut.plot.parse_output(plot_file_name, plot_directory)
 
@@ -3802,7 +4733,7 @@ class StarFormHistoryClass(ut.io.SayClass):
         # get formation times of star particles, sorted from earliest
         part_indices_sort = part_indices[np.argsort(part[species].prop('form.time', part_indices))]
         form_times = part[species].prop('form.time', part_indices_sort)
-        # need to store as 64-bit float to avoid precision error with cumsum below
+        # avoid precision error with cumsum below
         form_masses = part[species].prop('form.mass', part_indices_sort).astype(np.float64)
         current_masses = part[species]['mass'][part_indices_sort].astype(np.float64)
 
@@ -3817,8 +4748,6 @@ class StarFormHistoryClass(ut.io.SayClass):
 
         current_mass_cum_bins = np.interp(time_bins, form_times, np.cumsum(current_masses))
         current_mass_difs = np.diff(current_mass_cum_bins)
-
-        print(np.cumsum(current_masses))
 
         # convert to midpoints of bins
         current_mass_cum_bins = (
@@ -4480,11 +5409,11 @@ class HalosClass(ut.io.SayClass):
             if hii > 0 and hii % 10 == 0:
                 ut.io.print_flush(hii)
             pis = ut.particle.get_indices_within_coordinates(
-                part, 'dark', [0, radius], hal['position'][hi]
+                part, 'dark', None, [0, radius], hal['position'][hi]
             )
             hal[mass_key][hi] = ut.halo_property.get_circular_velocity(pis.size * dark_mass, radius)
 
-    def plot_vel_circ_v_radius(
+    def plot_vel_circ_v_distance(
         self,
         parts=None,
         hals=None,
@@ -5002,8 +5931,8 @@ def explore_galaxy(
     distance_bin_width=0.2,
     distance_bin_number=None,
     plot_only_members=True,
-    plot_file_name=False,
-    plot_directory='.',
+    # plot_file_name=False,
+    # plot_directory='.',
 ):
     '''
     Print and plot several properties of galaxies in list.
@@ -5039,7 +5968,7 @@ def explore_galaxy(
 
     if part is not None:
         if not distance_max and 'star.radius.90' in hal:
-            distance_max = 2 * hal.prop('star.radius.90', hi)
+            distance_max = 3 * hal.prop('star.radius.90', hi)
 
         if 'star' in species_plot and 'star' in part and 'star.indices' in hal:
             part_indices = None
@@ -5059,8 +5988,6 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('star.position', hi),
                 part_indices=part_indices,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=10,
             )
 
@@ -5072,150 +5999,131 @@ def explore_galaxy(
                 'histogram',
                 [0, 1, 2],
                 [0, 1, 2],
-                distance_max * 4,
+                distance_max,
                 distance_bin_width,
                 distance_bin_number,
                 hal.prop('star.position', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=11,
             )
 
-            plot_property_distribution(
+            # image of all nearby particles
+            Image.plot_image(
                 part,
                 'star',
-                'velocity.total',
-                [0, None],
-                2,
-                None,
-                False,
+                'mass',
                 'histogram',
-                [],
+                [0, 1, 2],
+                [0, 1, 2],
+                distance_max * 5,
+                distance_bin_width,
+                distance_bin_number,
                 hal.prop('star.position', hi),
-                hal.prop('star.velocity', hi),
-                0,
-                {},
-                part_indices,
-                [0, None],
-                False,
-                plot_file_name,
-                plot_directory,
                 figure_index=12,
             )
 
-            try:
-                element_name = 'metallicity.iron'
-                hal.prop('star.' + element_name)
-            except KeyError:
-                element_name = 'metallicity.metals'
+            # distribution of total velocity
+            plot_property_distribution(
+                part,
+                'star',
+                property_name='velocity.total',
+                property_limits=[0, None],
+                property_bin_width=2,
+                property_bin_number=None,
+                property_log_scale=False,
+                property_statistic='histogram',
+                distance_limits=[0, distance_max],
+                center_positions=hal.prop('star.position', hi),
+                center_velocities=hal.prop('star.velocity', hi),
+                part_indicess=part_indices,
+                axis_y_limits=[0, None],
+                axis_y_log_scale=False,
+                figure_index=13,
+            )
 
             plot_property_distribution(
                 part,
                 'star',
-                element_name,
-                [-4, 1],
-                0.1,
-                None,
-                False,
-                'histogram',
+                property_name='metallicity.iron',
+                property_limits=[-4, 0.5],
+                property_bin_width=0.1,
+                property_bin_number=None,
+                property_log_scale=False,
+                property_statistic='histogram',
+                distance_limits=[0, distance_max],
+                center_positions=hal.prop('star.position', hi),
                 part_indicess=part_indices,
                 axis_y_limits=[0, None],
                 axis_y_log_scale=False,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
-                figure_index=13,
-            )
-
-            plot_property_v_distance(
-                part,
-                'star',
-                'mass',
-                'density',
-                True,
-                [None, None],
-                None,
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
-                center_positions=hal.prop('star.position', hi),
-                part_indicess=part_indices,
-                distance_reference=hal.prop('star.radius.50', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=14,
             )
 
-            # plot_property_v_distance(
-            #    part, 'star', 'mass', 'sum.cum', True, False, None,
-            #    [0.1, distance_max], 0.1, True, 3,
-            #    center_positions=hal.prop('star.position', hi), part_indicess=part_indices,
-            #    distance_reference=hal.prop('star.radius.50', hi),
-            #    plot_file_name=plot_file_name, plot_directory=plot_directory, figure_index=15,
-            # )
+            StarFormHistory.plot_star_form_history(
+                part,
+                sfh_name='mass.normalized',
+                time_name='time.lookback',
+                time_limits=[13.6, 0],
+                time_width=0.2,
+                time_log_scale=False,
+                distance_limits=[0, distance_max],
+                center_positions=hal.prop('star.position', hi),
+                part_indicess=part_indices,
+                sfh_limits=[0, 1],
+                sfh_log_scale=False,
+                figure_index=15,
+            )
 
             plot_property_v_distance(
                 part,
                 'star',
-                'velocity.total',
-                'std.cum',
-                False,
-                [None, None],
-                'mass',
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
+                property_name='mass',
+                property_statistic='density',
+                property_log_scale=True,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
+                dimension_number=3,
                 center_positions=hal.prop('star.position', hi),
-                center_velocities=hal.prop('star.velocity', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=16,
             )
 
             plot_property_v_distance(
                 part,
                 'star',
-                element_name,
-                'median',
-                False,
-                [None, None],
-                'mass',
-                [0.1, distance_max],
-                0.2,
-                True,
-                3,
+                property_name='velocity.total',
+                property_statistic='std.cum',
+                property_log_scale=False,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
                 center_positions=hal.prop('star.position', hi),
+                center_velocities=hal.prop('star.velocity', hi),
                 part_indicess=part_indices,
                 distance_reference=hal.prop('star.radius.50', hi),
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=17,
             )
 
-            StarFormHistory.plot_star_form_history(
+            plot_property_v_distance(
                 part,
-                'mass.normalized',
-                'time.lookback',
-                [13.6, 0],
-                0.2,
-                False,
+                'star',
+                property_name='metallicity.iron',
+                property_statistic='median',
+                property_log_scale=False,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.2,
+                distance_log_scale=True,
+                center_positions=hal.prop('star.position', hi),
                 part_indicess=part_indices,
-                sfh_limits=[0, 1],
-                sfh_log_scale=False,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
+                distance_reference=hal.prop('star.radius.50', hi),
                 figure_index=18,
             )
 
         if 'dark' in species_plot and 'dark' in part:
             part_indices = None
-
-            center_position = hal.prop('position', hi)
-            # if 'star.position' in hal:
-            #    center_position = hal.prop('star.position', hi)
 
             if 'star.radius.50' in hal:
                 distance_reference = hal.prop('star.radius.50', hi)
@@ -5235,8 +6143,6 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('star.position', hi),
                 background_color='black',
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=20,
             )
 
@@ -5253,57 +6159,39 @@ def explore_galaxy(
                 distance_bin_number,
                 hal.prop('position', hi),
                 background_color='black',
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=21,
             )
 
             plot_property_v_distance(
                 part,
                 'dark',
-                'mass',
-                'density',
-                True,
-                [None, None],
-                None,
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
-                center_positions=center_position,
+                property_name='mass',
+                property_statistic='density',
+                property_log_scale=True,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
+                center_positions=hal.prop('position', hi),
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
                 figure_index=22,
             )
-
-            # plot_property_v_distance(
-            #    part, 'dark', 'velocity.total', 'std.cum', False, True, None,
-            #    [0.1, distance_max], 0.1, True', 3,
-            #    center_positions=center_position, center_velocities=center_velocity,
-            #    part_indicess=part_indices,
-            #    distance_reference=distance_reference,
-            #    plot_file_name=plot_file_name, plot_directory=plot_directory, figure_index=23)
 
             plot_property_v_distance(
                 part,
                 'dark',
-                'mass',
-                'vel.circ',
-                False,
-                [None, None],
-                None,
-                [0.1, distance_max],
-                0.1,
-                True,
-                3,
-                center_positions=center_position,
+                property_name='mass',
+                property_statistic='vel.circ',
+                property_log_scale=False,
+                property_limits=[None, None],
+                distance_limits=[0.1, distance_max],
+                distance_bin_width=0.1,
+                distance_log_scale=True,
+                center_positions=hal.prop('position', hi),
                 part_indicess=part_indices,
                 distance_reference=distance_reference,
-                plot_file_name=plot_file_name,
-                plot_directory=plot_directory,
-                figure_index=24,
+                figure_index=23,
             )
 
         if 'gas' in species_plot and 'gas' in part and 'gas.indices' in hal:
@@ -5324,8 +6212,6 @@ def explore_galaxy(
                     distance_bin_number,
                     hal.prop('star.position', hi),
                     part_indices=part_indices,
-                    plot_file_name=plot_file_name,
-                    plot_directory=plot_directory,
                     figure_index=30,
                 )
 
@@ -5341,8 +6227,6 @@ def explore_galaxy(
                     distance_bin_number,
                     hal.prop('star.position', hi),
                     part_indices=part_indices,
-                    plot_file_name=plot_file_name,
-                    plot_directory=plot_directory,
                     figure_index=31,
                 )
             else:
@@ -5994,7 +6878,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     distance_max,
                     distance_bin_width,
                     rotation=align_principal_axes,
-                    image_limits=[10 ** 6, 10 ** 10.5],
+                    image_limits=[10**6, 10**10.5],
                     background_color='black',
                     plot_file_name=True,
                     plot_directory=plot_directory,
@@ -6012,7 +6896,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     distance_max,
                     distance_bin_width,
                     rotation=align_principal_axes,
-                    image_limits=[10 ** 4, 10 ** 9],
+                    image_limits=[10**4, 10**9],
                     background_color='black',
                     plot_file_name=True,
                     plot_directory=plot_directory,
@@ -6030,7 +6914,7 @@ class CompareSimulationsClass(ut.io.SayClass):
                     distance_max,
                     distance_bin_width,
                     rotation=align_principal_axes,
-                    image_limits=[10 ** 5.5, 10 ** 9],
+                    image_limits=[10**5.5, 10**9],
                     background_color='black',
                     plot_file_name=True,
                     plot_directory=plot_directory,

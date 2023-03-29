@@ -15,8 +15,8 @@ import utilities as ut
 from . import gizmo_default
 from . import gizmo_io
 
-# default subset of snapshots (65 snapshots)
-snapshot_indices_keep = [
+# default subset of 65 snapshots for FIRE-2
+snapshot_indices_subset = [
     0,  # z = 99
     20,
     26,
@@ -84,6 +84,48 @@ snapshot_indices_keep = [
     600,
 ]
 
+snapshot_indices_public = [
+    20,
+    23,
+    26,
+    29,
+    33,
+    37,
+    41,
+    46,
+    52,  # z = 6
+    59,
+    67,  # z = 5
+    77,
+    88,  # z = 4
+    102,
+    120,  # z = 3
+    142,
+    172,  # z = 2
+    214,
+    277,  # z = 1
+    294,
+    312,
+    332,
+    356,
+    382,
+    412,
+    446,
+    486,
+    534,  # z = 0.1
+    590,  # z = 0.0016
+    591,
+    592,
+    593,
+    594,
+    595,
+    596,
+    597,
+    598,
+    599,
+    600,
+]
+
 
 # --------------------------------------------------------------------------------------------------
 # compress files
@@ -94,7 +136,9 @@ class CompressClass(ut.io.SayClass):
     '''
 
     def __init__(
-        self, manipulate_hdf5_directory='~/analysis/manipulate_hdf5', python_executable='python3',
+        self,
+        manipulate_hdf5_directory='~/analysis/manipulate_hdf5',
+        python_executable='python3',
     ):
         '''
         Parameters
@@ -665,7 +709,7 @@ class ArchiveClass(ut.io.SayClass):
     ):
         '''
         Delete all snapshots in simulation_directory/snapshot_directory/ that are within
-        snapshot_index_limits, except for those in snapshot_indices_keep list.
+        snapshot_index_limits, except for those in snapshot_indices_subset list.
 
         Parameters
         ----------
@@ -692,7 +736,7 @@ class ArchiveClass(ut.io.SayClass):
 
         print()
         for snapshot_index in snapshot_indices:
-            if snapshot_index not in snapshot_indices_keep:
+            if snapshot_index not in snapshot_indices_subset:
                 snapshot_name = (
                     simulation_directory
                     + snapshot_directory
@@ -722,24 +766,28 @@ class GlobusClass(ut.io.SayClass):
     def submit_transfer(
         self,
         simulation_path_directory=gizmo_default.simulation_directory,
-        snapshot_directory=gizmo_default.snapshot_directory,
+        machine_name='flatiron',
         batch_file_name='globus_batch.txt',
-        machine_name='peloton',
     ):
         '''
         Submit transfer of simulation files via Globus command-line utility.
-        Must initiate from Stampede.
+        Must initiate from Stampede2.
+
+        Install Globus CLI:
+            conda install -c conda-forge globus-cli
+        Create bookmark:
+            globus bookmark create '7961b534-3f0e-11e7-bd15-22000b9a448b:/' stampede
+                '0c9d7c36-ea22-11e5-97d6-22000b9da45e:/share/wetzellab/' peloton-scratch
+                'a90a2f92-c5ca-11e9-9ced-0edb67dd7a14:/fire2/public_release/' flatiron-fire2-public
 
         Parameters
         ----------
         simulation_path_directory : str
             '.' or full path + directory of simulation
-        snapshot_directory : str
-            directory of snapshot files within simulation_directory
-        batch_file_name : str
-            name of file to write
         machine_name : str
             name of machine transfering files to
+        batch_file_name : str
+            name of batch file to write
         '''
         # set directory from which to transfer
         simulation_path_directory = ut.io.get_path(simulation_path_directory)
@@ -748,37 +796,50 @@ class GlobusClass(ut.io.SayClass):
         if simulation_path_directory[-1] != '/':
             simulation_path_directory += '/'
 
-        # preceeding '/' already in globus bookmark
-        command = f'globus transfer $(globus bookmark show stampede){simulation_path_directory[1:]}'
-
         path_directories = simulation_path_directory.split('/')
         simulation_directory = path_directories[-2]
+
+        # set globus transfer command
+        command = 'globus transfer --sync-level=checksum --preserve-mtime --verify-checksum'
+        command += f' --label "{simulation_directory}" --batch {batch_file_name}'
+        # [1:] because preceeding '/' already in globus bookmark
+        command += f' $(globus bookmark show stampede){simulation_path_directory[1:]}'
 
         # parse machine + directory to transfer to
         if machine_name == 'peloton':
             if 'elvis' in simulation_directory:
-                directory_to = 'm12_elvis'
+                simulation_directory_to = 'm12_elvis'
             else:
-                directory_to = simulation_directory.split('_')[0]
-            directory_to += '/' + simulation_directory + '/'
+                simulation_directory_to = simulation_directory.split('_')[0]
+            simulation_directory_to += '/' + simulation_directory + '/'
 
-            command += f' $(globus bookmark show peloton-scratch){directory_to}'
+            command += f' $(globus bookmark show peloton-scratch){simulation_directory_to}'
 
-        # set globus parameters
-        command += ' --sync-level=checksum --preserve-mtime --verify-checksum'
-        command += f' --label "{simulation_directory}" --batch < {batch_file_name}'
+            # write globus batch file
+            self.write_globus_batch_file_peloton(simulation_path_directory, batch_file_name)
 
-        # write globus batch file
-        self.write_batch_file(simulation_path_directory, snapshot_directory, batch_file_name)
+        elif machine_name == 'flatiron':
+            simulation_directory_to = simulation_directory.replace('_r', '_res') + '/'
+            if simulation_directory[0] == 'm':
+                simulation_directory_to = 'core/' + simulation_directory_to
+            elif simulation_directory[0] == 'A':
+                simulation_directory_to = 'massive_halo/' + simulation_directory_to
+            elif simulation_directory[0] == 'z':
+                simulation_directory_to = 'high_redshift/' + simulation_directory_to
+
+            command += f' $(globus bookmark show flatiron-fire2-public){simulation_directory_to}'
+
+            # write globus batch file
+            self.write_globus_batch_file_public(simulation_path_directory, batch_file_name)
 
         self.say(f'* executing:\n{command}\n')
         os.system(command)
 
-    def write_batch_file(
+    def write_globus_batch_file_peloton(
         self,
         simulation_directory=gizmo_default.simulation_directory,
-        snapshot_directory=gizmo_default.snapshot_directory,
-        file_name='globus_batch.txt',
+        batch_file_name='globus_batch.txt',
+        snapshot_indices=snapshot_indices_subset,
     ):
         '''
         Write a batch file that sets files to transfer via globus.
@@ -787,59 +848,144 @@ class GlobusClass(ut.io.SayClass):
         ----------
         simulation_directory : str
             directory of simulation
-        snapshot_directory : str
-            directory of snapshot files within simulation_directory
-        file_name : str
-            name of batch file to write
+        batch_file_name : str
+            name of globus batch file in which to write files to transfer
+        snapshot_indices : array
+            snapshot_indices to transfer
         '''
         simulation_directory = ut.io.get_path(simulation_directory)
-        snapshot_directory = ut.io.get_path(snapshot_directory)
+        snapshot_directory = gizmo_default.snapshot_directory
+        ic_directory = gizmo_default.ic_directory
 
         transfer_string = ''
 
-        # general files
+        # files and directories (transfer everything within)
         transfer_items = [
             'gizmo/',
-            'gizmo_config.sh',
+            'Config.sh',
+            'gizmo_config.h',
+            'GIZMO_config.h',
             'gizmo_parameters.txt',
             'gizmo_parameters.txt-usedvalues',
             'gizmo.out.txt',
             'snapshot_times.txt',
             'notes.txt',
+            f'{ic_directory}/',
             'track/',
             'halo/rockstar_dm/catalog_hdf5/',
         ]
+
+        # add these files, and if a directory, everything within
         for transfer_item in transfer_items:
             if os.path.exists(simulation_directory + transfer_item):
                 command = '{} {}'
                 if transfer_item[-1] == '/':
                     transfer_item = transfer_item[:-1]
                     command += ' --recursive'
-                command = command.format(transfer_item, transfer_item) + '\n'
-                transfer_string += command
+                transfer_string += command.format(transfer_item, transfer_item) + '\n'
 
+        """
         # initial condition files
-        transfer_items = glob.glob(simulation_directory + gizmo_default.ic_directory + '*')
-        transfer_items.sort()
-        for transfer_item in transfer_items:
+        file_names = glob.glob(simulation_directory + gizmo_default.ic_directory + '*')
+        file_names.sort()
+        for file_name in file_names:
             if '.ics' not in transfer_item:
-                transfer_item = transfer_item.replace(simulation_directory, '')
-                command = f'{transfer_item} {transfer_item}\n'
-                transfer_string += command
+                file_name = file_name.replace(simulation_directory, '')
+                transfer_string += f'{file_name} {file_name}\n'
+        """
 
-        # snapshot files
-        for snapshot_index in snapshot_indices_keep:
-            snapshot_name = '{}snapdir_{:03d}'.format(snapshot_directory, snapshot_index)
-            if os.path.exists(simulation_directory + snapshot_name):
-                snapshot_string = f'{snapshot_name} {snapshot_name} --recursive\n'
-                transfer_string += snapshot_string
+        # add snapshot files
+        for si in snapshot_indices:
+            dir_name = f'{snapshot_directory}' + 'snapdir_{:03d}'.format(si)
+            if os.path.exists(simulation_directory + dir_name):
+                transfer_string += f'{dir_name} {dir_name} --recursive\n'
+            file_name = f'{snapshot_directory}' + 'snapshot_{:03d}.hdf5'.format(si)
+            if os.path.exists(simulation_directory + file_name):
+                transfer_string += f'{file_name} {file_name}\n'
 
-            snapshot_name = '{}snapshot_{:03d}.hdf5'.format(snapshot_directory, snapshot_index)
-            if os.path.exists(simulation_directory + snapshot_name):
-                snapshot_string = f'{snapshot_name} {snapshot_name}\n'
-                transfer_string += snapshot_string
+        with open(batch_file_name, 'w', encoding='utf-8') as file_out:
+            file_out.write(transfer_string)
 
-        with open(file_name, 'w', encoding='utf-8') as file_out:
+    def write_globus_batch_file_public(
+        self,
+        simulation_directory=gizmo_default.simulation_directory,
+        batch_file_name='globus_batch.txt',
+        snapshot_indices=snapshot_indices_public,
+    ):
+        '''
+        Write a batch file that sets files to transfer via globus,
+        for FIRE-2 public data release at Flatiron.
+
+        Parameters
+        ----------
+        simulation_directory : str
+            directory of simulation
+        batch_file_name : str
+            name of globus batch file in which to write files to transfer
+        snapshot_indices : array
+            snapshot_indices to transfer
+        '''
+        simulation_directory = ut.io.get_path(simulation_directory)
+        snapshot_directory = gizmo_default.snapshot_directory
+        ic_directory = gizmo_default.ic_directory
+        track_directory = gizmo_default.track_directory
+        hosts_coordinates_file_name = gizmo_default.hosts_coordinates_file_name
+        rockstar_directory = 'halo/rockstar_dm/'
+
+        transfer_string = ''
+
+        # files and directories (transfer everything within)
+        transfer_items = [
+            'Config.sh',
+            'gizmo_config.h',
+            'GIZMO_config.h',
+            'gizmo_parameters.txt',
+            'gizmo_parameters.txt-usedvalues',
+            'snapshot_times.txt',
+            f'{ic_directory}',
+            f'{track_directory}{hosts_coordinates_file_name}',
+            f'{track_directory}star_exsitu_flag_600.txt',
+        ]
+
+        # add these files, and if a directory, everything within
+        for transfer_item in transfer_items:
+            if os.path.exists(simulation_directory + transfer_item):
+                command = '{} {}'
+                if transfer_item[-1] == '/':
+                    transfer_item = transfer_item[:-1]
+                    command += ' --recursive'
+                transfer_string += command.format(transfer_item, transfer_item) + '\n'
+
+        # add snapshot files
+        for si in snapshot_indices:
+            dir_name = f'{snapshot_directory}' + 'snapdir_{:03d}'.format(si)
+            if os.path.exists(simulation_directory + dir_name):
+                transfer_string += f'{dir_name} {dir_name} --recursive\n'
+            file_name = f'{snapshot_directory}' + 'snapshot_{:03d}.hdf5'.format(si)
+            if os.path.exists(simulation_directory + file_name):
+                transfer_string += f'{file_name} {file_name}\n'
+
+        # add track files
+        for si in snapshot_indices:
+            file_name = f'{track_directory}' + 'star_gas_pointers_{:03d}.hdf5'.format(si)
+            if os.path.exists(simulation_directory + file_name):
+                transfer_string += f'{file_name} {file_name}\n'
+
+        # add halo files
+        for si in snapshot_indices:
+            file_name = f'{rockstar_directory}' + 'catalog_hdf5/' + 'halo_{:03d}.hdf5'.format(si)
+            if os.path.exists(simulation_directory + file_name):
+                transfer_string += f'{file_name} {file_name}\n'
+
+            file_name = f'{rockstar_directory}' + 'catalog_hdf5/' + 'star_{:03d}.hdf5'.format(si)
+            if os.path.exists(simulation_directory + file_name):
+                transfer_string += f'{file_name} {file_name}\n'
+
+            file_name = f'{rockstar_directory}' + 'catalog/' + 'out_{:03d}.list'.format(si)
+            if os.path.exists(simulation_directory + file_name):
+                transfer_string += f'{file_name} {file_name}\n'
+
+        with open(batch_file_name, 'w', encoding='utf-8') as file_out:
             file_out.write(transfer_string)
 
 
@@ -848,7 +994,7 @@ class GlobusClass(ut.io.SayClass):
 # --------------------------------------------------------------------------------------------------
 class RsyncClass(ut.io.SayClass):
     '''
-     Use rsync to copy simulations files from remote machine to local directory.
+    Use rsync to copy simulations files from remote machine to local directory.
     '''
 
     def __init__(self):
@@ -863,7 +1009,7 @@ class RsyncClass(ut.io.SayClass):
         machine_from,
         simulation_directory_from='',
         simulation_directory_to='.',
-        snapshot_indices=snapshot_indices_keep,
+        snapshot_indices=snapshot_indices_subset,
     ):
         '''
         Use rsync to copy snapshot files from a single simulations directory on a remote machine to
@@ -1011,7 +1157,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             simulation_directory = str(sys.argv[2])
 
-        snapshot_index_limits = [0, gizmo_default.snapshot_index]
+        snapshot_index_limits = [0, 600]
         if len(sys.argv) > 3:
             snapshot_index_limits[0] = int(sys.argv[3])
             if len(sys.argv) > 4:
@@ -1071,6 +1217,9 @@ if __name__ == '__main__':
 
         Rsync = RsyncClass()
         Rsync.rsync_simulation_files(
-            machine_from, directory_from, directory_to, snapshot_index=600,
+            machine_from,
+            directory_from,
+            directory_to,
+            snapshot_index=600,
         )
         Rsync.rsync_snapshot_files(machine_from, directory_from, directory_to)
