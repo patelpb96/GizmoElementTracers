@@ -475,6 +475,7 @@ class feedback:
                     if plot:
                         plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Mannucci")
                     else:
+                        print("Return 1")
                         return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
 
         if model_version == 'maoz':
@@ -519,6 +520,7 @@ class feedback:
             plt.loglog(a_ia, r_ia, label = "Mannucci")
 
         r_ia *= ejecta_masses[self.source]
+        print("Return 2")
         return r_ia, a_ia, transition_ages
 
 '''

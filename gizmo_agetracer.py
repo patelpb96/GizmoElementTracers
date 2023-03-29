@@ -298,16 +298,13 @@ class FIREYieldClass:
         snwd_rate = self.SupernovaWD.get_mass_loss_rate(age)
 
         if test == 'winds':
-            sncc_rate = 0
-            snwd_rate = 0
+            return self.NucleosyntheticYield['wind'][element_name] * wind_rate
         
         if test == 'cc':
-            wind_rate = 0
-            snwd_rate = 0
+            return self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate
 
         if test == 'ia':
-            wind_rate = 0
-            sncc_rate = 0
+            return self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate
 
         element_yield_rate = (
             self.NucleosyntheticYield['wind'][element_name] * wind_rate
@@ -322,7 +319,7 @@ class FIREYieldClass2:
     Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
     '''
 
-    def __init__(self, model='fire2', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], normalization_ia = 1.6e-5):
+    def __init__(self, model='fire2.1', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], normalization_ia = 1.6e-5):
         '''
         Parameters
         -----------
@@ -569,18 +566,15 @@ class FIREYieldClass2:
         r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
 
         if test_process == 'winds':
-            r_ia = 0
-            r_cc = 0
+            return r_w
             #print("TESTING WINDS")
 
         if test_process == 'cc':
-            r_w = 0
-            r_ia = 0
+            return r_cc
             #print("TESTING CCSN")
 
         if test_process == 'ia':
-            r_cc = 0
-            r_w = 0
+            return r_ia
             #print("TESTING IA")
 
 
