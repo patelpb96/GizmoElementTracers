@@ -508,6 +508,25 @@ class FIREYieldClass2:
                 age_min = 0  # ensure min age starts arbitrarily close to 0
             age_max = age_bins[ai + 1]
 
+            if continuous == True and fast_int == False:
+
+                for element_name in element_names:
+                    # get the integrated yield mass within/across the age bin
+                    element_yield_dict[element_name][ai] = integrate.quad(
+                        self._feedback_handler,
+                        age_min,
+                        age_max,
+                        args = (element_name),
+                        points = self.ages_transition,
+                        epsabs = int_error,
+                        limit = lim
+                    )[0]
+
+                    #c = self._feedback_handler(age_min, element_name, test)
+                    #log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
+                    #print(log)
+                return element_yield_dict
+
             if continuous == False:
                 for element_name in element_names:
                     #print("For " + str(element_name) + "in " + str(element_names))
@@ -575,25 +594,6 @@ class FIREYieldClass2:
                 for element_name in element_names:
                     # get the integrated yield mass within/across the age bin
                     element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
-
-            if continuous == True:
-
-                for element_name in element_names:
-                    # get the integrated yield mass within/across the age bin
-                    element_yield_dict[element_name][ai] = integrate.quad(
-                        self._feedback_handler,
-                        age_min,
-                        age_max,
-                        args = (element_name),
-                        points = self.ages_transition,
-                        epsabs = int_error,
-                        limit = lim
-                    )[0]
-
-                    #c = self._feedback_handler(age_min, element_name, test)
-                    #log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
-                    #print(log)
-                return element_yield_dict
 
 
         #print(self.ages_transition)
