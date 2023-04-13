@@ -343,8 +343,6 @@ class FIREYieldClass2:
         self.ia_model = ia_type
         self.ia_transition_time = trans_time_ia
         self.ia_normalization = normalization_ia
-        self.integrator_eps_default = 1.5e-8
-        self.integrator_lim_default = 50
 
         #print("Self.ia_model = " + str(ia_type))
         
@@ -417,7 +415,7 @@ class FIREYieldClass2:
         #for event_kind in self._event_kinds:
         #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()
             
-    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 50):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 10):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -508,25 +506,6 @@ class FIREYieldClass2:
                 age_min = 0  # ensure min age starts arbitrarily close to 0
             age_max = age_bins[ai + 1]
 
-            if continuous == True and fast_int == False:
-
-                for element_name in element_names:
-                    # get the integrated yield mass within/across the age bin
-                    element_yield_dict[element_name][ai] = integrate.quad(
-                        self._feedback_handler,
-                        age_min,
-                        age_max,
-                        args = (element_name),
-                        points = self.ages_transition,
-                        epsabs = int_error,
-                        limit = lim
-                    )[0]
-
-                    #c = self._feedback_handler(age_min, element_name, test)
-                    #log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
-                    #print(log)
-                return element_yield_dict
-
             if continuous == False:
                 for element_name in element_names:
                     #print("For " + str(element_name) + "in " + str(element_names))
@@ -594,6 +573,24 @@ class FIREYieldClass2:
                 for element_name in element_names:
                     # get the integrated yield mass within/across the age bin
                     element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
+
+            if continuous == True:
+
+                for element_name in element_names:
+                    # get the integrated yield mass within/across the age bin
+                    element_yield_dict[element_name][ai] = integrate.quad(
+                        self._feedback_handler,
+                        age_min,
+                        age_max,
+                        args = (element_name),
+                        points = self.ages_transition,
+                        epsabs = int_error,
+                        limit = lim
+                    )[0]
+
+                    #c = self._feedback_handler(age_min, element_name, test)
+                    #log = str(c) + ",FY2," +str(ai) + "," + str(element_name)
+                    #print(log)
 
 
         #print(self.ages_transition)
