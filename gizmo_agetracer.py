@@ -417,7 +417,7 @@ class FIREYieldClass2:
         #for event_kind in self._event_kinds:
         #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()
             
-    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 50):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, *args):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
