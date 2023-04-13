@@ -604,7 +604,6 @@ class NucleosyntheticYieldClass(dict):
                     element_yield[element_name] = np.clip(element_yield[element_name], 0, 1)
 
         if return_mass:
-            print("EJECTA MASS BEING MULTIPLIED TWICE POTENTIALLY ")
             # convert to yield masses [M_sun]
             for element_name in element_yield:
                 element_yield[element_name] *= ejecta_mass

@@ -59,7 +59,7 @@ for yield_dict in all_yields:
     for element_name in yield_dict:
         #print(element_name)
         if element_name != 'helium':
-            print(yield_dict[element_name])
+            #print(yield_dict[element_name])
             yield_dict['metals'] += yield_dict[element_name]
 
 
@@ -99,6 +99,7 @@ def get_simulation_directory(dirkey = False):
             'm10_res250_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res250',
             'm11_880' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r880',
             'm11_110' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r110',
+            'm12i_7100_old' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/agetracer/m12i_r7100_old',
             'test' : 'test'}
 
         return dirs
@@ -370,7 +371,7 @@ class feedback:
             return element_yields(self.source)[self.element]*r_wind, a_wind, transition_ages
 
         else:
-                print("ELSE WIN")
+                #print("ELSE WIN")
                 return r_wind, a_wind, transition_ages
 
         if plot:
@@ -479,7 +480,7 @@ class feedback:
                     if plot:
                         plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Mannucci")
                     else:
-                        print("Return 1")
+                        #print("Return 1")
                         return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
 
         if model_version == 'maoz':
@@ -524,7 +525,7 @@ class feedback:
             plt.loglog(a_ia, r_ia, label = "Mannucci")
 
         r_ia *= ejecta_masses[self.source]
-        print("Return 2")
+        #print("Return 2")
         return r_ia, a_ia, transition_ages
 
 '''

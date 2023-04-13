@@ -14,7 +14,7 @@ The age-tracer weights are dimensionless, in units of mass fraction.
 Specifically, each injected weight is: the total mass of the star particle at that timestep,
 multiplied by the geometric fraction of the wind/ejecta mass that would have been deposited into
 the gas cell, divided by the mass of the gas cell at that timestep.
-An age-tracer weight of 1 in an age bin means that the gas cell received winds/ejecta
+An age-tracer weight of 1.0 in an age bin means that the gas cell received winds/ejecta
 from 1 or several star particle[s] equal to the gas cell's own mass for a duration that spans
 the age bin. Thus, to convert an age-tracer mass weight to an element abundance (mass fraction),
 multiply the age-tracer weight by the nucleosynthetic yield mass of an element produced/injected
@@ -260,9 +260,10 @@ class FIREYieldClass:
                     age_min,
                     age_max,
                     (element_name,test),
-                    points=self.ages_transition,
+                    points=self.ages_transition
                 )[0]
 
+        #print(self.ages_transition)
         return element_yield_dict
 
     def _get_element_yield_rate(self, age, element_name, test = False, progenitor_metallicity=None):
@@ -348,7 +349,7 @@ class FIREYieldClass2:
         assert self.model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
         # this class computes the yields
-        self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
+        #self.NucleosyntheticYield = gizmo_star.NucleosyntheticYieldClass(model)
         self.NucleosyntheticYield = gizmo_model.nucleosyntheticYieldDict
         #print("Type NucleosyntheticYield: " + str(type(self.NucleosyntheticYield)))
         #print(self.NucleosyntheticYield)
@@ -414,7 +415,7 @@ class FIREYieldClass2:
         #for event_kind in self._event_kinds:
         #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()
             
-    def get_element_yields(self, age_bins, element_names=None, continuous = False, fast_int = True, testing = False):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 10):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -448,8 +449,8 @@ class FIREYieldClass2:
         #print("element names: " + str(element_names))
         #print("element names type: " + str(type(element_names)))
 
-        print("continuous: " + str(continuous))
-        print("fast_integ: " + str(fast_int)) # refers to the simplifcation of the yield dictionary. 
+        #print("continuous: " + str(continuous))
+        #print("fast_integ: " + str(fast_int)) # refers to the simplifcation of the yield dictionary. 
 
         # initialize main dictionary
         element_yield_dict = {}
@@ -461,7 +462,7 @@ class FIREYieldClass2:
             print("FATAL ERROR !! ")
             self.ages_transition = None
 
-        if fast_int == True:
+        if old_int == True:
             integrals = [[],[],[]]
 
             r_ia, a_ia, t_ia = self.gizmo_model.feedback(source = 'ia', ia_model= self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
@@ -492,7 +493,9 @@ class FIREYieldClass2:
 
             for ai in np.arange(np.size(age_bins) - 1):
                 for element_name in element_names:
-                    element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*integrals[0][ai] + self.gizmo_model.element_yield_cc[element_name]*integrals[1][ai] + self.gizmo_model.element_yield_wind[element_name]*integrals[2][ai]
+                    element_yield_dict[element_name][ai] = (self.gizmo_model.element_yield_ia[element_name]*integrals[0][ai] +
+                                                             self.gizmo_model.element_yield_cc[element_name]*integrals[1][ai] +
+                                                               self.gizmo_model.element_yield_wind[element_name]*integrals[2][ai])
 
                 return element_yield_dict
 
@@ -535,17 +538,54 @@ class FIREYieldClass2:
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
             #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
+            #test = False
 
-            test = testing
+            if continuous and fast_int:
+
+                int_w = integrate.quad(
+                    self._feedback_handler,
+                    age_min,
+                    age_max,
+                    args = (False,'winds'),
+                    points = self.ages_transition,
+                    epsabs = int_error,
+                    limit = lim
+                )[0]
+                int_cc = integrate.quad(
+                    self._feedback_handler,
+                    age_min,
+                    age_max,
+                    args = (False,'cc'),
+                    points = self.ages_transition,
+                    epsabs = int_error,
+                    limit = lim
+                )[0]
+                int_ia = integrate.quad(
+                    self._feedback_handler,
+                    age_min,
+                    age_max,
+                    args = (False,'ia'),
+                    points = self.ages_transition,
+                    epsabs = int_error,
+                    limit = lim
+                )[0]
+                
+                for element_name in element_names:
+                    # get the integrated yield mass within/across the age bin
+                    element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
+
             if continuous == True:
+
                 for element_name in element_names:
                     # get the integrated yield mass within/across the age bin
                     element_yield_dict[element_name][ai] = integrate.quad(
                         self._feedback_handler,
                         age_min,
                         age_max,
-                        (element_name,test),
-                        points=self.ages_transition
+                        args = (element_name),
+                        points = self.ages_transition,
+                        epsabs = int_error,
+                        limit = lim
                     )[0]
 
                     #c = self._feedback_handler(age_min, element_name, test)
@@ -553,30 +593,32 @@ class FIREYieldClass2:
                     #print(log)
 
 
+        #print(self.ages_transition)
         return element_yield_dict
 
-    def _feedback_handler(self, some_time, element_of_choice, test_process):
+    def _feedback_handler(self, some_time, element_of_choice, test_process = False):
         #print("eoc: " + str(element_of_choice))
     
         element_name = element_of_choice
 
-            
-        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
-        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
-        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
-
         if test_process == 'winds':
+            r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
             return r_w
             #print("TESTING WINDS")
 
         if test_process == 'cc':
+            r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
             return r_cc
             #print("TESTING CCSN")
 
         if test_process == 'ia':
+            r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
             return r_ia
             #print("TESTING IA")
 
+        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
+        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
 
         #try:
         #    len(r_ia)
