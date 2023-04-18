@@ -555,9 +555,6 @@ class FIREYieldClass2:
                     # get the integrated yield mass within/across the age bin
                     element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
 
-
-
-
         #print(self.ages_transition)
         return element_yield_dict
 
@@ -568,8 +565,8 @@ class FIREYieldClass2:
 
         if test_process == False:
             r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()[0]
-            r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()[0]
-            r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()[0]
+            r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'cc').get_rate_cc()[0]
+            r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind').get_rate_wind()[0]
 
             return (r_ia + r_cc + r_w)
 
