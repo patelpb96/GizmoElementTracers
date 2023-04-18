@@ -236,13 +236,15 @@ def element_yields(source = None, includeZ = False, plot = False):
 
 def _to_num(num):
 
-    list_i = isinstance(num, (list, np.ndarray))
-    num_i = isinstance(num, (int, float))
+    return float(num[0])
 
-    if list_i:
-        return float(num[0])
-    if num_i:
-        return float(num)
+    #list_i = isinstance(num, (list, np.ndarray))
+    #num_i = isinstance(num, (int, float))
+
+    #if list_i:
+    #    return float(num[0])
+    #if num_i:
+    #    return float(num)
 
 class feedback:
 
