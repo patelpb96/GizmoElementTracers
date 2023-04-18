@@ -566,6 +566,13 @@ class FIREYieldClass2:
     
         element_name = element_of_choice
 
+        if test_process == False:
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()[0]
+            r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()[0]
+            r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()[0]
+
+            return (r_ia + r_cc + r_w)
+
         if test_process == 'winds':
             r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
             return r_w
@@ -581,9 +588,6 @@ class FIREYieldClass2:
             return r_ia
             #print("TESTING IA")
 
-        r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
-        r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
-        r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
 
         #try:
         #    len(r_ia)
@@ -594,9 +598,6 @@ class FIREYieldClass2:
         #    rate_sum = (r_w + r_cc + r_ia)
 
         #print("RATE SUM: " + str(rate_sum))
-
-        return (r_ia + r_cc + r_w)
-
 
 # --------------------------------------------------------------------------------------------------
 # NuGrid/Sygma model for nucleosynthetic yields
