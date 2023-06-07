@@ -414,7 +414,7 @@ class FIREYieldClass2:
         #)
 
         #for event_kind in self._event_kinds:
-        #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()
+        #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()   
             
     def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 10):
         '''
@@ -565,7 +565,7 @@ class FIREYieldClass2:
         element_name = element_of_choice
 
         if test_process == False:
-            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, tdd = self.ia_tdd).get_rate_ia()[0]
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
             r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'cc').get_rate_cc()[0]
             r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind').get_rate_wind()[0]
 

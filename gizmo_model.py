@@ -503,6 +503,7 @@ class feedback:
                     return rfin, self.timespan, transition_ages
                 else:
                     return r_ia, self.timespan, transition_ages
+                
             elif len(self.timespan) > 1:
                 mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
                 mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
