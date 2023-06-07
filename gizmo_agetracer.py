@@ -320,7 +320,7 @@ class FIREYieldClass2:
     Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
     '''
 
-    def __init__(self, model='fire2.1', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], normalization_ia = 1.6e-5):
+    def __init__(self, model='fire2.1', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], tdd_ia = -1.1, normalization_ia = 1.6e-5):
         '''
         Parameters
         -----------
@@ -343,6 +343,7 @@ class FIREYieldClass2:
         self.ia_model = ia_type
         self.ia_transition_time = trans_time_ia
         self.ia_normalization = normalization_ia
+        self.ia_tdd = tdd_ia
 
         #print("Self.ia_model = " + str(ia_type))
         
@@ -564,7 +565,7 @@ class FIREYieldClass2:
         element_name = element_of_choice
 
         if test_process == False:
-            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()[0]
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, tdd = self.ia_tdd).get_rate_ia()[0]
             r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'cc').get_rate_cc()[0]
             r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind').get_rate_wind()[0]
 
@@ -1100,36 +1101,6 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
                 element_mass_fractions += self['massfraction.initial']
 
         return element_mass_fractions
-
-class TracerGrid:
-    '''
-    Class designed to use element-tracer models from gizmo_model and assemble them in a grid of parameters
-
-    '''
-    def init(type = 'wd'):
-        '''
-        want to write a function that generates all of the parameters we're going to test, or atleast generates them
-        i.e. 
-
-        WDSN_time_dependencies are a grid of 100 elements with values spanning from [-0.7,-3]
-        WDSN_normalizations are a grid of 100 elements  [Myr]
-
-        check for types in wd, ccsn, winds
-
-        for each parameter type, allow an input for which variables are being changed
-        For example, 't' for time dependence of in WDSN rates spanning values from -0.7 down to -3, and 'norm_ia' for the normalization going from 1e-5 to 1e-4 would look like:
-        
-        parameter_vars = ['t', 'norm_ia']
-        parameter_vals = [np.linspace(-3, -0.7, 100), np.linspace(1e-5,1e-4,100)]
-        func_forms = ['maoz']
-        
-        )
-        '''
-
-
-
-        if type == 'wd':
-            return "Use gizmo_model for the tracer grid. Not sure which of these classes I want to use yet but that one seems to make more sense. "
 
 
 # --------------------------------------------------------------------------------------------------

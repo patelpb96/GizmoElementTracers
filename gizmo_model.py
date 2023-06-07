@@ -255,6 +255,7 @@ class feedback:
     t_w = [1.0, 3.5, 100], 
     t_cc = [3.4, 10.37, 37.53], 
     t_ia = [37.53], 
+    t_dd = -1.1,
     n_ia = 1.6e-5, 
     n_cc = False,
     n_w = False,
@@ -291,6 +292,7 @@ class feedback:
         self.trans_cc = np.array(t_cc) # transition ages of CCSNe
         self.ia_model = ia_model.lower()
         self.ia_norm = n_ia
+        self.ia_tdd = t_dd
         self.cc_norm = n_cc 
         self.w_norm = n_w
 
@@ -304,8 +306,6 @@ class feedback:
         massloss: not sure why this is here, will be removed.
         metal_mass_fraction: was going to add as a potential fix to an inherent metallicity dependence built into FIRE-2. I did not implement this, but I could.
         plot: set to True to plot the results. 
-
-
         '''
     
         transition_ages = self.trans_w
@@ -444,6 +444,7 @@ class feedback:
         transition_ages = self.trans_ia
         model_version = self.ia_model
         ia_norm = self.ia_norm
+        tdd = self.ia_tdd
         t = _to_num(self.timespan)
 
         if model_version == 'mannucci':
@@ -489,46 +490,50 @@ class feedback:
             #print("Used Maoz for Rates")
 
             if len(self.timespan) == 1:
-                if 0 <= self.timespan < transition_ages[0]:
-                    r_ia = 0 * self.timespan
-                if transition_ages[0] <= self.timespan:
-                    r_ia = 2.6e-7 * (self.timespan / 1e3) ** -1.1
+                t = _to_num(self.timespan)
+                if t < transition_ages[0]:
+                    r_ia = 0
+                if transition_ages[0] <= t:
+                    r_ia = 2.6e-7 * (t / 1e3) ** tdd
+
+                r_ia *= ejecta_masses[self.source]
 
                 if self.element:
-                    return element_yields(self.source)[self.element]*r_ia, self.timespan, transition_ages
+                    rfin = element_yields(self.source)[self.element]*r_ia
+                    return rfin, self.timespan, transition_ages
                 else:
                     return r_ia, self.timespan, transition_ages
+            elif len(self.timespan) > 1:
+                mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
+                mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
 
-            mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
-            mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
+                func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
+                func2 = 2.6e-7 * (self.timespan[mask2] / 1e3) ** tdd
 
-            func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
-            func2 = 2.6e-7 * (self.timespan[mask2] / 1e3) ** -1.1
+                a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
+                r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
-            a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
-            r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
+                r_ia *= ejecta_masses[self.source]
+                if self.element:
+                    #print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
+                    #print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
 
-            r_ia *= ejecta_masses[self.source]
-            if self.element:
-                #print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
-                #print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
+                    if plot:
+                        plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Maoz")
+
+                    return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
 
                 if plot:
-                    plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Maoz")
+                    plt.loglog(a_ia, r_ia, label = "Maoz")
 
-                return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
+                return r_ia, a_ia, transition_ages
 
             if plot:
-                plt.loglog(a_ia, r_ia, label = "Maoz")
+                plt.loglog(a_ia, r_ia, label = "Mannucci")
 
+            r_ia *= ejecta_masses[self.source]
+            #print("Return 2")
             return r_ia, a_ia, transition_ages
-
-        if plot:
-            plt.loglog(a_ia, r_ia, label = "Mannucci")
-
-        r_ia *= ejecta_masses[self.source]
-        #print("Return 2")
-        return r_ia, a_ia, transition_ages
 
 '''
     def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False, ageBins = None, ia_ver = 'mannucci'):
