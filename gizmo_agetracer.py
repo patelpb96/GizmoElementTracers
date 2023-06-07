@@ -614,7 +614,7 @@ class NuGridYieldClass:
         .
         '''
         try:
-            import sygma  # pyright: reportMissingImports=false
+            import sygma
 
             self.sygma = sygma
         except ImportError as exc:
@@ -1100,6 +1100,36 @@ class ElementAgeTracerZClass(ElementAgeTracerClass):
                 element_mass_fractions += self['massfraction.initial']
 
         return element_mass_fractions
+
+class TracerGrid:
+    '''
+    Class designed to use element-tracer models from gizmo_model and assemble them in a grid of parameters
+
+    '''
+    def init(type = 'wd'):
+        '''
+        want to write a function that generates all of the parameters we're going to test, or atleast generates them
+        i.e. 
+
+        WDSN_time_dependencies are a grid of 100 elements with values spanning from [-0.7,-3]
+        WDSN_normalizations are a grid of 100 elements  [Myr]
+
+        check for types in wd, ccsn, winds
+
+        for each parameter type, allow an input for which variables are being changed
+        For example, 't' for time dependence of in WDSN rates spanning values from -0.7 down to -3, and 'norm_ia' for the normalization going from 1e-5 to 1e-4 would look like:
+        
+        parameter_vars = ['t', 'norm_ia']
+        parameter_vals = [np.linspace(-3, -0.7, 100), np.linspace(1e-5,1e-4,100)]
+        func_forms = ['maoz']
+        
+        )
+        '''
+
+
+
+        if type == 'wd':
+            return "Use gizmo_model for the tracer grid. Not sure which of these classes I want to use yet but that one seems to make more sense. "
 
 
 # --------------------------------------------------------------------------------------------------
