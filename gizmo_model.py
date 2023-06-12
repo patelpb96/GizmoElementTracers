@@ -256,7 +256,7 @@ class feedback:
     t_cc = [3.4, 10.37, 37.53], 
     t_ia = [37.53], 
     t_dd = -1.1,
-    n_ia = 1.6e-5, 
+    n_ia = 2.6e-7, 
     n_cc = False,
     n_w = False,
     ia_model = 'mannucci'):
@@ -454,7 +454,7 @@ class feedback:
                 if t < transition_ages[0]:
                     r_ia = 0
                 else:
-                    r_ia = 5.3e-8 + ia_norm * np.exp(-0.5 * ((t - 50) / 10) ** 2)
+                    r_ia = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((t - 50) / 10) ** 2)
 
                 r_ia *= ejecta_masses[self.source]
                 if self.element:
@@ -494,7 +494,7 @@ class feedback:
                 if t < transition_ages[0]:
                     r_ia = 0
                 if transition_ages[0] <= t:
-                    r_ia = 2.6e-7 * (t / 1e3) ** tdd
+                    r_ia = ia_norm * (t / 1e3) ** tdd
 
                 r_ia *= ejecta_masses[self.source]
 
