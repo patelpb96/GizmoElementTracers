@@ -100,6 +100,7 @@ def get_simulation_directory(dirkey = False):
             'm11_880' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r880',
             'm11_110' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r110',
             'm12i_7e3_f3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12i_m7e3/no_mhd_no_bh',
+            'm12j_7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12_new/m12j_r7100',
             'test' : 'test'}
 
         return dirs
