@@ -416,7 +416,7 @@ class FIREYieldClass2:
         #for event_kind in self._event_kinds:
         #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()   
             
-    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 10):
+    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 10, testing = False):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -446,7 +446,7 @@ class FIREYieldClass2:
 
         # if input element_names is None, generate yields for all elements in this model
         element_names = parse_element_names(self.element_names, element_names, scalarize=False)
-        
+        test = testing
         #print("element names: " + str(element_names))
         #print("element names type: " + str(type(element_names)))
 
@@ -478,7 +478,7 @@ class FIREYieldClass2:
                         self._feedback_handler,
                         age_min,
                         age_max,
-                        args = (element_name),
+                        args = (element_name, test),
                         points = self.ages_transition,
                         epsabs = int_error,
                         limit = lim
@@ -521,9 +521,9 @@ class FIREYieldClass2:
 
             #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
             #test = False
-
+            
             if continuous and fast_int:
-
+                #If we aren't concerned about inter-metal dependencies/progenitor metallicity dependence, we can pre-compute the integrals and multiply by yields for faster computation
                 int_w = integrate.quad(
                     self._feedback_handler,
                     age_min,
@@ -582,7 +582,7 @@ class FIREYieldClass2:
             #print("TESTING CCSN")
 
         if test_process == 'ia':
-            r_ia, a_ia, t_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization).get_rate_ia()
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
             return r_ia
             #print("TESTING IA")
 
