@@ -571,17 +571,17 @@ class FIREYieldClass2:
 
             return (r_ia + r_cc + r_w)
 
-        if test_process == 'winds':
+        if test_process == 'winds' or test_process == 'wind':
             r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
             return r_w
             #print("TESTING WINDS")
 
-        if test_process == 'cc':
+        if test_process == 'cc' or test_process == 'ccsn':
             r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
             return r_cc
             #print("TESTING CCSN")
 
-        if test_process == 'ia':
+        if test_process == 'ia' or test_process == 'wd' or test_process == 'wdsn':
             r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
             return r_ia
             #print("TESTING IA")
