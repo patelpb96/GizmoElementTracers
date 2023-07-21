@@ -105,71 +105,6 @@ def get_simulation_directory(dirkey = False):
 
         return dirs
 
-    if dirset == 'epsilon':
-        dirs = {'m09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
-            'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30',
-            'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' ,
-            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
-            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
-            #'m10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
-            #'m10_res30_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res30',
-            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_r250_uvb-late_snia-maoz',
-            'm09_30_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_r30_uvb-late_snia-maoz',
-            'm11_880' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r880'
-            }
-
-        return dirs
-
-    if dirset == 'eps_agetracer':
-        dirs = {'m09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
-            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
-            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
-            'm10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
-            'm09_30_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_r30_uvb-late_snia-maoz',
-            'm11_880' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r880',
-            'm11_110' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r110',
-            'm11_110_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m11i_r110_uvb2020',
-            'm09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_r250_uvb-late',
-            'm09_30_mol' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_r30',
-            'm09_30_sf-f2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/test/m09_r30_sf-fire2'
-            }
-
-        return dirs
-
-    if dirset == 'eps_f3':
-        dirs = {'m09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
-            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
-            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
-            'm10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
-            }
-
-        return dirs
-
-    if dirset == 'm09':
-        dirs = {'m09_30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m09_res30',
-            'm09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
-            'm09_res30_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res30',
-            'm09_res250_cw' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m09_res250' ,
-            #'m09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m09_res250_uvb-late',
-            'm09_250_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/core/m09_res250',
-            'm09_250_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
-            'm09_30_new' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
-            #'m09_250_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res250_uvb-late_snia-maoz',
-            #'m09_30_uvb' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_res30_uvb-late_snia-maoz'
-            }
-
-        return dirs
-
-    if dirset == 'm10':
-        dirs = {'m10_2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
-            'm10_res30' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res30'
-            #'m10_res250' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m10q_res250',
-            #'m10_res30_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res30',
-            #'m10_res250_cr' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m10q_res250'
-            }
-
-        return dirs
-
     if dirset == 'peloton':
         print("In development, sorry")
         return 0
@@ -380,7 +315,7 @@ class feedback:
         if plot:
             plt.loglog(a_wind, r_wind, label = "Wind")
 
-        return r_wind, a_wind, transition_ages
+        return r_wind, a_wind, transition_ages 
 
     def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, plotcolor = 'k'):
     
@@ -448,6 +383,7 @@ class feedback:
         tdd = self.ia_tdd
         t = _to_num(self.timespan)
 
+        #deprecating
         if model_version == 'mannucci':
 
             if len(self.timespan) == 1:
@@ -477,7 +413,9 @@ class feedback:
                 a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
                 r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
-                r_ia *= ejecta_masses[self.source] # multiply by ejecta mass of 1.4 M_sun to get mass loss rate 
+                if massloss is True:
+                    r_ia *= ejecta_masses[self.source] # multiply by ejecta mass of 1.4 M_sun to get mass loss rate 
+
 
                 if self.element:
 
@@ -497,7 +435,8 @@ class feedback:
                 if transition_ages[0] <= t:
                     r_ia = ia_norm * (t / 1e3) ** tdd
 
-                r_ia *= ejecta_masses[self.source]
+                if massloss is True:
+                    r_ia *= ejecta_masses[self.source]
 
                 if self.element:
                     rfin = element_yields(self.source)[self.element]*r_ia
@@ -515,7 +454,8 @@ class feedback:
                 a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
                 r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
 
-                r_ia *= ejecta_masses[self.source]
+                if massloss is True:
+                    r_ia *= ejecta_masses[self.source]
                 if self.element:
                     #print("Selected " + str(self.element) + " yields for " + str(self.source)) # diagnostic - are you selecting the right element?
                     #print(element_yields(self.source)[self.element]) # diagnostic - reading the yield values from the yield_dictionary
