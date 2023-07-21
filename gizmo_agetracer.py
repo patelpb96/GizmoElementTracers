@@ -76,6 +76,9 @@ from scipy import integrate
 
 from utilities import constant
 
+TDD_DEFAULT = -1.1
+NIA_DEFAULT = 2.6e-7 
+
 
 # --------------------------------------------------------------------------------------------------
 # utility
@@ -570,6 +573,10 @@ class FIREYieldClass2:
             r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind').get_rate_wind()[0]
 
             return (r_ia + r_cc + r_w)
+        
+        if test_process == 'default_wd':
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = NIA_DEFAULT, t_dd = TDD_DEFAULT).get_rate_ia()[0]
+
 
         if test_process == 'winds' or test_process == 'wind':
             r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
