@@ -558,7 +558,7 @@ class FIREYieldClass2:
                     limit = lim
                 )[0]
 
-                # normalization constant which preserves the total number of Ia events. Will expand this to CCSN as well. 
+                # normalization constant which preserves the total number of Ia events.
                 A_wd = NUM_IA_FIDUCIAL/int_ia[-1]
                 
                 for element_name in element_names:

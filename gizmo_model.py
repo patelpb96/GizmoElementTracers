@@ -109,7 +109,7 @@ def get_simulation_directory(dirkey = False):
         print("In development, sorry")
         return 0
 
-    print("Something went wrong in directory loading - i.e. are you passing machine == 'stampede2' ? ")
+    print("!! Possible Error, no directory loaded !!")
 
 def get_sun_massfraction(model='fire2'):
 
