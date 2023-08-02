@@ -73,12 +73,12 @@ Unless otherwise noted, all quantities are in (combinations of)
 
 import numpy as np
 from scipy import integrate
-
 from utilities import constant
 
-TDD_DEFAULT = -1.1
-NIA_DEFAULT = 2.6e-7 
-
+TDD_DEFAULT = -1.1 # default Maoz time delay distribution
+NIA_DEFAULT = 2.6e-7 # default Maoz Ia normalization
+NUM_IA_FIDUCIAL = 0.002257708396415009 # fiducial integrated massloss rate for SNe Ia
+NUM_CC_FIDUCIAL = 0.11152830837937755 # fiducial integrated massloss rate for CCSN
 
 # --------------------------------------------------------------------------------------------------
 # utility
@@ -323,7 +323,7 @@ class FIREYieldClass2:
     Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
     '''
 
-    def __init__(self, model='fire2.1', progenitor_metallicity=1.0, ia_type = 'mannucci', trans_time_ia = [37.53], tdd_ia = -1.1, normalization_ia = 1.6e-5):
+    def __init__(self, model='fire2.1', progenitor_metallicity=1.0, ia_type = 'maoz', trans_time_ia = [37.53], tdd_ia = TDD_DEFAULT, normalization_ia = NIA_DEFAULT):
         '''
         Parameters
         -----------
@@ -419,7 +419,15 @@ class FIREYieldClass2:
         #for event_kind in self._event_kinds:
         #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()   
             
-    def get_element_yields(self, age_bins, element_names=None, continuous = False, old_int = False, fast_int = False, int_error = 1.5e-8, lim = 10, testing = False):
+    def get_element_yields(self, 
+                           age_bins, 
+                           element_names=None, 
+                           continuous = False, 
+                           old_int = False, 
+                           fast_int = False, 
+                           int_error = 1.5e-8, 
+                           lim = 10, 
+                           testing = False):
         '''
         Construct and return a dictionary of stellar nucleosynthetic yields.
         * Each key is an element name
@@ -492,12 +500,13 @@ class FIREYieldClass2:
                     #print(log)
                     
             if continuous == False:
+                # if we want to use pre-tabulated values to integrate over instead of calculating the function at each relevant step
+                # speedtests show this is always the slower option for the ElementTracers, but saving your data beforehand instead of 
+                # calculating it each time CAN be useful in certain instances.
+
                 for element_name in element_names:
-                    #print("For " + str(element_name) + "in " + str(element_names))
                     # get the integrated yield mass within/across the age bin
                     #print(age_min, age_max)
-
-                    #integral1 = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
 
                     r_ia, a_ia, t_ia = self.gizmo_model.feedback(source = 'ia', 
                                                                  elem_name = element_name, 
@@ -508,13 +517,9 @@ class FIREYieldClass2:
                     mask = np.logical_and(age_min <= a_ia, a_ia <= age_max)
                     int_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [age_min, age_max])#, a_ia[mask])
 
-                    #integral2 = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).integrate_massloss(ageBins = [age_min, age_max])[1]
-
                     r_cc, a_cc, t_cc = self.gizmo_model.feedback(source = 'cc', elem_name = element_name).get_rate_cc()
                     mask = np.logical_and(age_min <= a_cc, a_cc <= age_max)
                     int_cc = integrate.trapz(r_cc[mask]/len(r_cc[mask]), x = [age_min, age_max])#, a_cc[mask])
-
-                    #integral3 = self.gizmo_model.feedback(source = 'ia', elem_name = element_name, ia_model = self.ia_model).integrate_massloss(ageBins = [age_min, age_max], ia_ver = self.ia_model)[1]
 
                     r_w, a_w, t_w = self.gizmo_model.feedback(source = 'wind', elem_name = element_name).get_rate_wind()
                     mask = np.logical_and(age_min <= a_w, a_w <= age_max)
@@ -522,8 +527,6 @@ class FIREYieldClass2:
 
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
-            #print("ai: " + str(ai) + "| min: " + str(age_min) + " | " + str(age_max))
-            #test = False
             
             if continuous and fast_int:
                 #If we aren't concerned about inter-metal dependencies/progenitor metallicity dependence, we can pre-compute the integrals and multiply by yields for faster computation
@@ -554,10 +557,13 @@ class FIREYieldClass2:
                     epsabs = int_error,
                     limit = lim
                 )[0]
+
+                # normalization constant which preserves the total number of Ia events. Will expand this to CCSN as well. 
+                A_wd = NUM_IA_FIDUCIAL/int_ia[-1]
                 
                 for element_name in element_names:
                     # get the integrated yield mass within/across the age bin
-                    element_yield_dict[element_name][ai] = self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
+                    element_yield_dict[element_name][ai] = A_wd*self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
 
         #print(self.ages_transition)
         return element_yield_dict
@@ -575,8 +581,12 @@ class FIREYieldClass2:
             return (r_ia + r_cc + r_w)
         
         if test_process == 'default_wd':
-            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = NIA_DEFAULT, t_dd = TDD_DEFAULT).get_rate_ia()[0]
-
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], 
+                                             elem_name=element_name, 
+                                             source = 'ia', ia_model=self.ia_model, 
+                                             t_ia = self.ia_transition_time, 
+                                             n_ia = NIA_DEFAULT, 
+                                             t_dd = TDD_DEFAULT).get_rate_ia()[0]
 
         if test_process == 'winds' or test_process == 'wind':
             r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
@@ -593,6 +603,29 @@ class FIREYieldClass2:
             return r_ia
             #print("TESTING IA")
 
+        '''
+        #Switches for speed, only works on Python 3.10+. Not functional on stampede2, functional on peloton.
+        if test_process:
+            # Lots of reasons to use the test parameter, not sure if I should rename to 'specify' or something like that. 
+            match test_process:
+                case 'default_wd': # calculate with fiducial Maoz rate
+                    r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = NIA_DEFAULT, t_dd = TDD_DEFAULT).get_rate_ia()[0]
+
+                case 'wind':
+                    r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
+                    return r_w
+                    #print("TESTING WINDS")
+
+                case 'ccsn':
+                    r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
+                    return r_cc
+                    #print("TESTING CCSN")
+
+                case 'wd':
+                    r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
+                    return r_ia
+                    #print("TESTING IA")
+        '''
 
         #try:
         #    len(r_ia)
