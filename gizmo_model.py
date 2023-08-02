@@ -383,7 +383,7 @@ class feedback:
         tdd = self.ia_tdd
         t = _to_num(self.timespan)
 
-        #deprecating
+        #deprecating(ed)
         if model_version == 'mannucci':
 
             if len(self.timespan) == 1:
@@ -426,7 +426,6 @@ class feedback:
                         return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
 
         if model_version == 'maoz':
-            #print("Used Maoz for Rates")
 
             if len(self.timespan) == 1:
                 t = _to_num(self.timespan)
@@ -449,7 +448,7 @@ class feedback:
                 mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
 
                 func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
-                func2 = 2.6e-7 * (self.timespan[mask2] / 1e3) ** tdd
+                func2 = ia_norm * (self.timespan[mask2] / 1e3) ** tdd
 
                 a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
                 r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
