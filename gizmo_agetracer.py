@@ -527,7 +527,6 @@ class FIREYieldClass2:
 
                     element_yield_dict[element_name][ai] = int_ia + int_w + int_cc
 
-            
             if continuous and fast_int:
                 #If we aren't concerned about inter-metal dependencies/progenitor metallicity dependence, we can pre-compute the integrals and multiply by yields for faster computation
                 int_w = integrate.quad(
@@ -560,12 +559,11 @@ class FIREYieldClass2:
 
                 # normalization constant which preserves the total number of Ia events.
                 A_wd = NUM_IA_FIDUCIAL/int_ia[-1]
-                
+
                 for element_name in element_names:
                     # get the integrated yield mass within/across the age bin
                     element_yield_dict[element_name][ai] = A_wd*self.gizmo_model.element_yield_ia[element_name]*int_ia + self.gizmo_model.element_yield_wind[element_name]*int_w + self.gizmo_model.element_yield_cc[element_name]*int_cc
 
-        #print(self.ages_transition)
         return element_yield_dict
 
     def _feedback_handler(self, some_time, element_of_choice, test_process = False):

@@ -35,42 +35,6 @@ colors = ['black', 'rosybrown', 'brown', 'red', 'peru', 'darkorange', 'gold', 'o
 
 feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 
-#timespan = np.logspace(0, 4.1367, 3000)
-
-# Yield Dictionaries for feedback types
-element_yield_wind = {'metals' : 0, 'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
-            'magnesium' : 0, 'silicon' : 0, 'sulfur' : 0, 'calcium' : 0, 'iron' : 0}
-
-element_yield_cc = {'metals' : 0, 'helium' : 0.369, 'carbon' : 0.0127, 'nitrogen' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
-            'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706}
-
-element_yield_mannucci = {'metals' : 1, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
-            'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
-
-element_yield_ia = {'metals' : 1, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
-            'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
-
-all_yields = [element_yield_wind, element_yield_cc, element_yield_ia, element_yield_mannucci]
-all_yields = [element_yield_wind, element_yield_cc]#, element_yield_ia, element_yield_mannucci]
-
-# adds 'metals' to each dictionary 
-for yield_dict in all_yields:
-    #print(yield_dict)
-    for element_name in yield_dict:
-        #print(element_name)
-        if element_name != 'helium':
-            #print(yield_dict[element_name])
-            yield_dict['metals'] += yield_dict[element_name]
-
-
-nucleosyntheticYieldDict = {'wind' : element_yield_wind, 'cc' : element_yield_cc, 'ia' :  element_yield_ia, 'mannucci' : element_yield_mannucci}
-
-# Ejecta Masses for Each Event, in M_sun
-ejecta_masses = {'wind' : 1,
-                 'ia': 1.4,
-                 'cc' : 10.5} # corresponding directly to the above
-
-
 
 def get_simulation_directory(dirkey = False):
 
@@ -106,8 +70,12 @@ def get_simulation_directory(dirkey = False):
         return dirs
 
     if dirset == 'peloton':
-        print("In development, sorry")
-        return 0
+        dirs = { 'm12i_880' : '/home/awetzel/scratch/m12i/m12i_r880' ,
+                'm12i_7100' : '/home/awetzel/scratch/m12i/m12i_r7100' ,
+                'test' : 'test'}
+        
+        print("Edit directories in gizmo_model.py for better access to your simulations!")
+        return dirs
 
     print("!! Possible Error, no directory loaded !!")
 
@@ -117,6 +85,7 @@ def get_sun_massfraction(model='fire2'):
     assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
 
     if model == 'fire2':
+        # values from Asplund 
         solar = {'metals' : 0.02,  # total of all metals (everything not H, He)
             'helium' : 0.28,
             'carbon' : 3.26e-3,
@@ -146,7 +115,7 @@ def element_yields(source = None, includeZ = False, plot = False):
     if source.lower() not in feedback_type:
         raise Exception("Please use one of " + str(feedback_type) + " for source (match case).")
     
-    string = "element_yield_"+str(source)
+    string = "nucleosyntheticYieldDict"
     if(plot == True):
         print("Plotting enabled.")
         x,y = zip(*globals()[string].items())
@@ -167,48 +136,117 @@ def element_yields(source = None, includeZ = False, plot = False):
         plt.grid(ls = "-.", alpha = 0.5)
 
         plt.show()
-        
-    return globals()[string] #globals() converts the [string] into a variable (or function, if needed). Works like eval()
+
+    try:
+        return globals()[string][str(source)] #globals() converts the [string] into a variable (or function, if needed). Works like eval()
+    except:
+        print("Error - code is not reading Gizmo_model.EventYieldDictionary correctly. See gizmo_model.py")
 
 def _to_num(num):
-
     return float(num[0])
 
-    #list_i = isinstance(num, (list, np.ndarray))
-    #num_i = isinstance(num, (int, float))
+class EventYieldDictionary:
 
-    #if list_i:
-    #    return float(num[0])
-    #if num_i:
-    #    return float(num)
+    '''
+    What fraction of a CCSN is in carbon? Iron? What about the same value for WDSN? Answers below.
+    '''
+
+    def __init__(self, 
+    Z = None):
+        
+        self.progenitor_metallicity = Z
+        # Ejecta Masses for Each Event, in M_sun
+        self.ejecta_masses = {'wind' : 1,
+                     'ia': 1.4,
+                     'wd' : 1.4,
+                     'cc' : 10.5} # corresponding directly to the above
+
+    def event_yield_dictionaries(self, fire_vers:str = 'fire2.1'):
+
+        Z = self.progenitor_metallicity
+
+        if Z == None and fire_vers == 'fire2.1':
+            # FIRE-2: stellar_evolution.c line ~587
+            # compilation of van den Hoek & Groenewegen 1997, Marigo 2001, Izzard 2004
+            # compiled in wiersma2009.
+            # assume the total wind abundances for He, C, N, and O as below
+            # for all other elements, simply return progenitor surface abundance
+
+            element_yield_wind = {'metals' : 0, 'helium' : 0.36, 'carbon' : 0.016, 'nitrogen' : 0.0041, 'oxygen' : 0.0118, 'neon' : 0,
+                'magnesium' : 0, 'silicon' : 0, 'sulfur' : 0, 'calcium' : 0, 'iron' : 0}
+
+            element_yield_cc = {'metals' : 0, 'helium' : 0.369, 'carbon' : 0.0127, 'nitrogen' : 0.00456, 'oxygen' : 0.111, 'neon' : 0.0381,
+                'magnesium' : 0.00940, 'silicon' : 0.00889, 'sulfur' : 0.00378, 'calcium' : 0.000436, 'iron' : 0.00706}
+
+            element_yield_mannucci = {'metals' : 1, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+                'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
+
+            element_yield_ia = {'metals' : 1, 'helium' : 0.0, 'carbon' : 0.035, 'nitrogen' : 8.57e-7, 'oxygen' : 0.102, 'neon' : 0.00321,
+                'magnesium' : 0.00614, 'silicon' : 0.111, 'sulfur' : 0.0621, 'calcium' : 0.00857, 'iron' : 0.531}
+
+
+            all_yields = [element_yield_wind, element_yield_cc, element_yield_ia, element_yield_mannucci]
+
+            self._add_metals(all_yields)
+            all_yields.append(self.ejecta_masses)
+
+            return all_yields
+
+        #all_yields = [element_yield_wind, element_yield_cc]#, element_yield_ia, element_yield_mannucci]
+
+    def _add_metals(self, yd):
+        # adds 'metals' to each dictionary
+        for yield_dict in yd:
+            #print(yield_dict)
+            for element_name in yield_dict:
+                #print(element_name)
+                if element_name != 'helium':
+                    #print(yield_dict[element_name])
+                    yield_dict['metals'] += yield_dict[element_name]
+    
+    def initialize_EYD():
+        EYD = EventYieldDictionary()
+        eyd = EYD.event_yield_dictionaries()
+        
+        return eyd
+
+eyd = EventYieldDictionary.initialize_EYD()
+
+# The dictionaries below are referenced throughout, I just wanted to initalize them early. 
+
+nucleosyntheticYieldDict = {'wind' : eyd[0], 'cc' : eyd[1], 'mannucci' : eyd[3], 'ia' :  eyd[2]}
+ejecta_masses = eyd[4]
 
 class feedback:
 
     def __init__(self, 
     time_span = None, 
     source = 'any', 
-    elem_name = False, 
-    t_w = [1.0, 3.5, 100], 
-    t_cc = [3.4, 10.37, 37.53], 
-    t_ia = [37.53], 
-    t_dd = -1.1,
-    n_ia = 2.6e-7, 
-    n_cc = False,
-    n_w = False,
-    ia_model = 'mannucci'):
+    elem_name = False, # name of element we are interested in
+    t_w = [1.0, 3.5, 100], # Discontinuities in the wind rate function
+    t_cc = [3.4, 10.37, 37.53],  #Discontinuities in the CCSN rate function
+    t_ia = [37.53],  #Discontinuity(ies) in the WDSN rate function
+    t_dd = -1.1, #WDSN/SNeIa time delay exponent
+    n_ia = 2.6e-7, #WDSN/SNeIa normalization coefficient
+    n_cc = False, #CCSN normalization coefficient(s) ; plan is to have it read in a list of len(t_cc)
+    n_w = False, #Wind normalization coefficient(s) ; same plan as above
+    ia_model = 'maoz'):
 
         '''
+        time_span: what range of time or instant in time do we want to calculate these values for?
         source: one of 'wind', 'ia', or 'cc'
         t_w: transition times for winds (list)
         t_cc: transition times for CCSN
         t_ia: transition times for SNe Ia
         n_ia: type ia normalization 
         
-        ia_model: 'maoz' or 'mannucci' (mannucci by default)
+        ia_model: 'maoz' or 'mannucci' (maoz by default)
 
         '''
         self.source = source
         self.element = elem_name
+
+        #Code below allows you to evaluate at a given point OR along a pre-generated array/list of values. 
 
         if time_span is not None:
             if len(time_span) > 1:
@@ -220,10 +258,11 @@ class feedback:
                 #print("time_span[0] = " + str(time_span[0]))
                 self.timespan = time_span
         else:
+            # Default timespan if none is specified
             self.timespan = np.logspace(0, 4.146159, 1500)
                 
 
-        self.trans_w = np.array(t_w) # transition ages of winds
+        self.trans_w = np.array(t_w) # Henceforth we will refer to the 'discontinuities' as 'transition ages'
         self.trans_ia = np.array(t_ia) # transition ages of SNe Ia
         self.trans_cc = np.array(t_cc) # transition ages of CCSNe
         self.ia_model = ia_model.lower()
@@ -246,8 +285,8 @@ class feedback:
     
         transition_ages = self.trans_w
 
-        # Imposed mins and maxes based on FIRE-2 and FIRE-3. For stability or something
-        metallicity_min = 0.01
+        # Imposed mins and maxes based on FIRE-2 and FIRE-3
+        metallicity_min = 0.01 
         metallicity_max = 3
         age_min = 0  # Myr
         age_max = 14001
@@ -476,62 +515,9 @@ class feedback:
             #print("Return 2")
             return r_ia, a_ia, transition_ages
 
-'''
-    def integrate_massloss(self, Z = Z_0, metal_mass_fraction = None, plot = False, ageBins = None, ia_ver = 'mannucci'):
-        elem = self.element
-        ia_model = ia_ver
 
-        #print(str(self.source) + " selected.") #diagnostic
-
-        if self.source == 'wind':
             
-
-            #For use with agetracers 
-            if ageBins is not None:
-                r_w, a_w, t_w = self.get_rate_wind()
-
-                mask = np.logical_and(ageBins[0] <= a_w, a_w <= ageBins[1])
-                i_w = integrate.trapz(r_w[mask]/len(r_w[mask]), x = [ageBins[0], ageBins[1]])#, a_w[mask])
-
-                return a_w[1:], i_w
-
-            r_w, a_w, t_w = self.get_rate_wind()
-            
-            # For raw plotting purposes (or whatever other relevant use case comes up)
-            i_w = integrate.cumtrapz(r_w, a_w)
-
-            return a_w[1:], i_w
-
-        if self.source == 'ia':
-            print("INTEGRATOR IS USING " + str(ia_model))
-            r_ia, a_ia, t_ia = self.get_rate_ia()
-
-            #For use with agetracers 
-            if ageBins is not None:
-                mask = np.logical_and(ageBins[0] <= a_ia, a_ia <= ageBins[1])
-                i_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [ageBins[0], ageBins[1]])#, a_ia[mask])
-                return a_ia[1:], i_ia
-
-
-            print("Shouldn't be here for Agetracers")
-            i_ia = integrate.cumtrapz(r_ia, a_ia)
-            return a_ia[1:], i_ia
-
-        if self.source == 'cc':
-            r_cc, a_cc, t_cc = self.get_rate_cc()
-
-            #For use with agetracers 
-            if ageBins is not None:
-                mask = np.logical_and(ageBins[0] <= a_cc, a_cc <= ageBins[1])
-                i_cc = integrate.trapz(r_cc[mask]/len(r_cc[mask]), x = [ageBins[0], ageBins[1]])#, a_cc[mask])
-                return a_cc[1:], i_cc
-
-            i_cc = integrate.cumtrapz(r_cc, a_cc)
-            return a_cc[1:], i_cc
-'''
-            
-            
-class analysis:
+class ElementTracerPipeline:
     def __init__(self, 
     z = 0):
         self.dirs = get_simulation_directory('stampede2')
