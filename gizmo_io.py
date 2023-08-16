@@ -143,7 +143,7 @@ Some useful examples:
     part['star'].prop('mass.loss') : mass loss since formation of star particle [M_sun]
 
     part['gas'].prop('number.density') :
-        gas number density, assuming solar metallicity [hydrogen atoms / cm^3]
+        gas number density [hydrogen atoms / cm^3]
 
     part['gas' or 'star'].prop('metallicity.iron') :
         iron abundance [Fe/H] :=
@@ -434,6 +434,10 @@ class ParticleDictionaryClass(dict):
             values = (3 * np.pi / (32 * ut.constant.grav_kpc_msun_Gyr * values)) ** 0.5  # [Gyr]
 
             return values
+
+        # hydrogen ionized fraction
+        if property_name == 'hydrogen.ionized.fraction':
+            return 1 - self.prop('hydrogen.neutral.fraction', indices, _dict_only=True)
 
         if 'magnetic' in property_name and (
             'energy' in property_name or 'pressure' in property_name
@@ -821,7 +825,7 @@ class ParticleDictionaryClass(dict):
                 indices = np.where(child_ids > 0)[0]
                 pids = ids[indices]
                 cids = child_ids[indices]
-                for (index, pid, cid) in zip(indices, pids, cids):
+                for index, pid, cid in zip(indices, pids, cids):
                     if (pid, cid) in self._ids_to_index:
                         pindices[index] = self._ids_to_index[(pid, cid)]
 
@@ -851,7 +855,7 @@ class ParticleDictionaryClass(dict):
             pids = self[id_name][pindices]
             cids = self[id_child_name][pindices]
             self._ids_to_index = {}
-            for (pindex, pid, cid) in zip(pindices, pids, cids):
+            for pindex, pid, cid in zip(pindices, pids, cids):
                 self._ids_to_index[(pid, cid)] = pindex
 
 
@@ -933,7 +937,7 @@ class ReadClass(ut.io.SayClass):
                 'dark2' = dark matter at lower resolution
                 'gas' = gas
                 'star' = stars
-                'blackhole' = black holes, if run contains them
+                'blackhole' = black holes, if snapshot contains them
         snapshot_value_kind : str
             input snapshot number kind: 'index', 'redshift', 'scalefactor'
         snapshot_values : int or float or list
@@ -1012,6 +1016,10 @@ class ReadClass(ut.io.SayClass):
                 host_number, simulation_directory, os
             )
 
+        # ensure input number or list/array of numbers
+        assert snapshot_values is not None and not isinstance(snapshot_values, str)
+        snapshot_values = ut.array.arrayize(snapshot_values)
+
         Snapshot = ut.simulation.read_snapshot_times(
             simulation_directory, self._verbose, error_if_no_file=False
         )
@@ -1019,7 +1027,6 @@ class ReadClass(ut.io.SayClass):
             # could not read file that lists all snapshots - require input snapshot index
             if snapshot_value_kind != 'index':
                 raise OSError(f'cannot find file of snapshot times in {simulation_directory}')
-        snapshot_values = ut.array.arrayize(snapshot_values)
 
         parts = []  # list to store particle dictionaries
 
@@ -2036,7 +2043,6 @@ class ReadClass(ut.io.SayClass):
         time_conversion = 1 / header['hubble']  # multiply by this for [Gyr]
 
         for spec_name in part:
-
             if 'position' in part[spec_name]:
                 # convert to [kpc comoving]
                 part[spec_name]['position'] /= header['hubble']
@@ -2054,6 +2060,10 @@ class ReadClass(ut.io.SayClass):
                 if prop_name in part[spec_name]:
                     # convert to [M_sun]
                     part[spec_name][prop_name] *= mass_conversion
+                    # rename blackhole 'mass' to 'mass.total' to avoid confusion with 'mass.bh'
+                    if spec_name == 'blackhole' and prop_name == 'mass':
+                        part[spec_name]['mass.total'] = part[spec_name][prop_name]
+                        del part[spec_name][prop_name]
 
             if 'accretion.rate' in part[spec_name]:
                 # convert to [M_sun / yr]
@@ -2402,7 +2412,7 @@ class ReadClass(ut.io.SayClass):
         assign_formation_coordinates=False,
         velocity_distance_max=8,
         host_number=1,
-        exclusion_distance=300,
+        exclusion_distance=400,
         simulation_directory=gizmo_default.simulation_directory,
         track_directory=gizmo_default.track_directory,
         verbose=True,
@@ -2538,7 +2548,7 @@ class ReadClass(ut.io.SayClass):
         method='mass',
         velocity_distance_max=8,
         host_number=1,
-        exclusion_distance=300,
+        exclusion_distance=400,
         verbose=True,
     ):
         '''

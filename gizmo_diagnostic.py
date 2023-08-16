@@ -791,11 +791,12 @@ def print_particle_properties_statistics(
     gizmo_plot.print_properties_statistics(part, species)
 
 
-def print_particle_property_extrema_all_snapshots(
+def print_particle_property_extrema_across_snapshots(
     simulation_directory=gizmo_default.simulation_directory,
     snapshot_directory=gizmo_default.snapshot_directory,
     track_directory=gizmo_default.track_directory,
-    species_property_dict={'gas': ['size', 'number.density']},
+    property_dict={'gas': ['size', 'number.density']},
+    snapshot_indices=None,
 ):
     '''
     For each input property, get its extremum at each snapshot.
@@ -809,8 +810,10 @@ def print_particle_property_extrema_all_snapshots(
         directory of snapshot files
     track_directory : str
         directory of files for particle pointers, formation coordinates, and host coordinates
-    species_property_dict : dict
+    property_dict : dict
         keys = species, values are string or list of property[s]
+    snapshot_indices : list
+        snapshots indices to read
     '''
     elements = ['metals', 'he']
 
@@ -820,38 +823,38 @@ def print_particle_property_extrema_all_snapshots(
         'number.density': {'function.name': 'max', 'function': np.max},
     }
 
-    Say = ut.io.SayClass(print_particle_property_extrema_all_snapshots)
+    Say = ut.io.SayClass(print_particle_property_extrema_across_snapshots)
 
     simulation_directory = ut.io.get_path(simulation_directory)
 
-    Snapshot = ut.simulation.SnapshotClass()
-    Snapshot.read_snapshots(directory=simulation_directory)
+    if snapshot_indices is None or len(snapshot_indices) == 0:
+        Snapshot = ut.simulation.SnapshotClass()
+        Snapshot.read_snapshots(directory=simulation_directory)
+        snapshot_indices = Snapshot['index']
 
-    species_read = species_property_dict.keys()
+    species_read = property_dict.keys()
 
     properties_read = []
-    for spec_name in species_property_dict:
-        properties = species_property_dict[spec_name]
+    for spec_name in property_dict:
+        properties = property_dict[spec_name]
         if np.isscalar(properties):
             properties = [properties]
 
         prop_dict = {}
-        for prop_name in species_property_dict[spec_name]:
+        for prop_name in property_dict[spec_name]:
             prop_dict[prop_name] = []
 
-            prop_name_read = prop_name.replace('.number', '')
+            prop_name_read = prop_name.replace('number.', '')
             if prop_name_read not in properties_read:
                 properties_read.append(prop_name_read)
 
-            if '.number' in prop_name and 'massfraction' not in properties_read:
-                properties_read.append('massfraction')
-
         # re-assign property list as dictionary so can store list of values
-        species_property_dict[spec_name] = prop_dict
+        property_dict[spec_name] = prop_dict
 
-    for snapshot_i in Snapshot['index']:
+    Read = gizmo_io.ReadClass()
+
+    for snapshot_i in snapshot_indices:
         try:
-            Read = gizmo_io.ReadClass()
             part = Read.read_snapshots(
                 species_read,
                 'index',
@@ -866,13 +869,13 @@ def print_particle_property_extrema_all_snapshots(
                 sort_dark_by_id=False,
             )
 
-            for spec_name in species_property_dict:
-                for prop_name in species_property_dict[spec_name]:
+            for spec_name in property_dict:
+                for prop_name in property_dict[spec_name]:
                     try:
                         prop_name_ext = property_statistic[prop_name]['function'](
                             part[spec_name].prop(prop_name)
                         )
-                        species_property_dict[spec_name][prop_name].append(prop_name_ext)
+                        property_dict[spec_name][prop_name].append(prop_name_ext)
                     except Exception:
                         Say.say(f'! {spec_name} {prop_name} not in particle dictionary')
         except Exception:
@@ -883,10 +886,12 @@ def print_particle_property_extrema_all_snapshots(
 
     Statistic = ut.math.StatisticClass()
 
-    for spec_name in species_property_dict:
-        for prop_name in species_property_dict[prop_name]:
+    for spec_name in property_dict:
+        for prop_name in property_dict[spec_name]:
             prop_func_name = property_statistic[prop_name]['function.name']
-            prop_values = np.array(species_property_dict[spec_name][prop_name])
+            prop_values = np.array(property_dict[spec_name][prop_name])
+            if prop_name == 'size':
+                prop_values *= 1000  # convert to [pc]
 
             Statistic.stat = Statistic.get_statistic_dict(prop_values)
 
@@ -895,6 +900,8 @@ def print_particle_property_extrema_all_snapshots(
                 Say.say('{:10s} = {:.3f}'.format(stat_name, Statistic.stat[stat_name]))
 
             # Statistic.print_statistics()
+
+    return property_dict
 
 
 def print_summary(
@@ -1322,7 +1329,6 @@ def plot_scaling(
 # running from command line
 # --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-
     if len(sys.argv) <= 1:
         s = 'specify function: runtime, contamination, properties, statistics, extrema, summary'
         raise OSError(s)
@@ -1382,7 +1388,7 @@ if __name__ == '__main__':
         )
 
     elif 'extrem' in function_kind:
-        print_particle_property_extrema_all_snapshots()
+        print_particle_property_extrema_across_snapshots()
 
     elif 'summary' in function_kind:
         snapshot_redshift = 0

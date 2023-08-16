@@ -70,7 +70,7 @@ from . import gizmo_default
 # --------------------------------------------------------------------------------------------------
 # dictionary class to store groups of particles
 # --------------------------------------------------------------------------------------------------
-class GroupDictionaryClass(dict,):
+class GroupDictionaryClass(dict):
     '''
     Dictionary class to store catalog of FoF groups.
     Allows production of derived quantities.
@@ -183,7 +183,7 @@ class GroupDictionaryClass(dict,):
 
             if 'density' in property_name:
                 # mean mass density [Msun / pc ^ 2]
-                values = masses / (4 / 3 * np.pi * radiuss ** 3)
+                values = masses / (4 / 3 * np.pi * radiuss**3)
             elif 'virial.parameter' in property_name:
                 # alpha_vir := 5 * R * (sigma_vel,1D^2 + c_s,1D^2) / (G * M) [dimensionless]
                 # convert to 1-D dispersion, by convention
@@ -247,7 +247,7 @@ class GroupDictionaryClass(dict,):
                     shape_pos = 0
                 else:
                     shape_pos = 1
-                values = np.sqrt(np.sum(values ** 2, shape_pos))
+                values = np.sqrt(np.sum(values**2, shape_pos))
 
             return values
 
@@ -325,6 +325,7 @@ class IOClass(ut.io.SayClass):
         group_directory=gizmo_default.group_directory,
     ):
         '''
+        .
         '''
         self.file_name_base = '{}_group.fof.{:.0f}pc_{:03d}'
         self.species_names = ['gas', 'star', 'dark']
@@ -457,9 +458,6 @@ class IOClass(ut.io.SayClass):
         # parse inputs
         assert species_name in self.species_names
         assert linking_length > 0
-
-        if isinstance(snapshot_values, int):
-            snapshot_values = [snapshot_values]  # ensure is list
 
         if simulation_directory is None or len(simulation_directory) == 0:
             simulation_directory = self.simulation_directory
@@ -719,9 +717,6 @@ class IOClass(ut.io.SayClass):
         assert linking_length > 0
         assert particle_number_min > 1
 
-        if isinstance(snapshot_values, int):
-            snapshot_values = [snapshot_values]  # ensure is list
-
         if simulation_directory is None or len(simulation_directory) == 0:
             simulation_directory = self.simulation_directory
         else:
@@ -751,7 +746,10 @@ class IOClass(ut.io.SayClass):
             )
 
         ut.io.run_in_parallel(
-            self._generate_write_group_catalog, args_list, proc_number=proc_number, verbose=verbose,
+            self._generate_write_group_catalog,
+            args_list,
+            proc_number=proc_number,
+            verbose=verbose,
         )
 
     def _generate_write_group_catalog(
@@ -821,7 +819,12 @@ class IOClass(ut.io.SayClass):
 
         # generate FoF group catalog of species
         grp = self.generate_group_catalog(
-            part, species_name, property_select, None, linking_length, particle_number_min,
+            part,
+            species_name,
+            property_select,
+            None,
+            linking_length,
+            particle_number_min,
         )
 
         if grp is None:
@@ -1032,7 +1035,6 @@ def plot_number_v_mass(
 
     # get counts for groups
     for grp_i, grp in enumerate(grps):
-
         if grp_indicess[grp_i] is None or len(grp_indicess[grp_i]) == 0:
             grp_indices = ut.array.get_arange(grp.prop(mass_name))
         else:
@@ -1040,7 +1042,8 @@ def plot_number_v_mass(
 
         for dist_i, host_distance_limits in enumerate(host_distance_limitss):
             gis_d = grp.get_indices(
-                host_distance_limits=host_distance_limits, prior_indices=grp_indices,
+                host_distance_limits=host_distance_limits,
+                prior_indices=grp_indices,
             )
 
             if len(gis_d) > 0:
@@ -1392,12 +1395,18 @@ def plot_property_v_property(
 
             Say.say(
                 '{} range = [{:.3e}, {:.3e}], med = {:.3e}'.format(
-                    x_property_name, x_props_d.min(), x_props_d.max(), np.median(x_props_d),
+                    x_property_name,
+                    x_props_d.min(),
+                    x_props_d.max(),
+                    np.median(x_props_d),
                 )
             )
             Say.say(
                 '{} range = [{:.3e}, {:.3e}], med = {:.3e}'.format(
-                    y_property_name, y_props_d.min(), y_props_d.max(), np.median(y_props_d),
+                    y_property_name,
+                    y_props_d.min(),
+                    y_props_d.max(),
+                    np.median(y_props_d),
                 )
             )
 

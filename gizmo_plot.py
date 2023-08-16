@@ -127,16 +127,227 @@ class ImageClass(ut.io.SayClass):
         self.histogram_ys = None
         self.plot_file_name = None
 
+    def plot_image_simple(
+        self,
+        part,
+        species_name='star',
+        weight_name='mass',
+        dimensions_plot=[0, 1, 2],
+        distance_max=20,
+        distance_bin_width=0.1,
+        rotation=True,
+        host_index=0,
+        part_indices=None,
+        image_limits=[None, None],
+        plot_file=False,
+    ):
+        '''
+        Plot image of the positions of given partcle species, using either a single panel for
+        2 dimensions or 3 panels for all 2-dimensional combinations.
+
+        Parameters
+        ----------
+        part : dict
+            catalog of particles at snapshot
+        species_name : str
+            name of particle species to plot
+        weight_name : str
+            property to weight positions by
+        dimensions_plot : list
+            dimensions to plot - if length 2, plot one v one; if length 3, plot all via 3 panels
+        distance_max : float or array
+            distance from center to plot [kpc]
+        distance_bin_width : float
+            size of pixel [kpc]
+        rotation : bool or array
+            whether to rotate particles
+            if True, will rotate to align with principal axes defined by input species
+        host_index : int
+            index of host halo to get position and rotation of (if not input them)
+        part_indices : array
+            input selection indices for particles
+        image_limits : list
+            min and max limits to impose on image dynamic range (exposure)
+        plot_file : bool
+            whether to write figure to file and its name
+        '''
+        dimen_label = {0: 'x', 1: 'y', 2: 'z'}
+
+        position_limits = [[-distance_max, distance_max] for _ in range(3)]
+        position_limits = np.array(position_limits)
+
+        if part_indices is None or len(part_indices) == 0:
+            part_indices = ut.array.get_arange(part[species_name]['position'].shape[0])
+
+        host_name = ut.catalog.get_host_name(host_index)
+
+        if rotation is True:
+            # rotate according to principal axes
+            positions = part[species_name].prop(f'{host_name}.distance.principal', part_indices)
+        else:
+            # positions in (arbitrary) Cartesian x,y,z of simulation
+            positions = part[species_name].prop(f'{host_name}.distance', part_indices)
+
+        weights = None
+        if weight_name:
+            weights = part[species_name].prop(weight_name, part_indices)
+
+        # keep only particles within distance limits
+        masks = positions[:, dimensions_plot[0]] <= distance_max
+        for dimen_i in dimensions_plot:
+            masks *= (positions[:, dimen_i] >= -distance_max) * (
+                positions[:, dimen_i] <= distance_max
+            )
+
+        positions = positions[masks]
+        if weights is not None:
+            weights = weights[masks]
+
+        position_bin_number = int(np.round(2 * np.max(distance_max) / distance_bin_width))
+
+        # set color map
+        if 'dark' in species_name:
+            color_map = plt.cm.afmhot
+        elif species_name == 'gas':
+            color_map = plt.cm.afmhot
+        elif species_name == 'star':
+            color_map = plt.cm.afmhot
+
+        # set interpolation method
+        interpolation = 'bilinear'
+
+        if len(dimensions_plot) == 2:
+            fig, subplot = ut.plot.make_figure(
+                1,
+                left=0.22,
+                right=0.98,
+                bottom=0.15,
+                top=0.98,
+                background_color='black',
+            )
+
+            subplot.set_xlim(position_limits[dimensions_plot[0]])
+            subplot.set_ylim(position_limits[dimensions_plot[1]])
+
+            subplot.set_xlabel(f'{dimen_label[dimensions_plot[0]]} $\\left[ {{\\rm kpc}} \\right]$')
+            subplot.set_ylabel(f'{dimen_label[dimensions_plot[1]]} $\\left[ {{\\rm kpc}} \\right]$')
+
+            hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
+                'histogram',
+                dimensions_plot,
+                position_bin_number,
+                position_limits,
+                positions,
+                weights,
+            )
+
+            image_limits_use = hist_limits
+            if image_limits is not None and len(image_limits) > 0:
+                if image_limits[0] is not None:
+                    image_limits_use[0] = image_limits[0]
+                if image_limits[1] is not None:
+                    image_limits_use[1] = image_limits[1]
+
+            _Image = subplot.imshow(
+                hist_valuess.transpose(),
+                norm=colors.LogNorm(),
+                cmap=color_map,
+                aspect='auto',
+                interpolation=interpolation,
+                extent=np.concatenate(position_limits[dimensions_plot]),
+                vmin=image_limits[0],
+                vmax=image_limits[1],
+            )
+
+            fig.colorbar(_Image)
+
+            fig.gca().set_aspect('equal')
+
+        elif len(dimensions_plot) == 3:
+            fig, subplots = ut.plot.make_figure(
+                1,
+                [2, 2],
+                left=0.22,
+                right=0.97,
+                bottom=0.16,
+                top=0.97,
+                background_color='black',
+            )
+
+            plot_dimension_iss = [
+                [dimensions_plot[0], dimensions_plot[1]],
+                [dimensions_plot[0], dimensions_plot[2]],
+                [dimensions_plot[1], dimensions_plot[2]],
+            ]
+
+            subplot_iss = [[0, 0], [1, 0], [1, 1]]
+
+            histogram_valuesss = []
+            for plot_i, plot_dimension_is in enumerate(plot_dimension_iss):
+                subplot_is = subplot_iss[plot_i]
+                subplot = subplots[subplot_is[0], subplot_is[1]]
+
+                hist_valuess, hist_xs, hist_ys, hist_limits = self.get_histogram(
+                    'histogram',
+                    plot_dimension_is,
+                    position_bin_number,
+                    position_limits,
+                    positions,
+                    weights,
+                )
+
+                histogram_valuesss.append(hist_valuess)
+
+                image_limits_use = hist_limits
+                if image_limits is not None and len(image_limits) > 0:
+                    if image_limits[0] is not None:
+                        image_limits_use[0] = image_limits[0]
+                    if image_limits[1] is not None:
+                        image_limits_use[1] = image_limits[1]
+
+                # ensure that tick labels do not overlap
+                subplot.set_xlim(position_limits[plot_dimension_is[0]])
+                subplot.set_ylim(position_limits[plot_dimension_is[1]])
+
+                units_label = ' $\\left[ {\\rm kpc} \\right]$'
+                if subplot_is == [0, 0]:
+                    subplot.set_ylabel(dimen_label[plot_dimension_is[1]] + units_label)
+                elif subplot_is == [1, 0]:
+                    subplot.set_xlabel(dimen_label[plot_dimension_is[0]] + units_label)
+                    subplot.set_ylabel(dimen_label[plot_dimension_is[1]] + units_label)
+                elif subplot_is == [1, 1]:
+                    subplot.set_xlabel(dimen_label[plot_dimension_is[0]] + units_label)
+
+                _Image = subplot.imshow(
+                    hist_valuess.transpose(),
+                    norm=colors.LogNorm(),
+                    cmap=color_map,
+                    # aspect='auto',
+                    interpolation=interpolation,
+                    extent=np.concatenate(position_limits[plot_dimension_is]),
+                    vmin=image_limits[0],
+                    vmax=image_limits[1],
+                )
+
+            if part.info['simulation.name']:
+                ut.plot.make_label_legend(subplots[0, 1], part.info['simulation.name'])
+
+            hist_valuess = np.array(histogram_valuesss)
+
+        if plot_file:
+            plt.savefig('image.pdf', format='pdf')
+        plt.show(block=False)
+
     def plot_image(
         self,
         part,
-        species_name='dark',
+        species_name='star',
         weight_name='mass',
         image_kind='histogram',
         dimensions_plot=[0, 1, 2],
         dimensions_select=[0, 1, 2],
-        distances_max=1000,
-        distance_bin_width=1,
+        distances_max=20,
+        distance_bin_width=0.1,
         distance_bin_number=None,
         center_position=None,
         rotation=None,
@@ -321,15 +532,16 @@ class ImageClass(ut.io.SayClass):
             hal_positions = hal_positions[masks]
 
         # plot ----------
-        BYW = colors.LinearSegmentedColormap('byw', ut.plot.color_map_dict['BlackYellowWhite'])
-        plt.register_cmap(cmap=BYW)
-        BBW = colors.LinearSegmentedColormap('bbw', ut.plot.color_map_dict['BlackBlueWhite'])
-        plt.register_cmap(cmap=BBW)
+        # BYW = colors.LinearSegmentedColormap('byw', ut.plot.color_map_dict['BlackYellowWhite'])
+        # plt.register_cmap(cmap=BYW)
+        # BBW = colors.LinearSegmentedColormap('bbw', ut.plot.color_map_dict['BlackBlueWhite'])
+        # plt.register_cmap(cmap=BBW)
 
         # set color map
         if background_color == 'black':
             if 'dark' in species_name:
-                color_map = plt.get_cmap('bbw')
+                # color_map = plt.get_cmap('bbw')
+                color_map = plt.cm.afmhot  # pylint: disable=no-member
             elif species_name == 'gas':
                 color_map = plt.cm.afmhot  # pylint: disable=no-member
             elif species_name == 'star':
@@ -3650,7 +3862,6 @@ class MassRadiusClass(ut.io.SayClass):
         for part_i, part in enumerate(parts):
             for _time_i, time_kind in enumerate(['now', 'form']):
                 for age_i, age_min in enumerate(AgeBin.maxs):
-
                     if len(parts) > 1:
                         color = colors[part_i]
                     else:
@@ -3816,7 +4027,6 @@ class MassRadiusClass(ut.io.SayClass):
         for part_i, part in enumerate(parts):
             for _time_i, time_kind in enumerate(['now', 'form']):
                 for m_i, mass_percent in enumerate(mass_percents):
-
                     if len(parts) > 1:
                         color = colors[part_i]
                     else:
