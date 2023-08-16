@@ -37,6 +37,7 @@ feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 
 
 def get_simulation_directory(dirkey = False):
+    '''Just an ease-of-access function for generation directory pathways'''
 
     dirset = dirkey.lower()
 
@@ -80,6 +81,7 @@ def get_simulation_directory(dirkey = False):
     print("!! Possible Error, no directory loaded !!")
 
 def get_sun_massfraction(model='fire2'):
+    '''Solar Massfraction from Asplund'''
 
     model = model.lower()
     assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
@@ -209,9 +211,45 @@ class EventYieldDictionary:
         eyd = EYD.event_yield_dictionaries()
         
         return eyd
+    
+    def plot_yields():
+
+        solar_values = get_sun_massfraction() # abundances of elements in the sun
+        sort_dicts = [nucleosyntheticYieldDict['wind'], nucleosyntheticYieldDict['cc'], nucleosyntheticYieldDict['ia'], solar_values]
+
+        def namestr(obj, namespace):
+            return [name for name in namespace if namespace[name] is obj]
+
+        for i in sort_dicts:
+            y = sorted(i.items(), key=lambda x:x[1])
+
+        styles = ['$W$', '$CC$', '$Ia$', "$\odot$"]
+        labels = ['Wind', 'CCSN', 'SNe Ia', 'Solar']
+        colors = ['c', 'r', 'g', 'k']
+        sizes = [700, 700, 700, 500]
+        j = 0
+
+        plt.figure(figsize = (15,8))
+        plt.grid(ls = "-.", alpha = 0.5)
+
+        for i in sort_dicts:
+
+            plt.scatter(i.keys(), i.values(), c = colors[j], marker = styles[j], s = sizes[j], label = labels[j])
+            plt.semilogy()
+            plt.ylim(1e-5)
+            plt.xticks(size = 15, rotation = 45)
+            #plt.show()
+
+
+            j+=1
+
+        plt.legend(fontsize = 26, fancybox = False)
+        plt.title("Nucleosynthetic Yields", size = 25)
+        plt.ylabel("Massfraction (per event)", size = 26)
+        plt.yticks(size = 20)
+        plt.show()
 
 eyd = EventYieldDictionary.initialize_EYD()
-
 # The dictionaries below are referenced throughout, I just wanted to initalize them early. 
 
 nucleosyntheticYieldDict = {'wind' : eyd[0], 'cc' : eyd[1], 'mannucci' : eyd[3], 'ia' :  eyd[2]}
@@ -271,15 +309,14 @@ class feedback:
         self.cc_norm = n_cc 
         self.w_norm = n_w
 
-
     def get_rate_wind(self, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
 
         '''
         Returns the rates versus stellar age for stellar winds in FIRE-2. 
 
         Z: progenitor metallicity. Set to 1 by default, do not change for FIRE-2
-        massloss: not sure why this is here, will be removed.
-        metal_mass_fraction: was going to add as a potential fix to an inherent metallicity dependence built into FIRE-2. I did not implement this, but I could.
+        massloss: replaced, will be deprecated in future. 
+        metal_mass_fraction: was going to add as a potential fix to an inherent metallicity dependence built into FIRE-2. I did not implement this. 
         plot: set to True to plot the results. 
         '''
     
@@ -289,7 +326,7 @@ class feedback:
         metallicity_min = 0.01 
         metallicity_max = 3
         age_min = 0  # Myr
-        age_max = 14001
+        age_max = 14001 # 13700 Myr is appropriate too
 
         # MODEL(s) BELOW
         if len(self.timespan) == 1:
@@ -316,9 +353,9 @@ class feedback:
             else:
                 return r_wind/1e3, self.timespan, transition_ages
 
-        ###########################################################################################
-        # Piecewise function for pre-generating a table of values and then performing operations. #
-        ###########################################################################################
+        #################################################################################################################################################
+        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        #################################################################################################################################################
 
         mask1 = [True if 0 < i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in self.timespan]
@@ -326,7 +363,6 @@ class feedback:
         mask4 = [True if transition_ages[2] <= i else False for i in self.timespan]
 
         #func1 = 4.76317 * Z * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2
-
 
         func1 = 4.76317 * (self.timespan[mask1]/self.timespan[mask1]) # FIRE-2.1
         func2 = 4.76317 * Z * self.timespan[mask2] ** (1.838 * (0.79 + np.log10(Z)))
@@ -384,6 +420,10 @@ class feedback:
             
             else:
                 return r_cc, self.timespan, transition_ages
+            
+        #################################################################################################################################################
+        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        #################################################################################################################################################
     
         mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
         mask2 = [True if transition_ages[0] <= i <= transition_ages[1] else False for i in self.timespan]
@@ -401,9 +441,6 @@ class feedback:
         r_cc *= ejecta_masses[self.source]
 
         if self.element:
-            #print("Selected " + str(self.element) + " yields for " + str(self.source))
-            #print(element_yields(self.source)[self.element])
-
             if plot:
                 plt.loglog(a_cc, element_yields(self.source)[self.element]*r_cc, label = str(self.element), c = plotcolor)
 
@@ -414,7 +451,7 @@ class feedback:
 
         return r_cc, a_cc, transition_ages
 
-    def get_rate_ia(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
+    def get_rate_wd(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False):
 
         transition_ages = self.trans_ia
         model_version = self.ia_model
@@ -442,6 +479,10 @@ class feedback:
                 else:
                     return r_ia, self.timespan, transition_ages
                 
+        #################################################################################################################################################
+        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        #################################################################################################################################################
+            
             elif len(self.timespan) > 1:
                 mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
                 mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
@@ -466,6 +507,10 @@ class feedback:
 
         if model_version == 'maoz':
 
+            ##########################################################
+            # Piecewise function for continuous function integration #
+            ##########################################################
+
             if len(self.timespan) == 1:
                 t = _to_num(self.timespan)
                 if t < transition_ages[0]:
@@ -481,7 +526,11 @@ class feedback:
                     return rfin, self.timespan, transition_ages
                 else:
                     return r_ia, self.timespan, transition_ages
-                
+
+        #################################################################################################################################################
+        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        #################################################################################################################################################
+        #    
             elif len(self.timespan) > 1:
                 mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
                 mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]

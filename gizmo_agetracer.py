@@ -364,7 +364,7 @@ class FIREYieldClass2:
         #self.StellarWind = gizmo_model.feedback(source = 'wind')
 
         #self.rate_cc, self.age_cc, self.trans_cc = self.SupernovaCC.get_rate_cc()
-        #self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaIa.get_rate_ia()
+        #self.rate_ia, self.age_ia, self.trans_ia = self.SupernovaIa.get_rate_wd()
         #self.rate_wind, self.age_wind, self.trans_wind = self.StellarWind.get_rate_wind()
         
 
@@ -512,7 +512,7 @@ class FIREYieldClass2:
                                                                  elem_name = element_name, 
                                                                  ia_model=self.ia_model, 
                                                                  t_ia = self.ia_transition_time, 
-                                                                 n_ia = self.ia_normalization).get_rate_ia()
+                                                                 n_ia = self.ia_normalization).get_rate_wd()
                     
                     mask = np.logical_and(age_min <= a_ia, a_ia <= age_max)
                     int_ia = integrate.trapz(r_ia[mask]/len(r_ia[mask]), x = [age_min, age_max])#, a_ia[mask])
@@ -572,7 +572,7 @@ class FIREYieldClass2:
         element_name = element_of_choice
 
         if test_process == False:
-            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_wd()[0]
             r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'cc').get_rate_cc()[0]
             r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind').get_rate_wind()[0]
 
@@ -584,7 +584,7 @@ class FIREYieldClass2:
                                              source = 'ia', ia_model=self.ia_model, 
                                              t_ia = self.ia_transition_time, 
                                              n_ia = NIA_DEFAULT, 
-                                             t_dd = TDD_DEFAULT).get_rate_ia()[0]
+                                             t_dd = TDD_DEFAULT).get_rate_wd()[0]
 
         if test_process == 'winds' or test_process == 'wind':
             r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
@@ -597,7 +597,7 @@ class FIREYieldClass2:
             #print("TESTING CCSN")
 
         if test_process == 'ia' or test_process == 'wd' or test_process == 'wdsn':
-            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
+            r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_wd()[0]
             return r_ia
             #print("TESTING IA")
 
@@ -607,7 +607,7 @@ class FIREYieldClass2:
             # Lots of reasons to use the test parameter, not sure if I should rename to 'specify' or something like that. 
             match test_process:
                 case 'default_wd': # calculate with fiducial Maoz rate
-                    r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = NIA_DEFAULT, t_dd = TDD_DEFAULT).get_rate_ia()[0]
+                    r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = NIA_DEFAULT, t_dd = TDD_DEFAULT).get_rate_wd()[0]
 
                 case 'wind':
                     r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
@@ -620,7 +620,7 @@ class FIREYieldClass2:
                     #print("TESTING CCSN")
 
                 case 'wd':
-                    r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_ia()[0]
+                    r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_wd()[0]
                     return r_ia
                     #print("TESTING IA")
         '''
