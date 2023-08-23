@@ -301,14 +301,27 @@ class FIREYieldClass:
         sncc_rate = self.SupernovaCC.get_mass_loss_rate(age)
         snwd_rate = self.SupernovaWD.get_mass_loss_rate(age)
 
-        if test == 'winds':
-            return self.NucleosyntheticYield['wind'][element_name] * wind_rate
-        
-        if test == 'cc':
-            return self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate
+        if test:
+            if test == 'winds':
+                return self.NucleosyntheticYield['wind'][element_name] * wind_rate
+            
+            if test == 'cc':
+                return self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate
 
-        if test == 'ia':
-            return self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate
+            if test == 'ia':
+                return self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate
+            
+            if test == 'no_winds':
+                eyr = (self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate + self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate)
+                return eyr
+            
+            if test == 'no_cc':
+                eyd = (self.NucleosyntheticYield['wind'][element_name] * wind_rate + self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate)
+                return eyr
+
+            if test == 'no_wd':
+                eyr = (self.NucleosyntheticYield['wind'][element_name] * wind_rate + self.NucleosyntheticYield['supernova.cc'][element_name] * sncc_rate)
+                return eyr
 
         element_yield_rate = (
             self.NucleosyntheticYield['wind'][element_name] * wind_rate
@@ -907,7 +920,7 @@ class ElementAgeTracerClass(dict):
             self['age.bins'][-1] = self._age_max_impose
 
     def assign_element_yield_massfractions(
-        self, element_yield_dict, _progenitor_metal_massfractions=None
+        self, element_yield_dict, _progenitor_metal_massfractions=None, flush = False
     ):
         '''
         Assign to self a dictionary of stellar nucleosynthetic yield mass fractions within
@@ -923,9 +936,19 @@ class ElementAgeTracerClass(dict):
         _progenitor_metal_massfractions : array
             placeholder for future development
         '''
+
+        if flush == True:
+            for element_name in element_yield_dict:
+                try:
+                    del self['yield.massfractions'][element_name]
+                except:
+                    print("Dictionary check passed")
+                    break
+
         for element_name in element_yield_dict:
             assert len(element_yield_dict[element_name]) == self['age.bin.number']
             self['yield.massfractions'][element_name] = np.array(element_yield_dict[element_name])
+
 
     def assign_element_initial_massfraction(
         self, massfraction_initial_dict=None, metallicity=None, helium_massfraction=0.24
@@ -1023,6 +1046,10 @@ class ElementAgeTracerClass(dict):
 
         # weight the yield within each age bin by the age-tracer mass weights
         # and sum across all age bins to get the total abundance
+
+        # agetracer_mass_weights : come from the simulation
+        # self['yield.massfractions'][element_name] : calculated from feedback models 
+
         element_mass_fractions = np.sum(
             agetracer_mass_weights * self['yield.massfractions'][element_name], axis=axis
         )

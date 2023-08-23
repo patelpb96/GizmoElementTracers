@@ -564,8 +564,6 @@ class feedback:
             #print("Return 2")
             return r_ia, a_ia, transition_ages
 
-
-            
 class ElementTracerPipeline:
     def __init__(self, 
     z = 0):
