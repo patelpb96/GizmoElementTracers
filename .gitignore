@@ -49,8 +49,3 @@ Thumbs.db
 *.wmv
 *.pdf
 .ipynb_checkpoints/gizmo_tutorial-checkpoint.ipynb
-gizmo_star.py
-gizmo_plot.py
-gizmo_io.py
-gizmo_group.py
-gizmo_diagnostic.py
