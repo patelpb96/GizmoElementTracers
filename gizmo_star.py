@@ -189,7 +189,7 @@ class NucleosyntheticYieldClass(dict):
 
         For stellar winds, FIRE-2 and FIRE-3 add the existing surface abundances from the progenitor
         to the injected yield for elements not included in its yield.
-        For supernovae (core-collapse and white-dwarf), FIRE-2 and FIRE-3 do not add any existing
+        For supernovae (core-collapse and white-dwarf)), FIRE-2 and FIRE-3 do not add any existing
         surface abundances from the progenitor to the yield.
 
         Parameters
@@ -385,7 +385,7 @@ class NucleosyntheticYieldClass(dict):
                 # Si: 8.89e-3, S: 3.78e-3, Ca: 4.36e-4, Fe: 7.06e-3]
                 ejecta_mass = 10.5  # [M_sun]
                 # below are mass fractions
-                element_yield['metals'] = 0.19
+                element_yield['metals'] = 0.195926
                 element_yield['helium'] = 0.369
                 element_yield['carbon'] = 0.0127
                 element_yield['nitrogen'] = 0.00456
@@ -415,7 +415,7 @@ class NucleosyntheticYieldClass(dict):
 
             elif self.model == 'fire3':
                 # FIRE-3: stellar_evolution.c line ~474
-                # ejecta_mass = 8.72  # [M_sun], IMF-averaged, but FIRE-3 does not use this directly
+                # ejecta_mass = 8.72  # IMF-averaged [M_sun], but FIRE-3 does not use this directly
 
                 # numbers for interpolation of ejecta masses
                 # [must be careful here that this integrates to the correct -total- ejecta mass]
@@ -463,13 +463,13 @@ class NucleosyntheticYieldClass(dict):
                     # important to note that early supernovae strongly dominate Mg
                     'magnesium': [2.89e-02, 1.25e-02, 5.77e-03, 1.03e-03, 1.03e-03],
                     # Si [IMF-mean y = 4.53e-3]
-                    # lots comes from WDSN, so low here is not an issue
+                    # lots comes from 1a's, so low here is not an issue
                     'silicon': [4.12e-04, 7.69e-03, 8.73e-03, 2.23e-03, 1.18e-03],
-                    # S [IMF-mean y=3.01e-3] - more from WDSN
+                    # S [IMF-mean y=3.01e-3] - more from SNWDs
                     'sulfur': [3.63e-04, 5.61e-03, 5.49e-03, 1.26e-03, 5.75e-04],
-                    # Ca [IMF-mean y = 2.77e-4] - WDSN
+                    # Ca [IMF-mean y = 2.77e-4] - SNWD
                     'calcium': [4.28e-05, 3.21e-04, 6.00e-04, 1.84e-04, 9.64e-05],
-                    # Fe [IMF-mean y = 4.11e-3] - WDSN
+                    # Fe [IMF-mean y = 4.11e-3] - SNWD
                     'iron': [5.46e-04, 2.18e-03, 1.08e-02, 4.57e-03, 1.83e-03],
                 }
 
@@ -562,7 +562,7 @@ class NucleosyntheticYieldClass(dict):
                 # 5.04357143e-02, 1.35621429e-03, 5.10112857e-03, 1.65785714e-01, 9.57078571e-02,
                 # 1.76928571e-02, 5.47890000e-01] -- absolute yield in solar
                 # updated W7 in Leung + Nomoto et al 2018 - seems bit low in Ca/Fe,
-                # less plausible if those dominated by WDSN
+                # less plausible if those dominated by SNWDs
                 # yields[2]=1.31e-2; yields[3]=7.59e-10; yields[4]=9.29e-2; yields[5]=1.79e-3;
                 # yields[6]=2.82e-3; yields[7]=1.06e-1; yields[8]=5.30e-2; yields[9]=6.27e-3;
                 # yields[10]=5.77e-1
@@ -1425,10 +1425,10 @@ class SupernovaWDClass(ut.io.SayClass):
             if age_min is None:
                 if 'fire2' in self.model:
                     age_min = 37.53  # [Myr] ensure FIRE-2 default
-                    # self.say(f'input model = {model}, forcing WDSN age min = {age_min} Myr')
+                    # self.say(f'input model = {model}, forcing SNWD age min = {age_min} Myr')
                 elif self.model == 'fire3':
                     age_min = 44  # [Myr] ensure FIRE-3 default
-                    # self.say(f'input model = {model}, forcing WDSN age min = {age_min} Myr')
+                    # self.say(f'input model = {model}, forcing SNWD age min = {age_min} Myr')
             assert age_min >= 0
             self.age_min = age_min
 
@@ -1476,11 +1476,11 @@ class SupernovaWDClass(ut.io.SayClass):
             elif self.model == 'maoz':
                 # Maoz & Graur 2017
                 rate = 2.6e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1] compromise fit
-                # fit to volumetric, Hubble-time-integrated WDSN N/M = 1.3 +/- 0.1 per 1000 Msun
+                # fit to volumetric, Hubble-time-integrated SNWD N/M = 1.3 +/- 0.1 per 1000 Msun
                 # rate = 2.1e-7 * (ages / 1e3) ** -1.1  # [Myr ^ -1]
-                # fit to field galaxies, Hubble-time-integrated WDSN N/M = 1.6 +/- 0.1 per 1000 Msun
+                # fit to field galaxies, Hubble-time-integrated SNWD N/M = 1.6 +/- 0.1 per 1000 Msun
                 # rate = 2.6e-7 * (ages / 1e3) ** -1.13  # [Myr ^ -1]
-                # fit to galaxy clusters, Hubble-time-int WDSN N/M = 5.4 +/- 0.1 per 1000 Msun
+                # fit to galaxy clusters, Hubble-time-int SNWD N/M = 5.4 +/- 0.1 per 1000 Msun
                 # rate = 6.7e-7 * (ages / 1e3) ** -1.39  # [Myr ^ -1]
 
             return rate
@@ -1844,7 +1844,7 @@ def plot_supernova_number_v_age(
 ):
     '''
     Plot specific rates or cumulative numbers [per M_sun of stars at that age] of
-    core-collapse and white-dwarf (Ia) supernova events versus stellar age [Myr].
+    core-collapse and white-dwarf supernova events versus stellar age [Myr].
 
     Parameters
     ----------
@@ -2066,7 +2066,6 @@ def plot_mass_loss_v_age(
             ut.io.get_string_from_numbers(metallicity, digits=4, exponential=False, strip=True)
         )
     ut.plot.parse_output(file_name, directory)
-
 
 def plot_nucleosynthetic_yields(
     event_kinds='wind',
