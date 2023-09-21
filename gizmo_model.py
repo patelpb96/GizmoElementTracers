@@ -41,6 +41,44 @@ def get_simulation_directory(dirkey = False):
 
     dirset = dirkey.lower()
 
+    if dirset == 'etmfs':
+        dirs = {'m09_2e2_core' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_m2e2/core',
+            'm09_r30' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
+            'm10v_m2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10v_m2e2/core',
+            #'m12b_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12b_m7e3/core',
+            'm10b_m5e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10b_m5e2/core',
+            #'m11i_r110' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r110',
+            #'m12m_m6e4' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12m_m6e4/core',
+            'm11q_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11q_m7e3/core',
+            'm09_r250' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r250',
+            #'m12f_m6e4' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12f_m6e4/core',
+            'm11e_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11e_m7e3/core',
+            'm11i_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_m7e3/core',
+            'm11a_m2e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11a_m2e3/core',
+            'm10q_m2e2' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m10q_m2e2/core',
+            #'m11g_m1e4' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11g_m1e4/core',
+            'm11h_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11h_m7e3/core',
+            #'m12q_r7100_v1' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12q_r7100_v1',
+            'm11b_m2e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11b_m2e3/core',
+            'm11f_m1e4' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11f_m1e4/core',
+            'm11i_r7100' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r7100',
+            #'m12q_m6e4' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12q_m6e4/core',
+            #'m09_r30' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m09_r30',
+            #'m12f_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m12f_m7e3/core',
+            'm11i_r880' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11i_r880',
+            'm11v_m7e3' : '/scratch/projects/xsede/GalaxiesOnFIRE/fire3/m11v_m7e3/core',
+            'm10q_250_et' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/element_tracer/m10q_r250',
+            'm11b_880_et' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m11i_r880_uvb2020',
+            'm12i_57000_et' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/element_tracer/m12i_r57000',
+            'm12i_uvb_7100' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m12i_r7100_uvb2020',
+            'm12f_uvb_7100' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m12f_r7100_uvb2020',
+            'm12m_uvb_7100' : '/scratch/projects/xsede/GalaxiesOnFIRE/uv_background/m12m_r7100_uvb2020',
+            'm09_r250_uvb_late_maoz' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m09_r250_uvb-late_snia-maoz',
+            'm12i_r57000_snia-maoz' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/snia_variation/m12i_r57000_snia-maoz'}
+        
+        return dirs
+
+
     if dirset == 'stampede2':
         dirs = { 'm11b' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/m11b_res260' ,
             'm11b_2100' : '/scratch/projects/xsede/GalaxiesOnFIRE/metal_diffusion/cr_heating_fix/m11b_res2100_no-swb_contaminated',
@@ -81,7 +119,7 @@ def get_simulation_directory(dirkey = False):
     print("!! Possible Error, no directory loaded !!")
 
 def get_sun_massfraction(model='fire2'):
-    '''Solar Massfraction from Asplund'''
+    '''Solar Massfractions from Asplund'''
 
     model = model.lower()
     assert model in ['fire2', 'fire2.1', 'fire2.2', 'fire3']
@@ -261,14 +299,21 @@ class feedback:
     time_span = None, 
     source = 'any', 
     elem_name = False, # name of element we are interested in
-    t_w = [1.0, 3.5, 100], # Discontinuities in the wind rate function
-    t_cc = [3.4, 10.37, 37.53],  #Discontinuities in the CCSN rate function
+
+    # All parameters for WDSN/SNe Ia
     t_ia = [37.53],  #Discontinuity(ies) in the WDSN rate function
     t_dd = -1.1, #WDSN/SNeIa time delay exponent
-    n_ia = 2.6e-7, #WDSN/SNeIa normalization coefficient
-    n_cc = False, #CCSN normalization coefficient(s) ; plan is to have it read in a list of len(t_cc)
-    n_w = False, #Wind normalization coefficient(s) ; same plan as above
-    ia_model = 'maoz'):
+    n_ia = 2.6e-7, #WDSN/SNeIa coefficient
+    ia_model = 'maoz',
+
+    # All parameters for CCSN
+    n_cc = [0, 5.408e-4, 2.516e-4, 0], #CCSN coefficient(s) ; plan is to have it read in a list of len(t_cc)
+    t_cc = [3.4, 10.37, 37.53],  #Discontinuities in the CCSN rate function
+
+    # All parameters for Winds 
+    t_w = [1.0, 3.5, 100], # Discontinuities in the wind rate function
+    n_w = False #Winds coefficients 
+    ):
 
         '''
         time_span: what range of time or instant in time do we want to calculate these values for?
@@ -306,7 +351,7 @@ class feedback:
         self.ia_model = ia_model.lower()
         self.ia_norm = n_ia
         self.ia_tdd = t_dd
-        self.cc_norm = n_cc 
+        self.cc_norm = np.array(n_cc)
         self.w_norm = n_w
 
     def get_rate_wind(self, Z = Z_0, massloss = True, metal_mass_fraction = None,  plot = False):
@@ -401,17 +446,16 @@ class feedback:
             ##########################################################
             # Piecewise function for continuous function integration #
             ##########################################################
-
             if 0 <= t <= transition_ages[0]:
-                r_cc = 0
+                r_cc = self.cc_norm[0]
 
             if transition_ages[0] <= t <= transition_ages[1]:
-                r_cc = 5.408e-4 # [Myr ^ -1]
+                r_cc = self.cc_norm[1] # [Myr ^ -1]
             if transition_ages[1] <= t <= transition_ages[2]:
-                r_cc = 2.516e-4 # [Myr ^ -1]
+                r_cc = self.cc_norm[2] # [Myr ^ -1]
 
             if transition_ages[2] <= t:
-                r_cc = 0
+                r_cc = self.cc_norm[0]
 
             r_cc *= ejecta_masses[self.source]
 
@@ -430,10 +474,10 @@ class feedback:
         mask3 = [True if transition_ages[1] <= i <= transition_ages[2] else False for i in self.timespan]
         mask4 = [True if transition_ages[2] <= i else False for i in self.timespan]
 
-        func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
-        func2 = 5.408e-4*(self.timespan[mask2]/self.timespan[mask2])
-        func3 = 2.516e-4*(self.timespan[mask3]/self.timespan[mask3])
-        func4 = 0*(self.timespan[mask4]/self.timespan[mask4])
+        func1 = self.cc_norm[0]*(self.timespan[mask1]/self.timespan[mask1])
+        func2 = self.cc_norm[1]*(self.timespan[mask2]/self.timespan[mask2])
+        func3 = self.cc_norm[2]*(self.timespan[mask3]/self.timespan[mask3])
+        func4 = self.cc_norm[3]*(self.timespan[mask4]/self.timespan[mask4])
 
         r_cc = np.array([*func1, *func2, *func3, *func4], dtype = 'object') # y-axis: rate
         a_cc = np.array([*self.timespan[mask1], *self.timespan[mask2], *self.timespan[mask3], *self.timespan[mask4]], dtype = 'object') # x-axis: age
@@ -459,7 +503,7 @@ class feedback:
         tdd = self.ia_tdd
         t = _to_num(self.timespan)
 
-        #deprecating(ed)
+        # Mannucci model (typically used in FIRE-2.x)
         if model_version == 'mannucci':
 
             if len(self.timespan) == 1:
@@ -480,7 +524,7 @@ class feedback:
                     return r_ia, self.timespan, transition_ages
                 
         #################################################################################################################################################
-        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, use sparingly       #
         #################################################################################################################################################
             
             elif len(self.timespan) > 1:
@@ -488,7 +532,7 @@ class feedback:
                 mask2 = [True if transition_ages[0] <= i else False for i in self.timespan]
 
                 func1 = 0*(self.timespan[mask1]/self.timespan[mask1])
-                func2 = 5.3e-8 + ia_norm * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
+                func2 = 5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((self.timespan[mask2] - 50) / 10) ** 2)
 
                 a_ia = np.array([*self.timespan[mask1], *self.timespan[mask2]], dtype = 'object') # x-axis: age
                 r_ia = np.array([*func1, *func2], dtype = 'object') # y-axis: rate
@@ -496,15 +540,19 @@ class feedback:
                 if massloss is True:
                     r_ia *= ejecta_masses[self.source] # multiply by ejecta mass of 1.4 M_sun to get mass loss rate 
 
-
                 if self.element:
 
                     if plot:
                         plt.loglog(a_ia, element_yields(self.source)[self.element]*r_ia, label = "Mannucci")
                     else:
-                        #print("Return 1")
-                        return element_yields(self.source)[self.element]*r_ia, a_ia, transition_ages
+                        rfin = element_yields(self.source)[self.element]*r_ia
+                        return rfin, a_ia, transition_ages
+                    
+                rfin = r_ia
+                return rfin, a_ia, transition_ages
+                
 
+        # Maoz model (typically used in FIRE-3.x)
         if model_version == 'maoz':
 
             ##########################################################
@@ -558,7 +606,7 @@ class feedback:
                 return r_ia, a_ia, transition_ages
 
             if plot:
-                plt.loglog(a_ia, r_ia, label = "Mannucci")
+                plt.loglog(a_ia, r_ia, label = "Maoz?")
 
             r_ia *= ejecta_masses[self.source]
             #print("Return 2")

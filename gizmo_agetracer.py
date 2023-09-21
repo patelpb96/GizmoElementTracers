@@ -76,7 +76,7 @@ from scipy import integrate
 from utilities import constant
 
 TDD_DEFAULT = -1.1 # default Maoz time delay distribution
-NIA_DEFAULT = 2.6e-7 # default Maoz Ia normalization
+NIA_DEFAULT = 2.6e-7 # default Maoz Ia prefactor
 NUM_IA_FIDUCIAL = 0.002257708396415009 # fiducial integrated massloss rate for SNe Ia
 NUM_CC_FIDUCIAL = 0.11152830837937755 # fiducial integrated massloss rate for CCSN
 
