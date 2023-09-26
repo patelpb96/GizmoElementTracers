@@ -316,7 +316,7 @@ class FIREYieldClass:
                 return eyr
             
             if test == 'no_cc':
-                eyd = (self.NucleosyntheticYield['wind'][element_name] * wind_rate + self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate)
+                eyr = (self.NucleosyntheticYield['wind'][element_name] * wind_rate + self.NucleosyntheticYield['supernova.wd'][element_name] * snwd_rate)
                 return eyr
 
             if test == 'no_wd':
@@ -336,7 +336,23 @@ class FIREYieldClass2:
     Modified FIREYieldClass to work with Preet's implementation of the FIRE-2 model. 
     '''
 
-    def __init__(self, model='fire2.1', progenitor_metallicity=1.0, ia_type = 'maoz', trans_time_ia = [37.53], tdd_ia = TDD_DEFAULT, normalization_ia = NIA_DEFAULT):
+    def __init__(self, model='fire2.1', 
+                 progenitor_metallicity=1.0, 
+                 
+                 # WDSN/SNe Ia parameters
+                 ia_type = 'maoz', 
+                 trans_time_ia = [37.53], 
+                 tdd_ia = TDD_DEFAULT, 
+                 normalization_ia = NIA_DEFAULT,
+
+                 # CCSN parameters
+                 normalization_ccsn = [0, 5.408e-4, 2.516e-4, 0],
+                 trans_time_ccsn = [3.4, 10.37, 37.53],
+
+                 # Winds parameters
+                 normalization_winds = False,
+                 trans_time_winds = [1.0, 3.5, 100]
+                 ):
         '''
         Parameters
         -----------
@@ -348,6 +364,14 @@ class FIREYieldClass2:
         progenitor_metallicity : float
             metallicity [linear mass fraction relative to Solar]
             for nucleosynthetic rates and yields that depend on progenitor metallicity
+        ia_type : string {'maoz', 'mannucci'}
+            choice of feedback model for type Ia's/WDSN
+        trans_time_ia : list[float()]
+            transition time(s) for ia model
+        tdd_ia : float
+            default value for maoz time-delay distribution exponent
+        normalization_ia : float
+            default value for maoz model normalization constant
         '''
         from . import gizmo_star
         from . import gizmo_model
@@ -360,6 +384,10 @@ class FIREYieldClass2:
         self.ia_transition_time = trans_time_ia
         self.ia_normalization = normalization_ia
         self.ia_tdd = tdd_ia
+        self.cc_transition_time = trans_time_ccsn
+        self.cc_normalization = normalization_ccsn
+        self.winds_transition_time = trans_time_winds
+        self.winds_normalization = normalization_winds
 
         #print("Self.ia_model = " + str(ia_type))
         
@@ -403,7 +431,8 @@ class FIREYieldClass2:
         """
 
         # transition/discontinuous ages [Myr] in this model to be careful near integrating
-        self.ages_transition = np.array([1, 3.4, 3.5, 10.37, 37.53, 50, 100, 1000])
+        #self.ages_transition = np.array([1, 3.4, 3.5, 10.37, 37.53, 50, 100, 1000])
+        self.ages_transition = np.unique(np.concatenate([self.winds_transition_time, self.cc_transition_time, self.winds_transition_time, np.array([50,1000])]))
 
         # self.ages_transition = None
 
@@ -420,17 +449,6 @@ class FIREYieldClass2:
 
         # store all yields as mass fraction relative to the IMF-averaged mass of stars at that time
         # can store because in FIRE-2 yields are independent of stellar age and mass-loss rate
-
-        #self.NucleosyntheticYield.assign_element_yields(
-            # match FIRE-2
-            #progenitor_massfraction_dict=self.progenitor_massfraction_dict,
-            # test: do not model correction of yields from pre-existing surface abundances
-            # progenitor_metallicity=self.progenitor_metallicity,
-            # progenitor_massfraction_dict=None,
-        #)
-
-        #for event_kind in self._event_kinds:
-        #    self.NucleosyntheticYield[event_kind] = self._feedback_handler()   
             
     def get_element_yields(self, 
                            age_bins, 
@@ -460,6 +478,16 @@ class FIREYieldClass2:
         element_names : list
             names of elements to generate, if only generating a subset
             If input None, assign all elements in this model.
+        continuous : bool
+            determines type of integration
+        old_int : bool
+            also used for type of integration (deprecated)
+        fast_int : bool
+            when yields are fixed (i.e. no progenitor metallicity dependence), this speeds up the integrator.
+        int_error : float
+            scipy integration has some threshold for error when performing integration, and this value corresponds to the best I could find
+        testing : bool {False}, string {'cc', 'wd', 'wind'}
+            False when not isolating feedback channels, otherwise string 
 
         Returns
         -------
@@ -572,6 +600,7 @@ class FIREYieldClass2:
 
                 # normalization constant which preserves the total number of Ia events.
                 A_wd = NUM_IA_FIDUCIAL/int_ia[-1]
+                A_cc = NUM_CC_FIDUCIAL/int_cc[-1]
 
                 for element_name in element_names:
                     # get the integrated yield mass within/across the age bin
@@ -586,8 +615,8 @@ class FIREYieldClass2:
 
         if test_process == False:
             r_ia = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'ia', ia_model=self.ia_model, t_ia = self.ia_transition_time, n_ia = self.ia_normalization, t_dd = self.ia_tdd).get_rate_wd()[0]
-            r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'cc').get_rate_cc()[0]
-            r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind').get_rate_wind()[0]
+            r_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'cc', n_cc = self.cc_normalization, t_cc = self.cc_transition_time).get_rate_cc()[0]
+            r_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name, source = 'wind', n_w=self.winds_normalization, t_w=self.winds_transition_time).get_rate_wind()[0]
 
             return (r_ia + r_cc + r_w)
         
@@ -600,12 +629,12 @@ class FIREYieldClass2:
                                              t_dd = TDD_DEFAULT).get_rate_wd()[0]
 
         if test_process == 'winds' or test_process == 'wind':
-            r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind').get_rate_wind()
+            r_w, a_w, t_w = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'wind', n_w=self.winds_normalization, t_w=self.winds_transition_time).get_rate_wind()
             return r_w
             #print("TESTING WINDS")
 
         if test_process == 'cc' or test_process == 'ccsn':
-            r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc').get_rate_cc()
+            r_cc, a_cc, t_cc = self.gizmo_model.feedback(time_span = [some_time], elem_name=element_name,source = 'cc', n_cc = self.cc_normalization, t_cc = self.cc_transition_time).get_rate_cc()
             return r_cc
             #print("TESTING CCSN")
 
@@ -637,16 +666,6 @@ class FIREYieldClass2:
                     return r_ia
                     #print("TESTING IA")
         '''
-
-        #try:
-        #    len(r_ia)
-        #    rate_sum = (r_w[0:] + r_cc[0:] + r_ia[0:])
-        #    print(rate_sum)
-        #except:
-        #    print("Rate sum exception")
-        #    rate_sum = (r_w + r_cc + r_ia)
-
-        #print("RATE SUM: " + str(rate_sum))
 
 # --------------------------------------------------------------------------------------------------
 # NuGrid/Sygma model for nucleosynthetic yields

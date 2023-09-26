@@ -35,7 +35,7 @@ colors = ['black', 'rosybrown', 'brown', 'red', 'peru', 'darkorange', 'gold', 'o
 
 feedback_type = ['wind', 'ia', 'mannucci', 'maoz', 'cc']
 
-
+# Note, maybe these directories should be stored in an hdf5 or csv at some point and simply loaded in to make cleaner code
 def get_simulation_directory(dirkey = False):
     '''Just an ease-of-access function for generation directory pathways'''
 
@@ -145,9 +145,12 @@ def element_yields(source = None, includeZ = False, plot = False):
     '''
     returns a dictionary with yields for different feedback event types (CCSN, SNe Ia, Winds)
 
-    source: one of 'ccsn', 'mannucci', 'maoz', or 'winds'
-    includeZ: progenitor metallicity dependence (set to False by default)
-    plot: will include a plot of the yields for a given feedback event type. Set True to plot, False is default.
+    source: string
+        one of 'ccsn', 'mannucci', 'maoz', or 'winds'
+    includeZ: bool
+        progenitor metallicity dependence (set to False by default)
+    plot: bool
+        will include a plot of the yields for a given feedback event type. Set True to plot, False is default.
     '''
     
     if source.lower() is None:
@@ -307,7 +310,7 @@ class feedback:
     ia_model = 'maoz',
 
     # All parameters for CCSN
-    n_cc = [0, 5.408e-4, 2.516e-4, 0], #CCSN coefficient(s) ; plan is to have it read in a list of len(t_cc)
+    n_cc = [0, 5.408e-4, 2.516e-4, 0], #CCSN coefficient(s)
     t_cc = [3.4, 10.37, 37.53],  #Discontinuities in the CCSN rate function
 
     # All parameters for Winds 
@@ -318,13 +321,21 @@ class feedback:
         '''
         time_span: what range of time or instant in time do we want to calculate these values for?
         source: one of 'wind', 'ia', or 'cc'
-        t_w: transition times for winds (list)
-        t_cc: transition times for CCSN
         t_ia: transition times for SNe Ia
         n_ia: type ia normalization 
-        
         ia_model: 'maoz' or 'mannucci' (maoz by default)
 
+        t_w: transition times for winds (list)
+        
+        n_cc : list
+            list of constants relevant for the ccsn rate model
+        t_cc : list 
+            transition times for CCSN
+
+        t_w : list
+            list of constants for the winds model
+        n_w : list
+            currently not implemented, but another list of constants that could be used for the wind rates models
         '''
         self.source = source
         self.element = elem_name
@@ -439,7 +450,9 @@ class feedback:
 
     def get_rate_cc(self, Z = Z_0, massloss = True, metal_mass_fraction = None, plot = False, plotcolor = 'k'):
     
+        # Remember, you have to create a reference to the initialized variable in 'self' to alter it when initializing a class
         transition_ages = self.trans_cc
+        cc_norm = self.cc_norm
 
         if len(self.timespan) == 1:
             t = _to_num(self.timespan)
@@ -447,15 +460,15 @@ class feedback:
             # Piecewise function for continuous function integration #
             ##########################################################
             if 0 <= t <= transition_ages[0]:
-                r_cc = self.cc_norm[0]
+                r_cc = cc_norm[0]
 
             if transition_ages[0] <= t <= transition_ages[1]:
-                r_cc = self.cc_norm[1] # [Myr ^ -1]
+                r_cc = cc_norm[1] # [Myr ^ -1]
             if transition_ages[1] <= t <= transition_ages[2]:
-                r_cc = self.cc_norm[2] # [Myr ^ -1]
+                r_cc = cc_norm[2] # [Myr ^ -1]
 
             if transition_ages[2] <= t:
-                r_cc = self.cc_norm[0]
+                r_cc = cc_norm[0]
 
             r_cc *= ejecta_masses[self.source]
 
@@ -466,7 +479,7 @@ class feedback:
                 return r_cc, self.timespan, transition_ages
             
         #################################################################################################################################################
-        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        # Masking function(s) for pre-generating a table of values and then performing operations. Much slower based on speed tests, use sparingly      #
         #################################################################################################################################################
     
         mask1 = [True if 0 <= i <= transition_ages[0] else False for i in self.timespan]
@@ -474,10 +487,10 @@ class feedback:
         mask3 = [True if transition_ages[1] <= i <= transition_ages[2] else False for i in self.timespan]
         mask4 = [True if transition_ages[2] <= i else False for i in self.timespan]
 
-        func1 = self.cc_norm[0]*(self.timespan[mask1]/self.timespan[mask1])
-        func2 = self.cc_norm[1]*(self.timespan[mask2]/self.timespan[mask2])
-        func3 = self.cc_norm[2]*(self.timespan[mask3]/self.timespan[mask3])
-        func4 = self.cc_norm[3]*(self.timespan[mask4]/self.timespan[mask4])
+        func1 = cc_norm[0]*(self.timespan[mask1]/self.timespan[mask1])
+        func2 = cc_norm[1]*(self.timespan[mask2]/self.timespan[mask2])
+        func3 = cc_norm[2]*(self.timespan[mask3]/self.timespan[mask3])
+        func4 = cc_norm[3]*(self.timespan[mask4]/self.timespan[mask4])
 
         r_cc = np.array([*func1, *func2, *func3, *func4], dtype = 'object') # y-axis: rate
         a_cc = np.array([*self.timespan[mask1], *self.timespan[mask2], *self.timespan[mask3], *self.timespan[mask4]], dtype = 'object') # x-axis: age
@@ -505,6 +518,9 @@ class feedback:
 
         # Mannucci model (typically used in FIRE-2.x)
         if model_version == 'mannucci':
+            ##########################################################
+            # Piecewise function for continuous function integration #
+            ##########################################################
 
             if len(self.timespan) == 1:
                 t = _to_num(self.timespan)
@@ -524,7 +540,7 @@ class feedback:
                     return r_ia, self.timespan, transition_ages
                 
         #################################################################################################################################################
-        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, use sparingly       #
+        # Masking function(s) for pre-generating a table of values and then performing operations. Much slower based on speed tests, use sparingly      #
         #################################################################################################################################################
             
             elif len(self.timespan) > 1:
@@ -576,7 +592,7 @@ class feedback:
                     return r_ia, self.timespan, transition_ages
 
         #################################################################################################################################################
-        # Piecewise function for pre-generating a table of values and then performing operations. Much slower based on speed tests, not wrong to remove #
+        # Masking function(s) for pre-generating a table of values and then performing operations. Much slower based on speed tests, use sparingly      #
         #################################################################################################################################################
         #    
             elif len(self.timespan) > 1:
@@ -611,14 +627,3 @@ class feedback:
             r_ia *= ejecta_masses[self.source]
             #print("Return 2")
             return r_ia, a_ia, transition_ages
-
-class ElementTracerPipeline:
-    def __init__(self, 
-    z = 0):
-        self.dirs = get_simulation_directory('stampede2')
-        self.redshift = z
-
-    def get_metrics(self, directory):
-        metrics = {}
-
-        return metrics
