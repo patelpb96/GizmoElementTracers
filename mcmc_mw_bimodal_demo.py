@@ -66,7 +66,7 @@ def main():
     parser.add_argument('--n-walker', type=int, default=24, help='number of MCMC walkers')
     parser.add_argument('--n-step', type=int, default=150,
                         help='MCMC steps per walker (stops a bit after convergence)')
-    parser.add_argument('--n-burn', type=int, default=50, help='burn-in steps to discard')
+    parser.add_argument('--n-burn', type=int, default=60, help='burn-in steps to discard')
     parser.add_argument('--true-n-ia-factor', type=float, default=1.35,
                         help='true n_ia as a multiple of the fiducial (MW) value')
     parser.add_argument('--true-t-dd', type=float, default=-1.0,
@@ -114,11 +114,14 @@ def main():
             name, d_feh, d_feh / obs_std[0], d_afe, d_afe / obs_std[1]))
 
     # ---- 3. MCMC ---------------------------------------------------------------------------------
-    # start walkers dispersed (uniform) around the truth so the movie shows them converge
+    # deliberately start the walkers at an *off* DTD guess (not the truth) so the
+    # movie shows the model abundance distribution sweep from that guess onto the
+    # data as the parameters change, and the corner dot travel to the truth.
+    init_guess = (np.log10(gizmo_mcmc.NIA_DEFAULT * 0.62), -1.28)
     print('\nrunning MCMC ({} walkers x {} steps)...'.format(args.n_walker, args.n_step))
     sampler, flat_chain = gizmo_mcmc.run_mcmc(
-        model, data, init=true_theta, n_walker=args.n_walker, n_step=args.n_step,
-        n_burn=args.n_burn, seed=args.seed, init_dist='uniform', init_scale=0.35,
+        model, data, init=init_guess, n_walker=args.n_walker, n_step=args.n_step,
+        n_burn=args.n_burn, seed=args.seed, init_dist='uniform', init_scale=0.12,
     )
     print('mean acceptance fraction: {:.2f}'.format(np.mean(sampler.acceptance_fraction)))
     try:
@@ -149,7 +152,8 @@ def main():
         try:
             gizmo_mcmc.animate_mcmc_walkers(
                 chain, movie_path, truths=list(true_theta),
-                bounds=gizmo_mcmc.DEFAULT_BOUNDS, fps=args.fps, burn=args.n_burn,
+                bounds=gizmo_mcmc.DEFAULT_BOUNDS, fps=args.fps, burn=0,
+                model=model, data=data,
             )
             print('wrote {}'.format(movie_path))
         except ImportError as exc:

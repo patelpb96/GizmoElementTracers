@@ -137,8 +137,8 @@ def generate_bimodal_weights(
     n_age_bin,
     high_alpha_frac=0.4,
     concentration=3.0,
-    high_alpha_total=(0.9, 0.35),
-    low_alpha_total=(2.2, 0.30),
+    high_alpha_total=(0.85, 0.35),
+    low_alpha_total=(2.4, 0.30),
     seed=None,
 ):
     '''
@@ -146,15 +146,20 @@ def generate_bimodal_weights(
     the Milky Way's two sequences in the [alpha/Fe]-[Fe/H] plane (the high-alpha
     "thick disk" and low-alpha "thin disk").
 
-    The bimodality lives entirely in the star-formation histories encoded by the
-    weights (NOT in the global Maoz Ia parameters, which are shared by all stars):
+    The bimodality lives in the star-formation histories encoded by the weights
+    (NOT in the global Maoz Ia parameters, which are shared by all stars).  Both
+    sequences carry substantial weight in the old, delayed-Ia age bins, so *both*
+    respond to the Maoz Ia parameters -- consistent with a gas-accretion origin of
+    the alpha bimodality (e.g. a large influx of near-pristine gas; cf. dilution
+    scenarios such as Barry et al. 2024) rather than an Ia-timing origin:
 
-    * high-alpha sequence: weights concentrated in *young* age bins, where the
-      prompt CCSN alpha + Fe yields dominate and little delayed-Ia Fe has been
-      added yet -> high [alpha/Fe], lower [Fe/H].  Lower total weight.
-    * low-alpha sequence: weights spread across *all* age bins, including old
-      bins where the delayed Maoz Ia channel has added substantial Fe (but almost
-      no alpha) -> low [alpha/Fe], higher [Fe/H].  Higher total weight.
+    * high-alpha ("thick disk"): a strong young/CCSN (alpha) contribution sits on
+      top of a diluted, Ia-enriched base.  A large influx of near-pristine gas
+      lowers the overall metallicity (lower total weight -> lower [Fe/H]) while
+      continued prompt CCSN enrichment keeps [alpha/Fe] elevated.  It still holds
+      real weight in the delayed-Ia bins, so it *does* shift with the Ia model.
+    * low-alpha ("thin disk"): relatively more weight in the old (delayed-Ia) bins
+      and higher total weight -> lower [alpha/Fe], higher [Fe/H]; most Ia-sensitive.
 
     Scatter in the per-star total weight spreads each population out along [Fe/H].
 
@@ -186,10 +191,12 @@ def generate_bimodal_weights(
     n_low = n_star - n_high
 
     x = np.linspace(0.0, 1.0, n_age_bin)  # 0 = youngest bin, 1 = oldest bin
-    # high-alpha: weight peaks in the young/CCSN bins and falls off toward old ages
-    profile_high = np.exp(-((x - 0.15) ** 2) / (2 * 0.18 ** 2)) + 0.03
-    # low-alpha: broad, extends into the old (delayed-Ia) bins
-    profile_low = 0.4 + 0.6 * np.exp(-((x - 0.55) ** 2) / (2 * 0.45 ** 2))
+    # high-alpha: strong young/CCSN (alpha) peak on top of a non-negligible old-bin
+    # (delayed-Ia) floor, so the thick disk stays alpha-enhanced but remains
+    # Ia-sensitive; low total weight (dilution) sets its lower [Fe/H]
+    profile_high = np.exp(-((x - 0.15) ** 2) / (2 * 0.26 ** 2)) + 0.20
+    # low-alpha: relatively more weight in the old (delayed-Ia) bins
+    profile_low = 0.45 + 0.7 * np.exp(-((x - 0.6) ** 2) / (2 * 0.5 ** 2))
 
     w_high = _dirichlet_from_profile(profile_high, concentration, n_high, rng)
     w_high *= rng.lognormal(np.log(high_alpha_total[0]), high_alpha_total[1], (n_high, 1))
@@ -698,18 +705,26 @@ def animate_mcmc_walkers(
     burn=0,
     stride=1,
     dpi=110,
+    model=None,
+    data=None,
+    abundance_lims=None,
 ):
     '''
     Render an mp4 movie of the MCMC walkers evolving (post-processing).
 
     Layout
     ------
-    Left column : per-parameter walker traces (parameter value vs step), one thin
-                  line per walker, revealed step by step.
-    Right block : a live 2-parameter "corner" -- the 1-D marginal histograms plus
-                  the 2-D joint -- that fills in as samples accumulate, with a
-                  moving dot marking the current ensemble-median position (the
-                  "dot on the corner plot") and a cross marking the truth.
+    Left column  : per-parameter walker traces (parameter value vs step), one thin
+                   line per walker, revealed step by step.
+    Middle block : a live 2-parameter "corner" -- the 1-D marginal histograms plus
+                   the 2-D joint -- that fills in as samples accumulate, with a
+                   moving dot marking the current ensemble-median position (the
+                   "dot on the corner plot") and a cross marking the truth.
+    Right panel  : (if `model` and `data` are given) the [X/Fe]-[Fe/H] plane, with
+                   the fixed observed data and the forward-model prediction at the
+                   *current* ensemble-median parameters overplotted, so you watch
+                   the abundance distribution shift as the Ia delay-time-distribution
+                   parameters change and settle onto the data.
 
     Parameters
     ----------
@@ -732,6 +747,15 @@ def animate_mcmc_walkers(
         render every `stride`-th step (1 = every step)
     dpi : int
         figure resolution
+    model : MaozElementTracerModel or None
+        if given together with `data`, add the evolving [X/Fe]-[Fe/H] panel
+    data : dict or None
+        the observed mock data (from generate_mock_data); uses data['label'] to
+        color the two sequences if present
+    abundance_lims : ((xmin, xmax), (ymin, ymax)) or None
+        fixed axis limits for the abundance panel; defaults to the data range
+        (padded).  Fixed limits are important so the shifting distribution is
+        visible against a stable frame.
 
     Returns
     -------
@@ -753,6 +777,20 @@ def animate_mcmc_walkers(
     n_step, n_walker, ndim = chain.shape
     assert ndim == 2, 'animate_mcmc_walkers is written for a 2-parameter model'
 
+    show_ab = model is not None and data is not None
+    if show_ab:
+        xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
+        has_label = 'label' in data
+        if has_label:
+            hi_mask = data['label'] == 1
+        # fixed limits for the abundance panel
+        if abundance_lims is not None:
+            ab_x, ab_y = abundance_lims
+        else:
+            fpad = 0.20
+            ab_x = (np.min(data['feh']) - fpad, np.max(data['feh']) + fpad)
+            ab_y = (np.min(data['xfe']) - fpad, np.max(data['xfe']) + fpad)
+
     # per-parameter axis limits
     if bounds is not None:
         lims = np.asarray(bounds, dtype=float)
@@ -766,11 +804,19 @@ def animate_mcmc_walkers(
     bins0 = np.linspace(lims[0, 0], lims[0, 1], 40)
     bins1 = np.linspace(lims[1, 0], lims[1, 1], 40)
 
-    fig = plt.figure(figsize=(12, 6), dpi=dpi)
-    gs = fig.add_gridspec(
-        2, 4, width_ratios=[1.0, 1.0, 1.1, 0.4], height_ratios=[1, 1],
-        hspace=0.28, wspace=0.30,
-    )
+    if show_ab:
+        fig = plt.figure(figsize=(17, 6), dpi=dpi)
+        gs = fig.add_gridspec(
+            2, 5, width_ratios=[1.0, 1.0, 0.95, 0.36, 1.75], height_ratios=[1, 1],
+            hspace=0.30, wspace=0.34,
+        )
+        ax_ab = fig.add_subplot(gs[0:2, 4])
+    else:
+        fig = plt.figure(figsize=(12, 6), dpi=dpi)
+        gs = fig.add_gridspec(
+            2, 4, width_ratios=[1.0, 1.0, 1.1, 0.4], height_ratios=[1, 1],
+            hspace=0.28, wspace=0.30,
+        )
     ax_tr0 = fig.add_subplot(gs[0, 0:2])
     ax_tr1 = fig.add_subplot(gs[1, 0:2])
     ax_h0 = fig.add_subplot(gs[0, 2])   # 1-D marginal of param 0 (top)
@@ -839,6 +885,41 @@ def animate_mcmc_walkers(
             ax_j.set_xlabel(labels[0])
             ax_j.set_ylabel(labels[1])
             ax_j.legend(loc='upper left', fontsize=8, frameon=False)
+
+            # ---- evolving abundance plane ---------------------------------------------------
+            if show_ab:
+                ax_ab.clear()
+                # fixed observed data (the target)
+                if has_label:
+                    ax_ab.scatter(data['feh'][hi_mask], data['xfe'][hi_mask], s=7,
+                                  color='lightcoral', alpha=0.30)
+                    ax_ab.scatter(data['feh'][~hi_mask], data['xfe'][~hi_mask], s=7,
+                                  color='lightskyblue', alpha=0.30)
+                    ax_ab.scatter([], [], s=20, color='0.55', label='observed data')
+                else:
+                    ax_ab.scatter(data['feh'], data['xfe'], s=7, color='0.7',
+                                  alpha=0.30, label='observed data')
+                # model prediction at the current ensemble-median parameters
+                feh_m, xfe_m = model.abundances(median)
+                if has_label:
+                    ax_ab.scatter(feh_m[hi_mask], xfe_m[hi_mask], s=9,
+                                  color='firebrick', alpha=0.6)
+                    ax_ab.scatter(feh_m[~hi_mask], xfe_m[~hi_mask], s=9,
+                                  color='steelblue', alpha=0.6)
+                    ax_ab.scatter([], [], s=20, color='k', label='model (current params)')
+                else:
+                    ax_ab.scatter(feh_m, xfe_m, s=9, color='k', alpha=0.6,
+                                  label='model (current params)')
+                ax_ab.set_xlim(ab_x)
+                ax_ab.set_ylim(ab_y)
+                ax_ab.set_xlabel('[Fe/H]')
+                ax_ab.set_ylabel('[{}/Fe]'.format(xfe_label))
+                ax_ab.set_title(
+                    r'[{}/Fe] vs [Fe/H]   ($n_{{\rm Ia}}$={:.2e}, $t_{{\rm dd}}$={:.2f})'.format(
+                        xfe_label, 10.0 ** median[0], median[1]),
+                    fontsize=11)
+                ax_ab.legend(loc='upper right', fontsize=8, frameon=False)
+                ax_ab.grid(ls='-.', alpha=0.35)
 
             fig.suptitle('MCMC step {} / {}'.format(f, n_step), fontsize=13)
 
