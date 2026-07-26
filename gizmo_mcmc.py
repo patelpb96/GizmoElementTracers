@@ -124,6 +124,86 @@ def generate_agetracer_weights(
     return weights * total_weight
 
 
+def _dirichlet_from_profile(profile, concentration, n_star, rng):
+    '''Draw n_star Dirichlet weight rows whose expectation follows `profile`.'''
+    profile = np.clip(np.asarray(profile, dtype=float), 1e-4, None)
+    profile = profile / profile.sum()
+    alpha = np.clip(profile * profile.size * concentration, 1e-3, None)
+    return rng.dirichlet(alpha, size=n_star)
+
+
+def generate_bimodal_weights(
+    n_star,
+    n_age_bin,
+    high_alpha_frac=0.4,
+    concentration=3.0,
+    high_alpha_total=(0.9, 0.35),
+    low_alpha_total=(2.2, 0.30),
+    seed=None,
+):
+    '''
+    Generate age-tracer mass weights for a *bimodal* stellar population, mimicking
+    the Milky Way's two sequences in the [alpha/Fe]-[Fe/H] plane (the high-alpha
+    "thick disk" and low-alpha "thin disk").
+
+    The bimodality lives entirely in the star-formation histories encoded by the
+    weights (NOT in the global Maoz Ia parameters, which are shared by all stars):
+
+    * high-alpha sequence: weights concentrated in *young* age bins, where the
+      prompt CCSN alpha + Fe yields dominate and little delayed-Ia Fe has been
+      added yet -> high [alpha/Fe], lower [Fe/H].  Lower total weight.
+    * low-alpha sequence: weights spread across *all* age bins, including old
+      bins where the delayed Maoz Ia channel has added substantial Fe (but almost
+      no alpha) -> low [alpha/Fe], higher [Fe/H].  Higher total weight.
+
+    Scatter in the per-star total weight spreads each population out along [Fe/H].
+
+    Parameters
+    ----------
+    n_star : int
+        total number of mock stars
+    n_age_bin : int
+        number of stellar age bins (columns); should equal len(age_bins) - 1
+    high_alpha_frac : float
+        fraction of stars in the high-alpha (thick-disk) sequence
+    concentration : float
+        Dirichlet concentration (star-to-star scatter in the age-bin shape)
+    high_alpha_total, low_alpha_total : (float, float)
+        (median, sigma_in_ln) of the log-normal per-star total weight for each
+        sequence; the median controls where the sequence sits in [Fe/H]
+    seed : int or None
+        random seed
+
+    Returns
+    -------
+    weights : 2-D array (n_star x n_age_bin)
+        age-tracer mass weights
+    labels : 1-D int array
+        1 for high-alpha (thick-disk) stars, 0 for low-alpha (thin-disk) stars
+    '''
+    rng = np.random.default_rng(seed)
+    n_high = int(round(high_alpha_frac * n_star))
+    n_low = n_star - n_high
+
+    x = np.linspace(0.0, 1.0, n_age_bin)  # 0 = youngest bin, 1 = oldest bin
+    # high-alpha: weight peaks in the young/CCSN bins and falls off toward old ages
+    profile_high = np.exp(-((x - 0.15) ** 2) / (2 * 0.18 ** 2)) + 0.03
+    # low-alpha: broad, extends into the old (delayed-Ia) bins
+    profile_low = 0.4 + 0.6 * np.exp(-((x - 0.55) ** 2) / (2 * 0.45 ** 2))
+
+    w_high = _dirichlet_from_profile(profile_high, concentration, n_high, rng)
+    w_high *= rng.lognormal(np.log(high_alpha_total[0]), high_alpha_total[1], (n_high, 1))
+
+    w_low = _dirichlet_from_profile(profile_low, concentration, n_low, rng)
+    w_low *= rng.lognormal(np.log(low_alpha_total[0]), low_alpha_total[1], (n_low, 1))
+
+    weights = np.vstack([w_high, w_low])
+    labels = np.concatenate([np.ones(n_high, dtype=int), np.zeros(n_low, dtype=int)])
+    # shuffle so the two sequences are interleaved (order should not matter)
+    order = rng.permutation(n_star)
+    return weights[order], labels[order]
+
+
 def massfractions_to_abundances(massfraction_dict, sun_massfraction, xfe='magnesium'):
     '''
     Convert a dictionary of linear elemental mass fractions into the abundance-ratio
@@ -286,7 +366,7 @@ class MaozElementTracerModel:
         return np.nanmean(feh), np.nanmean(xfe)
 
 
-def generate_mock_data(model, true_theta, obs_std=(0.08, 0.06), seed=None):
+def generate_mock_data(model, true_theta, obs_std=(0.08, 0.06), seed=None, labels=None):
     '''
     Generate a "fake" abundance data set by running the forward model at the
     input "true" Maoz parameters and scattering each star with a Gaussian whose
@@ -303,13 +383,16 @@ def generate_mock_data(model, true_theta, obs_std=(0.08, 0.06), seed=None):
         to scatter the mock data and as the measurement errors in the likelihood
     seed : int or None
         seed for the random number generator
+    labels : array or None
+        optional per-star population labels (e.g. from generate_bimodal_weights),
+        carried through into data['label'] for plotting
 
     Returns
     -------
     data : dict
         keys: 'feh', 'xfe' (scattered mock observations), 'feh_err', 'xfe_err'
         (per-star errors), 'feh_true', 'xfe_true' (noise-free model values),
-        'true_theta', 'obs_std'
+        'true_theta', 'obs_std', and 'label' if labels was given
     '''
     rng = np.random.default_rng(seed)
     feh_true, xfe_true = model.abundances(true_theta)
@@ -317,7 +400,7 @@ def generate_mock_data(model, true_theta, obs_std=(0.08, 0.06), seed=None):
     feh = feh_true + rng.normal(0.0, sig_feh, size=feh_true.shape)
     xfe = xfe_true + rng.normal(0.0, sig_xfe, size=xfe_true.shape)
     n_star = feh.size
-    return {
+    data = {
         'feh': feh,
         'xfe': xfe,
         'feh_err': np.full(n_star, sig_feh),
@@ -327,6 +410,9 @@ def generate_mock_data(model, true_theta, obs_std=(0.08, 0.06), seed=None):
         'true_theta': np.asarray(true_theta, dtype=float),
         'obs_std': np.asarray(obs_std, dtype=float),
     }
+    if labels is not None:
+        data['label'] = np.asarray(labels)
+    return data
 
 
 def generate_gaussian_cloud(
@@ -412,6 +498,8 @@ def run_mcmc(
     n_burn=200,
     seed=None,
     progress=True,
+    init_dist='ball',
+    init_scale=0.05,
 ):
     '''
     Run an affine-invariant MCMC (emcee) over theta = (log10 n_ia, t_dd).
@@ -436,6 +524,14 @@ def run_mcmc(
         random seed for walker initialization
     progress : bool
         show emcee's progress bar
+    init_dist : str
+        how to initialize the walkers:
+        'ball'    -> tight Gaussian ball around `init` (default; fast burn-in)
+        'uniform' -> spread uniformly in a box of half-width init_scale*(prior
+                     range) around `init`, useful to *watch* the walkers converge
+                     in the movie (see animate_mcmc_walkers)
+    init_scale : float
+        size of the initial walker spread as a fraction of the prior range
 
     Returns
     -------
@@ -456,10 +552,17 @@ def run_mcmc(
         init = np.mean(bounds, axis=1)
     init = np.asarray(init, dtype=float)
 
-    # start walkers in a small Gaussian ball around init, clipped to the prior
-    scale = 0.05 * (bounds[:, 1] - bounds[:, 0])
-    p0 = init + scale * rng.standard_normal((n_walker, ndim))
-    p0 = np.clip(p0, bounds[:, 0], bounds[:, 1])
+    span = bounds[:, 1] - bounds[:, 0]
+    if init_dist == 'uniform':
+        # spread walkers uniformly in a box around init (clipped to the prior)
+        half = init_scale * span
+        lo = np.maximum(init - half, bounds[:, 0])
+        hi = np.minimum(init + half, bounds[:, 1])
+        p0 = rng.uniform(lo, hi, size=(n_walker, ndim))
+    else:
+        # tight Gaussian ball around init
+        p0 = init + init_scale * span * rng.standard_normal((n_walker, ndim))
+        p0 = np.clip(p0, bounds[:, 0], bounds[:, 1])
 
     sampler = emcee.EnsembleSampler(
         n_walker, ndim, log_probability, args=(model, data, bounds)
@@ -527,6 +630,225 @@ def plot_data_and_model(model, data, theta, path=None, xfe_label=None):
     else:
         plt.show()
     return fig
+
+
+def plot_bimodal_data(data, model=None, theta=None, path=None, xfe_label=None):
+    '''
+    Scatter a bimodal mock data set in the [X/Fe]-[Fe/H] plane, coloring the two
+    sequences (high-alpha vs low-alpha) if data['label'] is present, and
+    optionally overlay the forward-model prediction at parameter vector theta.
+
+    Parameters
+    ----------
+    data : dict
+        mock data set; if it has a 'label' key (1 = high-alpha, 0 = low-alpha)
+        the two sequences are colored separately
+    model : MaozElementTracerModel or None
+        if given (with theta), overlay the model prediction
+    theta : sequence or None
+        parameter vector for the model overlay
+    path : str or None
+        save to this path, else show
+    xfe_label : str or None
+        label for the [X/Fe] axis
+    '''
+    import matplotlib
+
+    if path is not None:
+        matplotlib.use('Agg')
+    from matplotlib import pyplot as plt
+
+    if xfe_label is None:
+        xfe_label = 'alpha' if (model is not None and model.xfe == 'alpha') else 'X'
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.8))
+    if 'label' in data:
+        hi = data['label'] == 1
+        ax.scatter(data['feh'][hi], data['xfe'][hi], s=10, alpha=0.5,
+                   color='firebrick', label='high-alpha (thick disk)')
+        ax.scatter(data['feh'][~hi], data['xfe'][~hi], s=10, alpha=0.5,
+                   color='steelblue', label='low-alpha (thin disk)')
+    else:
+        ax.scatter(data['feh'], data['xfe'], s=10, alpha=0.4, color='0.5',
+                   label='mock data')
+    if model is not None and theta is not None:
+        feh_model, xfe_model = model.abundances(theta)
+        ax.scatter(feh_model, xfe_model, s=6, alpha=0.5, color='k',
+                   label='best-fit model')
+    ax.set_xlabel('[Fe/H]')
+    ax.set_ylabel('[{}/Fe]'.format(xfe_label))
+    ax.legend(frameon=False)
+    ax.grid(ls='-.', alpha=0.4)
+    fig.tight_layout()
+    if path is not None:
+        fig.savefig(path, dpi=150)
+        plt.close(fig)
+    else:
+        plt.show()
+    return fig
+
+
+def animate_mcmc_walkers(
+    chain,
+    path,
+    truths=None,
+    labels=PARAM_LABELS,
+    bounds=None,
+    fps=30,
+    burn=0,
+    stride=1,
+    dpi=110,
+):
+    '''
+    Render an mp4 movie of the MCMC walkers evolving (post-processing).
+
+    Layout
+    ------
+    Left column : per-parameter walker traces (parameter value vs step), one thin
+                  line per walker, revealed step by step.
+    Right block : a live 2-parameter "corner" -- the 1-D marginal histograms plus
+                  the 2-D joint -- that fills in as samples accumulate, with a
+                  moving dot marking the current ensemble-median position (the
+                  "dot on the corner plot") and a cross marking the truth.
+
+    Parameters
+    ----------
+    chain : 3-D array (n_step, n_walker, ndim=2)
+        the full un-flattened chain, e.g. sampler.get_chain()
+    path : str
+        output .mp4 path
+    truths : sequence or None
+        true parameter values to mark
+    labels : sequence of str
+        parameter labels (length 2)
+    bounds : array (2, 2) or None
+        axis limits per parameter; defaults to the chain range (padded)
+    fps : int
+        frames per second (30 by default)
+    burn : int
+        steps excluded from the accumulating posterior histograms (still shown in
+        the trace panels)
+    stride : int
+        render every `stride`-th step (1 = every step)
+    dpi : int
+        figure resolution
+
+    Returns
+    -------
+    path : str
+        the output path written
+    '''
+    try:
+        import imageio.v2 as imageio
+    except ImportError as exc:
+        raise ImportError(
+            'animate_mcmc_walkers requires imageio + a mp4 encoder '
+            '(pip install imageio imageio-ffmpeg)'
+        ) from exc
+    import matplotlib
+    matplotlib.use('Agg')
+    from matplotlib import pyplot as plt
+
+    chain = np.asarray(chain)
+    n_step, n_walker, ndim = chain.shape
+    assert ndim == 2, 'animate_mcmc_walkers is written for a 2-parameter model'
+
+    # per-parameter axis limits
+    if bounds is not None:
+        lims = np.asarray(bounds, dtype=float)
+    else:
+        lims = np.empty((2, 2))
+        for k in range(2):
+            lo, hi = chain[..., k].min(), chain[..., k].max()
+            pad = 0.05 * (hi - lo + 1e-12)
+            lims[k] = [lo - pad, hi + pad]
+
+    bins0 = np.linspace(lims[0, 0], lims[0, 1], 40)
+    bins1 = np.linspace(lims[1, 0], lims[1, 1], 40)
+
+    fig = plt.figure(figsize=(12, 6), dpi=dpi)
+    gs = fig.add_gridspec(
+        2, 4, width_ratios=[1.0, 1.0, 1.1, 0.4], height_ratios=[1, 1],
+        hspace=0.28, wspace=0.30,
+    )
+    ax_tr0 = fig.add_subplot(gs[0, 0:2])
+    ax_tr1 = fig.add_subplot(gs[1, 0:2])
+    ax_h0 = fig.add_subplot(gs[0, 2])   # 1-D marginal of param 0 (top)
+    ax_j = fig.add_subplot(gs[1, 2])    # 2-D joint (bottom-left of corner)
+    ax_h1 = fig.add_subplot(gs[1, 3])   # 1-D marginal of param 1 (right, rotated)
+
+    frames = list(range(1, n_step + 1, stride))
+    if frames[-1] != n_step:
+        frames.append(n_step)
+
+    x_all = np.arange(n_step)
+    writer = imageio.get_writer(path, fps=fps, macro_block_size=None, codec='libx264')
+    try:
+        for f in frames:
+            # ---- walker trace panels --------------------------------------------------------
+            for k, (ax, lim) in enumerate(((ax_tr0, lims[0]), (ax_tr1, lims[1]))):
+                ax.clear()
+                ax.plot(x_all[:f], chain[:f, :, k], color='0.3', alpha=0.35, lw=0.6)
+                if truths is not None:
+                    ax.axhline(truths[k], color='crimson', ls='--', lw=1.2)
+                ax.set_xlim(0, n_step)
+                ax.set_ylim(lim)
+                ax.set_ylabel(labels[k])
+                ax.grid(ls=':', alpha=0.4)
+            ax_tr1.set_xlabel('step')
+            ax_tr0.set_title('walker traces', fontsize=11)
+
+            # ---- accumulating corner --------------------------------------------------------
+            if f > burn:
+                samp = chain[burn:f].reshape(-1, 2)
+            else:
+                samp = chain[:f].reshape(-1, 2)
+            current = chain[f - 1]                 # walker positions at this step
+            median = np.median(current, axis=0)    # the moving "dot"
+
+            ax_h0.clear()
+            ax_h0.hist(samp[:, 0], bins=bins0, color='0.6')
+            if truths is not None:
+                ax_h0.axvline(truths[0], color='crimson', ls='--', lw=1.2)
+            ax_h0.axvline(median[0], color='navy', lw=1.4)
+            ax_h0.set_xlim(lims[0])
+            ax_h0.set_xticklabels([])
+            ax_h0.set_yticks([])
+            ax_h0.set_title('posterior (building)', fontsize=11)
+
+            ax_h1.clear()
+            ax_h1.hist(samp[:, 1], bins=bins1, orientation='horizontal', color='0.6')
+            if truths is not None:
+                ax_h1.axhline(truths[1], color='crimson', ls='--', lw=1.2)
+            ax_h1.axhline(median[1], color='navy', lw=1.4)
+            ax_h1.set_ylim(lims[1])
+            ax_h1.set_yticklabels([])
+            ax_h1.set_xticks([])
+
+            ax_j.clear()
+            ax_j.scatter(samp[:, 0], samp[:, 1], s=4, alpha=0.10, color='0.5')
+            ax_j.scatter(current[:, 0], current[:, 1], s=14, color='navy',
+                         alpha=0.7, label='walkers')
+            ax_j.scatter([median[0]], [median[1]], s=130, color='gold',
+                         edgecolor='k', zorder=5, label='ensemble median')
+            if truths is not None:
+                ax_j.axvline(truths[0], color='crimson', ls='--', lw=1.0)
+                ax_j.axhline(truths[1], color='crimson', ls='--', lw=1.0)
+            ax_j.set_xlim(lims[0])
+            ax_j.set_ylim(lims[1])
+            ax_j.set_xlabel(labels[0])
+            ax_j.set_ylabel(labels[1])
+            ax_j.legend(loc='upper left', fontsize=8, frameon=False)
+
+            fig.suptitle('MCMC step {} / {}'.format(f, n_step), fontsize=13)
+
+            fig.canvas.draw()
+            frame = np.asarray(fig.canvas.buffer_rgba())[..., :3]
+            writer.append_data(frame)
+    finally:
+        writer.close()
+        plt.close(fig)
+    return path
 
 
 def plot_corner(flat_chain, truths=None, labels=PARAM_LABELS, path=None):

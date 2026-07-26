@@ -27,9 +27,14 @@ We develop this package using python 3.9 and recommend that you use it with this
 
 ## gizmo_mcmc.py
 * infer the Maoz SNe Ia rate parameters (normalization and delay-time exponent) with MCMC, using the element-tracer forward model to map parameters onto stellar abundances ([Mg/Fe] or [alpha/Fe] vs [Fe/H])
+* includes a bimodal (Milky-Way-like) star-formation-history weight generator and a post-processing routine to render a movie of the MCMC walkers converging
+* extra dependencies for the demos: `emcee` (MCMC), and `corner` + `imageio` + `imageio-ffmpeg` for the corner plot and the mp4 movie (all imported lazily with clear messages if missing)
 
 ## mcmc_maoz_demo.py
 * end-to-end demo for gizmo_mcmc.py: generate a mock abundance data set and recover the input Maoz Ia parameters (run `python mcmc_maoz_demo.py`)
+
+## mcmc_mw_bimodal_demo.py
+* infer the Maoz Ia parameters that best describe a Milky-Way-like *bimodal* [alpha/Fe] vs [Fe/H] distribution offset ~1-2 sigma from the MW reference, and render a 30 fps movie of the walkers converging on the corner plot (run `python mcmc_mw_bimodal_demo.py`)
 
 ## gizmo_track.py
 * track star and gas particles across snapshots
