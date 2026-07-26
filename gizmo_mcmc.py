@@ -495,9 +495,182 @@ def log_probability(theta, model, data, bounds=DEFAULT_BOUNDS):
     return lp + log_likelihood(theta, model, data)
 
 
+# --------------------------------------------------------------------------------------------------
+# Summary-statistic inference: match a dual-Gaussian (2-component) description of the
+# [alpha/Fe]-[Fe/H] distribution between the simulation and (real, external) Milky Way data.
+#
+# This is the right posture when the *model is wrong*: rather than a star-by-star match to
+# model-generated data, we reduce each distribution to an equivalent quantification -- two
+# Gaussians (a high-alpha and a low-alpha sequence), each described by a mean and a standard
+# deviation along *both* axes ([Fe/H] and [alpha/Fe]), plus the mixing fraction -- and compare
+# those summary vectors.  The Maoz Ia parameters are then walked to best reproduce the Milky Way
+# summary.  Supply MW summary values measured from a real catalog (e.g. APOGEE) as the target.
+# --------------------------------------------------------------------------------------------------
+
+# order of the flattened summary vector produced by summary_to_vector()
+BIMODAL_SUMMARY_LABELS = [
+    'high.alpha.fraction',
+    'high.alpha.mean.feh', 'high.alpha.std.feh',
+    'high.alpha.mean.xfe', 'high.alpha.std.xfe',
+    'low.alpha.mean.feh', 'low.alpha.std.feh',
+    'low.alpha.mean.xfe', 'low.alpha.std.xfe',
+]
+
+
+def fit_bimodal_gaussians(feh, xfe, n_iter=40, reg=1e-4):
+    '''
+    Fit a 2-component, diagonal-covariance 2-D Gaussian mixture to the
+    [Fe/H]-[X/Fe] point cloud via a short, deterministic EM, and return the two
+    Gaussians described by their mean and standard deviation along *both* axes.
+
+    This is the "dual Gaussian along both axes" quantification: it captures the
+    two sequences (high-alpha and low-alpha) each with (mean, std) in [Fe/H] and
+    (mean, std) in [X/Fe], plus the mixing fraction.  Applied identically to the
+    simulation and to the (real) Milky Way data, it provides equivalent summaries
+    to compare.
+
+    Parameters
+    ----------
+    feh, xfe : 1-D arrays
+        [Fe/H] and [X/Fe] for each star
+    n_iter : int
+        number of EM iterations (fixed, for a deterministic, smooth summary)
+    reg : float
+        variance floor added for numerical stability
+
+    Returns
+    -------
+    summary : dict of length-2 arrays (component 0 = high-alpha, 1 = low-alpha)
+        'weight', 'mean_feh', 'std_feh', 'mean_xfe', 'std_xfe'
+    '''
+    X = np.column_stack([np.asarray(feh, float), np.asarray(xfe, float)])
+    n = X.shape[0]
+    # deterministic init: split on the median [X/Fe] into high- and low-alpha seeds
+    hi = X[:, 1] >= np.median(X[:, 1])
+    mu = np.array([
+        [X[hi, 0].mean(), X[hi, 1].mean()],
+        [X[~hi, 0].mean(), X[~hi, 1].mean()],
+    ])
+    var = np.tile(X.var(axis=0) + reg, (2, 1))
+    w = np.array([hi.mean(), 1.0 - hi.mean()])
+
+    for _ in range(n_iter):
+        # E-step (diagonal Gaussians), in log space for stability
+        logp = np.empty((n, 2))
+        for k in range(2):
+            d = X - mu[k]
+            logp[:, k] = np.log(w[k] + 1e-300) - 0.5 * np.sum(
+                d * d / var[k] + np.log(2 * np.pi * var[k]), axis=1
+            )
+        logp -= logp.max(axis=1, keepdims=True)
+        r = np.exp(logp)
+        r /= r.sum(axis=1, keepdims=True)
+        # M-step
+        Nk = r.sum(axis=0) + 1e-12
+        w = Nk / n
+        for k in range(2):
+            mu[k] = (r[:, k:k + 1] * X).sum(axis=0) / Nk[k]
+            d = X - mu[k]
+            var[k] = (r[:, k:k + 1] * d * d).sum(axis=0) / Nk[k] + reg
+
+    # order component 0 = high-alpha (larger mean [X/Fe])
+    order = np.argsort(-mu[:, 1])
+    std = np.sqrt(var)
+    return {
+        'weight': w[order],
+        'mean_feh': mu[order, 0],
+        'std_feh': std[order, 0],
+        'mean_xfe': mu[order, 1],
+        'std_xfe': std[order, 1],
+    }
+
+
+def summary_to_vector(summary):
+    '''
+    Flatten a dual-Gaussian summary (from fit_bimodal_gaussians or make_bimodal_summary)
+    into the fixed-order vector described by BIMODAL_SUMMARY_LABELS.
+    '''
+    return np.array([
+        summary['weight'][0],
+        summary['mean_feh'][0], summary['std_feh'][0],
+        summary['mean_xfe'][0], summary['std_xfe'][0],
+        summary['mean_feh'][1], summary['std_feh'][1],
+        summary['mean_xfe'][1], summary['std_xfe'][1],
+    ])
+
+
+def make_bimodal_summary(
+    high_alpha_fraction,
+    high_alpha_feh, high_alpha_feh_std, high_alpha_xfe, high_alpha_xfe_std,
+    low_alpha_feh, low_alpha_feh_std, low_alpha_xfe, low_alpha_xfe_std,
+):
+    '''
+    Build a dual-Gaussian summary dict (same structure as fit_bimodal_gaussians)
+    from explicit values -- e.g. to encode a Milky Way target measured from a real
+    survey.  Component 0 is the high-alpha sequence, component 1 the low-alpha.
+    '''
+    return {
+        'weight': np.array([high_alpha_fraction, 1.0 - high_alpha_fraction]),
+        'mean_feh': np.array([high_alpha_feh, low_alpha_feh]),
+        'std_feh': np.array([high_alpha_feh_std, low_alpha_feh_std]),
+        'mean_xfe': np.array([high_alpha_xfe, low_alpha_xfe]),
+        'std_xfe': np.array([high_alpha_xfe_std, low_alpha_xfe_std]),
+    }
+
+
+# Illustrative Milky Way [alpha/Fe]-[Fe/H] target on this module's abundance scale
+# (metallicity := log10(mass_fraction / mass_fraction_Solar)).  These stand in for a
+# 2-component Gaussian fit to a real survey (e.g. APOGEE thin/thick disk); REPLACE with
+# values measured from a real catalog for a science application.  Note the model's abundance
+# zero-points need not coincide with the data's, so a perfect match may require large
+# (non-perturbative) parameter excursions -- that mismatch is itself informative.
+MW_TARGET_SUMMARY = make_bimodal_summary(
+    high_alpha_fraction=0.40,
+    high_alpha_feh=-1.00, high_alpha_feh_std=0.18, high_alpha_xfe=0.20, high_alpha_xfe_std=0.05,
+    low_alpha_feh=-0.65, low_alpha_feh_std=0.16, low_alpha_xfe=0.05, low_alpha_xfe_std=0.07,
+)
+
+# default 1-sigma uncertainties on each summary statistic (same order as the vector)
+DEFAULT_SUMMARY_SIGMA = np.array([0.05, 0.04, 0.03, 0.03, 0.02, 0.04, 0.03, 0.03, 0.02])
+
+
+def summary_log_likelihood(theta, model, target_vector, sigma_vector, gmm_kwargs=None):
+    '''
+    Gaussian log likelihood comparing the *simulation's* dual-Gaussian summary at
+    parameters theta to a fixed target summary vector (e.g. the Milky Way).
+
+    Parameters
+    ----------
+    theta : (log10 n_ia, t_dd)
+    model : MaozElementTracerModel
+    target_vector : 1-D array
+        target summary (from summary_to_vector), e.g. the MW quantification
+    sigma_vector : 1-D array
+        1-sigma uncertainty on each summary statistic
+    gmm_kwargs : dict or None
+        keyword arguments forwarded to fit_bimodal_gaussians
+    '''
+    feh, xfe = model.abundances(theta)
+    if not (np.all(np.isfinite(feh)) and np.all(np.isfinite(xfe))):
+        return -np.inf
+    summary = fit_bimodal_gaussians(feh, xfe, **(gmm_kwargs or {}))
+    resid = (summary_to_vector(summary) - target_vector) / sigma_vector
+    return -0.5 * np.sum(resid ** 2 + np.log(2 * np.pi * sigma_vector ** 2))
+
+
+def summary_log_probability(
+    theta, model, target_vector, sigma_vector, bounds=DEFAULT_BOUNDS, gmm_kwargs=None
+):
+    '''Log posterior for the summary-statistic (dual-Gaussian) match.'''
+    lp = log_prior(theta, bounds)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + summary_log_likelihood(theta, model, target_vector, sigma_vector, gmm_kwargs)
+
+
 def run_mcmc(
     model,
-    data,
+    data=None,
     bounds=DEFAULT_BOUNDS,
     init=None,
     n_walker=24,
@@ -507,6 +680,8 @@ def run_mcmc(
     progress=True,
     init_dist='ball',
     init_scale=0.05,
+    log_prob_fn=None,
+    log_prob_args=None,
 ):
     '''
     Run an affine-invariant MCMC (emcee) over theta = (log10 n_ia, t_dd).
@@ -515,8 +690,9 @@ def run_mcmc(
     ----------
     model : MaozElementTracerModel
         forward model
-    data : dict
-        mock data set (from generate_mock_data)
+    data : dict or None
+        mock data set (from generate_mock_data), for the default star-by-star
+        likelihood; ignored if a custom log_prob_fn is supplied
     bounds : array (2 x 2)
         flat-prior bounds; also used to initialize walkers if init is None
     init : (float, float) or None
@@ -539,6 +715,13 @@ def run_mcmc(
                      in the movie (see animate_mcmc_walkers)
     init_scale : float
         size of the initial walker spread as a fraction of the prior range
+    log_prob_fn : callable or None
+        custom log-posterior function log_prob_fn(theta, *log_prob_args).  If None,
+        use the default star-by-star log_probability(theta, model, data, bounds).
+        Pass summary_log_probability (with log_prob_args) to fit the dual-Gaussian
+        summary to an external (Milky Way) target instead.
+    log_prob_args : tuple or None
+        extra positional arguments for log_prob_fn
 
     Returns
     -------
@@ -571,9 +754,13 @@ def run_mcmc(
         p0 = init + init_scale * span * rng.standard_normal((n_walker, ndim))
         p0 = np.clip(p0, bounds[:, 0], bounds[:, 1])
 
-    sampler = emcee.EnsembleSampler(
-        n_walker, ndim, log_probability, args=(model, data, bounds)
-    )
+    if log_prob_fn is None:
+        log_prob_fn = log_probability
+        log_prob_args = (model, data, bounds)
+    elif log_prob_args is None:
+        log_prob_args = ()
+
+    sampler = emcee.EnsembleSampler(n_walker, ndim, log_prob_fn, args=log_prob_args)
     sampler.run_mcmc(p0, n_step, progress=progress)
     flat_chain = sampler.get_chain(discard=n_burn, flat=True)
     return sampler, flat_chain
@@ -695,6 +882,28 @@ def plot_bimodal_data(data, model=None, theta=None, path=None, xfe_label=None):
     return fig
 
 
+def _draw_dual_gaussian(ax, summary, n_sigma=2, colors=('firebrick', 'steelblue'),
+                        ls='-', lw=2.0, label=None):
+    '''
+    Draw a dual-Gaussian summary as two axis-aligned n_sigma ellipses (component 0
+    = high-alpha, 1 = low-alpha) on axis `ax`.  Returns the list of patches.
+    '''
+    from matplotlib.patches import Ellipse
+
+    patches = []
+    for k in range(2):
+        e = Ellipse(
+            (summary['mean_feh'][k], summary['mean_xfe'][k]),
+            width=2 * n_sigma * summary['std_feh'][k],
+            height=2 * n_sigma * summary['std_xfe'][k],
+            fill=False, edgecolor=colors[k], ls=ls, lw=lw,
+            label=(label if k == 0 else None),
+        )
+        ax.add_patch(e)
+        patches.append(e)
+    return patches
+
+
 def animate_mcmc_walkers(
     chain,
     path,
@@ -707,6 +916,7 @@ def animate_mcmc_walkers(
     dpi=110,
     model=None,
     data=None,
+    target_summary=None,
     abundance_lims=None,
 ):
     '''
@@ -720,11 +930,14 @@ def animate_mcmc_walkers(
                    the 2-D joint -- that fills in as samples accumulate, with a
                    moving dot marking the current ensemble-median position (the
                    "dot on the corner plot") and a cross marking the truth.
-    Right panel  : (if `model` and `data` are given) the [X/Fe]-[Fe/H] plane, with
-                   the fixed observed data and the forward-model prediction at the
-                   *current* ensemble-median parameters overplotted, so you watch
-                   the abundance distribution shift as the Ia delay-time-distribution
-                   parameters change and settle onto the data.
+    Right panel  : (if `model` is given) the [X/Fe]-[Fe/H] plane showing the
+                   forward-model prediction at the *current* ensemble-median
+                   parameters, so you watch the abundance distribution shift as the
+                   Ia delay-time-distribution parameters change.  The fixed target
+                   it walks toward is either the observed data points (`data`) or,
+                   if `target_summary` is given, the Milky Way dual-Gaussian target
+                   drawn as 2-sigma ellipses (with the simulation's own fitted
+                   dual-Gaussian ellipses overplotted as they evolve).
 
     Parameters
     ----------
@@ -748,10 +961,15 @@ def animate_mcmc_walkers(
     dpi : int
         figure resolution
     model : MaozElementTracerModel or None
-        if given together with `data`, add the evolving [X/Fe]-[Fe/H] panel
+        if given, add the evolving [X/Fe]-[Fe/H] panel
     data : dict or None
-        the observed mock data (from generate_mock_data); uses data['label'] to
-        color the two sequences if present
+        observed data points to show as the fixed target (from generate_mock_data);
+        uses data['label'] to color the two sequences and, in summary mode, to
+        color the evolving simulation points
+    target_summary : dict or None
+        a dual-Gaussian target (e.g. MW_TARGET_SUMMARY); if given, the panel draws
+        this target as 2-sigma ellipses and overplots the simulation's own fitted
+        dual-Gaussian ellipses at the current parameters ("summary mode")
     abundance_lims : ((xmin, xmax), (ymin, ymax)) or None
         fixed axis limits for the abundance panel; defaults to the data range
         (padded).  Fixed limits are important so the shifting distribution is
@@ -777,19 +995,27 @@ def animate_mcmc_walkers(
     n_step, n_walker, ndim = chain.shape
     assert ndim == 2, 'animate_mcmc_walkers is written for a 2-parameter model'
 
-    show_ab = model is not None and data is not None
+    show_ab = model is not None and (data is not None or target_summary is not None)
+    summary_mode = model is not None and target_summary is not None
     if show_ab:
         xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
-        has_label = 'label' in data
+        has_label = data is not None and 'label' in data
         if has_label:
             hi_mask = data['label'] == 1
         # fixed limits for the abundance panel
         if abundance_lims is not None:
             ab_x, ab_y = abundance_lims
-        else:
+        elif data is not None:
             fpad = 0.20
             ab_x = (np.min(data['feh']) - fpad, np.max(data['feh']) + fpad)
             ab_y = (np.min(data['xfe']) - fpad, np.max(data['xfe']) + fpad)
+        else:
+            # derive from the target dual-Gaussian (means +/- ~4 sigma)
+            fpad = 0.25
+            mf, sf = target_summary['mean_feh'], target_summary['std_feh']
+            mx, sx = target_summary['mean_xfe'], target_summary['std_xfe']
+            ab_x = (np.min(mf - 3 * sf) - fpad, np.max(mf + 3 * sf) + fpad)
+            ab_y = (np.min(mx - 3 * sx) - fpad, np.max(mx + 3 * sx) + fpad)
 
     # per-parameter axis limits
     if bounds is not None:
@@ -889,27 +1115,47 @@ def animate_mcmc_walkers(
             # ---- evolving abundance plane ---------------------------------------------------
             if show_ab:
                 ax_ab.clear()
-                # fixed observed data (the target)
-                if has_label:
-                    ax_ab.scatter(data['feh'][hi_mask], data['xfe'][hi_mask], s=7,
-                                  color='lightcoral', alpha=0.30)
-                    ax_ab.scatter(data['feh'][~hi_mask], data['xfe'][~hi_mask], s=7,
-                                  color='lightskyblue', alpha=0.30)
-                    ax_ab.scatter([], [], s=20, color='0.55', label='observed data')
+                feh_m, xfe_m = model.abundances(median)  # simulation at current params
+                if summary_mode:
+                    # fixed Milky Way target as dual-Gaussian 2-sigma ellipses
+                    _draw_dual_gaussian(ax_ab, target_summary, n_sigma=2,
+                                        colors=('firebrick', 'steelblue'), ls='--', lw=2.2,
+                                        label='MW target (2$\\sigma$)')
+                    # evolving simulation points (colored by sequence if labels given)
+                    if has_label:
+                        ax_ab.scatter(feh_m[hi_mask], xfe_m[hi_mask], s=7,
+                                      color='lightcoral', alpha=0.35)
+                        ax_ab.scatter(feh_m[~hi_mask], xfe_m[~hi_mask], s=7,
+                                      color='lightskyblue', alpha=0.35)
+                    else:
+                        ax_ab.scatter(feh_m, xfe_m, s=7, color='0.6', alpha=0.35)
+                    ax_ab.scatter([], [], s=20, color='0.55', label='simulation')
+                    # the simulation's own fitted dual-Gaussian, evolving toward the target
+                    sim_summary = fit_bimodal_gaussians(feh_m, xfe_m)
+                    _draw_dual_gaussian(ax_ab, sim_summary, n_sigma=2,
+                                        colors=('darkred', 'navy'), ls='-', lw=1.8,
+                                        label='simulation fit (2$\\sigma$)')
                 else:
-                    ax_ab.scatter(data['feh'], data['xfe'], s=7, color='0.7',
-                                  alpha=0.30, label='observed data')
-                # model prediction at the current ensemble-median parameters
-                feh_m, xfe_m = model.abundances(median)
-                if has_label:
-                    ax_ab.scatter(feh_m[hi_mask], xfe_m[hi_mask], s=9,
-                                  color='firebrick', alpha=0.6)
-                    ax_ab.scatter(feh_m[~hi_mask], xfe_m[~hi_mask], s=9,
-                                  color='steelblue', alpha=0.6)
-                    ax_ab.scatter([], [], s=20, color='k', label='model (current params)')
-                else:
-                    ax_ab.scatter(feh_m, xfe_m, s=9, color='k', alpha=0.6,
-                                  label='model (current params)')
+                    # fixed observed data points (the target)
+                    if has_label:
+                        ax_ab.scatter(data['feh'][hi_mask], data['xfe'][hi_mask], s=7,
+                                      color='lightcoral', alpha=0.30)
+                        ax_ab.scatter(data['feh'][~hi_mask], data['xfe'][~hi_mask], s=7,
+                                      color='lightskyblue', alpha=0.30)
+                        ax_ab.scatter([], [], s=20, color='0.55', label='observed data')
+                    else:
+                        ax_ab.scatter(data['feh'], data['xfe'], s=7, color='0.7',
+                                      alpha=0.30, label='observed data')
+                    # model prediction at the current ensemble-median parameters
+                    if has_label:
+                        ax_ab.scatter(feh_m[hi_mask], xfe_m[hi_mask], s=9,
+                                      color='firebrick', alpha=0.6)
+                        ax_ab.scatter(feh_m[~hi_mask], xfe_m[~hi_mask], s=9,
+                                      color='steelblue', alpha=0.6)
+                        ax_ab.scatter([], [], s=20, color='k', label='model (current params)')
+                    else:
+                        ax_ab.scatter(feh_m, xfe_m, s=9, color='k', alpha=0.6,
+                                      label='model (current params)')
                 ax_ab.set_xlim(ab_x)
                 ax_ab.set_ylim(ab_y)
                 ax_ab.set_xlabel('[Fe/H]')
