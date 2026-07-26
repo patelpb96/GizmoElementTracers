@@ -25,6 +25,12 @@ We develop this package using python 3.9 and recommend that you use it with this
 ## gizmo_agetracer.py
 * generate elemental abundances in star and gas particles in post-processing, using the age-tracer module in FIRE-3
 
+## gizmo_mcmc.py
+* infer the Maoz SNe Ia rate parameters (normalization and delay-time exponent) with MCMC, using the element-tracer forward model to map parameters onto stellar abundances ([Mg/Fe] or [alpha/Fe] vs [Fe/H])
+
+## mcmc_maoz_demo.py
+* end-to-end demo for gizmo_mcmc.py: generate a mock abundance data set and recover the input Maoz Ia parameters (run `python mcmc_maoz_demo.py`)
+
 ## gizmo_track.py
 * track star and gas particles across snapshots
 
