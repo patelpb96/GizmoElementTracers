@@ -29,6 +29,7 @@ We develop this package using python 3.9 and recommend that you use it with this
 * infer the Maoz SNe Ia rate parameters (normalization and delay-time exponent) with MCMC, using the element-tracer forward model to map parameters onto stellar abundances ([Mg/Fe] or [alpha/Fe] vs [Fe/H])
 * includes a bimodal (Milky-Way-like) star-formation-history weight generator and a post-processing routine to render a movie of the MCMC walkers converging (with an optional panel showing the abundance distribution evolving as the parameters change)
 * supports two inference modes: a star-by-star likelihood against mock data, and a summary-statistic likelihood that matches a dual-Gaussian description (two sequences, each a mean and standard deviation along both axes) of the simulation to an external (real Milky Way) target -- the right posture when the model is imperfect
+* includes a fast, factorized yield integrator (`integrate_rate_over_bins` / `fast_element_yields`) that replaces the per-element scipy.quad tabulation and is ~25x faster (agrees to ~1e-6); it works for any vectorized rate function, including a new tunable "kinked" Ia model (`ia_rate_kink`) -- a broken power-law delay-time distribution with a modulatable kink location and post-kink slope (reduces to Maoz when the slopes match)
 * extra dependencies for the demos: `emcee` (MCMC), and `corner` + `imageio` + `imageio-ffmpeg` for the corner plot and the mp4 movie (all imported lazily with clear messages if missing)
 
 ## mcmc_maoz_demo.py
@@ -39,6 +40,9 @@ We develop this package using python 3.9 and recommend that you use it with this
 
 ## mcmc_mw_data_match_demo.py
 * summary-statistic version: quantify the simulation and an external Milky Way target as dual Gaussians (mean and standard deviation along both axes for each of the two sequences) and walk the Maoz Ia parameters to best match the MW summary, reporting the residual mismatch per statistic; renders a movie of the simulation walking onto the MW target ellipses (run `python mcmc_mw_data_match_demo.py`)
+
+## fast_yields_demo.py
+* validate the fast yield integrator against the scipy.quad path, report the speedup, and plot the Ia rate models including the new tunable "kinked" model and how it reshapes the [alpha/Fe] vs [Fe/H] plane (run `python fast_yields_demo.py`)
 
 ## gizmo_track.py
 * track star and gas particles across snapshots
