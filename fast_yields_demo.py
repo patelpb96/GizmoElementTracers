@@ -44,8 +44,9 @@ def main():
     # ---- accuracy: fast vs slow (scipy.quad) yield tabulation ------------------------------------
     model_fast = gm.MaozElementTracerModel(age_bins, weights, xfe='alpha', fast=True)
     model_slow = gm.MaozElementTracerModel(age_bins, weights, xfe='alpha', fast=False)
-    yf = model_fast.yields(gm.NIA_DEFAULT, gm.TDD_DEFAULT)
-    ys = model_slow.yields(gm.NIA_DEFAULT, gm.TDD_DEFAULT)
+    fiducial = {'log10_n_ia': np.log10(gm.NIA_DEFAULT), 't_dd': gm.TDD_DEFAULT}
+    yf = model_fast.yields(fiducial)
+    ys = model_slow.yields(fiducial)
     print('fast-vs-slow yield agreement (max relative error per element):')
     for e in elements:
         rel = np.abs(yf[e] - ys[e]) / np.maximum(np.abs(ys[e]), 1e-30)

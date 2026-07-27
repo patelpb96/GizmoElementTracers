@@ -60,6 +60,14 @@ PARAM_LABELS = [r'$\log_{10} n_{\mathrm{Ia}}$', r'$t_{\mathrm{dd}}$']
 # default (broad but physical) flat-prior bounds on (log10 n_ia, t_dd)
 DEFAULT_BOUNDS = np.array([[-7.5, -6.0], [-1.6, -0.5]])
 
+# for the 4-parameter kinked Ia model, sampling (log10 n_ia, t_dd, t_kink, t_dd2)
+KINK_SAMPLED_PARAMS = ['log10_n_ia', 't_dd', 't_kink', 't_dd2']
+KINK_PARAM_LABELS = [
+    r'$\log_{10} n_{\mathrm{Ia}}$', r'$t_{\mathrm{dd}}$',
+    r'$t_{\mathrm{kink}}$', r'$t_{\mathrm{dd2}}$',
+]
+KINK_BOUNDS = np.array([[-7.5, -6.0], [-1.6, -0.5], [60.0, 3000.0], [-2.6, -0.2]])
+
 
 def default_age_bins(age_bin_number=10, age_min=1.0, age_max=13700.0):
     '''
@@ -443,6 +451,7 @@ class MaozElementTracerModel:
         initial_massfraction=None,
         fast=True,
         kink_params=None,
+        sampled_params=None,
     ):
         '''
         Parameters
@@ -468,8 +477,12 @@ class MaozElementTracerModel:
             if True (default), tabulate yields with the fast factorized integrator
             (fast_element_yields); if False, use FIREYieldClass2.get_element_yields (scipy.quad)
         kink_params : dict or None
-            for ia_model='kink', the (fixed) shape of the kink, e.g.
-            {'t_kink': 200.0, 't_dd2': -0.6}; n_ia and t_dd are still the sampled parameters
+            for ia_model='kink', the shape of the kink, e.g. {'t_kink': 200.0, 't_dd2': -0.6}.
+            Any of these NOT listed in sampled_params are held fixed at these values.
+        sampled_params : list of str or None
+            names of the parameters the MCMC varies, in the order they appear in theta.
+            Default ['log10_n_ia', 't_dd'].  For the kink model you can also sample
+            't_kink' and 't_dd2', e.g. ['log10_n_ia', 't_dd', 't_kink', 't_dd2'].
         '''
         self.age_bins = np.asarray(age_bins, dtype=float)
         self.weights = np.asarray(weights, dtype=float)
@@ -483,6 +496,8 @@ class MaozElementTracerModel:
         self.fast = fast
         self.ia_model = ia_model
         self.kink_params = dict(kink_params or {})
+        self.sampled_params = list(sampled_params) if sampled_params is not None \
+            else ['log10_n_ia', 't_dd']
         self.sun_massfraction = gizmo_model.get_sun_massfraction()
 
         # elements we actually need to integrate (keep this minimal for speed)
@@ -522,30 +537,47 @@ class MaozElementTracerModel:
         self.tracer.assign_age_bins(age_bins=self.age_bins)
         self.initial_massfraction = initial_massfraction
 
-    def yields(self, n_ia, t_dd):
+    def _ia_kwargs_from_params(self, params):
         '''
-        Integrate the per-age-bin nucleosynthetic yield mass fractions for the
-        needed elements, for Ia parameters (n_ia, t_dd).
+        Build (ia_rate_fn, ia_kwargs, ia_breakpoints) from a params dict.  Values in
+        `params` (from theta) over-ride the fixed defaults; kink shape parameters not
+        being sampled fall back to self.kink_params.
+        '''
+        n_ia = 10.0 ** params['log10_n_ia']
+        t_dd = params.get('t_dd', self.kink_params.get('t_dd', TDD_DEFAULT))
+        ia_rate_fn = IA_RATE_MODELS[self.ia_model]
+        if self.ia_model == 'mannucci':
+            return ia_rate_fn, {'n_ia': n_ia, 't_ia': self.ia_transition}, [self.ia_transition]
+        ia_kwargs = {'n_ia': n_ia, 't_dd': t_dd, 't_ia': self.ia_transition}
+        ia_breakpoints = [self.ia_transition]
+        if self.ia_model == 'kink':
+            kink = dict(self.kink_params)
+            for k in ('t_kink', 't_dd2'):
+                if k in params:
+                    kink[k] = params[k]
+            ia_kwargs.update({'t_kink': kink.get('t_kink', 200.0), 't_dd2': kink.get('t_dd2', t_dd)})
+            ia_breakpoints.append(ia_kwargs['t_kink'])
+        return ia_rate_fn, ia_kwargs, ia_breakpoints
 
-        Uses the fast factorized integrator (fast_element_yields) when self.fast, else
-        FIREYieldClass2.get_element_yields.  Returns an element_yield_dict.
+    def yields(self, params):
         '''
+        Integrate the per-age-bin nucleosynthetic yield mass fractions for the needed
+        elements, for the parameter dict `params` (keys are self.sampled_params plus
+        any fixed kink shape).  Uses the fast factorized integrator when self.fast,
+        else FIREYieldClass2.get_element_yields.  Returns an element_yield_dict.
+        '''
+        ia_rate_fn, ia_kwargs, ia_breakpoints = self._ia_kwargs_from_params(params)
+
         if not self.fast:
             fyield = gizmo_agetracer.FIREYieldClass2(
-                normalization_ia=n_ia, tdd_ia=t_dd, **self._yield_kwargs
+                normalization_ia=ia_kwargs['n_ia'], tdd_ia=ia_kwargs.get('t_dd', TDD_DEFAULT),
+                **self._yield_kwargs
             )
             return fyield.get_element_yields(
                 self.age_bins, element_names=self.element_names, continuous=True
             )
 
-        ia_rate_fn = IA_RATE_MODELS[self.ia_model]
-        ia_kwargs = {'n_ia': n_ia, 't_dd': t_dd, 't_ia': self.ia_transition}
-        ia_breakpoints = [self.ia_transition]
-        if self.ia_model == 'kink':
-            ia_kwargs.update(self.kink_params)
-            ia_breakpoints.append(self.kink_params.get('t_kink', 200.0))
         ia_yield_source = 'mannucci' if self.ia_model == 'mannucci' else 'ia'
-
         return fast_element_yields(
             self.age_bins, self.element_names,
             ia_rate_fn=ia_rate_fn, ia_kwargs=ia_kwargs, ia_breakpoints=tuple(ia_breakpoints),
@@ -553,16 +585,17 @@ class MaozElementTracerModel:
             wind_transition=self.wind_transition, ia_yield_source=ia_yield_source,
         )
 
+    def params_from_theta(self, theta):
+        '''Map a parameter vector theta to a dict keyed by self.sampled_params.'''
+        return dict(zip(self.sampled_params, np.atleast_1d(theta)))
+
     def massfractions(self, theta):
         '''
-        Return a dict of linear elemental mass fractions (one array per element)
-        for parameter vector theta = (log10 n_ia, t_dd), using the element tracer
-        module to combine the per-bin yields with the stored weights.
+        Return a dict of linear elemental mass fractions (one array per element) for
+        parameter vector theta (ordered as self.sampled_params), using the element
+        tracer module to combine the per-bin yields with the stored weights.
         '''
-        log10_n_ia, t_dd = theta
-        n_ia = 10.0 ** log10_n_ia
-
-        element_yield_dict = self.yields(n_ia, t_dd)
+        element_yield_dict = self.yields(self.params_from_theta(theta))
         # load the freshly integrated yields into the element tracer container
         self.tracer.assign_element_yield_massfractions(element_yield_dict, flush=True)
         if self.initial_massfraction is not None:
@@ -574,6 +607,14 @@ class MaozElementTracerModel:
             element_name: self.tracer.get_element_massfractions(element_name, self.weights)
             for element_name in self.element_names
         }
+
+    def ia_rate(self, ages, theta):
+        '''
+        Return the Ia mass-loss rate over `ages` [Myr] for parameter vector theta.
+        Useful for plotting the (evolving) delay-time distribution.
+        '''
+        ia_rate_fn, ia_kwargs, _ = self._ia_kwargs_from_params(self.params_from_theta(theta))
+        return ia_rate_fn(np.asarray(ages, dtype=float), **ia_kwargs)
 
     def abundances(self, theta):
         '''
@@ -953,7 +994,8 @@ def run_mcmc(
         ) from exc
 
     rng = np.random.default_rng(seed)
-    ndim = 2
+    bounds = np.asarray(bounds, dtype=float)
+    ndim = bounds.shape[0]
     if init is None:
         init = np.mean(bounds, axis=1)
     init = np.asarray(init, dtype=float)
@@ -1124,7 +1166,7 @@ def animate_mcmc_walkers(
     chain,
     path,
     truths=None,
-    labels=PARAM_LABELS,
+    labels=None,
     bounds=None,
     fps=30,
     burn=0,
@@ -1134,62 +1176,56 @@ def animate_mcmc_walkers(
     data=None,
     target_summary=None,
     abundance_lims=None,
+    rate_fiducial_theta=None,
+    rate_ages=None,
+    rate_ylim=(1e-12, 1e-3),
 ):
     '''
-    Render an mp4 movie of the MCMC walkers evolving (post-processing).
+    Render an mp4 movie of the MCMC walkers evolving (post-processing), for a model with
+    any number of parameters.
 
     Layout
     ------
-    Left column  : per-parameter walker traces (parameter value vs step), one thin
-                   line per walker, revealed step by step.
-    Middle block : a live 2-parameter "corner" -- the 1-D marginal histograms plus
-                   the 2-D joint -- that fills in as samples accumulate, with a
-                   moving dot marking the current ensemble-median position (the
-                   "dot on the corner plot") and a cross marking the truth.
-    Right panel  : (if `model` is given) the [X/Fe]-[Fe/H] plane showing the
-                   forward-model prediction at the *current* ensemble-median
-                   parameters, so you watch the abundance distribution shift as the
-                   Ia delay-time-distribution parameters change.  The fixed target
-                   it walks toward is either the observed data points (`data`) or,
-                   if `target_summary` is given, the Milky Way dual-Gaussian target
-                   drawn as 2-sigma ellipses (with the simulation's own fitted
-                   dual-Gaussian ellipses overplotted as they evolve).
+    Left block   : per-parameter walker traces (value vs step), revealed step by step.
+    Middle block : a live N-parameter corner -- diagonal 1-D marginals plus lower-triangle
+                   2-D joints -- filling in as samples accumulate, with a moving gold dot at
+                   the current ensemble-median position and a cross at the truth (if given).
+    Right block  : (if `model` is given)
+                   * the [X/Fe]-[Fe/H] plane with the model prediction at the current median
+                     parameters over the fixed target (data points, or MW dual-Gaussian
+                     ellipses in summary mode); and
+                   * the Ia delay-time distribution (rate vs stellar age): a fixed fiducial
+                     curve, the truth (if given), and the current-median curve, so you watch
+                     the rate model itself evolve.  The y-axis uses a wide dynamic range so
+                     nothing is clipped at the top.
 
     Parameters
     ----------
-    chain : 3-D array (n_step, n_walker, ndim=2)
+    chain : 3-D array (n_step, n_walker, ndim)
         the full un-flattened chain, e.g. sampler.get_chain()
     path : str
         output .mp4 path
     truths : sequence or None
-        true parameter values to mark
-    labels : sequence of str
-        parameter labels (length 2)
-    bounds : array (2, 2) or None
+        true parameter values to mark (length ndim)
+    labels : sequence of str or None
+        parameter labels (length ndim); defaults to PARAM_LABELS for ndim==2
+    bounds : array (ndim, 2) or None
         axis limits per parameter; defaults to the chain range (padded)
-    fps : int
-        frames per second (30 by default)
-    burn : int
-        steps excluded from the accumulating posterior histograms (still shown in
-        the trace panels)
-    stride : int
-        render every `stride`-th step (1 = every step)
-    dpi : int
-        figure resolution
+    fps, burn, stride, dpi : movie/rendering controls (see run_mcmc / earlier docs)
     model : MaozElementTracerModel or None
-        if given, add the evolving [X/Fe]-[Fe/H] panel
+        if given, add the evolving abundance panel and Ia-rate panel
     data : dict or None
-        observed data points to show as the fixed target (from generate_mock_data);
-        uses data['label'] to color the two sequences and, in summary mode, to
-        color the evolving simulation points
+        observed data points to show as the fixed target (uses data['label'] to color)
     target_summary : dict or None
-        a dual-Gaussian target (e.g. MW_TARGET_SUMMARY); if given, the panel draws
-        this target as 2-sigma ellipses and overplots the simulation's own fitted
-        dual-Gaussian ellipses at the current parameters ("summary mode")
+        a dual-Gaussian target (e.g. MW_TARGET_SUMMARY); enables summary mode
     abundance_lims : ((xmin, xmax), (ymin, ymax)) or None
-        fixed axis limits for the abundance panel; defaults to the data range
-        (padded).  Fixed limits are important so the shifting distribution is
-        visible against a stable frame.
+        fixed axis limits for the abundance panel
+    rate_fiducial_theta : sequence or None
+        parameter vector (length ndim) for the fixed fiducial Ia-rate curve
+    rate_ages : array or None
+        ages [Myr] at which to draw the Ia rate (default log 1..13700)
+    rate_ylim : (float, float)
+        y-limits for the Ia-rate panel (wide by default so the top is not clipped)
 
     Returns
     -------
@@ -1209,16 +1245,29 @@ def animate_mcmc_walkers(
 
     chain = np.asarray(chain)
     n_step, n_walker, ndim = chain.shape
-    assert ndim == 2, 'animate_mcmc_walkers is written for a 2-parameter model'
+    if labels is None:
+        labels = list(PARAM_LABELS) if ndim == 2 else ['p{}'.format(k) for k in range(ndim)]
 
+    # per-parameter axis limits
+    if bounds is not None:
+        lims = np.asarray(bounds, dtype=float)
+    else:
+        lims = np.empty((ndim, 2))
+        for k in range(ndim):
+            lo, hi = chain[..., k].min(), chain[..., k].max()
+            pad = 0.05 * (hi - lo + 1e-12)
+            lims[k] = [lo - pad, hi + pad]
+    bins_list = [np.linspace(lims[k, 0], lims[k, 1], 36) for k in range(ndim)]
+
+    # abundance panel setup
     show_ab = model is not None and (data is not None or target_summary is not None)
     summary_mode = model is not None and target_summary is not None
+    show_rate = model is not None and hasattr(model, 'ia_rate')
     if show_ab:
         xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
         has_label = data is not None and 'label' in data
         if has_label:
             hi_mask = data['label'] == 1
-        # fixed limits for the abundance panel
         if abundance_lims is not None:
             ab_x, ab_y = abundance_lims
         elif data is not None:
@@ -1226,118 +1275,120 @@ def animate_mcmc_walkers(
             ab_x = (np.min(data['feh']) - fpad, np.max(data['feh']) + fpad)
             ab_y = (np.min(data['xfe']) - fpad, np.max(data['xfe']) + fpad)
         else:
-            # derive from the target dual-Gaussian (means +/- ~4 sigma)
             fpad = 0.25
             mf, sf = target_summary['mean_feh'], target_summary['std_feh']
             mx, sx = target_summary['mean_xfe'], target_summary['std_xfe']
             ab_x = (np.min(mf - 3 * sf) - fpad, np.max(mf + 3 * sf) + fpad)
             ab_y = (np.min(mx - 3 * sx) - fpad, np.max(mx + 3 * sx) + fpad)
 
-    # per-parameter axis limits
-    if bounds is not None:
-        lims = np.asarray(bounds, dtype=float)
-    else:
-        lims = np.empty((2, 2))
-        for k in range(2):
-            lo, hi = chain[..., k].min(), chain[..., k].max()
-            pad = 0.05 * (hi - lo + 1e-12)
-            lims[k] = [lo - pad, hi + pad]
+    rate_fid = rate_true = None
+    if show_rate:
+        if rate_ages is None:
+            rate_ages = np.logspace(0.0, np.log10(13700.0), 400)
+        if rate_fiducial_theta is not None:
+            rate_fid = model.ia_rate(rate_ages, rate_fiducial_theta)
+        if truths is not None:
+            rate_true = model.ia_rate(rate_ages, truths)
 
-    bins0 = np.linspace(lims[0, 0], lims[0, 1], 40)
-    bins1 = np.linspace(lims[1, 0], lims[1, 1], 40)
+    # ---- figure layout: [ traces | corner | right(abundance + rate) ] --------------------------
+    right_rows = int(show_ab) + int(show_rate)
+    n_block = 3 if right_rows else 2
+    width_ratios = [1.0, 0.95 * ndim, 2.1][:n_block]
+    fig_w = 3.6 + 2.0 * ndim + (6.2 if right_rows else 0)
+    fig_h = max(5.6, 1.7 * ndim)
+    fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
+    outer = fig.add_gridspec(1, n_block, width_ratios=width_ratios, wspace=0.30)
 
-    if show_ab:
-        fig = plt.figure(figsize=(17, 6), dpi=dpi)
-        gs = fig.add_gridspec(
-            2, 5, width_ratios=[1.0, 1.0, 0.95, 0.36, 1.75], height_ratios=[1, 1],
-            hspace=0.30, wspace=0.34,
-        )
-        ax_ab = fig.add_subplot(gs[0:2, 4])
-    else:
-        fig = plt.figure(figsize=(12, 6), dpi=dpi)
-        gs = fig.add_gridspec(
-            2, 4, width_ratios=[1.0, 1.0, 1.1, 0.4], height_ratios=[1, 1],
-            hspace=0.28, wspace=0.30,
-        )
-    ax_tr0 = fig.add_subplot(gs[0, 0:2])
-    ax_tr1 = fig.add_subplot(gs[1, 0:2])
-    ax_h0 = fig.add_subplot(gs[0, 2])   # 1-D marginal of param 0 (top)
-    ax_j = fig.add_subplot(gs[1, 2])    # 2-D joint (bottom-left of corner)
-    ax_h1 = fig.add_subplot(gs[1, 3])   # 1-D marginal of param 1 (right, rotated)
+    gs_tr = outer[0].subgridspec(ndim, 1, hspace=0.16)
+    ax_tr = [fig.add_subplot(gs_tr[k]) for k in range(ndim)]
+
+    gs_co = outer[1].subgridspec(ndim, ndim, hspace=0.10, wspace=0.10)
+    ax_co = [[fig.add_subplot(gs_co[i, j]) if i >= j else None for j in range(ndim)]
+             for i in range(ndim)]
+
+    ax_ab = ax_rate = None
+    if right_rows:
+        gs_r = outer[2].subgridspec(right_rows, 1, hspace=0.34)
+        ridx = 0
+        if show_ab:
+            ax_ab = fig.add_subplot(gs_r[ridx]); ridx += 1
+        if show_rate:
+            ax_rate = fig.add_subplot(gs_r[ridx]); ridx += 1
 
     frames = list(range(1, n_step + 1, stride))
     if frames[-1] != n_step:
         frames.append(n_step)
-
     x_all = np.arange(n_step)
+
     writer = imageio.get_writer(path, fps=fps, macro_block_size=None, codec='libx264')
     try:
         for f in frames:
-            # ---- walker trace panels --------------------------------------------------------
-            for k, (ax, lim) in enumerate(((ax_tr0, lims[0]), (ax_tr1, lims[1]))):
+            samp = chain[burn:f].reshape(-1, ndim) if f > burn else chain[:f].reshape(-1, ndim)
+            current = chain[f - 1]
+            median = np.median(current, axis=0)
+
+            # ---- traces ----
+            for k in range(ndim):
+                ax = ax_tr[k]
                 ax.clear()
                 ax.plot(x_all[:f], chain[:f, :, k], color='0.3', alpha=0.35, lw=0.6)
                 if truths is not None:
-                    ax.axhline(truths[k], color='crimson', ls='--', lw=1.2)
+                    ax.axhline(truths[k], color='crimson', ls='--', lw=1.1)
                 ax.set_xlim(0, n_step)
-                ax.set_ylim(lim)
-                ax.set_ylabel(labels[k])
+                ax.set_ylim(lims[k])
+                ax.set_ylabel(labels[k], fontsize=9)
                 ax.grid(ls=':', alpha=0.4)
-            ax_tr1.set_xlabel('step')
-            ax_tr0.set_title('walker traces', fontsize=11)
+                if k < ndim - 1:
+                    ax.set_xticklabels([])
+                else:
+                    ax.set_xlabel('step')
+            ax_tr[0].set_title('walker traces', fontsize=10)
 
-            # ---- accumulating corner --------------------------------------------------------
-            if f > burn:
-                samp = chain[burn:f].reshape(-1, 2)
-            else:
-                samp = chain[:f].reshape(-1, 2)
-            current = chain[f - 1]                 # walker positions at this step
-            median = np.median(current, axis=0)    # the moving "dot"
+            # ---- corner ----
+            for i in range(ndim):
+                for j in range(ndim):
+                    if i < j:
+                        continue
+                    ax = ax_co[i][j]
+                    ax.clear()
+                    if i == j:
+                        ax.hist(samp[:, i], bins=bins_list[i], color='0.6')
+                        if truths is not None:
+                            ax.axvline(truths[i], color='crimson', ls='--', lw=1.0)
+                        ax.axvline(median[i], color='navy', lw=1.2)
+                        ax.set_xlim(lims[i])
+                        ax.set_yticks([])
+                    else:
+                        ax.scatter(samp[:, j], samp[:, i], s=3, alpha=0.08, color='0.5')
+                        ax.scatter(current[:, j], current[:, i], s=9, color='navy', alpha=0.6)
+                        ax.scatter([median[j]], [median[i]], s=70, color='gold',
+                                   edgecolor='k', zorder=5)
+                        if truths is not None:
+                            ax.axvline(truths[j], color='crimson', ls='--', lw=0.8)
+                            ax.axhline(truths[i], color='crimson', ls='--', lw=0.8)
+                        ax.set_xlim(lims[j])
+                        ax.set_ylim(lims[i])
+                    if j == 0 and i > 0:
+                        ax.set_ylabel(labels[i], fontsize=8)
+                    else:
+                        ax.set_yticklabels([])
+                    if i == ndim - 1:
+                        ax.set_xlabel(labels[j], fontsize=8)
+                        for lab in ax.get_xticklabels():
+                            lab.set_rotation(45)
+                            lab.set_fontsize(7)
+                    else:
+                        ax.set_xticklabels([])
+            ax_co[0][0].set_title('posterior (building)', fontsize=10)
 
-            ax_h0.clear()
-            ax_h0.hist(samp[:, 0], bins=bins0, color='0.6')
-            if truths is not None:
-                ax_h0.axvline(truths[0], color='crimson', ls='--', lw=1.2)
-            ax_h0.axvline(median[0], color='navy', lw=1.4)
-            ax_h0.set_xlim(lims[0])
-            ax_h0.set_xticklabels([])
-            ax_h0.set_yticks([])
-            ax_h0.set_title('posterior (building)', fontsize=11)
-
-            ax_h1.clear()
-            ax_h1.hist(samp[:, 1], bins=bins1, orientation='horizontal', color='0.6')
-            if truths is not None:
-                ax_h1.axhline(truths[1], color='crimson', ls='--', lw=1.2)
-            ax_h1.axhline(median[1], color='navy', lw=1.4)
-            ax_h1.set_ylim(lims[1])
-            ax_h1.set_yticklabels([])
-            ax_h1.set_xticks([])
-
-            ax_j.clear()
-            ax_j.scatter(samp[:, 0], samp[:, 1], s=4, alpha=0.10, color='0.5')
-            ax_j.scatter(current[:, 0], current[:, 1], s=14, color='navy',
-                         alpha=0.7, label='walkers')
-            ax_j.scatter([median[0]], [median[1]], s=130, color='gold',
-                         edgecolor='k', zorder=5, label='ensemble median')
-            if truths is not None:
-                ax_j.axvline(truths[0], color='crimson', ls='--', lw=1.0)
-                ax_j.axhline(truths[1], color='crimson', ls='--', lw=1.0)
-            ax_j.set_xlim(lims[0])
-            ax_j.set_ylim(lims[1])
-            ax_j.set_xlabel(labels[0])
-            ax_j.set_ylabel(labels[1])
-            ax_j.legend(loc='upper left', fontsize=8, frameon=False)
-
-            # ---- evolving abundance plane ---------------------------------------------------
+            # ---- abundance panel ----
             if show_ab:
                 ax_ab.clear()
-                feh_m, xfe_m = model.abundances(median)  # simulation at current params
+                feh_m, xfe_m = model.abundances(median)
                 if summary_mode:
-                    # fixed Milky Way target as dual-Gaussian 2-sigma ellipses
                     _draw_dual_gaussian(ax_ab, target_summary, n_sigma=2,
                                         colors=('firebrick', 'steelblue'), ls='--', lw=2.2,
                                         label='MW target (2$\\sigma$)')
-                    # evolving simulation points (colored by sequence if labels given)
                     if has_label:
                         ax_ab.scatter(feh_m[hi_mask], xfe_m[hi_mask], s=7,
                                       color='lightcoral', alpha=0.35)
@@ -1346,13 +1397,11 @@ def animate_mcmc_walkers(
                     else:
                         ax_ab.scatter(feh_m, xfe_m, s=7, color='0.6', alpha=0.35)
                     ax_ab.scatter([], [], s=20, color='0.55', label='simulation')
-                    # the simulation's own fitted dual-Gaussian, evolving toward the target
                     sim_summary = fit_bimodal_gaussians(feh_m, xfe_m)
                     _draw_dual_gaussian(ax_ab, sim_summary, n_sigma=2,
                                         colors=('darkred', 'navy'), ls='-', lw=1.8,
                                         label='simulation fit (2$\\sigma$)')
                 else:
-                    # fixed observed data points (the target)
                     if has_label:
                         ax_ab.scatter(data['feh'][hi_mask], data['xfe'][hi_mask], s=7,
                                       color='lightcoral', alpha=0.30)
@@ -1362,7 +1411,6 @@ def animate_mcmc_walkers(
                     else:
                         ax_ab.scatter(data['feh'], data['xfe'], s=7, color='0.7',
                                       alpha=0.30, label='observed data')
-                    # model prediction at the current ensemble-median parameters
                     if has_label:
                         ax_ab.scatter(feh_m[hi_mask], xfe_m[hi_mask], s=9,
                                       color='firebrick', alpha=0.6)
@@ -1376,12 +1424,29 @@ def animate_mcmc_walkers(
                 ax_ab.set_ylim(ab_y)
                 ax_ab.set_xlabel('[Fe/H]')
                 ax_ab.set_ylabel('[{}/Fe]'.format(xfe_label))
-                ax_ab.set_title(
-                    r'[{}/Fe] vs [Fe/H]   ($n_{{\rm Ia}}$={:.2e}, $t_{{\rm dd}}$={:.2f})'.format(
-                        xfe_label, 10.0 ** median[0], median[1]),
-                    fontsize=11)
+                ax_ab.set_title('[{}/Fe] vs [Fe/H]'.format(xfe_label), fontsize=10)
                 ax_ab.legend(loc='upper right', fontsize=8, frameon=False)
                 ax_ab.grid(ls='-.', alpha=0.35)
+
+            # ---- Ia rate panel (the delay-time distribution, evolving) ----
+            if show_rate:
+                ax_rate.clear()
+                if rate_fid is not None:
+                    ax_rate.loglog(rate_ages, np.maximum(rate_fid, 1e-30), color='0.55', lw=2.2,
+                                   label='fiducial')
+                if rate_true is not None:
+                    ax_rate.loglog(rate_ages, np.maximum(rate_true, 1e-30), 'k--', lw=1.4,
+                                   label='truth')
+                cur_rate = model.ia_rate(rate_ages, median)
+                ax_rate.loglog(rate_ages, np.maximum(cur_rate, 1e-30), color='crimson', lw=2.2,
+                               label='current median')
+                ax_rate.set_xlim(rate_ages[0], rate_ages[-1])
+                ax_rate.set_ylim(rate_ylim)
+                ax_rate.set_xlabel('stellar age [Myr]')
+                ax_rate.set_ylabel(r'Ia rate [$M_\odot$/$M_\odot$/Myr]')
+                ax_rate.set_title('Ia delay-time distribution', fontsize=10)
+                ax_rate.legend(loc='lower left', fontsize=8, frameon=False)
+                ax_rate.grid(ls=':', alpha=0.4, which='both')
 
             fig.suptitle('MCMC step {} / {}'.format(f, n_step), fontsize=13)
 

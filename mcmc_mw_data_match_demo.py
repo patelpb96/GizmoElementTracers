@@ -153,6 +153,7 @@ def main():
                 chain, movie_path, truths=None, bounds=gizmo_mcmc.DEFAULT_BOUNDS,
                 fps=args.fps, burn=0, model=model,
                 data={'label': labels}, target_summary=target, abundance_lims=ab_lims,
+                rate_fiducial_theta=list(fiducial_theta), rate_ylim=(1e-12, 1e-3),
             )
             print('wrote {}'.format(movie_path))
         except ImportError as exc:

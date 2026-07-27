@@ -30,6 +30,7 @@ We develop this package using python 3.9 and recommend that you use it with this
 * includes a bimodal (Milky-Way-like) star-formation-history weight generator and a post-processing routine to render a movie of the MCMC walkers converging (with an optional panel showing the abundance distribution evolving as the parameters change)
 * supports two inference modes: a star-by-star likelihood against mock data, and a summary-statistic likelihood that matches a dual-Gaussian description (two sequences, each a mean and standard deviation along both axes) of the simulation to an external (real Milky Way) target -- the right posture when the model is imperfect
 * includes a fast, factorized yield integrator (`integrate_rate_over_bins` / `fast_element_yields`) that replaces the per-element scipy.quad tabulation and is ~25x faster (agrees to ~1e-6); it works for any vectorized rate function, including a new tunable "kinked" Ia model (`ia_rate_kink`) -- a broken power-law delay-time distribution with a modulatable kink location and post-kink slope (reduces to Maoz when the slopes match)
+* the MCMC and the movie renderer are N-dimensional: you can sample the kink parameters themselves (e.g. `sampled_params=['log10_n_ia','t_dd','t_kink','t_dd2']`), and the movie draws an N-parameter corner plus an evolving Ia rate-model panel (fixed fiducial, truth, and current-median curves, over a wide y-range)
 * extra dependencies for the demos: `emcee` (MCMC), and `corner` + `imageio` + `imageio-ffmpeg` for the corner plot and the mp4 movie (all imported lazily with clear messages if missing)
 
 ## mcmc_maoz_demo.py
@@ -43,6 +44,9 @@ We develop this package using python 3.9 and recommend that you use it with this
 
 ## fast_yields_demo.py
 * validate the fast yield integrator against the scipy.quad path, report the speedup, and plot the Ia rate models including the new tunable "kinked" model and how it reshapes the [alpha/Fe] vs [Fe/H] plane (run `python fast_yields_demo.py`)
+
+## mcmc_kink_demo.py
+* sample the four parameters of the kinked Ia model (log10 n_ia, t_dd, t_kink, t_dd2), recovering them from a mock bimodal data set, and render a movie whose right column shows the abundance distribution and the Ia delay-time distribution both evolving as the walkers move (run `python mcmc_kink_demo.py`)
 
 ## gizmo_track.py
 * track star and gas particles across snapshots
