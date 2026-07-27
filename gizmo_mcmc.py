@@ -41,7 +41,10 @@ so that [Fe/H] = metallicity.iron and [Mg/Fe] = metallicity.mg - metallicity.fe,
 matching gizmo_io.ParticleDictionaryClass.prop('metallicity.agetracer...').
 '''
 
+from collections import namedtuple
+
 import numpy as np
+from scipy.special import erf
 
 from . import gizmo_agetracer
 from . import gizmo_model
@@ -312,7 +315,240 @@ def ia_rate_kink(t, n_ia, t_dd, t_kink=200.0, t_dd2=-1.1, t_ia=IA_TRANSITION_DEF
     return np.where(t >= t_ia, r, 0.0)
 
 
-IA_RATE_MODELS = {'maoz': ia_rate_maoz, 'mannucci': ia_rate_mannucci, 'kink': ia_rate_kink}
+def _gauss(t, amp, center, sigma):
+    '''Un-normalized Gaussian bump amp * exp(-0.5 ((t - center)/sigma)^2).'''
+    sigma = max(float(sigma), 1e-6)
+    return amp * np.exp(-0.5 * ((t - center) / sigma) ** 2)
+
+
+def ia_rate_powerlaw_gauss(
+    t, n_ia, t_dd, a_gauss, t_gauss, sigma_gauss, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4
+):
+    '''
+    Power-law delay-time distribution plus a single Gaussian bump:
+        n_ia * (t/Gyr)^t_dd  +  a_gauss * exp(-0.5 ((t - t_gauss)/sigma_gauss)^2),  for t >= t_ia.
+
+    One functional form serves two physically distinct pictures depending on where the bump sits:
+      * a *prompt* component (t_gauss ~ 40-120 Myr): the "prompt + delayed" (A M* + B SFR) DTD of
+        Scannapieco & Bildsten / Mannucci / Sullivan, whose bump amplitude sets the prompt fraction;
+      * a *long-delay* component (t_gauss ~ 5-13 Gyr): the double-degenerate long-delay bump of the
+        recent two-component ("power law + long-delay Gaussian") DTD analyses.
+    '''
+    t = np.asarray(t, dtype=float)
+    r = ejecta * (n_ia * _pow(t / 1e3, t_dd) + _gauss(t, a_gauss, t_gauss, sigma_gauss))
+    return np.where(t >= t_ia, r, 0.0)
+
+
+def ia_rate_skewnorm(t, n_ia, xi, omega, a, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4):
+    '''
+    Strolger (2020) skew-normal delay-time distribution in log10(age).  The event fraction per
+    unit log10-age is a skew-normal, so the rate per unit *time* carries a 1/(t ln10) Jacobian:
+        u = (log10 t - xi) / omega
+        psi(t) = n_ia * (2/omega) * phi(u) * Phi(a u) / (t ln10),
+    with phi the standard normal pdf and Phi its cdf.  A smooth, flexible (essentially
+    log-normal-with-skew) DTD alternative to a power law: xi sets the characteristic log-age,
+    omega its width, and a the skewness (a > 0 -> more delayed than prompt events).  n_ia is the
+    overall normalization (on the same rough scale as the Maoz n_ia).
+    '''
+    t = np.asarray(t, dtype=float)
+    omega = max(float(omega), 1e-6)
+    tt = np.maximum(t, 1e-6)
+    u = (np.log10(tt) - xi) / omega
+    phi = np.exp(-0.5 * u * u) / np.sqrt(2 * np.pi)
+    Phi = 0.5 * (1.0 + erf(a * u / np.sqrt(2.0)))
+    r = ejecta * n_ia * (2.0 / omega) * phi * Phi / (tt * np.log(10.0))
+    return np.where(t >= t_ia, r, 0.0)
+
+
+def ia_rate_exponential(t, n_ia, tau, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4):
+    '''
+    Exponential delay-time distribution n_ia * exp(-t/tau) for t >= t_ia -- a steep,
+    single-degenerate-flavored DTD included as a foil the ~t^-1 data should disfavor at long delays.
+    '''
+    t = np.asarray(t, dtype=float)
+    tau = max(float(tau), 1e-6)
+    r = ejecta * n_ia * np.exp(-t / tau)
+    return np.where(t >= t_ia, r, 0.0)
+
+
+def ia_rate_kink_prompt(
+    t, n_ia, t_dd, t_kink, t_dd2, a_prompt, t_p, sigma_p=12.0,
+    t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4,
+):
+    '''
+    "Kitchen sink" DTD: a broken power law (kink at t_kink, slopes t_dd -> t_dd2) plus a prompt
+    Gaussian bump, with a free onset t_ia.  The hardest, most degenerate model in the suite --
+    it exists to stress-test the sampler on a genuinely difficult 7-D posterior.
+    '''
+    t = np.asarray(t, dtype=float)
+    r_before = n_ia * _pow(t / 1e3, t_dd)
+    r_after = n_ia * _pow(t_kink / 1e3, t_dd) * _pow(t / t_kink, t_dd2)
+    r_pl = np.where(t < t_kink, r_before, r_after)
+    r = ejecta * (r_pl + _gauss(t, a_prompt, t_p, sigma_p))
+    return np.where(t >= t_ia, r, 0.0)
+
+
+IA_RATE_MODELS = {
+    'maoz': ia_rate_maoz,
+    'mannucci': ia_rate_mannucci,
+    'kink': ia_rate_kink,
+    'maoz_onset': ia_rate_maoz,
+    'prompt_delayed': ia_rate_powerlaw_gauss,
+    'long_delay': ia_rate_powerlaw_gauss,
+    'skewnorm': ia_rate_skewnorm,
+    'exponential': ia_rate_exponential,
+    'kink_prompt': ia_rate_kink_prompt,
+}
+
+
+# --------------------------------------------------------------------------------------------------
+# Ia delay-time-distribution model registry
+#
+# Each entry describes one physically motivated DTD family as an arbitrary vectorized rate function
+# plus a named parameter spec: for every (potentially) free parameter we record the sampling name
+# (what appears in theta and the corner plot), the rate-function keyword it maps to, its fiducial
+# value, flat-prior bounds, a LaTeX label, and whether it is sampled in log10.  This makes the
+# forward model and the MCMC generic: adding a new DTD family is just adding a rate function and a
+# spec here -- the fast integrator, the summary-statistic likelihood, and the movie all work as-is.
+#
+# Priors are anchored to the delay-time-distribution literature: the ~t^-1 consensus slope
+# (t_dd in [-1.6, -0.5], fiducial -1.1; Maoz & Graur, Wiseman, Freundlich & Maoz), a white-dwarf
+# formation onset of a few x 10 Myr (t_ia in [37, 200]), and normalization spanning the observed
+# Hubble-time-integrated N_Ia/M* (log10 n_ia in [-7.5, -6.0], fiducial log10(2.6e-7)).
+# --------------------------------------------------------------------------------------------------
+
+# one free (or fixable) parameter of a DTD model
+ParamSpec = namedtuple('ParamSpec', ['sample', 'kwarg', 'default', 'bounds', 'label', 'log'])
+
+
+def _P(sample, kwarg, default, bounds, label, log=False):
+    return ParamSpec(sample, kwarg, default, tuple(bounds), label, log)
+
+
+# reusable parameter specs shared across models
+_LOG10_NIA = _P('log10_n_ia', 'n_ia', float(np.log10(NIA_DEFAULT)), (-7.5, -6.0),
+                r'$\log_{10} n_{\mathrm{Ia}}$', log=True)
+_TDD = _P('t_dd', 't_dd', TDD_DEFAULT, (-1.6, -0.5), r'$t_{\mathrm{dd}}$')
+_TIA = _P('t_ia', 't_ia', IA_TRANSITION_DEFAULT, (37.0, 200.0), r'$t_{\mathrm{Ia}}$')
+_TKINK = _P('t_kink', 't_kink', 200.0, (60.0, 3000.0), r'$t_{\mathrm{kink}}$')
+_TDD2 = _P('t_dd2', 't_dd2', TDD_DEFAULT, (-2.6, -0.2), r'$t_{\mathrm{dd2}}$')
+
+
+# spec: rate_fn, ordered full parameter list, and the default subset the MCMC samples
+IaModelSpec = namedtuple('IaModelSpec', ['rate_fn', 'params', 'default_sampled'])
+
+IA_MODEL_SPECS = {
+    # M1: canonical ~t^-1 power law (the fiducial Maoz DTD)
+    'maoz': IaModelSpec(ia_rate_maoz, [_LOG10_NIA, _TDD], ['log10_n_ia', 't_dd']),
+    # M2: power law with a free white-dwarf-formation onset
+    'maoz_onset': IaModelSpec(
+        ia_rate_maoz, [_LOG10_NIA, _TDD, _TIA], ['log10_n_ia', 't_dd', 't_ia']
+    ),
+    # M3: broken power law ("kink" -- slope change at t_kink)
+    'kink': IaModelSpec(
+        ia_rate_kink, [_LOG10_NIA, _TDD, _TKINK, _TDD2],
+        ['log10_n_ia', 't_dd', 't_kink', 't_dd2'],
+    ),
+    # M4: prompt + delayed (power law + prompt Gaussian; measures the prompt fraction)
+    'prompt_delayed': IaModelSpec(
+        ia_rate_powerlaw_gauss,
+        [
+            _LOG10_NIA, _TDD,
+            _P('log10_a_prompt', 'a_gauss', -7.0, (-9.0, -5.0),
+               r'$\log_{10} A_{\mathrm{p}}$', log=True),
+            _P('t_p', 't_gauss', 60.0, (40.0, 150.0), r'$t_{\mathrm{p}}$'),
+            _P('sigma_p', 'sigma_gauss', 15.0, (5.0, 40.0), r'$\sigma_{\mathrm{p}}$'),
+        ],
+        ['log10_n_ia', 't_dd', 'log10_a_prompt', 't_p', 'sigma_p'],
+    ),
+    # M5: power law + long-delay (double-degenerate) Gaussian bump
+    'long_delay': IaModelSpec(
+        ia_rate_powerlaw_gauss,
+        [
+            _LOG10_NIA, _TDD,
+            _P('log10_a_long', 'a_gauss', -9.0, (-12.0, -7.0),
+               r'$\log_{10} A_{\mathrm{L}}$', log=True),
+            _P('t_long', 't_gauss', 10000.0, (5000.0, 13000.0), r'$t_{\mathrm{L}}$'),
+            _P('sigma_long', 'sigma_gauss', 1500.0, (500.0, 3000.0), r'$\sigma_{\mathrm{L}}$'),
+        ],
+        ['log10_n_ia', 't_dd', 'log10_a_long', 't_long', 'sigma_long'],
+    ),
+    # M6: Strolger (2020) skew-normal in log-age
+    'skewnorm': IaModelSpec(
+        ia_rate_skewnorm,
+        [
+            _P('log10_n_ia', 'n_ia', -3.0, (-4.5, -1.5),
+               r'$\log_{10} n_{\mathrm{Ia}}$', log=True),
+            _P('xi', 'xi', 3.0, (2.0, 4.1), r'$\xi$'),
+            _P('omega', 'omega', 0.6, (0.2, 1.5), r'$\omega$'),
+            _P('a', 'a', 1.0, (-5.0, 5.0), r'$a$'),
+        ],
+        ['log10_n_ia', 'xi', 'omega', 'a'],
+    ),
+    # M7: exponential DTD (a steep foil)
+    'exponential': IaModelSpec(
+        ia_rate_exponential,
+        [
+            _P('log10_n_ia', 'n_ia', -6.5, (-8.0, -5.0),
+               r'$\log_{10} n_{\mathrm{Ia}}$', log=True),
+            _P('tau', 'tau', 2000.0, (200.0, 10000.0), r'$\tau$'),
+        ],
+        ['log10_n_ia', 'tau'],
+    ),
+    # M8: broken power law + prompt bump + free onset ("kitchen sink", 7-D)
+    'kink_prompt': IaModelSpec(
+        ia_rate_kink_prompt,
+        [
+            _LOG10_NIA, _TDD, _TKINK, _TDD2,
+            _P('log10_a_prompt', 'a_prompt', -7.0, (-9.0, -5.0),
+               r'$\log_{10} A_{\mathrm{p}}$', log=True),
+            _P('t_p', 't_p', 60.0, (40.0, 150.0), r'$t_{\mathrm{p}}$'),
+            _TIA,
+        ],
+        ['log10_n_ia', 't_dd', 't_kink', 't_dd2', 'log10_a_prompt', 't_p', 't_ia'],
+    ),
+    # Mannucci (FIRE-2) prompt-Gaussian Ia rate, kept for backward compatibility
+    'mannucci': IaModelSpec(
+        ia_rate_mannucci,
+        [
+            _P('log10_n_ia', 'n_ia', 0.0, (-1.0, 1.0),
+               r'$\log_{10} n_{\mathrm{Ia}}$', log=True),
+            _TDD,
+        ],
+        ['log10_n_ia', 't_dd'],
+    ),
+}
+
+
+def model_prior(ia_model, sampled_params=None):
+    '''
+    Return (sampled_params, bounds, labels, fiducial_theta) for a DTD model from IA_MODEL_SPECS.
+
+    Parameters
+    ----------
+    ia_model : str
+        key into IA_MODEL_SPECS (e.g. 'maoz', 'kink', 'prompt_delayed', ...)
+    sampled_params : list of str or None
+        subset (and order) of the model's parameters to sample; defaults to the model's
+        default_sampled
+
+    Returns
+    -------
+    sampled_params : list of str
+    bounds : 2-D array (n_param x 2)
+        flat-prior bounds for the sampled parameters, in order
+    labels : list of str
+        LaTeX labels for the sampled parameters
+    fiducial_theta : 1-D array
+        fiducial values (in sampling space) for the sampled parameters
+    '''
+    spec = IA_MODEL_SPECS[ia_model]
+    names = list(sampled_params) if sampled_params is not None else list(spec.default_sampled)
+    by_name = {p.sample: p for p in spec.params}
+    bounds = np.array([by_name[n].bounds for n in names], dtype=float)
+    labels = [by_name[n].label for n in names]
+    fiducial = np.array([by_name[n].default for n in names], dtype=float)
+    return names, bounds, labels, fiducial
 
 
 def ccsn_rate(t, cc_normalization=CC_NORMALIZATION_DEFAULT, t_cc=CC_TRANSITION_DEFAULT, ejecta=10.5):
@@ -451,6 +687,7 @@ class MaozElementTracerModel:
         initial_massfraction=None,
         fast=True,
         kink_params=None,
+        fixed_params=None,
         sampled_params=None,
     ):
         '''
@@ -479,10 +716,15 @@ class MaozElementTracerModel:
         kink_params : dict or None
             for ia_model='kink', the shape of the kink, e.g. {'t_kink': 200.0, 't_dd2': -0.6}.
             Any of these NOT listed in sampled_params are held fixed at these values.
+            (Kept for backward compatibility; `fixed_params` is the general form.)
+        fixed_params : dict or None
+            values (in sampling space) at which to hold any model parameter that is NOT in
+            sampled_params, keyed by sampling name (e.g. {'sigma_p': 12.0, 't_ia': 40.0}).
+            Falls back to the parameter's fiducial default from IA_MODEL_SPECS.
         sampled_params : list of str or None
             names of the parameters the MCMC varies, in the order they appear in theta.
-            Default ['log10_n_ia', 't_dd'].  For the kink model you can also sample
-            't_kink' and 't_dd2', e.g. ['log10_n_ia', 't_dd', 't_kink', 't_dd2'].
+            Defaults to the model's default_sampled in IA_MODEL_SPECS.  Any DTD family and
+            parameter subset registered there is supported (see model_prior).
         '''
         self.age_bins = np.asarray(age_bins, dtype=float)
         self.weights = np.asarray(weights, dtype=float)
@@ -496,8 +738,16 @@ class MaozElementTracerModel:
         self.fast = fast
         self.ia_model = ia_model
         self.kink_params = dict(kink_params or {})
-        self.sampled_params = list(sampled_params) if sampled_params is not None \
-            else ['log10_n_ia', 't_dd']
+        # generic fixed-parameter overrides (in sampling space); kink_params folded in for compat
+        self.fixed_overrides = dict(fixed_params or {})
+        self.fixed_overrides.update(self.kink_params)
+        self.spec = IA_MODEL_SPECS.get(ia_model)
+        if sampled_params is not None:
+            self.sampled_params = list(sampled_params)
+        elif self.spec is not None:
+            self.sampled_params = list(self.spec.default_sampled)
+        else:
+            self.sampled_params = ['log10_n_ia', 't_dd']
         self.sun_massfraction = gizmo_model.get_sun_massfraction()
 
         # elements we actually need to integrate (keep this minimal for speed)
@@ -539,23 +789,26 @@ class MaozElementTracerModel:
 
     def _ia_kwargs_from_params(self, params):
         '''
-        Build (ia_rate_fn, ia_kwargs, ia_breakpoints) from a params dict.  Values in
-        `params` (from theta) over-ride the fixed defaults; kink shape parameters not
-        being sampled fall back to self.kink_params.
+        Build (ia_rate_fn, ia_kwargs, ia_breakpoints) from a params dict, driven by the
+        model's IA_MODEL_SPECS entry.  Each spec parameter takes its value from `params`
+        (i.e. from theta) if it is being sampled, else from self.fixed_overrides, else its
+        fiducial default; log-sampled parameters are exponentiated before being passed to
+        the rate function.  Breakpoints (for the fast integrator) are the onset t_ia plus a
+        kink location t_kink if the model has one.
         '''
-        n_ia = 10.0 ** params['log10_n_ia']
-        t_dd = params.get('t_dd', self.kink_params.get('t_dd', TDD_DEFAULT))
-        ia_rate_fn = IA_RATE_MODELS[self.ia_model]
-        if self.ia_model == 'mannucci':
-            return ia_rate_fn, {'n_ia': n_ia, 't_ia': self.ia_transition}, [self.ia_transition]
-        ia_kwargs = {'n_ia': n_ia, 't_dd': t_dd, 't_ia': self.ia_transition}
-        ia_breakpoints = [self.ia_transition]
-        if self.ia_model == 'kink':
-            kink = dict(self.kink_params)
-            for k in ('t_kink', 't_dd2'):
-                if k in params:
-                    kink[k] = params[k]
-            ia_kwargs.update({'t_kink': kink.get('t_kink', 200.0), 't_dd2': kink.get('t_dd2', t_dd)})
+        spec = IA_MODEL_SPECS[self.ia_model]
+        ia_rate_fn = spec.rate_fn
+        ia_kwargs = {'t_ia': self.ia_transition}
+        for p in spec.params:
+            if p.sample in params:
+                value = params[p.sample]
+            elif p.sample in self.fixed_overrides:
+                value = self.fixed_overrides[p.sample]
+            else:
+                value = p.default
+            ia_kwargs[p.kwarg] = (10.0 ** value) if p.log else value
+        ia_breakpoints = [ia_kwargs.get('t_ia', self.ia_transition)]
+        if 't_kink' in ia_kwargs:
             ia_breakpoints.append(ia_kwargs['t_kink'])
         return ia_rate_fn, ia_kwargs, ia_breakpoints
 
@@ -1243,6 +1496,9 @@ def animate_mcmc_walkers(
     matplotlib.use('Agg')
     from matplotlib import pyplot as plt
 
+    # render the movie in a serif typeface (text and math)
+    plt.rcParams.update({'font.family': 'serif', 'mathtext.fontset': 'dejavuserif'})
+
     chain = np.asarray(chain)
     n_step, n_walker, ndim = chain.shape
     if labels is None:
@@ -1290,30 +1546,52 @@ def animate_mcmc_walkers(
         if truths is not None:
             rate_true = model.ia_rate(rate_ages, truths)
 
-    # ---- figure layout: [ traces | corner | right(abundance + rate) ] --------------------------
-    right_rows = int(show_ab) + int(show_rate)
-    n_block = 3 if right_rows else 2
-    width_ratios = [1.0, 0.95 * ndim, 2.1][:n_block]
-    fig_w = 3.6 + 2.0 * ndim + (6.2 if right_rows else 0)
-    fig_h = max(5.6, 1.7 * ndim)
-    fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
-    outer = fig.add_gridspec(1, n_block, width_ratios=width_ratios, wspace=0.30)
-
-    gs_tr = outer[0].subgridspec(ndim, 1, hspace=0.16)
-    ax_tr = [fig.add_subplot(gs_tr[k]) for k in range(ndim)]
-
-    gs_co = outer[1].subgridspec(ndim, ndim, hspace=0.10, wspace=0.10)
-    ax_co = [[fig.add_subplot(gs_co[i, j]) if i >= j else None for j in range(ndim)]
-             for i in range(ndim)]
-
+    # ---- figure layout ------------------------------------------------------------------------
+    # Science panels anchor the corners: the [X/Fe]-[Fe/H] plane is top-left, the corner plot is
+    # rightmost, and the Ia rate model is bottom-right.  Walker traces tuck into the bottom-left.
+    #
+    #     [ abundance (top-left) | corner (top-right, rightmost) ]
+    #     [ traces (bottom-left) | rate  (bottom-right)          ]
+    #
+    # When a science panel is absent, the corner grows to span the missing row.
     ax_ab = ax_rate = None
-    if right_rows:
-        gs_r = outer[2].subgridspec(right_rows, 1, hspace=0.34)
-        ridx = 0
+    if show_ab or show_rate:
+        left_w = 2.6
+        right_w = max(3.2, 1.15 * ndim)
+        fig_w = left_w + right_w + 3.0
+        fig_h = max(7.5, 1.5 * ndim + 3.0)
+        fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
+        outer = fig.add_gridspec(
+            2, 2, width_ratios=[left_w, right_w], height_ratios=[1.0, 0.85],
+            wspace=0.28, hspace=0.30,
+        )
+        # left column: abundance on top (if any), traces below
         if show_ab:
-            ax_ab = fig.add_subplot(gs_r[ridx]); ridx += 1
+            ax_ab = fig.add_subplot(outer[0, 0])
+            traces_cell = outer[1, 0]
+        else:
+            traces_cell = outer[:, 0]
+        gs_tr = traces_cell.subgridspec(ndim, 1, hspace=0.16)
+        ax_tr = [fig.add_subplot(gs_tr[k]) for k in range(ndim)]
+        # right column: corner on top (rightmost), rate below (bottom-right)
+        corner_cell = outer[0, 1] if show_rate else outer[:, 1]
+        gs_co = corner_cell.subgridspec(ndim, ndim, hspace=0.10, wspace=0.10)
+        ax_co = [[fig.add_subplot(gs_co[i, j]) if i >= j else None for j in range(ndim)]
+                 for i in range(ndim)]
         if show_rate:
-            ax_rate = fig.add_subplot(gs_r[ridx]); ridx += 1
+            ax_rate = fig.add_subplot(outer[1, 1])
+    else:
+        # no science panels: simple [ traces | corner ]
+        width_ratios = [1.0, 0.95 * ndim]
+        fig_w = 3.6 + 2.0 * ndim
+        fig_h = max(5.6, 1.7 * ndim)
+        fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
+        outer = fig.add_gridspec(1, 2, width_ratios=width_ratios, wspace=0.30)
+        gs_tr = outer[0].subgridspec(ndim, 1, hspace=0.16)
+        ax_tr = [fig.add_subplot(gs_tr[k]) for k in range(ndim)]
+        gs_co = outer[1].subgridspec(ndim, ndim, hspace=0.10, wspace=0.10)
+        ax_co = [[fig.add_subplot(gs_co[i, j]) if i >= j else None for j in range(ndim)]
+                 for i in range(ndim)]
 
     frames = list(range(1, n_step + 1, stride))
     if frames[-1] != n_step:
@@ -1452,6 +1730,9 @@ def animate_mcmc_walkers(
 
             fig.canvas.draw()
             frame = np.asarray(fig.canvas.buffer_rgba())[..., :3]
+            # libx264 (yuv420p) requires even frame dimensions; trim a stray odd row/column
+            h, w = frame.shape[:2]
+            frame = frame[:h - (h % 2), :w - (w % 2)]
             writer.append_data(frame)
     finally:
         writer.close()
