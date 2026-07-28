@@ -49,6 +49,9 @@ from scipy.special import erf
 from . import gizmo_agetracer
 from . import gizmo_model
 
+# numpy>=2 renamed trapz -> trapezoid
+_trapz = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
+
 
 # default "true"/fiducial Maoz parameters (from gizmo_agetracer)
 NIA_DEFAULT = gizmo_agetracer.NIA_DEFAULT  # 2.6e-7
@@ -689,6 +692,9 @@ class MaozElementTracerModel:
         kink_params=None,
         fixed_params=None,
         sampled_params=None,
+        conserve_events=None,
+        t_hubble=13700.0,
+        abundance_offset=None,
     ):
         '''
         Parameters
@@ -725,6 +731,23 @@ class MaozElementTracerModel:
             names of the parameters the MCMC varies, in the order they appear in theta.
             Defaults to the model's default_sampled in IA_MODEL_SPECS.  Any DTD family and
             parameter subset registered there is supported (see model_prior).
+        conserve_events : float or None
+            if set, the Ia normalization n_ia is NOT taken from the parameters but is DERIVED at
+            every evaluation so that the total number of Ia events -- i.e. the delay-time
+            distribution integrated over [t_ia, t_hubble] -- always equals this value.  This makes
+            a change of DTD *shape* (e.g. the slope t_dd or the onset t_ia) a genuine
+            redistribution of a FIXED number of explosions in time, matching the simulation's
+            ground truth that a definite number of Ia events actually occur.  Only meaningful for
+            DTD families in which n_ia is a pure multiplicative normalization (maoz, exponential,
+            skewnorm, kink); with it set, 'log10_n_ia' should be left OUT of sampled_params.
+            Use dtd_event_count() to compute a fiducial value to conserve.
+        t_hubble : float
+            upper age limit [Myr] for the event-conservation integral (default 13700).
+        abundance_offset : (float, float) or None
+            optional constant (d[Fe/H], d[X/Fe]) added to the model abundances -- a calibration
+            offset to put the simulation on the same abundance zero-point as an external data set
+            (e.g. APOGEE), so that a shape comparison is not dominated by an absolute-scale
+            mismatch.  Applied in abundances(); does not affect the yields or event conservation.
         '''
         self.age_bins = np.asarray(age_bins, dtype=float)
         self.weights = np.asarray(weights, dtype=float)
@@ -737,6 +760,11 @@ class MaozElementTracerModel:
         self.model = model
         self.fast = fast
         self.ia_model = ia_model
+        self.conserve_events = conserve_events
+        self.t_hubble = float(t_hubble)
+        self.abundance_offset = (
+            np.asarray(abundance_offset, dtype=float) if abundance_offset is not None else None
+        )
         self.kink_params = dict(kink_params or {})
         # generic fixed-parameter overrides (in sampling space); kink_params folded in for compat
         self.fixed_overrides = dict(fixed_params or {})
@@ -807,10 +835,39 @@ class MaozElementTracerModel:
             else:
                 value = p.default
             ia_kwargs[p.kwarg] = (10.0 ** value) if p.log else value
+        if self.conserve_events is not None:
+            # derive n_ia so the DTD integrated over [t_ia, t_hubble] equals the fixed event total
+            ia_kwargs['n_ia'] = self.conserve_events / self._event_integral_per_norm(
+                ia_rate_fn, ia_kwargs
+            )
         ia_breakpoints = [ia_kwargs.get('t_ia', self.ia_transition)]
         if 't_kink' in ia_kwargs:
             ia_breakpoints.append(ia_kwargs['t_kink'])
         return ia_rate_fn, ia_kwargs, ia_breakpoints
+
+    def _event_integral_per_norm(self, ia_rate_fn, ia_kwargs, n_grid=6000):
+        '''
+        Integral of the Ia rate over [t_ia, t_hubble] evaluated at n_ia = 1 -- i.e. the total Ia
+        mass-loss (proportional to the number of events, since each ejects a fixed mass) per unit
+        normalization.  Assumes n_ia is a pure multiplicative factor of the rate.
+        '''
+        t_ia = ia_kwargs.get('t_ia', self.ia_transition)
+        grid = np.geomspace(max(t_ia, 1e-2), self.t_hubble, n_grid)
+        kwargs = dict(ia_kwargs)
+        kwargs['n_ia'] = 1.0
+        return _trapz(ia_rate_fn(grid, **kwargs), grid)
+
+    def dtd_event_count(self, theta):
+        '''
+        Total Ia events (delay-time distribution integrated over [t_ia, t_hubble], in mass-loss
+        units proportional to the number of explosions) for parameter vector theta.  Use this at
+        the fiducial parameters to get the value to pass as conserve_events, and to verify that the
+        count stays fixed as the DTD shape is varied.
+        '''
+        ia_rate_fn, ia_kwargs, _ = self._ia_kwargs_from_params(self.params_from_theta(theta))
+        t_ia = ia_kwargs.get('t_ia', self.ia_transition)
+        grid = np.geomspace(max(t_ia, 1e-2), self.t_hubble, 6000)
+        return _trapz(ia_rate_fn(grid, **ia_kwargs), grid)
 
     def yields(self, params):
         '''
@@ -872,10 +929,15 @@ class MaozElementTracerModel:
     def abundances(self, theta):
         '''
         Return ([Fe/H], [X/Fe]) arrays (one value per star) for parameter vector theta.
+        Applies the constant abundance_offset (if set) to align onto an external data zero-point.
         '''
-        return massfractions_to_abundances(
+        feh, xfe = massfractions_to_abundances(
             self.massfractions(theta), self.sun_massfraction, self.xfe
         )
+        if self.abundance_offset is not None:
+            feh = feh + self.abundance_offset[0]
+            xfe = xfe + self.abundance_offset[1]
+        return feh, xfe
 
     def mean_abundances(self, theta):
         '''Return the population-mean (<[Fe/H]>, <[X/Fe]>) for parameter vector theta.'''
@@ -1142,6 +1204,77 @@ MW_TARGET_SUMMARY = make_bimodal_summary(
 
 # default 1-sigma uncertainties on each summary statistic (same order as the vector)
 DEFAULT_SUMMARY_SIGMA = np.array([0.05, 0.04, 0.03, 0.03, 0.02, 0.04, 0.03, 0.03, 0.02])
+
+
+# default APOGEE quality cuts for a clean giant-disk [Mg/Fe]-[Fe/H] sample
+APOGEE_DEFAULT_CUTS = {
+    'logg': (0.5, 3.5),      # giants
+    'teff': (3500.0, 5500.0),
+    'feh': (-1.2, 0.5),      # disk (drop the metal-poor halo tail)
+    'mgfe': (-0.2, 0.6),
+}
+
+
+def load_apogee_disk(
+    path, feh_col='FE_H', mgfe_col='MG_FE', teff_col='TEFF', logg_col='LOGG', cuts=None
+):
+    '''
+    Load a real APOGEE per-star catalog (CSV with a header row) and return a clean giant-disk
+    sample in the [Fe/H]-[Mg/Fe] plane.
+
+    Applies quality cuts (surface gravity, effective temperature, and abundance ranges; see
+    APOGEE_DEFAULT_CUTS) that select field disk giants and remove the metal-poor halo tail, so the
+    surviving sample shows the canonical high-alpha / low-alpha disk bimodality.
+
+    Parameters
+    ----------
+    path : str
+        path to the APOGEE CSV
+    feh_col, mgfe_col, teff_col, logg_col : str
+        column names for [Fe/H], [Mg/Fe], Teff, and log g
+    cuts : dict or None
+        override APOGEE_DEFAULT_CUTS; keys 'logg', 'teff', 'feh', 'mgfe' map to (min, max)
+
+    Returns
+    -------
+    feh, mgfe : 1-D arrays
+        [Fe/H] and [Mg/Fe] for the surviving stars
+    info : dict
+        'n_total', 'n_kept', and the applied 'cuts'
+    '''
+    cuts = dict(APOGEE_DEFAULT_CUTS if cuts is None else cuts)
+    data = np.genfromtxt(path, delimiter=',', names=True)
+    feh = np.asarray(data[feh_col], dtype=float)
+    mgfe = np.asarray(data[mgfe_col], dtype=float)
+    teff = np.asarray(data[teff_col], dtype=float)
+    logg = np.asarray(data[logg_col], dtype=float)
+    keep = (
+        np.isfinite(feh) & np.isfinite(mgfe) & np.isfinite(teff) & np.isfinite(logg)
+        & (logg > cuts['logg'][0]) & (logg < cuts['logg'][1])
+        & (teff > cuts['teff'][0]) & (teff < cuts['teff'][1])
+        & (feh > cuts['feh'][0]) & (feh < cuts['feh'][1])
+        & (mgfe > cuts['mgfe'][0]) & (mgfe < cuts['mgfe'][1])
+    )
+    info = {'n_total': int(feh.size), 'n_kept': int(keep.sum()), 'cuts': cuts}
+    return feh[keep], mgfe[keep], info
+
+
+def apogee_target_summary(path, **kwargs):
+    '''
+    Build a dual-Gaussian MW target summary (same structure as make_bimodal_summary) by fitting the
+    two disk sequences of a real APOGEE giant-disk sample loaded via load_apogee_disk.
+
+    Returns
+    -------
+    summary : dict
+        dual-Gaussian summary (component 0 = high-alpha, 1 = low-alpha)
+    feh, mgfe : 1-D arrays
+        the clean APOGEE [Fe/H] and [Mg/Fe] used
+    info : dict
+        selection info from load_apogee_disk
+    '''
+    feh, mgfe, info = load_apogee_disk(path, **kwargs)
+    return fit_bimodal_gaussians(feh, mgfe), feh, mgfe, info
 
 
 def summary_log_likelihood(theta, model, target_vector, sigma_vector, gmm_kwargs=None):
@@ -1664,6 +1797,10 @@ def animate_mcmc_walkers(
                 ax_ab.clear()
                 feh_m, xfe_m = model.abundances(median)
                 if summary_mode:
+                    # faint real data cloud behind the target ellipses, if provided
+                    if data is not None and 'feh' in data and 'xfe' in data:
+                        ax_ab.scatter(data['feh'], data['xfe'], s=4, color='0.82', alpha=0.30,
+                                      zorder=0, label='data')
                     _draw_dual_gaussian(ax_ab, target_summary, n_sigma=2,
                                         colors=('firebrick', 'steelblue'), ls='--', lw=2.2,
                                         label='MW target (2$\\sigma$)')
