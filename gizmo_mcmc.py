@@ -1126,24 +1126,25 @@ def fit_bimodal_gaussians(feh, xfe, n_iter=40, reg=1e-4):
     var = np.tile(X.var(axis=0) + reg, (2, 1))
     w = np.array([hi.mean(), 1.0 - hi.mean()])
 
+    # fully vectorized over the 2 components (no per-component Python loop): this EM is called once
+    # per MCMC likelihood evaluation, so it is the dominant per-step cost.  Shapes: X (n, 2),
+    # mu/var (2, 2), the (n, 2, 2) broadcast d is only ~n*4 floats.
+    Xk = X[:, None, :]  # (n, 1, 2)
     for _ in range(n_iter):
         # E-step (diagonal Gaussians), in log space for stability
-        logp = np.empty((n, 2))
-        for k in range(2):
-            d = X - mu[k]
-            logp[:, k] = np.log(w[k] + 1e-300) - 0.5 * np.sum(
-                d * d / var[k] + np.log(2 * np.pi * var[k]), axis=1
-            )
+        d = Xk - mu[None, :, :]  # (n, 2, 2)
+        logp = np.log(w + 1e-300)[None, :] - 0.5 * np.sum(
+            d * d / var[None, :, :] + np.log(2 * np.pi * var[None, :, :]), axis=2
+        )  # (n, 2)
         logp -= logp.max(axis=1, keepdims=True)
         r = np.exp(logp)
         r /= r.sum(axis=1, keepdims=True)
         # M-step
-        Nk = r.sum(axis=0) + 1e-12
+        Nk = r.sum(axis=0) + 1e-12  # (2,)
         w = Nk / n
-        for k in range(2):
-            mu[k] = (r[:, k:k + 1] * X).sum(axis=0) / Nk[k]
-            d = X - mu[k]
-            var[k] = (r[:, k:k + 1] * d * d).sum(axis=0) / Nk[k] + reg
+        mu = np.einsum('nk,nd->kd', r, X) / Nk[:, None]  # (2, 2)
+        d = Xk - mu[None, :, :]
+        var = np.einsum('nk,nkd->kd', r, d * d) / Nk[:, None] + reg
 
     # order component 0 = high-alpha (larger mean [X/Fe])
     order = np.argsort(-mu[:, 1])

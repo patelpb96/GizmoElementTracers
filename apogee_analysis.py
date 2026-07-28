@@ -31,6 +31,28 @@ gizmo_mcmc = __import__('{}.gizmo_mcmc'.format(_PACKAGE_NAME), fromlist=['gizmo_
 APOGEE_CSV = os.path.join(_REPO_DIR, 'data', 'apogee_dr17_stellar_labels.csv')
 
 
+def fit_1d_two_gaussian_means(x, n_iter=200, reg=1e-4):
+    '''
+    Fit a 1-D two-component Gaussian mixture to x with a short EM and return the two component
+    means, sorted (low, high).  Used to place the vertical markers on the actual peaks of the
+    [Mg/Fe] slice histogram (which differ from the full 2-D GMM means).
+    '''
+    x = np.asarray(x, dtype=float)
+    lo, hi = np.percentile(x, 25), np.percentile(x, 75)
+    mu = np.array([lo, hi])
+    var = np.array([x.var(), x.var()]) + reg
+    w = np.array([0.5, 0.5])
+    for _ in range(n_iter):
+        r = w[None, :] * np.exp(-0.5 * (x[:, None] - mu[None, :]) ** 2 / var[None, :]) \
+            / np.sqrt(2 * np.pi * var[None, :])
+        r /= r.sum(axis=1, keepdims=True) + 1e-300
+        nk = r.sum(axis=0) + 1e-12
+        w = nk / x.size
+        mu = (r * x[:, None]).sum(axis=0) / nk
+        var = (r * (x[:, None] - mu[None, :]) ** 2).sum(axis=0) / nk + reg
+    return tuple(np.sort(mu))
+
+
 def main():
     print('reading APOGEE DR17 sample: {}'.format(APOGEE_CSV))
     feh, mgfe, info = gizmo_mcmc.load_apogee_disk(APOGEE_CSV)
@@ -82,12 +104,13 @@ def main():
     ax0.legend(frameon=False, fontsize=9, loc='upper right')
     ax0.grid(ls='-.', alpha=0.3)
 
-    # right: [Mg/Fe] histogram in the mid-metallicity slice (the bimodality)
+    # right: [Mg/Fe] histogram in the mid-metallicity slice (the bimodality).
+    # Mark the two peaks of THIS 1-D slice (fit a 1-D two-Gaussian to it) rather than the 2-D GMM
+    # means, so the lines sit on the histogram peaks.
+    peak_lo, peak_hi = fit_1d_two_gaussian_means(mgfe[sl])
     ax1.hist(mgfe[sl], bins=np.linspace(-0.1, 0.45, 26), color='0.6', edgecolor='0.3')
-    for k, c in [(0, 'firebrick'), (1, 'steelblue')]:
-        ax1.axvline(summary['mean_xfe'][k], color=c, lw=2.0,
-                    label='{}: {:+.2f}'.format(['high-alpha', 'low-alpha'][k],
-                                               summary['mean_xfe'][k]))
+    for peak, c, tag in [(peak_hi, 'firebrick', 'high-alpha'), (peak_lo, 'steelblue', 'low-alpha')]:
+        ax1.axvline(peak, color=c, lw=2.0, label='{}: {:+.2f}'.format(tag, peak))
     ax1.set_xlabel('[Mg/Fe]')
     ax1.set_ylabel('stars')
     ax1.set_title(r'[Mg/Fe] for $-0.6<$[Fe/H]$<-0.3$ (bimodal)')

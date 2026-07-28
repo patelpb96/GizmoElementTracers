@@ -64,14 +64,18 @@ def _print_summary_match(target_vec, sim_vec, sigma_vec):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--n-star', type=int, default=1500)
+    parser.add_argument('--n-star', type=int, default=1200)
     parser.add_argument('--high-alpha-frac', type=float, default=0.4)
     parser.add_argument('--n-age-bin', type=int, default=10)
-    parser.add_argument('--n-walker', type=int, default=24)
-    parser.add_argument('--n-step', type=int, default=140)
-    parser.add_argument('--n-burn', type=int, default=50)
+    parser.add_argument('--n-walker', type=int, default=48)
+    parser.add_argument('--gmm-iter', type=int, default=20,
+                        help='EM iterations for the per-step dual-Gaussian summary (converged by ~20)')
+    parser.add_argument('--n-step', type=int, default=3000)
+    parser.add_argument('--n-burn', type=int, default=1000)
     parser.add_argument('--fps', type=int, default=30)
-    parser.add_argument('--stride', type=int, default=1)
+    # animate a subset of steps so the movie is a sensible length: n_step/stride frames / fps
+    # seconds (default 3000/10 = 300 frames = 10 s at 30 fps)
+    parser.add_argument('--stride', type=int, default=10)
     parser.add_argument('--dpi', type=int, default=110)
     parser.add_argument('--seed', type=int, default=7)
     parser.add_argument('--outdir', default=os.getcwd())
@@ -134,7 +138,7 @@ def main():
         n_walker=args.n_walker, n_step=args.n_step, n_burn=args.n_burn, seed=args.seed,
         init_dist='uniform', init_scale=0.15, progress=args.progress,
         log_prob_fn=gizmo_mcmc.summary_log_probability,
-        log_prob_args=(model, target_vec, sigma_vec, bounds, None),
+        log_prob_args=(model, target_vec, sigma_vec, bounds, {'n_iter': args.gmm_iter}),
     )
     print('mean acceptance fraction: {:.2f}'.format(np.mean(sampler.acceptance_fraction)))
     print('\nbest-fit DTD shape (median, 16-84th percentile):')
@@ -194,11 +198,13 @@ def main():
     if not args.no_movie:
         chain = sampler.get_chain()
         movie_path = os.path.join(args.outdir, 'apogee_maoz_conserved_walkers.mp4')
-        print('rendering movie ({} frames @ {} fps)...'.format(chain.shape[0], args.fps))
+        n_frames = len(range(1, chain.shape[0] + 1, args.stride))
+        print('rendering movie ({} of {} steps @ stride {} -> {:.0f} s at {} fps)...'.format(
+            n_frames, chain.shape[0], args.stride, n_frames / args.fps, args.fps))
         try:
             gizmo_mcmc.animate_mcmc_walkers(
                 chain, movie_path, truths=list(fid_shape), labels=param_labels, bounds=bounds,
-                fps=args.fps, burn=0, stride=args.stride, dpi=args.dpi, model=model,
+                fps=args.fps, burn=args.n_burn, stride=args.stride, dpi=args.dpi, model=model,
                 data={'feh': feh_apo, 'xfe': mgfe_apo}, target_summary=target,
                 abundance_lims=ab_lims, rate_fiducial_theta=list(fid_shape),
                 rate_ylim=(1e-12, 1e-3),
