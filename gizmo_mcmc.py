@@ -930,13 +930,19 @@ class MaozElementTracerModel:
         '''
         Return ([Fe/H], [X/Fe]) arrays (one value per star) for parameter vector theta.
         Applies the constant abundance_offset (if set) to align onto an external data zero-point.
+        The offset can instead be SAMPLED as a calibration nuisance parameter by including
+        'd_feh' and/or 'd_xfe' in sampled_params; a sampled value overrides abundance_offset.
         '''
         feh, xfe = massfractions_to_abundances(
             self.massfractions(theta), self.sun_massfraction, self.xfe
         )
-        if self.abundance_offset is not None:
-            feh = feh + self.abundance_offset[0]
-            xfe = xfe + self.abundance_offset[1]
+        params = self.params_from_theta(theta)
+        base = self.abundance_offset if self.abundance_offset is not None else (0.0, 0.0)
+        d_feh = params.get('d_feh', base[0])
+        d_xfe = params.get('d_xfe', base[1])
+        if d_feh or d_xfe:
+            feh = feh + d_feh
+            xfe = xfe + d_xfe
         return feh, xfe
 
     def mean_abundances(self, theta):
@@ -1437,6 +1443,15 @@ def summarize_chain(flat_chain, truths=None, labels=('log10 n_ia', 't_dd')):
     return summary
 
 
+def _element_label(element):
+    '''Axis-label symbol for an [X/Fe] numerator: 'alpha' stays as-is, element names -> symbols.'''
+    if element == 'alpha':
+        return 'alpha'
+    symbols = {'oxygen': 'O', 'magnesium': 'Mg', 'silicon': 'Si', 'calcium': 'Ca', 'sulfur': 'S',
+               'neon': 'Ne', 'carbon': 'C', 'nitrogen': 'N', 'iron': 'Fe'}
+    return symbols.get(element, element.capitalize())
+
+
 # --------------------------------------------------------------------------------------------------
 # Plotting helpers (matplotlib optional)
 # --------------------------------------------------------------------------------------------------
@@ -1453,7 +1468,7 @@ def plot_data_and_model(model, data, theta, path=None, xfe_label=None):
 
     feh_model, xfe_model = model.abundances(theta)
     if xfe_label is None:
-        xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
+        xfe_label = _element_label(model.xfe)
 
     fig, ax = plt.subplots(figsize=(7, 5.5))
     ax.scatter(data['feh'], data['xfe'], s=10, alpha=0.4, color='0.5', label='mock data')
@@ -1566,6 +1581,8 @@ def animate_mcmc_walkers(
     rate_fiducial_theta=None,
     rate_ages=None,
     rate_ylim=(1e-12, 1e-3),
+    frame_steps=None,
+    truth_label='truth',
 ):
     '''
     Render an mp4 movie of the MCMC walkers evolving (post-processing), for a model with
@@ -1599,6 +1616,12 @@ def animate_mcmc_walkers(
     bounds : array (ndim, 2) or None
         axis limits per parameter; defaults to the chain range (padded)
     fps, burn, stride, dpi : movie/rendering controls (see run_mcmc / earlier docs)
+    truth_label : str
+        legend label for the `truths` curve in the Ia-rate panel (e.g. 'reference' when fitting
+        real data, where there is no ground truth)
+    frame_steps : sequence of int or None
+        explicit chain steps (1..n_step) to render as frames, overriding `stride`; e.g.
+        log-spaced steps to linger on early convergence and skim the long equilibrated tail
     model : MaozElementTracerModel or None
         if given, add the evolving abundance panel and Ia-rate panel
     data : dict or None
@@ -1654,7 +1677,7 @@ def animate_mcmc_walkers(
     summary_mode = model is not None and target_summary is not None
     show_rate = model is not None and hasattr(model, 'ia_rate')
     if show_ab:
-        xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
+        xfe_label = _element_label(model.xfe)
         has_label = data is not None and 'label' in data
         if has_label:
             hi_mask = data['label'] == 1
@@ -1727,7 +1750,10 @@ def animate_mcmc_walkers(
         ax_co = [[fig.add_subplot(gs_co[i, j]) if i >= j else None for j in range(ndim)]
                  for i in range(ndim)]
 
-    frames = list(range(1, n_step + 1, stride))
+    if frame_steps is not None:
+        frames = sorted({int(min(max(f, 1), n_step)) for f in frame_steps})
+    else:
+        frames = list(range(1, n_step + 1, stride))
     if frames[-1] != n_step:
         frames.append(n_step)
     x_all = np.arange(n_step)
@@ -1811,8 +1837,9 @@ def animate_mcmc_walkers(
                         ax_ab.scatter(feh_m[~hi_mask], xfe_m[~hi_mask], s=7,
                                       color='lightskyblue', alpha=0.35)
                     else:
-                        ax_ab.scatter(feh_m, xfe_m, s=7, color='0.6', alpha=0.35)
-                    ax_ab.scatter([], [], s=20, color='0.55', label='simulation')
+                        ax_ab.scatter(feh_m, xfe_m, s=7, color='darkorange', alpha=0.35)
+                    ax_ab.scatter([], [], s=20, color='0.55' if has_label else 'darkorange',
+                                  label='simulation')
                     sim_summary = fit_bimodal_gaussians(feh_m, xfe_m)
                     _draw_dual_gaussian(ax_ab, sim_summary, n_sigma=2,
                                         colors=('darkred', 'navy'), ls='-', lw=1.8,
@@ -1852,7 +1879,7 @@ def animate_mcmc_walkers(
                                    label='fiducial')
                 if rate_true is not None:
                     ax_rate.loglog(rate_ages, np.maximum(rate_true, 1e-30), 'k--', lw=1.4,
-                                   label='truth')
+                                   label=truth_label)
                 cur_rate = model.ia_rate(rate_ages, median)
                 ax_rate.loglog(rate_ages, np.maximum(cur_rate, 1e-30), color='crimson', lw=2.2,
                                label='current median')
