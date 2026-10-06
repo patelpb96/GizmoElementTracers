@@ -24,6 +24,9 @@ model and fast yield integrator), grounded in the DTD literature:
     M9 peak_growth     skewed Gaussian peak, then a slowly exponentially      [5 params]
                        growing tail once the peak is over (amplitude, width,
                        skew and growth exponent fitted; location fixed)
+    M10 mannucci_prompt  Mannucci et al. (2006) constant tardy rate + prompt   [4 params]
+                       Gaussian, free prompt amplitude / center / width
+                       (fiducial = the FIRE-2 Mannucci rate)
 
 Run (all models):
     python mcmc_mw_model_suite_demo.py
@@ -68,6 +71,7 @@ SUITE = [
     ('exponential', 'M7 exponential'),
     ('kink_prompt', 'M8 kitchen sink'),
     ('peak_growth', 'M9 skewed peak + exponential growth'),
+    ('mannucci_prompt', 'M10 Mannucci prompt + tardy'),
 ]
 
 

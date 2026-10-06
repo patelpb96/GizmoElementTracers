@@ -39,6 +39,9 @@ The families (registry keys in gizmo_mcmc.IA_MODEL_SPECS; shape parameters sampl
     peak_growth     NEW: skewed Gaussian peak, then a slowly    (A_pk, sigma_pk, alpha_pk, k_grow)
                     exponentially growing tail once the peak
                     is over (peak location held at 100 Myr)
+    mannucci        Mannucci (FIRE-2) constant + prompt         (none: fixed shape)
+                    Gaussian at 50 Myr, exactly as in FIRE-2
+    mannucci_prompt Mannucci prompt + tardy, free shape         (A_p, t_p, sigma_p)
 
 plus the two zero-point offsets for each.
 
@@ -88,14 +91,24 @@ SUITE = [
     ('skewnorm', 'Skew-normal (Strolger 2020)'),
     ('exponential', 'Exponential'),
     ('peak_growth', 'Skewed peak + exponential growth'),
+    ('mannucci', 'Mannucci (FIRE-2, fixed shape)'),
+    ('mannucci_prompt', 'Mannucci prompt + tardy (free shape)'),
 ]
 TITLES = dict(SUITE)
 
 OFFSET_LABELS = [r'$\Delta$[Fe/H]', r'$\Delta$[Mg/Fe]']
 
 
+# families whose sampled shape differs from their registry default.  The FIRE-2 Mannucci rate has
+# a fixed shape (its registry 't_dd' slot is unused by the rate), so once the event count is fixed
+# only the zero-point offsets are fitted -- a test of that exact DTD.
+SHAPE_OVERRIDES = {'mannucci': []}
+
+
 def shape_params(key):
     '''A family's sampled shape parameters: its defaults, minus n_ia (fixed by event conservation).'''
+    if key in SHAPE_OVERRIDES:
+        return list(SHAPE_OVERRIDES[key])
     return [p for p in gizmo_mcmc.IA_MODEL_SPECS[key].default_sampled if p != 'log10_n_ia']
 
 
@@ -220,6 +233,15 @@ def run_model(key, ctx, args):
         bump = [float(v) for v in np.percentile(shares, [16, 50, 84])]
         print('share of the events in the bump/peak: {:.1%} (16-84%: {:.1%} - {:.1%})'.format(
             bump[1], bump[0], bump[2]))
+    elif key == 'mannucci':
+        # fixed FIRE-2 shape: its prompt share is fixed too -- read it off the free-shape Mannucci
+        # family at its fiducial, which is identical to the FIRE-2 rate
+        mp_shapes, _, _, mp_fid = gizmo_mcmc.model_prior('mannucci_prompt',
+                                                        shape_params('mannucci_prompt'))
+        share = build_model('mannucci_prompt', mp_shapes, ctx).dtd_component_fraction(mp_fid)
+        bump = [float(share)] * 3
+        print('share of the events in the prompt component (fixed by the FIRE-2 shape): '
+              '{:.1%}'.format(share))
 
     chain = sampler.get_chain()
     convergence = []
@@ -330,7 +352,7 @@ def summarize(keys, ctx, outdir):
             if name in ('d_feh', 'd_xfe'):
                 continue
             out.append('{} = {:.3g} (+{:.2g}/-{:.2g})'.format(name, m, hi - m, m - lo))
-        return '; '.join(out)
+        return '; '.join(out) if out else 'fixed shape (only the zero-point offsets fitted)'
 
     lines = ['# APOGEE DR17 fits at fixed Ia event count', '',
              'Every family is fit to the same dual-Gaussian APOGEE target with the same conserved '

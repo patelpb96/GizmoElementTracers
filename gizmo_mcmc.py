@@ -295,10 +295,36 @@ def ia_rate_maoz(t, n_ia, t_dd, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4):
     return np.where(t >= t_ia, r, 0.0)
 
 
+# FIRE-2 Mannucci et al. (2006) Ia rate constants [per Msun per Myr]: the tardy (delayed) constant,
+# and the prompt Gaussian's height, center [Myr] and width [Myr]
+MANNUCCI_TARDY = 5.3e-8
+MANNUCCI_PROMPT = 1.6e-5
+MANNUCCI_T_PROMPT = 50.0
+MANNUCCI_SIGMA_PROMPT = 10.0
+
+
 def ia_rate_mannucci(t, n_ia=1.0, t_dd=None, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4):
     '''Mannucci (FIRE-2) Ia rate: a prompt Gaussian bump; n_ia scales it (1 = original).'''
+    return ia_rate_mannucci_prompt(
+        t, n_ia=n_ia, a_prompt=n_ia * MANNUCCI_PROMPT, t_p=MANNUCCI_T_PROMPT,
+        sigma_p=MANNUCCI_SIGMA_PROMPT, t_ia=t_ia, ejecta=ejecta,
+    )
+
+
+def ia_rate_mannucci_prompt(
+    t, n_ia=1.0, a_prompt=MANNUCCI_PROMPT, t_p=MANNUCCI_T_PROMPT, sigma_p=MANNUCCI_SIGMA_PROMPT,
+    t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4,
+):
+    '''
+    Mannucci et al. (2006) two-population Ia rate with a free shape:
+        psi = n_ia * 5.3e-8  +  a_prompt * exp(-0.5 ((t - t_p) / sigma_p)^2),   t >= t_ia,
+    a constant "tardy" component plus a "prompt" Gaussian.  With n_ia = 1 and the default prompt
+    (a_prompt = 1.6e-5, t_p = 50 Myr, sigma_p = 10 Myr) it is exactly the FIRE-2 Mannucci rate.
+    The rate is linear in both amplitudes, so under event conservation a_prompt / n_ia sets the
+    prompt component's share of the fixed events -- Mannucci's "prompt fraction" (~half of all Ia).
+    '''
     t = np.asarray(t, dtype=float)
-    r = ejecta * n_ia * (5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((t - 50.0) / 10.0) ** 2))
+    r = ejecta * (n_ia * MANNUCCI_TARDY + _gauss(t, a_prompt, t_p, sigma_p))
     return np.where(t >= t_ia, r, 0.0)
 
 
@@ -455,6 +481,7 @@ IA_RATE_MODELS = {
     'exponential': ia_rate_exponential,
     'kink_prompt': ia_rate_kink_prompt,
     'peak_growth': ia_rate_peak_growth,
+    'mannucci_prompt': ia_rate_mannucci_prompt,
 }
 
 
@@ -606,6 +633,21 @@ IA_MODEL_SPECS = {
         ],
         ['log10_n_ia', 't_dd'],
     ),
+    # M10: Mannucci et al. (2006) prompt + tardy two-population DTD with a FREE shape: the prompt
+    # Gaussian's amplitude (-> prompt share of the events), center and width.  Its fiducial is
+    # exactly the FIRE-2 'mannucci' rate above; the tardy component is a constant.
+    'mannucci_prompt': IaModelSpec(
+        ia_rate_mannucci_prompt,
+        [
+            _P('log10_n_ia', 'n_ia', 0.0, (-1.0, 1.0),  # tardy constant, in FIRE-2 units
+               r'$\log_{10} n_{\mathrm{Ia}}$', log=True),
+            _P('log10_a_prompt', 'a_prompt', float(np.log10(MANNUCCI_PROMPT)), (-7.0, -3.0),
+               r'$\log_{10} A_{\mathrm{p}}$', log=True),
+            _P('t_p', 't_p', MANNUCCI_T_PROMPT, (40.0, 150.0), r'$t_{\mathrm{p}}$'),
+            _P('sigma_p', 'sigma_p', MANNUCCI_SIGMA_PROMPT, (5.0, 40.0), r'$\sigma_{\mathrm{p}}$'),
+        ],
+        ['log10_n_ia', 'log10_a_prompt', 't_p', 'sigma_p'],
+    ),
 }
 
 
@@ -634,7 +676,7 @@ def model_prior(ia_model, sampled_params=None):
     spec = IA_MODEL_SPECS[ia_model]
     names = list(sampled_params) if sampled_params is not None else list(spec.default_sampled)
     by_name = {p.sample: p for p in spec.params}
-    bounds = np.array([by_name[n].bounds for n in names], dtype=float)
+    bounds = np.array([by_name[n].bounds for n in names], dtype=float).reshape(-1, 2)
     labels = [by_name[n].label for n in names]
     fiducial = np.array([by_name[n].default for n in names], dtype=float)
     return names, bounds, labels, fiducial
@@ -992,7 +1034,7 @@ class MaozElementTracerModel:
                 self.age_bins, element_names=self.element_names, continuous=True
             )
 
-        ia_yield_source = 'mannucci' if self.ia_model == 'mannucci' else 'ia'
+        ia_yield_source = 'mannucci' if self.ia_model.startswith('mannucci') else 'ia'
         return fast_element_yields(
             self.age_bins, self.element_names,
             ia_rate_fn=ia_rate_fn, ia_kwargs=ia_kwargs, ia_breakpoints=tuple(ia_breakpoints),
