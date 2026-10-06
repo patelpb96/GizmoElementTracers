@@ -48,6 +48,16 @@ We develop this package using python 3.9 and recommend that you use it with this
 ## mcmc_kink_demo.py
 * sample the four parameters of the kinked Ia model (log10 n_ia, t_dd, t_kink, t_dd2), recovering them from a mock bimodal data set, and render a movie whose right column shows the abundance distribution and the Ia delay-time distribution both evolving as the walkers move (run `python mcmc_kink_demo.py`)
 
+## mcmc_mw_model_suite_demo.py
+* match each delay-time-distribution (DTD) family in `gizmo_mcmc.IA_MODEL_SPECS` (power law, power law with free onset, broken power law, prompt + delayed, long-delay bump, Strolger skew-normal, exponential, kitchen sink, and the skewed peak + exponential growth model) to the illustrative MW dual-Gaussian target, with a per-family movie and a leaderboard (run `python mcmc_mw_model_suite_demo.py`)
+
+## apogee_analysis.py
+* cursory analysis of the committed APOGEE DR17 giant-disk sample (`data/apogee_dr17_stellar_labels.csv`, provenance in `data/APOGEE_PROVENANCE.md`): quality cuts, the high-alpha / low-alpha [Mg/Fe] bimodality, and the dual-Gaussian fit used as the real Milky Way target (run `python apogee_analysis.py`)
+
+## mcmc_apogee_dtd_conserved_demo.py
+* fit every DTD family to the real APOGEE DR17 target while conserving the total number of Ia events (all amplitudes are rescaled together so every DTD integrates to the same event count; a bump amplitude sets the bump's share of the events), with the sim-data zero-point sampled as a nuisance offset and the walkers started 1 sigma off the MW mean so the convergence is visible; writes per-family figures, movies and JSON results plus a suite summary (run `python mcmc_apogee_dtd_conserved_demo.py`, or `--models peak_growth`; the committed 48-walker x 3000-step results, movies and `apogee_dtd_suite_summary.md` leaderboard are in `results/apogee_dtd_conserved/`)
+* includes the new `peak_growth` DTD (`ia_rate_peak_growth`): a skewed Gaussian peak (amplitude, width and skew fitted; location held at 100 Myr) followed, once the peak has fallen to 1% of its maximum, by a slowly exponentially growing tail whose exponent `k_grow` is fitted
+
 ## gizmo_track.py
 * track star and gas particles across snapshots
 
