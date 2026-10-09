@@ -295,10 +295,36 @@ def ia_rate_maoz(t, n_ia, t_dd, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4):
     return np.where(t >= t_ia, r, 0.0)
 
 
+# FIRE-2 Mannucci et al. (2006) Ia rate constants [per Msun per Myr]: the tardy (delayed) constant,
+# and the prompt Gaussian's height, center [Myr] and width [Myr]
+MANNUCCI_TARDY = 5.3e-8
+MANNUCCI_PROMPT = 1.6e-5
+MANNUCCI_T_PROMPT = 50.0
+MANNUCCI_SIGMA_PROMPT = 10.0
+
+
 def ia_rate_mannucci(t, n_ia=1.0, t_dd=None, t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4):
     '''Mannucci (FIRE-2) Ia rate: a prompt Gaussian bump; n_ia scales it (1 = original).'''
+    return ia_rate_mannucci_prompt(
+        t, n_ia=n_ia, a_prompt=n_ia * MANNUCCI_PROMPT, t_p=MANNUCCI_T_PROMPT,
+        sigma_p=MANNUCCI_SIGMA_PROMPT, t_ia=t_ia, ejecta=ejecta,
+    )
+
+
+def ia_rate_mannucci_prompt(
+    t, n_ia=1.0, a_prompt=MANNUCCI_PROMPT, t_p=MANNUCCI_T_PROMPT, sigma_p=MANNUCCI_SIGMA_PROMPT,
+    t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4,
+):
+    '''
+    Mannucci et al. (2006) two-population Ia rate with a free shape:
+        psi = n_ia * 5.3e-8  +  a_prompt * exp(-0.5 ((t - t_p) / sigma_p)^2),   t >= t_ia,
+    a constant "tardy" component plus a "prompt" Gaussian.  With n_ia = 1 and the default prompt
+    (a_prompt = 1.6e-5, t_p = 50 Myr, sigma_p = 10 Myr) it is exactly the FIRE-2 Mannucci rate.
+    The rate is linear in both amplitudes, so under event conservation a_prompt / n_ia sets the
+    prompt component's share of the fixed events -- Mannucci's "prompt fraction" (~half of all Ia).
+    '''
     t = np.asarray(t, dtype=float)
-    r = ejecta * n_ia * (5.3e-8 + 1.6e-5 * np.exp(-0.5 * ((t - 50.0) / 10.0) ** 2))
+    r = ejecta * (n_ia * MANNUCCI_TARDY + _gauss(t, a_prompt, t_p, sigma_p))
     return np.where(t >= t_ia, r, 0.0)
 
 
@@ -391,6 +417,59 @@ def ia_rate_kink_prompt(
     return np.where(t >= t_ia, r, 0.0)
 
 
+# the skewed peak counts as over once it has fallen to this fraction of its maximum (past the max);
+# for zero skew that is t_peak + 3.03 sigma_peak
+PEAK_TAIL_FRACTION = 0.01
+_PEAK_U = np.linspace(-8.0, 8.0, 8001)
+
+
+def _skew_peak_shape(u, skew):
+    return np.exp(-0.5 * u * u) * (1.0 + erf(skew * u / np.sqrt(2.0)))
+
+
+def peak_tail_end(t_peak, sigma_peak, skew=0.0, frac=PEAK_TAIL_FRACTION):
+    '''
+    Age [Myr] at which the skewed Gaussian peak of ia_rate_peak_growth has reached its tail: the first
+    age past the peak's maximum where it has fallen to `frac` (1%) of that maximum.  Found on a fine
+    grid in u = (t - t_peak) / sigma_peak, so it follows the real skewed shape -- an early-leaning
+    (negative-skew) peak dies away sooner than a Gaussian -- and the growing tail picks up where the
+    peak actually ends, with no gap.  For zero skew this is t_peak + 3.03 sigma_peak.
+    '''
+    shape = _skew_peak_shape(_PEAK_U, skew)
+    imax = int(np.argmax(shape))
+    below = np.nonzero(shape[imax:] <= frac * shape[imax])[0]
+    u_end = _PEAK_U[imax + below[0]] if below.size else _PEAK_U[-1]
+    return t_peak + sigma_peak * u_end
+
+
+def ia_rate_peak_growth(
+    t, n_ia, a_peak, sigma_peak, skew, k_grow, t_peak=100.0,
+    t_ia=IA_TRANSITION_DEFAULT, ejecta=1.4,
+):
+    '''
+    Skewed Gaussian peak followed by a slowly, exponentially GROWING tail:
+
+        peak(t) = a_peak * exp(-u^2 / 2) * (1 + erf(skew * u / sqrt(2))),   u = (t - t_peak)/sigma_peak
+        tail(t) = n_ia * exp(k_grow * (t - t_tail) / Gyr)   for t >= t_tail,  0 before
+        t_tail  = where the peak, past its maximum, has fallen to 1% of that maximum
+                  (= t_peak + 3.03 sigma_peak for zero skew; see peak_tail_end)
+
+    and psi = peak + tail for t >= t_ia.  The peak is a skew-normal shape (a_peak is its height for
+    zero skew; skew > 0 leans it toward longer delays, skew < 0 toward shorter ones).  Once the peak
+    has died away the rate switches to a floor n_ia that grows slowly with delay at rate k_grow
+    [Gyr^-1] (k_grow = 0.1 -> x3.9 over a Hubble time).  The rate is linear in the two amplitudes,
+    so under event conservation a_peak / n_ia sets the share of the fixed events in the peak.
+    '''
+    t = np.asarray(t, dtype=float)
+    sigma_peak = max(float(sigma_peak), 1e-6)
+    u = (t - t_peak) / sigma_peak
+    peak = a_peak * _skew_peak_shape(u, skew)
+    t_tail = peak_tail_end(t_peak, sigma_peak, skew)
+    tail = np.where(t >= t_tail, n_ia * np.exp(k_grow * (t - t_tail) / 1e3), 0.0)
+    r = ejecta * (peak + tail)
+    return np.where(t >= t_ia, r, 0.0)
+
+
 IA_RATE_MODELS = {
     'maoz': ia_rate_maoz,
     'mannucci': ia_rate_mannucci,
@@ -401,6 +480,8 @@ IA_RATE_MODELS = {
     'skewnorm': ia_rate_skewnorm,
     'exponential': ia_rate_exponential,
     'kink_prompt': ia_rate_kink_prompt,
+    'peak_growth': ia_rate_peak_growth,
+    'mannucci_prompt': ia_rate_mannucci_prompt,
 }
 
 
@@ -420,12 +501,17 @@ IA_RATE_MODELS = {
 # Hubble-time-integrated N_Ia/M* (log10 n_ia in [-7.5, -6.0], fiducial log10(2.6e-7)).
 # --------------------------------------------------------------------------------------------------
 
-# one free (or fixable) parameter of a DTD model
-ParamSpec = namedtuple('ParamSpec', ['sample', 'kwarg', 'default', 'bounds', 'label', 'log'])
+# one free (or fixable) parameter of a DTD model.  `amplitude` marks a normalization the rate is
+# linear in (n_ia and any added-bump heights); event conservation rescales all of them together.
+ParamSpec = namedtuple(
+    'ParamSpec', ['sample', 'kwarg', 'default', 'bounds', 'label', 'log', 'amplitude']
+)
 
 
-def _P(sample, kwarg, default, bounds, label, log=False):
-    return ParamSpec(sample, kwarg, default, tuple(bounds), label, log)
+def _P(sample, kwarg, default, bounds, label, log=False, amplitude=None):
+    # every log-sampled parameter in the registry is an amplitude unless stated otherwise
+    amplitude = log if amplitude is None else amplitude
+    return ParamSpec(sample, kwarg, default, tuple(bounds), label, log, amplitude)
 
 
 # reusable parameter specs shared across models
@@ -437,8 +523,16 @@ _TKINK = _P('t_kink', 't_kink', 200.0, (60.0, 3000.0), r'$t_{\mathrm{kink}}$')
 _TDD2 = _P('t_dd2', 't_dd2', TDD_DEFAULT, (-2.6, -0.2), r'$t_{\mathrm{dd2}}$')
 
 
-# spec: rate_fn, ordered full parameter list, and the default subset the MCMC samples
-IaModelSpec = namedtuple('IaModelSpec', ['rate_fn', 'params', 'default_sampled'])
+# spec: rate_fn, ordered full parameter list, the default subset the MCMC samples, and an optional
+# breakpoints(ia_kwargs) -> list of ages [Myr] where the rate jumps or kinks (beyond the onset t_ia),
+# so the fast integrator places nodes exactly there
+IaModelSpec = namedtuple(
+    'IaModelSpec', ['rate_fn', 'params', 'default_sampled', 'breakpoints'], defaults=(None,)
+)
+
+
+def _kink_breakpoints(kw):
+    return [kw['t_kink']]
 
 IA_MODEL_SPECS = {
     # M1: canonical ~t^-1 power law (the fiducial Maoz DTD)
@@ -451,13 +545,14 @@ IA_MODEL_SPECS = {
     'kink': IaModelSpec(
         ia_rate_kink, [_LOG10_NIA, _TDD, _TKINK, _TDD2],
         ['log10_n_ia', 't_dd', 't_kink', 't_dd2'],
+        _kink_breakpoints,
     ),
     # M4: prompt + delayed (power law + prompt Gaussian; measures the prompt fraction)
     'prompt_delayed': IaModelSpec(
         ia_rate_powerlaw_gauss,
         [
             _LOG10_NIA, _TDD,
-            _P('log10_a_prompt', 'a_gauss', -7.0, (-9.0, -5.0),
+            _P('log10_a_prompt', 'a_gauss', -7.0, (-9.0, -4.0),
                r'$\log_{10} A_{\mathrm{p}}$', log=True),
             _P('t_p', 't_gauss', 60.0, (40.0, 150.0), r'$t_{\mathrm{p}}$'),
             _P('sigma_p', 'sigma_gauss', 15.0, (5.0, 40.0), r'$\sigma_{\mathrm{p}}$'),
@@ -469,7 +564,7 @@ IA_MODEL_SPECS = {
         ia_rate_powerlaw_gauss,
         [
             _LOG10_NIA, _TDD,
-            _P('log10_a_long', 'a_gauss', -9.0, (-12.0, -7.0),
+            _P('log10_a_long', 'a_gauss', -9.0, (-12.0, -6.0),
                r'$\log_{10} A_{\mathrm{L}}$', log=True),
             _P('t_long', 't_gauss', 10000.0, (5000.0, 13000.0), r'$t_{\mathrm{L}}$'),
             _P('sigma_long', 'sigma_gauss', 1500.0, (500.0, 3000.0), r'$\sigma_{\mathrm{L}}$'),
@@ -509,6 +604,24 @@ IA_MODEL_SPECS = {
             _TIA,
         ],
         ['log10_n_ia', 't_dd', 't_kink', 't_dd2', 'log10_a_prompt', 't_p', 't_ia'],
+        _kink_breakpoints,
+    ),
+    # M9: skewed Gaussian peak, then a slowly exponentially GROWING tail once the peak is over.
+    # Samples the peak amplitude, width and skew and the growth exponent; the peak location t_peak
+    # is held fixed (at 100 Myr, a prompt-channel delay) unless it is added to sampled_params.
+    'peak_growth': IaModelSpec(
+        ia_rate_peak_growth,
+        [
+            _LOG10_NIA,  # height of the growing tail where it switches on
+            _P('log10_a_peak', 'a_peak', -5.0, (-9.0, -3.0),
+               r'$\log_{10} A_{\mathrm{pk}}$', log=True),
+            _P('sigma_peak', 'sigma_peak', 30.0, (10.0, 200.0), r'$\sigma_{\mathrm{pk}}$'),
+            _P('skew_peak', 'skew', 0.0, (-5.0, 5.0), r'$\alpha_{\mathrm{pk}}$'),
+            _P('k_grow', 'k_grow', 0.1, (0.0, 0.3), r'$k_{\mathrm{grow}}$'),
+            _P('t_peak', 't_peak', 100.0, (40.0, 500.0), r'$t_{\mathrm{pk}}$'),
+        ],
+        ['log10_n_ia', 'log10_a_peak', 'sigma_peak', 'skew_peak', 'k_grow'],
+        lambda kw: [peak_tail_end(kw['t_peak'], kw['sigma_peak'], kw['skew'])],
     ),
     # Mannucci (FIRE-2) prompt-Gaussian Ia rate, kept for backward compatibility
     'mannucci': IaModelSpec(
@@ -519,6 +632,21 @@ IA_MODEL_SPECS = {
             _TDD,
         ],
         ['log10_n_ia', 't_dd'],
+    ),
+    # M10: Mannucci et al. (2006) prompt + tardy two-population DTD with a FREE shape: the prompt
+    # Gaussian's amplitude (-> prompt share of the events), center and width.  Its fiducial is
+    # exactly the FIRE-2 'mannucci' rate above; the tardy component is a constant.
+    'mannucci_prompt': IaModelSpec(
+        ia_rate_mannucci_prompt,
+        [
+            _P('log10_n_ia', 'n_ia', 0.0, (-1.0, 1.0),  # tardy constant, in FIRE-2 units
+               r'$\log_{10} n_{\mathrm{Ia}}$', log=True),
+            _P('log10_a_prompt', 'a_prompt', float(np.log10(MANNUCCI_PROMPT)), (-7.0, -3.0),
+               r'$\log_{10} A_{\mathrm{p}}$', log=True),
+            _P('t_p', 't_p', MANNUCCI_T_PROMPT, (40.0, 150.0), r'$t_{\mathrm{p}}$'),
+            _P('sigma_p', 'sigma_p', MANNUCCI_SIGMA_PROMPT, (5.0, 40.0), r'$\sigma_{\mathrm{p}}$'),
+        ],
+        ['log10_n_ia', 'log10_a_prompt', 't_p', 'sigma_p'],
     ),
 }
 
@@ -548,7 +676,7 @@ def model_prior(ia_model, sampled_params=None):
     spec = IA_MODEL_SPECS[ia_model]
     names = list(sampled_params) if sampled_params is not None else list(spec.default_sampled)
     by_name = {p.sample: p for p in spec.params}
-    bounds = np.array([by_name[n].bounds for n in names], dtype=float)
+    bounds = np.array([by_name[n].bounds for n in names], dtype=float).reshape(-1, 2)
     labels = [by_name[n].label for n in names]
     fiducial = np.array([by_name[n].default for n in names], dtype=float)
     return names, bounds, labels, fiducial
@@ -732,15 +860,17 @@ class MaozElementTracerModel:
             Defaults to the model's default_sampled in IA_MODEL_SPECS.  Any DTD family and
             parameter subset registered there is supported (see model_prior).
         conserve_events : float or None
-            if set, the Ia normalization n_ia is NOT taken from the parameters but is DERIVED at
-            every evaluation so that the total number of Ia events -- i.e. the delay-time
-            distribution integrated over [t_ia, t_hubble] -- always equals this value.  This makes
-            a change of DTD *shape* (e.g. the slope t_dd or the onset t_ia) a genuine
-            redistribution of a FIXED number of explosions in time, matching the simulation's
-            ground truth that a definite number of Ia events actually occur.  Only meaningful for
-            DTD families in which n_ia is a pure multiplicative normalization (maoz, exponential,
-            skewnorm, kink); with it set, 'log10_n_ia' should be left OUT of sampled_params.
-            Use dtd_event_count() to compute a fiducial value to conserve.
+            if set, the overall Ia normalization is NOT taken from the parameters but is DERIVED at
+            every evaluation: all amplitude parameters (n_ia and any bump heights) are rescaled by
+            one common factor so that the total number of Ia events -- the delay-time distribution
+            integrated over [t_ia, t_hubble] -- always equals this value.  A change of DTD *shape*
+            is then a genuine redistribution of a FIXED number of explosions in time, matching the
+            simulation's ground truth that a definite number of Ia events actually occur.  For
+            single-amplitude DTDs (maoz, kink, skewnorm, exponential) this is the same as deriving
+            n_ia; for DTDs with an added bump (prompt_delayed, long_delay, peak_growth) a sampled
+            bump amplitude sets the bump's SHARE of the fixed events.  With it set, 'log10_n_ia'
+            should be left OUT of sampled_params.  Use dtd_event_count() to compute a fiducial
+            value to conserve, and dtd_component_fraction() for the bump's share.
         t_hubble : float
             upper age limit [Myr] for the event-conservation integral (default 13700).
         abundance_offset : (float, float) or None
@@ -836,26 +966,33 @@ class MaozElementTracerModel:
                 value = p.default
             ia_kwargs[p.kwarg] = (10.0 ** value) if p.log else value
         if self.conserve_events is not None:
-            # derive n_ia so the DTD integrated over [t_ia, t_hubble] equals the fixed event total
-            ia_kwargs['n_ia'] = self.conserve_events / self._event_integral_per_norm(
-                ia_rate_fn, ia_kwargs
-            )
+            # rescale ALL amplitudes (n_ia and any bump heights) by one common factor so the DTD
+            # integrated over [t_ia, t_hubble] equals the fixed event total.  The rate is linear in
+            # each amplitude, so this fixes the overall normalization while leaving the shape --
+            # including how the events are shared between components -- to the other parameters.
+            scale = self.conserve_events / self._event_integral(ia_rate_fn, ia_kwargs)
+            for p in spec.params:
+                if p.amplitude:
+                    ia_kwargs[p.kwarg] *= scale
         ia_breakpoints = [ia_kwargs.get('t_ia', self.ia_transition)]
-        if 't_kink' in ia_kwargs:
-            ia_breakpoints.append(ia_kwargs['t_kink'])
+        if spec.breakpoints is not None:
+            ia_breakpoints += list(spec.breakpoints(ia_kwargs))
         return ia_rate_fn, ia_kwargs, ia_breakpoints
 
-    def _event_integral_per_norm(self, ia_rate_fn, ia_kwargs, n_grid=6000):
+    def _event_integral(self, ia_rate_fn, ia_kwargs, n_grid=6000):
         '''
-        Integral of the Ia rate over [t_ia, t_hubble] evaluated at n_ia = 1 -- i.e. the total Ia
-        mass-loss (proportional to the number of events, since each ejects a fixed mass) per unit
-        normalization.  Assumes n_ia is a pure multiplicative factor of the rate.
+        Integral of the Ia rate over [t_ia, t_hubble] -- the total Ia mass-loss, proportional to the
+        number of events since each ejects a fixed mass.  The grid includes the model's breakpoints
+        so a step in the rate (e.g. where the peak_growth tail switches on) is integrated exactly.
         '''
         t_ia = ia_kwargs.get('t_ia', self.ia_transition)
         grid = np.geomspace(max(t_ia, 1e-2), self.t_hubble, n_grid)
-        kwargs = dict(ia_kwargs)
-        kwargs['n_ia'] = 1.0
-        return _trapz(ia_rate_fn(grid, **kwargs), grid)
+        spec = IA_MODEL_SPECS[self.ia_model]
+        if spec.breakpoints is not None:
+            extra = [b * f for b in spec.breakpoints(ia_kwargs) if t_ia < b < self.t_hubble
+                     for f in (1 - 1e-9, 1.0, 1 + 1e-9)]
+            grid = np.unique(np.concatenate([grid, extra]))
+        return _trapz(ia_rate_fn(grid, **ia_kwargs), grid)
 
     def dtd_event_count(self, theta):
         '''
@@ -865,9 +1002,19 @@ class MaozElementTracerModel:
         count stays fixed as the DTD shape is varied.
         '''
         ia_rate_fn, ia_kwargs, _ = self._ia_kwargs_from_params(self.params_from_theta(theta))
-        t_ia = ia_kwargs.get('t_ia', self.ia_transition)
-        grid = np.geomspace(max(t_ia, 1e-2), self.t_hubble, 6000)
-        return _trapz(ia_rate_fn(grid, **ia_kwargs), grid)
+        return self._event_integral(ia_rate_fn, ia_kwargs)
+
+    def dtd_component_fraction(self, theta, component='n_ia'):
+        '''
+        Fraction of the Ia events carried by everything EXCEPT the `component` amplitude (default:
+        the main n_ia term) -- e.g. the share of events in the prompt or long-delay bump, or in the
+        peak of peak_growth.  0 for single-amplitude DTDs.
+        '''
+        ia_rate_fn, ia_kwargs, _ = self._ia_kwargs_from_params(self.params_from_theta(theta))
+        total = self._event_integral(ia_rate_fn, ia_kwargs)
+        rest = dict(ia_kwargs)
+        rest[component] = 0.0
+        return self._event_integral(ia_rate_fn, rest) / total
 
     def yields(self, params):
         '''
@@ -887,7 +1034,7 @@ class MaozElementTracerModel:
                 self.age_bins, element_names=self.element_names, continuous=True
             )
 
-        ia_yield_source = 'mannucci' if self.ia_model == 'mannucci' else 'ia'
+        ia_yield_source = 'mannucci' if self.ia_model.startswith('mannucci') else 'ia'
         return fast_element_yields(
             self.age_bins, self.element_names,
             ia_rate_fn=ia_rate_fn, ia_kwargs=ia_kwargs, ia_breakpoints=tuple(ia_breakpoints),
@@ -930,13 +1077,19 @@ class MaozElementTracerModel:
         '''
         Return ([Fe/H], [X/Fe]) arrays (one value per star) for parameter vector theta.
         Applies the constant abundance_offset (if set) to align onto an external data zero-point.
+        The offset can instead be SAMPLED as a calibration nuisance parameter by including
+        'd_feh' and/or 'd_xfe' in sampled_params; a sampled value overrides abundance_offset.
         '''
         feh, xfe = massfractions_to_abundances(
             self.massfractions(theta), self.sun_massfraction, self.xfe
         )
-        if self.abundance_offset is not None:
-            feh = feh + self.abundance_offset[0]
-            xfe = xfe + self.abundance_offset[1]
+        params = self.params_from_theta(theta)
+        base = self.abundance_offset if self.abundance_offset is not None else (0.0, 0.0)
+        d_feh = params.get('d_feh', base[0])
+        d_xfe = params.get('d_xfe', base[1])
+        if d_feh or d_xfe:
+            feh = feh + d_feh
+            xfe = xfe + d_xfe
         return feh, xfe
 
     def mean_abundances(self, theta):
@@ -1437,6 +1590,15 @@ def summarize_chain(flat_chain, truths=None, labels=('log10 n_ia', 't_dd')):
     return summary
 
 
+def _element_label(element):
+    '''Axis-label symbol for an [X/Fe] numerator: 'alpha' stays as-is, element names -> symbols.'''
+    if element == 'alpha':
+        return 'alpha'
+    symbols = {'oxygen': 'O', 'magnesium': 'Mg', 'silicon': 'Si', 'calcium': 'Ca', 'sulfur': 'S',
+               'neon': 'Ne', 'carbon': 'C', 'nitrogen': 'N', 'iron': 'Fe'}
+    return symbols.get(element, element.capitalize())
+
+
 # --------------------------------------------------------------------------------------------------
 # Plotting helpers (matplotlib optional)
 # --------------------------------------------------------------------------------------------------
@@ -1453,7 +1615,7 @@ def plot_data_and_model(model, data, theta, path=None, xfe_label=None):
 
     feh_model, xfe_model = model.abundances(theta)
     if xfe_label is None:
-        xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
+        xfe_label = _element_label(model.xfe)
 
     fig, ax = plt.subplots(figsize=(7, 5.5))
     ax.scatter(data['feh'], data['xfe'], s=10, alpha=0.4, color='0.5', label='mock data')
@@ -1566,6 +1728,9 @@ def animate_mcmc_walkers(
     rate_fiducial_theta=None,
     rate_ages=None,
     rate_ylim=(1e-12, 1e-3),
+    frame_steps=None,
+    truth_label='truth',
+    title=None,
 ):
     '''
     Render an mp4 movie of the MCMC walkers evolving (post-processing), for a model with
@@ -1599,6 +1764,14 @@ def animate_mcmc_walkers(
     bounds : array (ndim, 2) or None
         axis limits per parameter; defaults to the chain range (padded)
     fps, burn, stride, dpi : movie/rendering controls (see run_mcmc / earlier docs)
+    title : str or None
+        optional prefix for the per-frame title (e.g. the model name)
+    truth_label : str
+        legend label for the `truths` curve in the Ia-rate panel (e.g. 'reference' when fitting
+        real data, where there is no ground truth)
+    frame_steps : sequence of int or None
+        explicit chain steps (1..n_step) to render as frames, overriding `stride`; e.g.
+        log-spaced steps to linger on early convergence and skim the long equilibrated tail
     model : MaozElementTracerModel or None
         if given, add the evolving abundance panel and Ia-rate panel
     data : dict or None
@@ -1654,7 +1827,7 @@ def animate_mcmc_walkers(
     summary_mode = model is not None and target_summary is not None
     show_rate = model is not None and hasattr(model, 'ia_rate')
     if show_ab:
-        xfe_label = 'alpha' if model.xfe == 'alpha' else model.xfe.capitalize()
+        xfe_label = _element_label(model.xfe)
         has_label = data is not None and 'label' in data
         if has_label:
             hi_mask = data['label'] == 1
@@ -1727,7 +1900,10 @@ def animate_mcmc_walkers(
         ax_co = [[fig.add_subplot(gs_co[i, j]) if i >= j else None for j in range(ndim)]
                  for i in range(ndim)]
 
-    frames = list(range(1, n_step + 1, stride))
+    if frame_steps is not None:
+        frames = sorted({int(min(max(f, 1), n_step)) for f in frame_steps})
+    else:
+        frames = list(range(1, n_step + 1, stride))
     if frames[-1] != n_step:
         frames.append(n_step)
     x_all = np.arange(n_step)
@@ -1811,8 +1987,9 @@ def animate_mcmc_walkers(
                         ax_ab.scatter(feh_m[~hi_mask], xfe_m[~hi_mask], s=7,
                                       color='lightskyblue', alpha=0.35)
                     else:
-                        ax_ab.scatter(feh_m, xfe_m, s=7, color='0.6', alpha=0.35)
-                    ax_ab.scatter([], [], s=20, color='0.55', label='simulation')
+                        ax_ab.scatter(feh_m, xfe_m, s=7, color='darkorange', alpha=0.35)
+                    ax_ab.scatter([], [], s=20, color='0.55' if has_label else 'darkorange',
+                                  label='simulation')
                     sim_summary = fit_bimodal_gaussians(feh_m, xfe_m)
                     _draw_dual_gaussian(ax_ab, sim_summary, n_sigma=2,
                                         colors=('darkred', 'navy'), ls='-', lw=1.8,
@@ -1852,7 +2029,7 @@ def animate_mcmc_walkers(
                                    label='fiducial')
                 if rate_true is not None:
                     ax_rate.loglog(rate_ages, np.maximum(rate_true, 1e-30), 'k--', lw=1.4,
-                                   label='truth')
+                                   label=truth_label)
                 cur_rate = model.ia_rate(rate_ages, median)
                 ax_rate.loglog(rate_ages, np.maximum(cur_rate, 1e-30), color='crimson', lw=2.2,
                                label='current median')
@@ -1864,7 +2041,9 @@ def animate_mcmc_walkers(
                 ax_rate.legend(loc='lower left', fontsize=8, frameon=False)
                 ax_rate.grid(ls=':', alpha=0.4, which='both')
 
-            fig.suptitle('MCMC step {} / {}'.format(f, n_step), fontsize=13)
+            step_title = 'MCMC step {} / {}'.format(f, n_step)
+            fig.suptitle(step_title if title is None else '{}  --  {}'.format(title, step_title),
+                         fontsize=13)
 
             fig.canvas.draw()
             frame = np.asarray(fig.canvas.buffer_rgba())[..., :3]
