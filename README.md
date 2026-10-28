@@ -59,6 +59,9 @@ We develop this package using python 3.9 and recommend that you use it with this
 * includes Mannucci et al. (2006) in two forms: `mannucci`, the FIRE-2 rate (constant tardy component + prompt Gaussian at 50 Myr) with its shape fixed, so only the zero-point is fitted; and `mannucci_prompt` (`ia_rate_mannucci_prompt`), the same two-component form with the prompt amplitude (its share of the events), center and width fitted
 * includes the new `peak_growth` DTD (`ia_rate_peak_growth`): a skewed Gaussian peak (amplitude, width and skew fitted; location held at 100 Myr) followed, once the peak has fallen to 1% of its maximum, by a slowly exponentially growing tail whose exponent `k_grow` is fitted
 
+## fire_m09_stars.py
+* load the star particles of the public FIRE-2 ultra-faint dwarf m09_res30 at z = 0 (all 1349, committed as a stars-only snapshot in `data/fire2_m09_res30/`, provenance in `data/fire2_m09_res30/PROVENANCE.md`) with `gizmo_io`, select the host galaxy (within 4 stellar half-mass radii of a shrinking-sphere centre) and set aside stars at the metallicity floor, then plot [Mg/Fe] and [O/Fe] vs [Fe/H] coloured by age with the core-collapse yield plateau, the metallicity distribution and the formation history (run `python fire_m09_stars.py`; figure in `results/fire2_m09_res30/`). This run has no age-tracers, so the abundances are the in-code FIRE-2 values
+
 ## gizmo_track.py
 * track star and gas particles across snapshots
 
